@@ -13,7 +13,9 @@ import { consume } from './ratelimit';
  * of "no such paper" is remembered, so crawling made-up ids cannot reach the source.
  */
 
-const MISS_TTL_DAYS = 7;
+/** Short, because arXiv's API can lag behind a paper's announcement by hours. */
+const MISS_TTL_DAYS = 1;
+const MAX_WAIT_SECONDS = 6;
 const MERGE_DEPTH_LIMIT = 8;
 /** Serializes making rows, so that two identifiers of one paper cannot both make one. */
 const CREATE_LOCK = 7_210_001;
@@ -102,29 +104,30 @@ export async function savePaper(source: SourcePaper, database: Database = getDb(
   });
 }
 
-/** The paper for an identifier in normal form, asking its source if we have never seen it. */
-export async function lookupPaper(id: PaperId, options: Options = {}): Promise<PaperLookup> {
-  const database = options.database ?? getDb();
+/**
+ * Asks in flight, so that a page's metadata and body, or two readers of one new paper, share one
+ * request. If Next loads this module twice the budget still holds, and the waiter finds the row.
+ */
+const inFlight = new Map<string, Promise<PaperLookup>>();
+
+function sleep(ms: number): Promise<void> {
+  return new Promise((resolve) => setTimeout(resolve, ms));
+}
+
+async function askSource(id: PaperId, source: PaperSource, database: Database): Promise<PaperLookup> {
+  let budget = await consume(`paper-source:${source.name}`, source.budget, getPool());
+  // A short wait beats an error page: arXiv allows only one request every three seconds.
+  for (let waited = 0; !budget.allowed && waited + budget.retryAfterSeconds <= MAX_WAIT_SECONDS;) {
+    const seconds = budget.retryAfterSeconds;
+    await sleep(seconds * 1000);
+    waited += seconds;
+    budget = await consume(`paper-source:${source.name}`, source.budget, getPool());
+  }
+  if (!budget.allowed) return { status: 'unavailable', retryAfterSeconds: Math.ceil(budget.retryAfterSeconds) };
+
+  // Someone else may have fetched it during the wait.
   const known = await findPaper(id, database);
   if (known) return { status: 'found', ...known };
-
-  const source = (options.sources ?? PAPER_SOURCES)[id.scheme];
-  if (!source) return { status: 'missing' };
-
-  const [miss] = await database
-    .select({ value: paperLookupMisses.value })
-    .from(paperLookupMisses)
-    .where(
-      and(
-        eq(paperLookupMisses.scheme, id.scheme),
-        eq(paperLookupMisses.value, id.value),
-        gt(paperLookupMisses.expiresAt, new Date()),
-      ),
-    );
-  if (miss) return { status: 'missing' };
-
-  const budget = await consume(`paper-source:${source.name}`, source.budget, getPool());
-  if (!budget.allowed) return { status: 'unavailable', retryAfterSeconds: Math.ceil(budget.retryAfterSeconds) };
 
   let described: SourcePaper | null;
   try {
@@ -147,4 +150,33 @@ export async function lookupPaper(id: PaperId, options: Options = {}): Promise<P
   // A source that answers for an identifier but does not list it is a bug in its adapter.
   if (!saved) throw new Error(`source ${source.name} did not return ${id.scheme}:${id.value}`);
   return { status: 'found', ...saved };
+}
+
+/** The paper for an identifier in normal form, asking its source if we have never seen it. */
+export async function lookupPaper(id: PaperId, options: Options = {}): Promise<PaperLookup> {
+  const database = options.database ?? getDb();
+  const known = await findPaper(id, database);
+  if (known) return { status: 'found', ...known };
+
+  const source = (options.sources ?? PAPER_SOURCES)[id.scheme];
+  if (!source) return { status: 'missing' };
+
+  const [miss] = await database
+    .select({ value: paperLookupMisses.value })
+    .from(paperLookupMisses)
+    .where(
+      and(
+        eq(paperLookupMisses.scheme, id.scheme),
+        eq(paperLookupMisses.value, id.value),
+        gt(paperLookupMisses.expiresAt, new Date()),
+      ),
+    );
+  if (miss) return { status: 'missing' };
+
+  const key = `${source.name}:${id.scheme}:${id.value}`;
+  const pending = inFlight.get(key);
+  if (pending) return pending;
+  const asked = askSource(id, source, database).finally(() => inFlight.delete(key));
+  inFlight.set(key, asked);
+  return asked;
 }

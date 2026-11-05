@@ -73,6 +73,25 @@ describe('looking up a paper', () => {
     expect(arxiv.calls()).toBe(1);
   });
 
+  it('waits briefly for the budget rather than failing', async () => {
+    const arxiv = fakeSource(async () => null);
+    arxiv.budget = { burst: 1, perSecond: 2 };
+    await lookupPaper(ID, { sources: { arxiv } });
+    const second = await lookupPaper({ scheme: 'arxiv', value: '1706.03763' }, { sources: { arxiv } });
+    expect(second.status).toBe('missing');
+    expect(arxiv.calls()).toBe(2);
+  });
+
+  it('asks once for concurrent requests about one new paper', async () => {
+    const arxiv = fakeSource(async () => ATTENTION, 1);
+    const results = await Promise.all([
+      lookupPaper(ID, { sources: { arxiv } }),
+      lookupPaper(ID, { sources: { arxiv } }),
+    ]);
+    expect(results.map((r) => r.status)).toEqual(['found', 'found']);
+    expect(arxiv.calls()).toBe(1);
+  });
+
   it('has no source for OpenReview: only an import adds those', async () => {
     expect((await lookupPaper({ scheme: 'openreview', value: 'abcdefgh' })).status).toBe('missing');
   });
