@@ -1,6 +1,7 @@
 import { sql } from 'drizzle-orm';
 import {
   type AnyPgColumn,
+  bigint,
   boolean,
   check,
   customType,
@@ -207,4 +208,115 @@ export const paperLookupMisses = pgTable(
     expiresAt: timestamp('expires_at', { withTimezone: true, mode: 'date' }).notNull(),
   },
   (t) => [primaryKey({ columns: [t.scheme, t.value] })],
+);
+
+const bytea = customType<{ data: Buffer; driverData: Buffer }>({ dataType: () => 'bytea' });
+
+/**
+ * The stable pseudonym in the commits of an account (DESIGN.md §4.4), such as `u_7k3xq2mf`. **Private:**
+ * git shows only `id`, and this table is what ties it to a person. Deleting an account clears the link
+ * and leaves history as it was.
+ */
+export const commitIdentities = pgTable(
+  'commit_identities',
+  {
+    id: text('id').primaryKey(),
+    accountId: uuid('account_id').references(() => accounts.id, { onDelete: 'set null' }),
+    createdAt: createdAt(),
+  },
+  (t) => [uniqueIndex('commit_identities_account_key').on(t.accountId)],
+);
+
+/**
+ * A page's git repository: real blobs, trees and commits as rows (DESIGN.md §4.1). `oid` is the SHA-1 git
+ * would compute, and `body` the object without git's `<type> <size>\0` header. Written only by
+ * `server/pages/commit.ts`.
+ */
+export const pageObjects = pgTable(
+  'page_objects',
+  {
+    paperId: uuid('paper_id')
+      .notNull()
+      .references(() => papers.id, { onDelete: 'cascade' }),
+    oid: bytea('oid').notNull(),
+    type: text('type', { enum: ['blob', 'tree', 'commit'] }).notNull(),
+    body: bytea('body').notNull(),
+  },
+  (t) => [
+    primaryKey({ columns: [t.paperId, t.oid] }),
+    check('page_objects_type_check', sql`${t.type} in ('blob', 'tree', 'commit')`),
+  ],
+);
+
+/** The only mutable part of a repo: `refs/heads/main`. A paper nobody has edited has no row (§4.2). */
+export const pageRefs = pgTable('page_refs', {
+  paperId: uuid('paper_id')
+    .primaryKey()
+    .references(() => papers.id, { onDelete: 'cascade' }),
+  head: bytea('head').notNull(),
+});
+
+/**
+ * A projection: one row per commit on `main`, oldest first. `scripts/rebuild-page-projections.ts` makes
+ * it again from the objects and `commit_identities`. **`account_id` is private**: public reads return
+ * `author_id`, as the commit itself does.
+ */
+export const pageRevisions = pgTable(
+  'page_revisions',
+  {
+    paperId: uuid('paper_id')
+      .notNull()
+      .references(() => papers.id, { onDelete: 'cascade' }),
+    seq: integer('seq').notNull(),
+    oid: bytea('oid').notNull(),
+    authorId: text('author_id').notNull(),
+    accountId: uuid('account_id').references(() => accounts.id, { onDelete: 'set null' }),
+    kind: text('kind', { enum: ['edit', 'revert'] }).notNull(),
+    summary: text('summary').notNull(),
+    paths: text('paths').array().notNull(),
+    bytesDelta: integer('bytes_delta').notNull(),
+    at: timestamp('at', { withTimezone: true, mode: 'date' }).notNull(),
+  },
+  (t) => [
+    primaryKey({ columns: [t.paperId, t.seq] }),
+    uniqueIndex('page_revisions_oid_key').on(t.paperId, t.oid),
+    index('page_revisions_account_idx').on(t.accountId),
+    check('page_revisions_kind_check', sql`${t.kind} in ('edit', 'revert')`),
+  ],
+);
+
+/**
+ * A projection: what a page says at its head, so that reading one never touches git objects (§4.5). The
+ * Markdown is stored as written: rendering it to sanitized HTML at commit comes with the editor (Milestone 3).
+ */
+export const pageCurrent = pgTable('page_current', {
+  paperId: uuid('paper_id')
+    .primaryKey()
+    .references(() => papers.id, { onDelete: 'cascade' }),
+  head: bytea('head').notNull(),
+  authorMarkdown: text('author_markdown'),
+  communityMarkdown: text('community_markdown'),
+  resources: jsonb('resources').$type<Record<string, unknown>>(),
+  updatedAt: timestamp('updated_at', { withTimezone: true, mode: 'date' }).notNull(),
+});
+
+/**
+ * The event outbox (§10): one row per commit, in the commit's transaction, for feeds, webhooks and
+ * extensions to read. **Not a projection**, since consumers remember how far they have read, so a rebuild
+ * leaves it alone. The payload is public, so it never holds an account id. `id`s are handed out before
+ * commit, so a reader that keeps a cursor must allow for a lower id appearing late; per page, `seq` is exact.
+ */
+export const pageEvents = pgTable(
+  'page_events',
+  {
+    id: bigint('id', { mode: 'number' }).primaryKey().generatedAlwaysAsIdentity(),
+    paperId: uuid('paper_id')
+      .notNull()
+      .references(() => papers.id, { onDelete: 'cascade' }),
+    seq: integer('seq').notNull(),
+    type: text('type').notNull(),
+    payload: jsonb('payload').$type<Record<string, unknown>>().notNull(),
+    createdAt: createdAt(),
+  },
+  (t) => [uniqueIndex('page_events_paper_seq_key').on(t.paperId, t.seq)],
 );

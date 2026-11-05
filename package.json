@@ -16,12 +16,15 @@
     "users:prune": "tsx scripts/prune-unconfirmed-users.ts",
     "admin:password": "tsx scripts/set-admin-password.ts",
     "papers:import-iclr": "tsx scripts/import-iclr.ts",
+    "pages:edit": "tsx scripts/edit-page.ts",
+    "pages:rebuild": "tsx scripts/rebuild-page-projections.ts",
     "institutions:build": "NODE_OPTIONS=--max-old-space-size=4096 tsx scripts/build-institution-domains.ts",
     "format": "prettier --write .",
     "format:check": "prettier --check ."
   },
   "dependencies": {
     "better-auth": "^1.7.6",
+    "diff": "^9.0.0",
     "drizzle-orm": "^0.45.3",
     "fast-xml-parser": "^5.12.0",
     "input-otp": "^1.5.0",

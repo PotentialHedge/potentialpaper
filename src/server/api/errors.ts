@@ -24,6 +24,9 @@ export const API_ERROR_CODES = [
   'institution_already_listed',
   'domain_not_institutional',
   'source_unavailable',
+  'edit_conflict',
+  'paper_merged',
+  'page_busy',
   'method_not_allowed',
   'internal_error',
 ] as const;
