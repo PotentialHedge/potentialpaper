@@ -1,0 +1,100 @@
+# Runs behind the host's shared Traefik, which owns :80/:443 and admits only Cloudflare. This file
+# publishes no ports: `app` joins the external `web` network and is routed by its labels alone.
+# APP_HOST in .env.production names the host, so one file serves staging and production: use a
+# different project name (`-p papertrail-staging`) and env file for each.
+#
+# Deploy (commit first: the image is tagged with HEAD's commit):
+#   test -z "$(git status --porcelain)" && export GIT_COMMIT=$(git rev-parse --short HEAD)
+#   docker compose -f docker-compose.prod.yml --env-file .env.production --profile tools build
+#   docker compose -f docker-compose.prod.yml --env-file .env.production up -d postgres
+#   docker compose -f docker-compose.prod.yml --env-file .env.production run --rm tools
+#   docker compose -f docker-compose.prod.yml --env-file .env.production up -d app
+#
+# Migrations are their own step, never run at app start. `build` needs --profile tools: without it
+# the tools image goes stale and migrate silently applies nothing new.
+
+name: papertrail
+
+x-logging: &logging
+  driver: json-file
+  options:
+    max-size: '10m'
+    max-file: '5'
+
+services:
+  postgres:
+    image: postgres:16
+    restart: unless-stopped
+    logging: *logging
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+      POSTGRES_DB: ${POSTGRES_DB}
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ['CMD-SHELL', 'pg_isready -U $${POSTGRES_USER} -d $${POSTGRES_DB}']
+      interval: 30s
+      timeout: 5s
+      retries: 20
+
+  app:
+    build:
+      context: .
+      target: app
+      args:
+        GIT_COMMIT: ${GIT_COMMIT:-unknown}
+    image: papertrail-app:${GIT_COMMIT:-latest}
+    restart: unless-stopped
+    logging: *logging
+    env_file: .env.production
+    depends_on:
+      postgres:
+        condition: service_healthy
+    networks:
+      - default
+      - web
+    healthcheck:
+      test:
+        [
+          'CMD',
+          'node',
+          '-e',
+          "fetch('http://127.0.0.1:3000/healthz').then(r=>process.exit(r.ok?0:1),()=>process.exit(1))",
+        ]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 20s
+    labels:
+      - traefik.enable=true
+      - traefik.docker.network=web
+      - traefik.http.routers.${COMPOSE_PROJECT_NAME:-papertrail}.rule=Host(`${APP_HOST}`)
+      - traefik.http.routers.${COMPOSE_PROJECT_NAME:-papertrail}.entrypoints=websecure
+      - traefik.http.routers.${COMPOSE_PROJECT_NAME:-papertrail}.tls=true
+      - traefik.http.routers.${COMPOSE_PROJECT_NAME:-papertrail}.middlewares=${COMPOSE_PROJECT_NAME:-papertrail}-ratelimit
+      - traefik.http.services.${COMPOSE_PROJECT_NAME:-papertrail}.loadbalancer.server.port=3000
+      # Anonymous traffic is the edge's job, keyed on the real client IP, which is trustworthy
+      # because only Cloudflare can reach this origin.
+      - traefik.http.middlewares.${COMPOSE_PROJECT_NAME:-papertrail}-ratelimit.ratelimit.average=${RATE_LIMIT_AVERAGE:-30}
+      - traefik.http.middlewares.${COMPOSE_PROJECT_NAME:-papertrail}-ratelimit.ratelimit.burst=${RATE_LIMIT_BURST:-60}
+      - traefik.http.middlewares.${COMPOSE_PROJECT_NAME:-papertrail}-ratelimit.ratelimit.period=1s
+      - traefik.http.middlewares.${COMPOSE_PROJECT_NAME:-papertrail}-ratelimit.ratelimit.sourcecriterion.requestheadername=Cf-Connecting-Ip
+
+  tools:
+    build:
+      context: .
+      target: tools
+    image: papertrail-tools
+    profiles: [tools]
+    env_file: .env.production
+    depends_on:
+      postgres:
+        condition: service_healthy
+
+volumes:
+  pgdata:
+
+networks:
+  web:
+    external: true

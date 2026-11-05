@@ -1,0 +1,17 @@
+/node_modules
+/coverage
+/.next/
+/out/
+/build
+.DS_Store
+*.pem
+npm-debug.log*
+# env files - never commit a filled one; the *.example files are checked in
+.env*
+!.env.example
+!.env.production.example
+*.tsbuildinfo
+next-env.d.ts
+# downloaded sources for scripts/build-institution-domains.ts
+/.cache/
+.claude/

@@ -1,0 +1,54 @@
+import type { NextConfig } from 'next';
+import { PRIVATE_PAGES } from './src/lib/private-paths';
+
+const dev = process.env.NODE_ENV !== 'production';
+
+/**
+ * The content security policy, on every response. Scripts keep `'unsafe-inline'` because Next's inline
+ * bootstrap scripts otherwise need a per-request nonce, and a nonce makes every page dynamic, which
+ * rules out caching pages at the edge (DESIGN.md §2). Everything else is closed: scripts only from this
+ * origin and inline, no frames, nothing fetched elsewhere, and no plugin, base or form tricks. User
+ * content is sanitized when committed, so this is the second lock, not the first.
+ */
+const CSP = [
+  "default-src 'self'",
+  `script-src 'self' 'unsafe-inline'${dev ? " 'unsafe-eval'" : ''}`,
+  "style-src 'self' 'unsafe-inline'",
+  "img-src 'self' data: https:",
+  "font-src 'self'",
+  `connect-src 'self'${dev ? ' ws:' : ''}`,
+  "frame-src 'none'",
+  "object-src 'none'",
+  "base-uri 'self'",
+  "form-action 'self'",
+  "frame-ancestors 'none'",
+].join('; ');
+
+const nextConfig: NextConfig = {
+  // No `X-Powered-By: Next.js`: it tells a scanner which advisories to try.
+  poweredByHeader: false,
+  async redirects() {
+    // A guessed address: there is no sign-up page of that name.
+    return [{ source: '/signup', destination: '/welcome', permanent: false }];
+  },
+  async headers() {
+    return [
+      {
+        source: '/:path*',
+        headers: [
+          { key: 'Content-Security-Policy', value: CSP },
+          { key: 'X-Content-Type-Options', value: 'nosniff' },
+          { key: 'Referrer-Policy', value: 'strict-origin-when-cross-origin' },
+        ],
+      },
+      ...PRIVATE_PAGES.map((source) => ({
+        source,
+        headers: [{ key: 'X-Robots-Tag', value: 'noindex, nofollow' }],
+      })),
+    ];
+  },
+  // Not optional: the production image copies .next/standalone and is far smaller than a full install.
+  output: 'standalone',
+};
+
+export default nextConfig;

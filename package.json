@@ -1,0 +1,49 @@
+{
+  "name": "papertrail",
+  "version": "0.1.0",
+  "private": true,
+  "scripts": {
+    "dev": "next dev",
+    "build": "next build",
+    "start": "next start",
+    "lint": "eslint",
+    "typecheck": "tsc --noEmit",
+    "test": "vitest run tests/unit --passWithNoTests",
+    "test:integration": "vitest run tests/integration --passWithNoTests",
+    "test:all": "vitest run --passWithNoTests",
+    "db:generate": "drizzle-kit generate",
+    "db:migrate": "tsx src/db/migrate.ts",
+    "users:prune": "tsx scripts/prune-unconfirmed-users.ts",
+    "institutions:build": "NODE_OPTIONS=--max-old-space-size=4096 tsx scripts/build-institution-domains.ts",
+    "format": "prettier --write .",
+    "format:check": "prettier --check ."
+  },
+  "dependencies": {
+    "better-auth": "^1.7.6",
+    "drizzle-orm": "^0.45.3",
+    "input-otp": "^1.5.0",
+    "next": "16.4.5",
+    "pg": "^8.23.0",
+    "react": "19.3.0",
+    "react-dom": "19.3.0",
+    "resend": "^6.31.0",
+    "zod": "^4.6.5"
+  },
+  "devDependencies": {
+    "@tailwindcss/postcss": "^4",
+    "@types/node": "^26.6.3",
+    "@types/pg": "^8.23.1",
+    "@types/react": "^19",
+    "@types/react-dom": "^19",
+    "dotenv": "^18.0.4",
+    "drizzle-kit": "^0.31.11",
+    "eslint": "^9.39.5",
+    "eslint-config-next": "16.4.5",
+    "fast-check": "^4.10.2",
+    "prettier": "3.9.9",
+    "tailwindcss": "^4",
+    "tsx": "^4.23.15",
+    "typescript": "npm:@typescript/typescript6@^6.0.2",
+    "vitest": "^5.0.3"
+  }
+}
