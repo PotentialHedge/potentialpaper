@@ -15,3 +15,6 @@ next-env.d.ts
 # downloaded sources for scripts/build-institution-domains.ts
 /.cache/
 .claude/
+
+# Manifests of uploaded PDFs
+/data/

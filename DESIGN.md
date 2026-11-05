@@ -166,12 +166,14 @@ extensions/<id>/...      reserved: data owned by one extension (section 10)
 | Path                 | Who may commit                                   |
 | -------------------- | ------------------------------------------------ |
 | `metadata.json`      | System ingest, admins                            |
+| `pdf.json`           | System ingest, admins                            |
 | `author/**`          | Confirmed authors of this paper, admins          |
 | `community/**`       | Any verified account, subject to page protection |
 | `extensions/<id>/**` | Extension `<id>` acting for a consenting user    |
 
 Media doesn't go in git: bytes go to R2, keyed by hash, and git records the pointer, as Git LFS
-does. Files are one record per line, so links diff cleanly.
+does. `pdf.json` is such a pointer: the SHA-256, size, URL, source page and license of the
+paper's PDF, copied unmodified. Files are one record per line, so links diff cleanly.
 
 ### 4.4 The write path
 

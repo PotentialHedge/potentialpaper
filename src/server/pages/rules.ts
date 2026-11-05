@@ -8,6 +8,8 @@ export const METADATA_PATH = 'metadata.json';
 export const AUTHOR_PAGE_PATH = 'author/page.md';
 export const COMMUNITY_PAGE_PATH = 'community/page.md';
 export const RESOURCES_PATH = 'author/resources.json';
+/** Where the paper's PDF is: the bytes are in R2 (DESIGN.md §4.3), and this says which ones. */
+export const PDF_PATH = 'pdf.json';
 
 export const MAX_FILE_BYTES = 256 * 1024;
 export const MAX_CHANGES = 50;
@@ -66,6 +68,9 @@ export function pathDenied(path: string, roles: Roles): string | null {
   if (path === METADATA_PATH) {
     return roles.system || roles.admin ? null : 'only the system and admins can change the metadata';
   }
+  if (path === PDF_PATH) {
+    return roles.system || roles.admin ? null : 'only the system and admins can change the PDF';
+  }
   if (path.startsWith('author/')) {
     return roles.confirmedAuthor || roles.admin
       ? null
@@ -77,7 +82,7 @@ export function pathDenied(path: string, roles: Roles): string | null {
   }
   // Data owned by one extension (DESIGN.md §10). Nobody can act as one until extensions exist.
   if (path.startsWith('extensions/')) return 'this path is reserved for extensions';
-  return 'pages only have metadata.json, author/, community/ and extensions/';
+  return 'pages only have metadata.json, pdf.json, author/, community/ and extensions/';
 }
 
 function jsonValueProblem(value: unknown, depth = 0): string | null {
@@ -113,6 +118,39 @@ function jsonProblem(text: string, mustBeObject: boolean): string | null {
   return jsonValueProblem(value);
 }
 
+export interface PdfPointer {
+  sha256: string;
+  bytes: number;
+  /** Where the bytes are. */
+  url: string;
+  /** The page it was copied from, which the license requires us to credit. */
+  source: string;
+  license: string;
+  fetchedAt: string;
+}
+
+function isHttps(value: unknown): boolean {
+  if (typeof value !== 'string') return false;
+  return URL.parse(value)?.protocol === 'https:';
+}
+
+/** The pointer in a `pdf.json`, or `null` if it isn't one. Pages link to `url`, so it has to be checked. */
+export function parsePdfPointer(text: string): PdfPointer | null {
+  let value: Partial<PdfPointer> | null;
+  try {
+    value = JSON.parse(text) as Partial<PdfPointer> | null;
+  } catch {
+    return null;
+  }
+  if (value === null || typeof value !== 'object') return null;
+  const { sha256, bytes, url, source, license, fetchedAt } = value;
+  if (typeof sha256 !== 'string' || !/^[0-9a-f]{64}$/.test(sha256)) return null;
+  if (typeof bytes !== 'number' || !Number.isSafeInteger(bytes) || bytes <= 0) return null;
+  if (!isHttps(url) || !isHttps(source)) return null;
+  if (typeof license !== 'string' || license === '' || typeof fetchedAt !== 'string') return null;
+  return { sha256, bytes, url: url as string, source: source as string, license, fetchedAt };
+}
+
 /**
  * Why this can't be the file's content, or `null`. Files are text, since media goes to R2 (DESIGN.md
  * §4.3). Checked after merging as well, because two valid edits can merge into invalid JSON. What a link
@@ -122,6 +160,7 @@ export function contentProblem(path: string, content: string): string | null {
   if (!content.isWellFormed()) return 'is not valid Unicode';
   if (content.includes('\0')) return 'is not text';
   if (Buffer.byteLength(content) > MAX_FILE_BYTES) return `is larger than ${MAX_FILE_BYTES} bytes`;
+  if (path === PDF_PATH) return parsePdfPointer(content) ? null : 'is not a valid PDF pointer';
   if (path.endsWith('.jsonl')) {
     for (const line of content.split('\n')) {
       if (line === '') continue;

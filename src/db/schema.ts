@@ -16,6 +16,7 @@ import {
   uniqueIndex,
   uuid,
 } from 'drizzle-orm/pg-core';
+import type { PdfPointer } from '@/server/pages/rules';
 import { user } from './auth-schema';
 
 export * from './auth-schema';
@@ -297,6 +298,8 @@ export const pageCurrent = pgTable('page_current', {
   authorMarkdown: text('author_markdown'),
   communityMarkdown: text('community_markdown'),
   resources: jsonb('resources').$type<Record<string, unknown>>(),
+  /** The page's `pdf.json`. */
+  pdf: jsonb('pdf').$type<PdfPointer>(),
   updatedAt: timestamp('updated_at', { withTimezone: true, mode: 'date' }).notNull(),
 });
 

@@ -189,6 +189,16 @@ describe('importing submissions', () => {
     expect(found.status === 'found' && found.paper.authors).toEqual([]);
     expect(await getDb().select().from(paperIdentifiers)).toHaveLength(1);
   });
+
+  it('keeps the authors and venue of a paper whose review has ended', async () => {
+    const decided = { ...submissions[0], authors: ['Ada Lovelace'], venue: 'ICLR 2026 submission' };
+    expect(await importSubmissions([decided], venue)).toBe(1);
+    const found = await lookupPaper({ scheme: 'openreview', value: decided.id });
+    expect(found.status === 'found' && [found.paper.authors, found.paper.venue]).toEqual([
+      ['Ada Lovelace'],
+      'ICLR 2026 submission',
+    ]);
+  });
 });
 
 describe('search', () => {

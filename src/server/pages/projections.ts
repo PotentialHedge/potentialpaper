@@ -3,7 +3,7 @@ import { getDb, type Database } from '@/db';
 import { commitIdentities, pageCurrent, pageRefs, pageRevisions } from '@/db/schema';
 import { type Commit, SYSTEM_AUTHOR_ID } from './git-objects';
 import { changedFiles, readCommit, readFiles, readHead, readText, toBytes, type Reader } from './repo';
-import { AUTHOR_PAGE_PATH, COMMUNITY_PAGE_PATH, RESOURCES_PATH } from './rules';
+import { AUTHOR_PAGE_PATH, COMMUNITY_PAGE_PATH, parsePdfPointer, PDF_PATH, RESOURCES_PATH } from './rules';
 
 /**
  * The rows that can be derived from the objects (DESIGN.md §4.5). A commit and a rebuild both come through
@@ -73,11 +73,13 @@ export async function writeRevision(
 export async function writeCurrent(tx: Writer, paperId: string, head: string, commit: Commit): Promise<void> {
   const files = await readFiles(tx, paperId, commit.tree);
   const resources = await readText(tx, paperId, files.get(RESOURCES_PATH));
+  const pdf = await readText(tx, paperId, files.get(PDF_PATH));
   const row = {
     head: toBytes(head),
     authorMarkdown: await readText(tx, paperId, files.get(AUTHOR_PAGE_PATH)),
     communityMarkdown: await readText(tx, paperId, files.get(COMMUNITY_PAGE_PATH)),
     resources: resources === null ? null : (JSON.parse(resources) as Record<string, unknown>),
+    pdf: pdf === null ? null : parsePdfPointer(pdf),
     updatedAt: commit.at,
   };
   await tx

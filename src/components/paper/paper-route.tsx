@@ -1,7 +1,10 @@
+import { eq } from 'drizzle-orm';
 import type { Metadata } from 'next';
 import { cache } from 'react';
 import { ui } from '@/components/ui';
 import { canonicalPaperId, paperPath, parsePaperId, type PaperScheme } from '@/lib/paper-ids';
+import { getDb } from '@/db';
+import { pageCurrent } from '@/db/schema';
 import { findPaper, type FoundPaper } from '@/server/papers';
 import { Slot } from './slots';
 
@@ -32,7 +35,11 @@ export async function paperMetadata(scheme: PaperScheme, segments: string[]): Pr
 
 export async function PaperRoute({ scheme, segments }: { scheme: PaperScheme; segments: string[] }) {
   const { paper, identifiers } = await load(scheme, segments);
-  const panel = { paper, identifiers };
+  const [current] = await getDb()
+    .select({ pdf: pageCurrent.pdf })
+    .from(pageCurrent)
+    .where(eq(pageCurrent.paperId, paper.id));
+  const panel = { paper, identifiers, pdf: current?.pdf ?? null };
   const about = [paper.venue, paper.year].filter(Boolean).join(', ');
   return (
     <main className={ui.page}>

@@ -2,6 +2,7 @@ import type { ComponentType } from 'react';
 import { ui } from '@/components/ui';
 import type { Paper } from '@/db/schema';
 import { sourceLinks, type PaperId } from '@/lib/paper-ids';
+import type { PdfPointer } from '@/server/pages/rules';
 
 /**
  * A paper page is assembled from named slots, so that built-in panels can later become the first
@@ -12,6 +13,7 @@ import { sourceLinks, type PaperId } from '@/lib/paper-ids';
 export interface PanelProps {
   paper: Paper;
   identifiers: PaperId[];
+  pdf: PdfPointer | null;
 }
 
 export type PaperSlot = 'paper.main' | 'paper.aside';
@@ -43,11 +45,24 @@ function CommunitySection() {
   );
 }
 
-function ReadThePaper({ identifiers }: PanelProps) {
+function ReadThePaper({ identifiers, pdf }: PanelProps) {
   return (
     <div className={ui.box}>
       <h2 className={ui.boxHeading}>Read the paper</h2>
       <ul className="space-y-1">
+        {pdf && (
+          <li>
+            <a href={pdf.url} rel="noopener" className={ui.hyperref}>
+              PDF
+            </a>{' '}
+            <span className={ui.fine}>
+              {pdf.license}, from{' '}
+              <a href={pdf.source} rel="noopener" className={ui.hyperref}>
+                the source
+              </a>
+            </span>
+          </li>
+        )}
         {identifiers.flatMap(sourceLinks).map(({ label, url }) => (
           <li key={url}>
             <a href={url} rel="noopener" className={ui.hyperref}>

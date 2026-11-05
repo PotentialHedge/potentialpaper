@@ -8,6 +8,10 @@ export interface Submission {
   id: string;
   title: string;
   abstract: string | null;
+  /** Only for a venue whose review has ended. Left out, the paper stays anonymous. */
+  authors?: string[];
+  /** Overrides the venue's name, for a paper it didn't accept. */
+  venue?: string;
 }
 
 const CHUNK = 500;
@@ -15,8 +19,8 @@ const CHUNK = 500;
 const ABSTRACT_MIN = 50;
 
 /**
- * Add anonymous conference submissions under their OpenReview ids. Authors stay empty: the source has
- * none while a paper is under review, and none must be added here. Safe to run again: one already
+ * Add conference submissions under their OpenReview ids. Authors stay empty unless given: the source
+ * has none while a paper is under review, and none must be added then. Safe to run again: one already
  * imported is left as it is. Returns how many were added.
  */
 export async function importSubmissions(
@@ -46,9 +50,9 @@ export async function importSubmissions(
           id: s.paperId,
           title: s.title.trim(),
           abstract: s.abstract?.trim(),
-          authors: [],
+          authors: s.authors ?? [],
           year: venue.year,
-          venue: venue.name,
+          venue: s.venue ?? venue.name,
         })),
       );
       await tx
