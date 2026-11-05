@@ -5,10 +5,10 @@ Things only you can do or decide. Most urgent first.
 - [ ] **acceptodds is running vulnerable Next 16.4.0 in production.** `npm audit` lists critical advisories,
       including unauthenticated remote code execution. Fix it, or ask me to.
 - [ ] **Review Milestone 1 on the live site.** Try https://papers.potentialhedge.com/abs/1706.03762, the search
-      link in the header, and the home page. It's on the branch `milestone-1-papers`, deployed but not pushed.
-      Tell me whether to push it and merge to `main` (CI hasn't run on it).
-- [ ] **Review Milestone 2 and tell me whether to push it.** It's on `milestone-2-git-store`, on top of
-      `milestone-1-papers`, deployed but not pushed, so CI hasn't run on either. Try it:
+      link in the header, and the home page. It's on the branch `milestone-1-papers`, pushed and deployed. Tell me
+      whether to merge it to `main`.
+- [ ] **Review Milestone 2 and tell me whether to merge it.** It's on `milestone-2-git-store`, on top of
+      `milestone-1-papers`, pushed and deployed. Try it:
       `git clone https://papers.potentialhedge.com/git/arxiv/1706.03762.git`.
 - [ ] **Keep or remove the test commits on the live site.** To check clones, I made 5 commits on
       _Attention Is All You Need_ (`arxiv:1706.03762`): the metadata snapshot, then two test edits by a new
