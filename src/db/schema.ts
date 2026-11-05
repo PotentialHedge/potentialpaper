@@ -1,11 +1,15 @@
 import { sql } from 'drizzle-orm';
 import {
+  type AnyPgColumn,
   boolean,
   check,
+  customType,
   doublePrecision,
   index,
   integer,
+  jsonb,
   pgTable,
+  primaryKey,
   text,
   timestamp,
   uniqueIndex,
@@ -141,3 +145,66 @@ export const institutionRequests = pgTable(
 );
 
 export type InstitutionRequest = typeof institutionRequests.$inferSelect;
+
+const tsvector = customType<{ data: string }>({ dataType: () => 'tsvector' });
+
+/**
+ * A work, not a version: arXiv v1 to v5 and the published version share one row (DESIGN.md §3). Made
+ * on the first visit to a valid identifier (`server/papers.ts`) or by a bulk import. Ids stay internal:
+ * addresses use `paper_identifiers`.
+ */
+export const papers = pgTable(
+  'papers',
+  {
+    id: uuid('id').primaryKey().defaultRandom(),
+    title: text('title').notNull(),
+    /** Names as printed on the paper, in order. Empty while a paper is under anonymous review. */
+    authors: jsonb('authors').$type<string[]>().notNull().default([]),
+    abstract: text('abstract'),
+    year: integer('year'),
+    venue: text('venue'),
+    /** The duplicate's survivor. Its identifiers still resolve, and redirect there. */
+    mergedInto: uuid('merged_into').references((): AnyPgColumn => papers.id, { onDelete: 'set null' }),
+    search: tsvector('search')
+      .notNull()
+      .generatedAlwaysAs(
+        sql`setweight(to_tsvector('english', title), 'A') || setweight(to_tsvector('english', coalesce(abstract, '')), 'B')`,
+      ),
+    createdAt: createdAt(),
+  },
+  (t) => [
+    index('papers_search_idx').using('gin', t.search),
+    index('papers_title_trgm_idx').using('gin', t.title.op('gin_trgm_ops')),
+    index('papers_merged_into_idx').on(t.mergedInto),
+  ],
+);
+
+export type Paper = typeof papers.$inferSelect;
+
+/** The addresses of a paper. `value` is in the normal form of `lib/paper-ids.ts`. */
+export const paperIdentifiers = pgTable(
+  'paper_identifiers',
+  {
+    scheme: text('scheme', { enum: ['arxiv', 'doi', 'openreview'] }).notNull(),
+    value: text('value').notNull(),
+    paperId: uuid('paper_id')
+      .notNull()
+      .references(() => papers.id, { onDelete: 'cascade' }),
+  },
+  (t) => [
+    primaryKey({ columns: [t.scheme, t.value] }),
+    index('paper_identifiers_paper_id_idx').on(t.paperId),
+    check('paper_identifiers_scheme_check', sql`${t.scheme} in ('arxiv', 'doi', 'openreview')`),
+  ],
+);
+
+/** Identifiers a source said do not exist, so a crawler cannot make us ask again and again. */
+export const paperLookupMisses = pgTable(
+  'paper_lookup_misses',
+  {
+    scheme: text('scheme').notNull(),
+    value: text('value').notNull(),
+    expiresAt: timestamp('expires_at', { withTimezone: true, mode: 'date' }).notNull(),
+  },
+  (t) => [primaryKey({ columns: [t.scheme, t.value] })],
+);

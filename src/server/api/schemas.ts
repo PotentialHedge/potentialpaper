@@ -74,3 +74,32 @@ export const Decided = z.object({ decided: z.number(), mailed: z.number(), mailF
 export const Accepted = z.object({ status: z.literal('accepted') });
 export const Ok = z.object({ status: z.literal('ok') });
 export const IdParam = z.uuid();
+
+export const PaperIdentifier = z.object({ scheme: z.enum(['arxiv', 'doi', 'openreview']), value: z.string() });
+export const PaperResponse = z.object({
+  title: z.string(),
+  authors: z.array(z.string()),
+  abstract: z.string().nullable(),
+  year: z.number().int().nullable(),
+  venue: z.string().nullable(),
+  identifiers: z.array(PaperIdentifier),
+  path: z.string(),
+});
+export const PaperSchemeParam = z.enum(['arxiv', 'doi', 'openreview']);
+export const SearchQuery = z.object({
+  q: z.string().trim().min(2).max(200),
+  page: z.coerce.number().int().min(1).max(500).default(1),
+});
+export const SearchResponse = z.object({
+  hits: z.array(
+    z.object({
+      title: z.string(),
+      authors: z.array(z.string()),
+      abstract: z.string().nullable(),
+      year: z.number().int().nullable(),
+      venue: z.string().nullable(),
+      path: z.string(),
+    }),
+  ),
+  hasMore: z.boolean(),
+});

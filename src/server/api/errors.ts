@@ -23,6 +23,7 @@ export const API_ERROR_CODES = [
   'handle_taken',
   'institution_already_listed',
   'domain_not_institutional',
+  'source_unavailable',
   'method_not_allowed',
   'internal_error',
 ] as const;

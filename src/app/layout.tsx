@@ -25,6 +25,9 @@ export default function RootLayout({ children }: Readonly<{ children: React.Reac
             </span>
           </Link>
           <span className="flex-1" />
+          <Link href="/search" className="font-sans text-[13px]">
+            search
+          </Link>
           <NavUser />
         </header>
         {children}

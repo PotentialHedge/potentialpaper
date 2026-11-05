@@ -5,7 +5,11 @@ import { addAffiliation, listAffiliations, removeAffiliation, verifyAffiliation 
 import { requireAdmin, requireAuth, viewerFromHeaders } from '../auth';
 import { approveDomain, rejectDomain, requestInstitution } from '../institution-requests';
 import { setFirstPassword, startOnboarding } from '../onboarding';
-import { clientIp, parseBody, parseParam, respond, route, toIso, toIsoOrNull } from './http';
+import { canonicalPaperId, paperPath, parsePaperId } from '@/lib/paper-ids';
+import { lookupPaper } from '../papers';
+import { searchPapers } from '../search';
+import { ApiError } from './errors';
+import { clientIp, parseBody, parseParam, parseQuery, respond, route, toIso, toIsoOrNull } from './http';
 import * as S from './schemas';
 
 /** The `/api/v1` handlers; the route files only re-export them. */
@@ -118,4 +122,52 @@ export const rejectInstitution = route(async (req) => {
   const body = await parseBody(req, S.RejectBody);
   const result = await rejectDomain({ ...body, adminAccountId: principal.account.id });
   return respond(S.Decided, result, { principal });
+});
+
+/** Empty, which no identifier is, when a segment is not valid percent-encoding. */
+function decodedPath(segments: string[]): string {
+  try {
+    return segments.map(decodeURIComponent).join('/');
+  } catch {
+    return '';
+  }
+}
+
+/** A paper by identifier, in any scheme; the first request for one may fetch it from its source. */
+export const getPaper = route(async (_req, params) => {
+  const scheme = parseParam(params.scheme, S.PaperSchemeParam, 'scheme');
+  const id = parsePaperId(scheme, decodedPath(params.value as string[]));
+  if (!id) throw new ApiError(404, 'not_found', 'no paper with that identifier');
+  const found = await lookupPaper(id);
+  if (found.status === 'missing') throw new ApiError(404, 'not_found', 'no paper with that identifier');
+  if (found.status === 'unavailable') {
+    throw new ApiError(
+      503,
+      'source_unavailable',
+      'could not reach the source for this paper; try again shortly',
+      undefined,
+      {
+        'Retry-After': String(found.retryAfterSeconds),
+      },
+    );
+  }
+  const { paper, identifiers } = found;
+  return respond(S.PaperResponse, {
+    title: paper.title,
+    authors: paper.authors,
+    abstract: paper.abstract,
+    year: paper.year,
+    venue: paper.venue,
+    identifiers,
+    path: paperPath(canonicalPaperId(identifiers) ?? id),
+  });
+});
+
+export const search = route(async (req) => {
+  const { q, page } = parseQuery(req, S.SearchQuery);
+  const { hits, hasMore } = await searchPapers(q, page);
+  return respond(S.SearchResponse, {
+    hits: hits.map(({ scheme, value, ...hit }) => ({ ...hit, path: paperPath({ scheme, value }) })),
+    hasMore,
+  });
 });
