@@ -70,7 +70,7 @@ export function paperIdFromText(text: string): PaperId | null {
   return parsePaperId('arxiv', input) ?? parseDoi(input);
 }
 
-const PATH_PREFIX: Record<PaperScheme, string> = { arxiv: '/abs', doi: '/doi', openreview: '/openreview' };
+export const PATH_PREFIX: Record<PaperScheme, string> = { arxiv: '/abs', doi: '/doi', openreview: '/openreview' };
 
 /** The page of an identifier. Slashes in old arXiv ids and in DOIs stay path separators. */
 export function paperPath({ scheme, value }: PaperId): string {

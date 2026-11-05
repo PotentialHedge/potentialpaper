@@ -1,32 +1,20 @@
 import type { Metadata } from 'next';
-import { notFound, permanentRedirect } from 'next/navigation';
 import { cache } from 'react';
 import { ui } from '@/components/ui';
 import { canonicalPaperId, paperPath, parsePaperId, type PaperScheme } from '@/lib/paper-ids';
-import { lookupPaper, type FoundPaper } from '@/server/papers';
+import { findPaper, type FoundPaper } from '@/server/papers';
 import { Slot } from './slots';
 
 /**
  * What the routes at `/abs`, `/doi` and `/openreview` share. Each page is rendered once and cached, by
- * Next and at the edge (DESIGN.md §2), so nothing here may read the request. A source being unreachable
- * throws: an error is not cached, whereas a page saying so would be, for a day.
+ * Next and at the edge (DESIGN.md §2), so nothing here may read the request. `proxy.ts` has already
+ * answered everything but a real paper at its own address. If that has changed since, this throws, as
+ * an error is never cached.
  */
 const load = cache(async (scheme: PaperScheme, segments: string[]): Promise<FoundPaper> => {
-  let raw: string;
-  try {
-    raw = segments.map(decodeURIComponent).join('/');
-  } catch {
-    notFound();
-  }
-  const id = parsePaperId(scheme, raw);
-  if (!id) notFound();
-  // Another spelling of the identifier, a version, or arXiv's own DOI for a preprint.
-  if (id.scheme !== scheme || id.value !== raw) permanentRedirect(paperPath(id));
-
-  const found = await lookupPaper(id);
-  if (found.status === 'missing') notFound();
-  if (found.status === 'unavailable') throw new Error(`no answer yet for ${id.scheme}:${id.value}`);
-  if (found.merged) permanentRedirect(paperPath(canonicalPaperId(found.identifiers) ?? id));
+  const id = parsePaperId(scheme, segments.map(decodeURIComponent).join('/'));
+  const found = id && (await findPaper(id));
+  if (!found || found.merged) throw new Error(`no paper at ${scheme}:${segments.join('/')}`);
   return found;
 });
 

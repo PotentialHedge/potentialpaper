@@ -36,7 +36,7 @@ export interface FoundPaper {
 export type PaperLookup =
   ({ status: 'found' } & FoundPaper) | { status: 'missing' } | { status: 'unavailable'; retryAfterSeconds: number };
 
-interface Options {
+export interface LookupOptions {
   database?: Database;
   sources?: Partial<Record<PaperScheme, PaperSource>>;
 }
@@ -153,7 +153,7 @@ async function askSource(id: PaperId, source: PaperSource, database: Database): 
 }
 
 /** The paper for an identifier in normal form, asking its source if we have never seen it. */
-export async function lookupPaper(id: PaperId, options: Options = {}): Promise<PaperLookup> {
+export async function lookupPaper(id: PaperId, options: LookupOptions = {}): Promise<PaperLookup> {
   const database = options.database ?? getDb();
   const known = await findPaper(id, database);
   if (known) return { status: 'found', ...known };

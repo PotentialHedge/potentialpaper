@@ -6,6 +6,7 @@ import { getDb } from '@/db';
 import { paperIdentifiers, papers } from '@/db/schema';
 import { importSubmissions } from '@/server/import-submissions';
 import { SourceUnavailable, type PaperSource, type SourcePaper } from '@/server/paper-sources/types';
+import { paperGate } from '@/server/paper-gate';
 import { lookupPaper, savePaper } from '@/server/papers';
 import { searchPapers } from '@/server/search';
 import { closePool, ORIGIN, resetDatabase } from './helpers';
@@ -120,6 +121,57 @@ describe('looking up a paper', () => {
     const found = await lookupPaper({ scheme: 'doi', value: '10.1/dup' });
     expect(found.status === 'found' && found.merged).toBe(true);
     expect(found.status === 'found' && found.paper.id).toBe(survivor);
+  });
+});
+
+describe('the gate in front of paper pages', () => {
+  const noSource = { sources: {} };
+
+  it('lets a known paper through at its own address', async () => {
+    await savePaper(ATTENTION);
+    expect(await paperGate('/abs/1706.03762', noSource)).toEqual({ action: 'render' });
+  });
+
+  it('redirects another spelling without looking anything up', async () => {
+    const arxiv = fakeSource(async () => ATTENTION);
+    const options = { sources: { arxiv } };
+    expect(await paperGate('/abs/1706.03762v5', options)).toEqual({ action: 'redirect', to: '/abs/1706.03762' });
+    expect(await paperGate('/doi/10.48550/arXiv.1706.03762', options)).toEqual({
+      action: 'redirect',
+      to: '/abs/1706.03762',
+    });
+    expect(arxiv.calls()).toBe(0);
+  });
+
+  it('keeps old arXiv ids and encoded DOIs at their address', async () => {
+    await savePaper({ ...ATTENTION, identifiers: [{ scheme: 'arxiv', value: 'hep-th/9901001' }] });
+    await savePaper({ ...ATTENTION, identifiers: [{ scheme: 'doi', value: '10.1000/(a)<b>' }] });
+    expect(await paperGate('/abs/hep-th/9901001', noSource)).toEqual({ action: 'render' });
+    expect(await paperGate('/doi/10.1000/(a)%3Cb%3E', noSource)).toEqual({ action: 'render' });
+  });
+
+  it('calls junk missing, however it is spelled', async () => {
+    for (const path of ['/abs', '/abs/garbage', '/abs/%E0%A4%A', '/openreview/nosuchpaper', '/openreview/a/b']) {
+      expect(await paperGate(path, noSource)).toEqual({ action: 'missing' });
+    }
+  });
+
+  it('fetches a new paper once, then renders it', async () => {
+    const arxiv = fakeSource(async () => ATTENTION);
+    expect(await paperGate('/abs/1706.03762', { sources: { arxiv } })).toEqual({ action: 'render' });
+    expect(arxiv.calls()).toBe(1);
+  });
+
+  it('reports an outage', async () => {
+    const arxiv = fakeSource(async () => null, 0);
+    expect(await paperGate('/abs/1706.03762', { sources: { arxiv } })).toEqual({ action: 'unavailable' });
+  });
+
+  it("sends a merged duplicate's address to the survivor", async () => {
+    const survivor = await savePaper(ATTENTION);
+    const duplicate = await savePaper({ ...ATTENTION, identifiers: [{ scheme: 'doi', value: '10.1000/dup' }] });
+    await getDb().update(papers).set({ mergedInto: survivor }).where(eq(papers.id, duplicate));
+    expect(await paperGate('/doi/10.1000/dup', noSource)).toEqual({ action: 'redirect', to: '/abs/1706.03762' });
   });
 });
 
