@@ -42,7 +42,7 @@ export async function PaperRoute({ scheme, segments }: { scheme: PaperScheme; se
   const panel = { paper, identifiers, pdf: current?.pdf ?? null };
   const about = [paper.venue, paper.year].filter(Boolean).join(', ');
   return (
-    <main className={ui.page}>
+    <main className={ui.paperPage}>
       <article>
         <h1 className="mt-6 text-center text-[26px] leading-tight font-normal">{paper.title}</h1>
         <p className="mt-3 text-center">
