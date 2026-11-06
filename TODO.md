@@ -20,10 +20,13 @@ Things only you can do or decide. Most urgent first.
 - [ ] **Decide how production purges the edge, before Milestone 3.** Once pages show edits, each commit has to
       purge that page from Cloudflare, so the app needs a token. I'd make one limited to cache purge on this zone,
       and put it in `.env.production`. Production doesn't have one yet.
-- [ ] **Decide whether to publish the ICLR 2027 submissions.** All 42,425 are imported in the dev database only.
-      I held back from production because it puts abstracts of papers under review on a public site, and I
-      haven't checked OpenReview's terms. If you're happy with that, run:
-      `docker compose -f docker-compose.prod.yml --env-file .env.production run --rm -T -v "$PWD/../papermarket/platform/data/iclr2027.sqlite:/data/iclr.sqlite:ro" tools npm run -s papers:import-iclr -- /data/iclr.sqlite`
+- [ ] **Review ICLR on the live site, and the PDF link.** It's on `iclr-pdfs`, pushed and deployed: 42,425 ICLR 2027
+      and 19,804 ICLR 2026 papers. Tell me whether to merge it.
+- [ ] **Decide about the ICLR 2026 PDFs.** They aren't local, and downloading them needs an OpenReview login, so those
+      pages only link to OpenReview. The ICLR 2027 list is the Oct 3 scrape, not refreshed.
+- [ ] **Decide about 16 ICLR 2027 PDFs I didn't link.** They open with "Published as a conference paper at ICLR 2027"
+      during review, so they may name their authors. Their bytes are in R2, public to anyone with the hash.
+- [ ] **Set up a takedown route** for hosted PDFs, and consider asking policy@openreview.net about re-hosting.
 - [ ] **Check the abstract policy.** For papers found by DOI, I only show abstracts under an open license, so
       many publisher papers show none. arXiv abstracts always show. Loosen this only if you're comfortable
       with the licensing.
