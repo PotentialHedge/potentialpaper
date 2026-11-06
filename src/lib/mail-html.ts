@@ -153,8 +153,8 @@ function htmlOf(doc: MailDoc): string {
     `<table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="background:${BG}"><tr><td align="center" style="padding:28px 16px 40px">` +
     `<table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="max-width:600px"><tr><td style="font-family:${SERIF};font-size:16px;line-height:1.55;color:${INK};overflow-wrap:anywhere;word-break:break-word">` +
     `<div style="padding-bottom:2px;border-bottom:1px solid ${RULE};font-size:15px;color:${SUBTLE}">` +
-    // The site header's wordmark (`components/Wordmark.tsx`): "paper" in ink, "trail" in the accent.
-    `<a href="${escapeHtml(doc.siteUrl)}" style="color:${INK};text-decoration:none">paper<span style="color:${ACCENT}">trail</span></a></div>` +
+    // The site header's wordmark (`components/Wordmark.tsx`): "potential" in ink, "paper" in the accent.
+    `<a href="${escapeHtml(doc.siteUrl)}" style="color:${INK};text-decoration:none">potential<span style="color:${ACCENT}">paper</span></a></div>` +
     `<h1 style="margin:36px 0 ${doc.byline ? 8 : 28}px;font-family:${SERIF};font-size:26px;line-height:1.3;font-weight:normal;text-align:center;color:${INK}">${escapeHtml(doc.title)}</h1>` +
     (doc.byline
       ? `<div style="margin:0 0 28px;font-size:15px;text-align:center;color:${SUBTLE}">${escapeHtml(doc.byline)}</div>`

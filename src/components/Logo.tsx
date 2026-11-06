@@ -1,4 +1,4 @@
-/** A trail of three linked papers: the accent mark beside the wordmark, and `app/icon.svg`. */
+/** Three linked papers: the accent mark beside the wordmark, and `app/icon.svg`. */
 export function LogoMark({ size = 20 }: { size?: number }) {
   return (
     <svg viewBox="0 0 24 24" width={size} height={size} aria-hidden="true" className="inline align-[-3px] text-accent">
@@ -10,11 +10,11 @@ export function LogoMark({ size = 20 }: { size?: number }) {
   );
 }
 
-/** The site's name as the header sets it: "paper" in ink, "trail" in the accent. */
+/** The site's name as the header sets it: "potential" in ink, "paper" in the accent. */
 export function Wordmark() {
   return (
     <>
-      paper<i className="text-accent not-italic">trail</i>
+      potential<i className="text-accent not-italic">paper</i>
     </>
   );
 }
