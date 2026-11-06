@@ -1,5 +1,5 @@
 import type { NextConfig } from 'next';
-import { PRIVATE_PAGES } from './src/lib/private-paths';
+import { HOME_LIST_PARAMS, PRIVATE_PAGES } from './src/lib/private-paths';
 
 const dev = process.env.NODE_ENV !== 'production';
 
@@ -29,7 +29,11 @@ const nextConfig: NextConfig = {
   poweredByHeader: false,
   async redirects() {
     // A guessed address: there is no sign-up page of that name.
-    return [{ source: '/signup', destination: '/welcome', permanent: false }];
+    return [
+      { source: '/signup', destination: '/welcome', permanent: false },
+      // Search moved to the home page. The query string carries over.
+      { source: '/search', destination: '/', permanent: false },
+    ];
   },
   async headers() {
     return [
@@ -43,6 +47,11 @@ const nextConfig: NextConfig = {
       },
       ...PRIVATE_PAGES.map((source) => ({
         source,
+        headers: [{ key: 'X-Robots-Tag', value: 'noindex, nofollow' }],
+      })),
+      ...HOME_LIST_PARAMS.map((key) => ({
+        source: '/',
+        has: [{ type: 'query' as const, key }],
         headers: [{ key: 'X-Robots-Tag', value: 'noindex, nofollow' }],
       })),
     ];

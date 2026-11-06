@@ -1,0 +1,371 @@
+/**
+ * The home page's search syntax, parsed into a tree. Pure and client-safe; `server/search.ts` compiles the
+ * tree to SQL, always with bound parameters. Copied from acceptodds, with this site's fields.
+ *
+ * `key:value` filters, quoted values, `-` to negate a word, phrase, filter or group, `OR` between terms,
+ * parentheses to group, and a plain AND between everything else.
+ *
+ *     graph neural author:hinton year>=2026 -venue:submission
+ *     (venue:iclr OR venue:neurips) "diffusion model"
+ *
+ * Words and phrases are full-text search: next to each other in one AND they are merged into a single
+ * `websearch_to_tsquery` string, so a stop word among them is dropped rather than matching nothing, and the
+ * last word still matches as a prefix (`lib/search.ts`). A `key:` that is not a field below is just text, so
+ * a title like "BERT: pre-training" searches as one. A known field with a bad value is dropped with an
+ * error the page shows.
+ */
+
+import { prefixTsquery } from './search';
+
+export const TEXT_FIELDS = ['title', 'author', 'venue'] as const;
+export const NUMBER_FIELDS = ['year'] as const;
+export const SEARCH_FIELDS = [...TEXT_FIELDS, ...NUMBER_FIELDS] as const;
+export type SearchField = (typeof SEARCH_FIELDS)[number];
+
+/** Every name a field answers to. The first spelling of each is its own name. */
+const ALIASES: Record<string, SearchField> = {
+  title: 'title',
+  t: 'title',
+  author: 'author',
+  authors: 'author',
+  a: 'author',
+  venue: 'venue',
+  v: 'venue',
+  year: 'year',
+  y: 'year',
+};
+
+/** One line per field, for the syntax help. */
+export const FIELD_HELP: { field: SearchField; aliases: string[]; example: string; means: string }[] = [
+  { field: 'title', aliases: ['t'], example: 'title:diffusion', means: 'title contains' },
+  { field: 'author', aliases: ['a'], example: 'author:"de freitas"', means: 'an author contains' },
+  { field: 'venue', aliases: ['v'], example: 'venue:iclr', means: 'venue contains' },
+  { field: 'year', aliases: ['y'], example: 'year>=2026', means: 'year published' },
+];
+
+export type CompareOp = '=' | '!=' | '>' | '<' | '>=' | '<=';
+
+export type SearchNode =
+  | { kind: 'and'; items: SearchNode[] }
+  | { kind: 'or'; items: SearchNode[] }
+  | { kind: 'not'; item: SearchNode }
+  /**
+   * Full text. `include` and `exclude` are `websearch_to_tsquery` fragments
+   * — a word, or a `"quoted phrase"` — without their `-`.
+   */
+  | { kind: 'text'; include: string[]; exclude: string[] }
+  /** A text field: contains (`=`) or does not (`!=`), case-insensitively. */
+  | { kind: 'match'; field: (typeof TEXT_FIELDS)[number]; op: '=' | '!='; value: string }
+  /** `value` is a whole number, as a string. */
+  | { kind: 'compare'; field: (typeof NUMBER_FIELDS)[number]; op: CompareOp; value: string };
+
+export interface ParsedSearch {
+  /** `null` when nothing searchable is left. */
+  node: SearchNode | null;
+  /** One line per term that was dropped, for the page to show. */
+  errors: string[];
+  /** Fields the query filters on, so the page can step its own filters aside. */
+  fields: Set<SearchField>;
+}
+
+// ---------------------------------------------------------------------------
+// tokens
+// ---------------------------------------------------------------------------
+
+type Token =
+  | { t: '('; neg: boolean }
+  | { t: ')' }
+  | { t: 'or' }
+  | { t: 'word'; neg: boolean; text: string }
+  | { t: 'phrase'; neg: boolean; text: string }
+  | { t: 'field'; neg: boolean; key: string; op: string; value: string; raw: string };
+
+const FIELD = /^([A-Za-z]+)(!=|>=|<=|:|=|>|<)/;
+
+function tokenize(input: string): Token[] {
+  const out: Token[] = [];
+  let i = 0;
+  const n = input.length;
+  const isSpace = (c: string) => /\s/.test(c);
+  // A bare run: up to whitespace or a paren.
+  const bare = () => {
+    const start = i;
+    while (i < n && !isSpace(input[i]) && input[i] !== '(' && input[i] !== ')') i += 1;
+    return input.slice(start, i);
+  };
+  // A quoted run starting at the quote at `i`; unterminated runs to the end.
+  const quoted = () => {
+    const q = input[i];
+    const end = input.indexOf(q, i + 1);
+    const text = input.slice(i + 1, end < 0 ? n : end);
+    i = end < 0 ? n : end + 1;
+    return text;
+  };
+
+  while (i < n) {
+    const c = input[i];
+    if (isSpace(c)) {
+      i += 1;
+      continue;
+    }
+    if (c === ')') {
+      out.push({ t: ')' });
+      i += 1;
+      continue;
+    }
+    let neg = false;
+    if (c === '-' && i + 1 < n && !isSpace(input[i + 1])) {
+      neg = true;
+      i += 1;
+    }
+    const d = input[i];
+    if (d === '(') {
+      out.push({ t: '(', neg });
+      i += 1;
+    } else if (d === '"' || d === '`') {
+      out.push({ t: 'phrase', neg, text: quoted() });
+    } else {
+      const start = i;
+      const head = FIELD.exec(input.slice(i));
+      if (head && ALIASES[head[1].toLowerCase()] !== undefined) {
+        i += head[0].length;
+        const value = i < n && (input[i] === '"' || input[i] === '`') ? quoted() : bare();
+        out.push({ t: 'field', neg, key: head[1].toLowerCase(), op: head[2], value, raw: input.slice(start, i) });
+      } else {
+        const text = bare();
+        if (!neg && /^or$/i.test(text)) out.push({ t: 'or' });
+        else if (text !== '') out.push({ t: 'word', neg, text });
+      }
+    }
+  }
+  return out;
+}
+
+// ---------------------------------------------------------------------------
+// parsing
+// ---------------------------------------------------------------------------
+
+const YEAR = /^\d{1,4}$/;
+
+/**
+ * A websearch fragment. Quotes inside it are dropped (they would open a
+ * phrase) — in a word without leaving a space, which could start a `-word`
+ * the person never wrote — and one with no letter or digit is nothing:
+ * websearch would read a lone `-` as an operator.
+ */
+function fragment(text: string, phrase: boolean): string | null {
+  const clean = phrase
+    ? text.replace(/["`]/g, ' ').replace(/\s+/g, ' ').trim()
+    : text.replace(/["`]/g, '').replace(/^-+/, '');
+  if (!/[\p{L}\p{N}]/u.test(clean)) return null;
+  return phrase ? `"${clean}"` : clean;
+}
+
+function isTextField(f: SearchField): f is (typeof TEXT_FIELDS)[number] {
+  return (TEXT_FIELDS as readonly string[]).includes(f);
+}
+
+function fieldNode(tok: Extract<Token, { t: 'field' }>, errors: string[]): SearchNode | null {
+  const field = ALIASES[tok.key];
+  let op = (tok.op === ':' ? '=' : tok.op) as CompareOp;
+  let value = tok.value.trim();
+  // `year:>2020`, as GitHub writes it, means `year>2020`. Number fields only:
+  // a text field's value may start with `<`.
+  const colonOp = /^(!=|>=|<=|=|>|<)/.exec(value);
+  if (tok.op === ':' && colonOp && (NUMBER_FIELDS as readonly string[]).includes(field)) {
+    op = colonOp[1] as CompareOp;
+    value = value.slice(colonOp[1].length).trim();
+  }
+  if (value === '') {
+    errors.push(`“${tok.raw}”: no value`);
+    return null;
+  }
+  if (isTextField(field)) {
+    if (op !== '=' && op !== '!=') {
+      errors.push(`“${tok.raw}”: ${field} takes : or !=`);
+      return null;
+    }
+    return { kind: 'match', field, op, value };
+  }
+  if (!YEAR.test(value)) {
+    errors.push(`“${tok.raw}”: ${field} takes a year`);
+    return null;
+  }
+  return { kind: 'compare', field, op, value };
+}
+
+/**
+ * `-node`. A text node is the AND of its fragments, so only a single fragment
+ * negates by switching sides: `-(a b)` is "not both", not "neither".
+ */
+function negate(node: SearchNode): SearchNode {
+  if (node.kind === 'text' && node.include.length + node.exclude.length === 1) {
+    return { kind: 'text', include: node.exclude, exclude: node.include };
+  }
+  if (node.kind === 'not') return node.item;
+  return { kind: 'not', item: node };
+}
+
+/**
+ * An AND's children with their text merged into one node, then flattened:
+ * one child is itself, none is nothing.
+ */
+function and(items: SearchNode[]): SearchNode | null {
+  const include: string[] = [];
+  const exclude: string[] = [];
+  const rest: SearchNode[] = [];
+  for (const item of items) {
+    // A text node is already an AND of its fragments.
+    if (item.kind === 'text') {
+      include.push(...item.include);
+      exclude.push(...item.exclude);
+    } else if (item.kind === 'and') rest.push(...item.items);
+    else rest.push(item);
+  }
+  const all = include.length + exclude.length > 0 ? [{ kind: 'text', include, exclude } as SearchNode, ...rest] : rest;
+  if (all.length === 0) return null;
+  return all.length === 1 ? all[0] : { kind: 'and', items: all };
+}
+
+function or(items: SearchNode[]): SearchNode | null {
+  const flat = items.flatMap((i) => (i.kind === 'or' ? i.items : [i]));
+  if (flat.length === 0) return null;
+  return flat.length === 1 ? flat[0] : { kind: 'or', items: flat };
+}
+
+/**
+ * Most terms a query keeps. Each one past the text every match needs is a
+ * predicate that can be checked on every row (`server/search.ts`), so
+ * an anonymous 200-character chain of ~40 `OR`ed words cost acceptodds 6–11 s
+ * of database time per request, and ten at once held the whole pool. Words in
+ * one AND merge into a single term first, so a long plain query is one.
+ */
+export const MAX_SEARCH_TERMS = 8;
+
+/** `node` with only its first `max` terms (leaves), in reading order. */
+function capTerms(node: SearchNode | null, max: number): { node: SearchNode | null; dropped: number } {
+  let kept = 0;
+  let dropped = 0;
+  const walk = (n: SearchNode): SearchNode | null => {
+    switch (n.kind) {
+      case 'and':
+      case 'or': {
+        const items = n.items.map(walk).filter((i): i is SearchNode => i !== null);
+        return n.kind === 'and' ? and(items) : or(items);
+      }
+      case 'not': {
+        const item = walk(n.item);
+        return item === null ? null : { kind: 'not', item };
+      }
+      default:
+        if (kept >= max) {
+          dropped += 1;
+          return null;
+        }
+        kept += 1;
+        return n;
+    }
+  };
+  return { node: node === null ? null : walk(node), dropped };
+}
+
+/**
+ * The query as a tree. Forgiving: an unmatched `)` is ignored, a missing one
+ * is implied at the end, a dangling `OR` is dropped, a bad filter is
+ * dropped with an error, and so is every term past {@link MAX_SEARCH_TERMS}.
+ * Never throws.
+ */
+export function parseSearch(input: string): ParsedSearch {
+  const tokens = tokenize(input);
+  const errors: string[] = [];
+  const fields = new Set<SearchField>();
+  let pos = 0;
+
+  // or := and (OR and)* ; and := unary* ; stops at ')' (consumed by the caller).
+  const parseOr = (depth: number): SearchNode | null => {
+    const branches: SearchNode[] = [];
+    let current: SearchNode[] = [];
+    const close = () => {
+      const node = and(current);
+      if (node) branches.push(node);
+      current = [];
+    };
+    while (pos < tokens.length) {
+      const tok = tokens[pos];
+      if (tok.t === ')') {
+        if (depth > 0) break;
+        pos += 1; // unmatched: ignored
+        continue;
+      }
+      pos += 1;
+      if (tok.t === 'or') {
+        close();
+        continue;
+      }
+      let node: SearchNode | null;
+      if (tok.t === '(') {
+        node = parseOr(depth + 1);
+        if (tokens[pos]?.t === ')') pos += 1;
+      } else if (tok.t === 'field') {
+        node = fieldNode(tok, errors);
+        if (node) fields.add(ALIASES[tok.key]);
+      } else {
+        const f = fragment(tok.text, tok.t === 'phrase');
+        node = f === null ? null : { kind: 'text', include: [f], exclude: [] };
+      }
+      if (node) current.push('neg' in tok && tok.neg ? negate(node) : node);
+    }
+    close();
+    return or(branches);
+  };
+
+  const capped = capTerms(parseOr(0), MAX_SEARCH_TERMS);
+  if (capped.dropped > 0) {
+    errors.push(`${capped.dropped} more term${capped.dropped === 1 ? '' : 's'}: at most ${MAX_SEARCH_TERMS} are used`);
+    // A dropped `venue:` no longer moves the page's own filter aside.
+    fields.clear();
+    const collect = (n: SearchNode) => {
+      if (n.kind === 'and' || n.kind === 'or') n.items.forEach(collect);
+      else if (n.kind === 'not') collect(n.item);
+      else if (n.kind === 'match' || n.kind === 'compare') fields.add(n.field);
+    };
+    if (capped.node) collect(capped.node);
+  }
+  return { node: capped.node, errors, fields };
+}
+
+// ---------------------------------------------------------------------------
+// reading the tree
+// ---------------------------------------------------------------------------
+
+/** A text node's `websearch_to_tsquery` string. */
+export function websearchOf(node: { include: string[]; exclude: string[] }): string {
+  return [...node.include, ...node.exclude.map((f) => `-${f}`)].join(' ');
+}
+
+/**
+ * The prefix alternative for a text node (`lib/search.ts`): its words ANDed,
+ * the last as a prefix. Only for positive words; a phrase or a negation keeps
+ * exact websearch semantics.
+ */
+export function prefixOf(node: { include: string[]; exclude: string[] }): string | null {
+  return node.exclude.length === 0 ? prefixTsquery(node.include.join(' ')) : null;
+}
+
+/**
+ * The text every match must contain: the root's text, or the text of a root
+ * AND. It can drive the relevance rank.
+ * `null` when there is none (only filters, or text only under an OR or NOT),
+ * or when it only excludes.
+ */
+export function requiredText(node: SearchNode | null): Extract<SearchNode, { kind: 'text' }> | null {
+  if (node === null) return null;
+  const text =
+    node.kind === 'text' ? node : node.kind === 'and' ? node.items.find((i) => i.kind === 'text') : undefined;
+  return text?.kind === 'text' && text.include.length > 0 ? text : null;
+}
+
+/** `%value%` for ILIKE, with `\`, `%` and `_` escaped (backslash is ILIKE's default escape). */
+export function containsPattern(value: string): string {
+  return `%${value.replace(/[\\%_]/g, (c) => `\\${c}`)}%`;
+}

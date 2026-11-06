@@ -1,5 +1,6 @@
 import { z } from 'zod';
 import { REAL_NAME_MAX } from '@/lib/profile';
+import { SEARCH_SORTS } from '@/lib/search';
 
 /** The `/api/v1` contract: requests are validated on the way in, responses on the way out. */
 
@@ -87,8 +88,11 @@ export const PaperResponse = z.object({
 });
 export const PaperSchemeParam = z.enum(['arxiv', 'doi', 'openreview']);
 export const SearchQuery = z.object({
-  q: z.string().trim().min(2).max(200),
-  page: z.coerce.number().int().min(1).max(500).default(1),
+  /** The search syntax (`lib/query.ts`). Without one, every paper is listed. */
+  q: z.string().trim().max(200).optional(),
+  venue: z.string().trim().max(200).optional(),
+  sort: z.enum(SEARCH_SORTS).optional(),
+  page: z.coerce.number().int().min(1).max(10_000).default(1),
 });
 export const SearchResponse = z.object({
   hits: z.array(
@@ -98,8 +102,10 @@ export const SearchResponse = z.object({
       abstract: z.string().nullable(),
       year: z.number().int().nullable(),
       venue: z.string().nullable(),
+      pdf: z.string().nullable(),
       path: z.string(),
     }),
   ),
+  total: z.number().int(),
   hasMore: z.boolean(),
 });

@@ -2,13 +2,14 @@ import { afterAll, afterEach, beforeEach, describe, expect, it, vi } from 'vites
 import { eq } from 'drizzle-orm';
 import * as paperRoute from '@/app/api/v1/papers/[scheme]/[...value]/route';
 import * as searchRoute from '@/app/api/v1/search/route';
+import type { SearchSort } from '@/lib/search';
 import { getDb } from '@/db';
 import { paperIdentifiers, papers } from '@/db/schema';
 import { importSubmissions } from '@/server/import-submissions';
 import { SourceUnavailable, type PaperSource, type SourcePaper } from '@/server/paper-sources/types';
 import { paperGate } from '@/server/paper-gate';
 import { lookupPaper, savePaper } from '@/server/papers';
-import { searchPapers } from '@/server/search';
+import { searchPapers, topVenues } from '@/server/search';
 import { closePool, ORIGIN, resetDatabase } from './helpers';
 
 beforeEach(resetDatabase);
@@ -207,23 +208,24 @@ describe('search', () => {
     await savePaper({
       ...ATTENTION,
       title: 'Deep residual learning',
+      authors: ['Kaiming He'],
       abstract: 'Skip connections help very deep networks.',
       identifiers: [{ scheme: 'doi', value: '10.1/resnet' }],
     });
   });
 
   it('finds words in titles and abstracts', async () => {
-    expect((await searchPapers('attention')).hits[0].title).toBe(ATTENTION.title);
-    expect((await searchPapers('skip connections')).hits[0].value).toBe('10.1/resnet');
+    expect((await searchPapers({ q: 'attention' })).hits[0].title).toBe(ATTENTION.title);
+    expect((await searchPapers({ q: 'skip connections' })).hits[0].value).toBe('10.1/resnet');
   });
 
   it('finds a misspelled title', async () => {
-    expect((await searchPapers('atention is all you ned')).hits[0].title).toBe(ATTENTION.title);
+    expect((await searchPapers({ q: 'atention is all you ned' })).hits[0].title).toBe(ATTENTION.title);
   });
 
   it('survives operators and punctuation in a query', async () => {
     for (const q of ["'; drop table papers; --", '"unterminated', 'a & | ! (b', '-']) {
-      await expect(searchPapers(q)).resolves.toBeDefined();
+      await expect(searchPapers({ q })).resolves.toBeDefined();
     }
   });
 
@@ -231,7 +233,7 @@ describe('search', () => {
     const survivor = await savePaper(ATTENTION);
     const [resnet] = await getDb().select().from(papers).where(eq(papers.title, 'Deep residual learning'));
     await getDb().update(papers).set({ mergedInto: survivor }).where(eq(papers.id, resnet.id));
-    expect((await searchPapers('residual')).hits).toHaveLength(0);
+    expect((await searchPapers({ q: 'residual' })).hits).toHaveLength(0);
   });
 
   it('pages through results', async () => {
@@ -241,12 +243,65 @@ describe('search', () => {
       identifiers: [{ scheme: 'doi' as const, value: `10.1/banana${i}` }],
     }));
     for (const paper of many) await savePaper(paper);
-    const first = await searchPapers('quantum bananas');
+    const first = await searchPapers({ q: 'quantum bananas', limit: 20 });
     expect(first.hits).toHaveLength(20);
-    expect(first.hasMore).toBe(true);
-    const second = await searchPapers('quantum bananas', 2);
+    expect(first.total).toBe(25);
+    const second = await searchPapers({ q: 'quantum bananas', limit: 20, page: 2 });
     expect(second.hits).toHaveLength(5);
-    expect(second.hasMore).toBe(false);
+  });
+
+  it('reads the search syntax', async () => {
+    const title = async (q: string) => (await searchPapers({ q })).hits.map((h) => h.title);
+    expect(await title('author:vaswani')).toEqual([ATTENTION.title]);
+    expect(await title('year<2000')).toEqual([]);
+    expect(await title('-attention year>=2017')).toEqual(['Deep residual learning']);
+    expect(await title('title:residual OR title:attention')).toHaveLength(2);
+    expect(await title('"residual attention"')).toEqual([]);
+    expect(await title('resid')).toEqual(['Deep residual learning']);
+    expect(await title('attention OR residual')).toHaveLength(2);
+    expect(await title('attention OR year<2000')).toEqual([ATTENTION.title]);
+    expect(await title('-(attention OR residual)')).toEqual([]);
+    expect(await title('author!=vaswani')).toEqual(['Deep residual learning']);
+  });
+
+  it('keeps a pattern from matching more than it says', async () => {
+    expect((await searchPapers({ q: 'title:"%"' })).total).toBe(0);
+  });
+
+  it('filters by one venue, and lists the venues with most papers', async () => {
+    const venued = (venue: string, value: string) =>
+      savePaper({
+        ...ATTENTION,
+        title: `Paper ${value}`,
+        venue,
+        identifiers: [{ scheme: 'doi', value: `10.1/${value}` }],
+      });
+    await venued('ICLR 2026', 'a');
+    await venued('ICLR 2026', 'b');
+    await venued('NeurIPS', 'c');
+    expect((await searchPapers({ venue: 'NeurIPS' })).hits.map((h) => h.title)).toEqual(['Paper c']);
+    expect(await topVenues()).toEqual(['ICLR 2026', 'NeurIPS']);
+  });
+
+  it('sorts', async () => {
+    const dated = (title: string, year: number | null, value: string) =>
+      savePaper({ ...ATTENTION, title, year, identifiers: [{ scheme: 'doi', value: `10.1/${value}` }] });
+    await dated('Banana', 2030, 'a');
+    await dated('apple', 1990, 'b');
+    await dated('Undated', null, 'c');
+    const titles = async (sort: SearchSort) => (await searchPapers({ sort })).hits.map((h) => h.title);
+    expect((await titles('newest'))[0]).toBe('Banana');
+    expect((await titles('oldest'))[0]).toBe('apple');
+    expect(await titles('oldest')).toHaveLength(5);
+    expect((await titles('newest')).at(-1)).toBe('Undated');
+    expect((await titles('oldest')).at(-1)).toBe('Undated');
+    expect((await titles('title')).slice(0, 2)).toEqual(['apple', 'Attention Is All You Need']);
+  });
+
+  it('with nothing to search for, lists every paper', async () => {
+    expect((await searchPapers()).total).toBe(2);
+    expect((await searchPapers({ q: '  ' })).total).toBe(2);
+    expect((await searchPapers({ sort: 'relevance' })).total).toBe(2);
   });
 });
 
@@ -299,5 +354,7 @@ describe('the API', () => {
     const res = await searchRoute.GET(req, { params: Promise.resolve({}) });
     const body = await res.json();
     expect(body.hits[0].path).toBe('/abs/1706.03762');
+    expect(body.total).toBe(1);
+    expect(body.hasMore).toBe(false);
   });
 });

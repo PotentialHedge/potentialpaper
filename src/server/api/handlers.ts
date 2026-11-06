@@ -164,10 +164,12 @@ export const getPaper = route(async (_req, params) => {
 });
 
 export const search = route(async (req) => {
-  const { q, page } = parseQuery(req, S.SearchQuery);
-  const { hits, hasMore } = await searchPapers(q, page);
+  const { q, venue, sort, page } = parseQuery(req, S.SearchQuery);
+  const limit = 20;
+  const { hits, total } = await searchPapers({ q, venue, sort: sort ?? (q ? 'relevance' : 'activity'), page, limit });
   return respond(S.SearchResponse, {
     hits: hits.map(({ scheme, value, ...hit }) => ({ ...hit, path: paperPath({ scheme, value }) })),
-    hasMore,
+    total,
+    hasMore: page * limit < total,
   });
 });
