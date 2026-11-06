@@ -254,8 +254,8 @@ describe('every repo passes git fsck --strict', () => {
       .trim()
       .split('\n')
       .filter(Boolean);
-    expect(log[0]).toBe('papertrail|papertrail@users.invalid|papertrail|Update metadata|edit');
-    expect(log[1]).toMatch(/^u_[a-z2-9]{8}\|u_[a-z2-9]{8}@users\.invalid\|papertrail\|Revert "C"\|revert$/);
+    expect(log[0]).toBe('potentialpaper|potentialpaper@users.invalid|potentialpaper|Update metadata|edit');
+    expect(log[1]).toMatch(/^u_[a-z2-9]{8}\|u_[a-z2-9]{8}@users\.invalid\|potentialpaper\|Revert "C"\|revert$/);
   });
 });
 

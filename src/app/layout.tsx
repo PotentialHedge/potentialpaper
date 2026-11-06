@@ -5,7 +5,7 @@ import { NavUser } from '@/components/NavUser';
 import './globals.css';
 
 export const metadata: Metadata = {
-  title: 'PaperTrail',
+  title: 'PotentialPaper',
   description: 'A public, editable page for every research paper, with labeled links between them.',
 };
 

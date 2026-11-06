@@ -30,7 +30,7 @@ export function createDb(pool: Pool) {
 export type Database = ReturnType<typeof createDb>;
 
 declare global {
-  var __papertrailPool: Pool | undefined;
+  var __potentialpaperPool: Pool | undefined;
 }
 
 /**
@@ -42,10 +42,10 @@ declare global {
  * Postgres's connection slots within a minute.
  */
 export function getPool(): Pool {
-  const existing = globalThis.__papertrailPool;
+  const existing = globalThis.__potentialpaperPool;
   if (existing) return existing;
   const created = createPool();
-  globalThis.__papertrailPool = created;
+  globalThis.__potentialpaperPool = created;
   return created;
 }
 

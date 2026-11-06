@@ -75,7 +75,7 @@ export function Finish({
 
   if (!profileDone) {
     return (
-      <OnboardingCard title="How should you appear?" eyebrow="Confirmed. Welcome to PaperTrail.">
+      <OnboardingCard title="How should you appear?" eyebrow="Confirmed. Welcome to PotentialPaper.">
         <form onSubmit={saveProfile}>
           <ProfileFields values={profile} onChange={setProfile} />
           <button className={ui.btn()} disabled={busy || !profile.handle.trim() || profile.showInstitution === null}>

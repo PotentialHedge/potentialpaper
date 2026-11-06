@@ -7,7 +7,7 @@ import { renderMail, type RenderedMail } from './mail-html';
  * the running head links to that link's origin.
  */
 
-const SITE = 'papertrail';
+const SITE = 'potentialpaper';
 
 function mail(url: string, doc: Omit<Parameters<typeof renderMail>[0], 'siteUrl'>): RenderedMail {
   return renderMail({ siteUrl: new URL(url).origin, ...doc });

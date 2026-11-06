@@ -7,7 +7,7 @@ import { paperIdFromText, paperPath } from '@/lib/paper-ids';
 import { searchPapers } from '@/server/search';
 
 export const dynamic = 'force-dynamic';
-export const metadata: Metadata = { title: 'Search · PaperTrail' };
+export const metadata: Metadata = { title: 'Search · PotentialPaper' };
 
 const MAX_PAGE = 500;
 

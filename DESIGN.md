@@ -1,6 +1,6 @@
-# PaperTrail — design
+# PotentialPaper — design
 
-Status: draft for review, 2026-11-05. "PaperTrail" is a working name taken from the directory.
+Status: draft for review, 2026-11-05.
 The build order is in [IMPLEMENTATION.md](IMPLEMENTATION.md).
 
 ## 1. What this is
@@ -566,12 +566,12 @@ Decided on 2026-11-05:
 - **Storage:** git objects in Postgres (section 4).
 - **Identity:** real names are optional, with anonymous commenting available (section 5.3).
 - **Joining:** institutional email or the request form, following acceptodds (section 5).
-- **Name:** PaperTrail is the working title and can change later.
+- **Name:** PotentialPaper.
 
 ### Later
 
 - [ ] **Choose the contribution license.** To discuss. The starting proposal is CC BY-SA 4.0 for
       community content and CC BY 4.0 for author sections. **This must be settled before anyone outside
       the team edits**, because relicensing other people's contributions later is close to impossible.
-- [ ] **Choose the final name and domain.** Papertrail is also an existing log-management product, so
-      check for confusion and availability before anything public. The extension domain can wait for this.
+- [ ] **Choose the final domain.** `potentialpaper.com` is the candidate. The extension domain can wait for
+      this.

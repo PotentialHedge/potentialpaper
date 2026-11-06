@@ -21,7 +21,7 @@ Who: --bot (the labeled site bot, made if missing), --as <handle>, or --system (
 --system with no change starts the repo with its metadata snapshot.
 --base <commit id> says which commit the edit started from; the default is the head.`;
 
-const BOT_HANDLE = 'papertrail-bot';
+const BOT_HANDLE = 'potentialpaper-bot';
 
 async function botActor(): Promise<Actor> {
   await getDb()

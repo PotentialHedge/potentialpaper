@@ -73,7 +73,7 @@ export type EditKind = (typeof EDIT_KINDS)[number];
 export interface Commit {
   tree: string;
   parent: string | null;
-  /** The public id of whoever wrote it: `u_7k3xq2mf`, or `papertrail` for the system. */
+  /** The public id of whoever wrote it: `u_7k3xq2mf`, or `potentialpaper` for the system. */
   authorId: string;
   /** Whole seconds, because a commit holds no more. */
   at: Date;
@@ -83,7 +83,7 @@ export interface Commit {
   bot?: boolean;
 }
 
-export const SYSTEM_AUTHOR_ID = 'papertrail';
+export const SYSTEM_AUTHOR_ID = 'potentialpaper';
 
 function signature(id: string, at: Date): string {
   return `${id} <${id}@users.invalid> ${Math.floor(at.getTime() / 1000)} +0000`;

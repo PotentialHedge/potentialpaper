@@ -29,7 +29,7 @@ export async function fetchSource(url: string): Promise<Response | null> {
   let res: Response;
   try {
     res = await fetch(url, {
-      headers: { 'User-Agent': 'PaperTrail (https://papers.potentialhedge.com)' },
+      headers: { 'User-Agent': 'PotentialPaper (https://papers.potentialhedge.com)' },
       signal: AbortSignal.timeout(TIMEOUT_MS),
     });
   } catch (err) {

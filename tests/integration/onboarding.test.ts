@@ -51,7 +51,7 @@ describe('signing up', () => {
     await signUp('ada@ethz.ch');
     const res = await api('POST', '/onboarding', { body: { email: 'ada@ethz.ch' } });
     expect(res.status).toBe(202);
-    expect(lastMailTo('ada@ethz.ch')?.text).toContain('already has a papertrail account');
+    expect(lastMailTo('ada@ethz.ch')?.text).toContain('already has a potentialpaper account');
     expect(await getDb().select().from(accounts)).toHaveLength(1);
   });
 

@@ -4,6 +4,10 @@ Things only you can do or decide. Most urgent first.
 
 - [ ] **acceptodds is running vulnerable Next 16.4.0 in production.** `npm audit` lists critical advisories,
       including unauthenticated remote code execution. Fix it, or ask me to.
+- [ ] **The live site still runs under the old name.** Its containers, volume and database are still `papertrail`,
+      and they keep running. A deploy from this code would start a new `potentialpaper` project with an empty
+      database, and its routes would clash with the old stack. Stop or migrate the old stack first, and replay the
+      page commits, because the system author in their hashes changed.
 - [ ] **Review Milestone 1 on the live site.** Try https://papers.potentialhedge.com/abs/1706.03762, the search
       link in the header, and the home page. It's on the branch `milestone-1-papers`, pushed and deployed. Tell me
       whether to merge it to `main`.

@@ -1,7 +1,7 @@
 # Runs behind the host's shared Traefik, which owns :80/:443 and admits only Cloudflare. This file
 # publishes no ports: `app` joins the external `web` network and is routed by its labels alone.
 # APP_HOST in .env.production names the host, so one file serves staging and production: use a
-# different project name (`-p papertrail-staging`) and env file for each.
+# different project name (`-p potentialpaper-staging`) and env file for each.
 #
 # Deploy (commit first: the image is tagged with HEAD's commit):
 #   test -z "$(git status --porcelain)" && export GIT_COMMIT=$(git rev-parse --short HEAD)
@@ -16,7 +16,7 @@
 # Migrations are their own step, never run at app start. `build` needs --profile tools: without it
 # the tools image goes stale and migrate silently applies nothing new.
 
-name: papertrail
+name: potentialpaper
 
 x-logging: &logging
   driver: json-file
@@ -47,7 +47,7 @@ services:
       target: app
       args:
         GIT_COMMIT: ${GIT_COMMIT:-unknown}
-    image: papertrail-app:${GIT_COMMIT:-latest}
+    image: potentialpaper-app:${GIT_COMMIT:-latest}
     restart: unless-stopped
     logging: *logging
     env_file: .env.production
@@ -72,34 +72,34 @@ services:
     labels:
       - traefik.enable=true
       - traefik.docker.network=web
-      - traefik.http.routers.${COMPOSE_PROJECT_NAME:-papertrail}.rule=Host(`${APP_HOST}`)
-      - traefik.http.routers.${COMPOSE_PROJECT_NAME:-papertrail}.entrypoints=websecure
-      - traefik.http.routers.${COMPOSE_PROJECT_NAME:-papertrail}.tls=true
-      - traefik.http.routers.${COMPOSE_PROJECT_NAME:-papertrail}.middlewares=${COMPOSE_PROJECT_NAME:-papertrail}-ratelimit
-      - traefik.http.services.${COMPOSE_PROJECT_NAME:-papertrail}.loadbalancer.server.port=3000
+      - traefik.http.routers.${COMPOSE_PROJECT_NAME:-potentialpaper}.rule=Host(`${APP_HOST}`)
+      - traefik.http.routers.${COMPOSE_PROJECT_NAME:-potentialpaper}.entrypoints=websecure
+      - traefik.http.routers.${COMPOSE_PROJECT_NAME:-potentialpaper}.tls=true
+      - traefik.http.routers.${COMPOSE_PROJECT_NAME:-potentialpaper}.middlewares=${COMPOSE_PROJECT_NAME:-potentialpaper}-ratelimit
+      - traefik.http.services.${COMPOSE_PROJECT_NAME:-potentialpaper}.loadbalancer.server.port=3000
       # A dumb-HTTP clone asks for each git object separately: over a thousand quick requests for a page with
       # a few hundred edits, all small primary-key reads. It would trip the limit below, and git gives up on a 429.
-      - traefik.http.routers.${COMPOSE_PROJECT_NAME:-papertrail}-git.rule=Host(`${APP_HOST}`) && PathPrefix(`/git/`)
-      - traefik.http.routers.${COMPOSE_PROJECT_NAME:-papertrail}-git.entrypoints=websecure
-      - traefik.http.routers.${COMPOSE_PROJECT_NAME:-papertrail}-git.tls=true
-      - traefik.http.routers.${COMPOSE_PROJECT_NAME:-papertrail}-git.service=${COMPOSE_PROJECT_NAME:-papertrail}
-      - traefik.http.routers.${COMPOSE_PROJECT_NAME:-papertrail}-git.middlewares=${COMPOSE_PROJECT_NAME:-papertrail}-git-ratelimit
-      - traefik.http.middlewares.${COMPOSE_PROJECT_NAME:-papertrail}-git-ratelimit.ratelimit.average=${GIT_RATE_LIMIT_AVERAGE:-200}
-      - traefik.http.middlewares.${COMPOSE_PROJECT_NAME:-papertrail}-git-ratelimit.ratelimit.burst=${GIT_RATE_LIMIT_BURST:-1500}
-      - traefik.http.middlewares.${COMPOSE_PROJECT_NAME:-papertrail}-git-ratelimit.ratelimit.period=1s
-      - traefik.http.middlewares.${COMPOSE_PROJECT_NAME:-papertrail}-git-ratelimit.ratelimit.sourcecriterion.requestheadername=Cf-Connecting-Ip
+      - traefik.http.routers.${COMPOSE_PROJECT_NAME:-potentialpaper}-git.rule=Host(`${APP_HOST}`) && PathPrefix(`/git/`)
+      - traefik.http.routers.${COMPOSE_PROJECT_NAME:-potentialpaper}-git.entrypoints=websecure
+      - traefik.http.routers.${COMPOSE_PROJECT_NAME:-potentialpaper}-git.tls=true
+      - traefik.http.routers.${COMPOSE_PROJECT_NAME:-potentialpaper}-git.service=${COMPOSE_PROJECT_NAME:-potentialpaper}
+      - traefik.http.routers.${COMPOSE_PROJECT_NAME:-potentialpaper}-git.middlewares=${COMPOSE_PROJECT_NAME:-potentialpaper}-git-ratelimit
+      - traefik.http.middlewares.${COMPOSE_PROJECT_NAME:-potentialpaper}-git-ratelimit.ratelimit.average=${GIT_RATE_LIMIT_AVERAGE:-200}
+      - traefik.http.middlewares.${COMPOSE_PROJECT_NAME:-potentialpaper}-git-ratelimit.ratelimit.burst=${GIT_RATE_LIMIT_BURST:-1500}
+      - traefik.http.middlewares.${COMPOSE_PROJECT_NAME:-potentialpaper}-git-ratelimit.ratelimit.period=1s
+      - traefik.http.middlewares.${COMPOSE_PROJECT_NAME:-potentialpaper}-git-ratelimit.ratelimit.sourcecriterion.requestheadername=Cf-Connecting-Ip
       # Anonymous traffic is the edge's job, keyed on the real client IP, which is trustworthy
       # because only Cloudflare can reach this origin.
-      - traefik.http.middlewares.${COMPOSE_PROJECT_NAME:-papertrail}-ratelimit.ratelimit.average=${RATE_LIMIT_AVERAGE:-30}
-      - traefik.http.middlewares.${COMPOSE_PROJECT_NAME:-papertrail}-ratelimit.ratelimit.burst=${RATE_LIMIT_BURST:-60}
-      - traefik.http.middlewares.${COMPOSE_PROJECT_NAME:-papertrail}-ratelimit.ratelimit.period=1s
-      - traefik.http.middlewares.${COMPOSE_PROJECT_NAME:-papertrail}-ratelimit.ratelimit.sourcecriterion.requestheadername=Cf-Connecting-Ip
+      - traefik.http.middlewares.${COMPOSE_PROJECT_NAME:-potentialpaper}-ratelimit.ratelimit.average=${RATE_LIMIT_AVERAGE:-30}
+      - traefik.http.middlewares.${COMPOSE_PROJECT_NAME:-potentialpaper}-ratelimit.ratelimit.burst=${RATE_LIMIT_BURST:-60}
+      - traefik.http.middlewares.${COMPOSE_PROJECT_NAME:-potentialpaper}-ratelimit.ratelimit.period=1s
+      - traefik.http.middlewares.${COMPOSE_PROJECT_NAME:-potentialpaper}-ratelimit.ratelimit.sourcecriterion.requestheadername=Cf-Connecting-Ip
 
   tools:
     build:
       context: .
       target: tools
-    image: papertrail-tools
+    image: potentialpaper-tools
     profiles: [tools]
     env_file: .env.production
     depends_on:

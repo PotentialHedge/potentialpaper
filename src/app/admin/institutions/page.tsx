@@ -7,7 +7,7 @@ import { pendingByDomain } from '@/server/institution-requests';
 import { Queue } from './Queue';
 
 export const dynamic = 'force-dynamic';
-export const metadata: Metadata = { title: 'Institution requests · PaperTrail' };
+export const metadata: Metadata = { title: 'Institution requests · PotentialPaper' };
 
 /** The admin queue for institution requests. Not found for everyone else: nothing here is theirs to know of. */
 export default async function InstitutionQueue() {

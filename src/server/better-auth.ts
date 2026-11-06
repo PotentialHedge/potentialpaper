@@ -152,7 +152,7 @@ export async function revokeUnprovenAccess(userId: string, database: Pick<Databa
 
 export function createAuth(database: Database) {
   const auth = betterAuth({
-    appName: 'papertrail',
+    appName: 'potentialpaper',
     baseURL: baseURL(),
     secret: process.env.BETTER_AUTH_SECRET,
     trustedOrigins: [new URL(baseURL()).origin],

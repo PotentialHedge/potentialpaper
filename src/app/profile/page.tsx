@@ -11,7 +11,7 @@ import { Affiliations } from './Affiliations';
 import { ProfileForm } from './ProfileForm';
 
 export const dynamic = 'force-dynamic';
-export const metadata: Metadata = { title: 'Profile · PaperTrail' };
+export const metadata: Metadata = { title: 'Profile · PotentialPaper' };
 
 export default async function Profile() {
   const viewer = await viewerFromHeaders(await headers());

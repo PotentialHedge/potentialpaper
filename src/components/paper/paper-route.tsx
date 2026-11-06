@@ -27,7 +27,7 @@ export async function paperMetadata(scheme: PaperScheme, segments: string[]): Pr
   const { paper, identifiers } = await load(scheme, segments);
   const canonical = canonicalPaperId(identifiers);
   return {
-    title: `${paper.title} · PaperTrail`,
+    title: `${paper.title} · PotentialPaper`,
     description: paper.abstract?.slice(0, DESCRIPTION_LENGTH),
     alternates: canonical ? { canonical: paperPath(canonical) } : undefined,
   };

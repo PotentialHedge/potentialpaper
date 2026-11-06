@@ -14,7 +14,7 @@ describe('handleProblem', () => {
   });
 
   it('refuses names that would read as the site, and the placeholder shape', () => {
-    for (const h of ['admin', 'moderator', 'papertrail', 'anonymous', 'user-a1b2c3']) {
+    for (const h of ['admin', 'moderator', 'potentialpaper', 'anonymous', 'user-a1b2c3']) {
       expect(handleProblem(h)).toBe('That handle is reserved.');
     }
   });

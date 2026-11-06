@@ -1,21 +1,21 @@
 # Dev database only. `next dev` runs on the host and talks to this over 127.0.0.1:55433.
 # 5432 and 6543 are taken by unrelated containers on the dev host, and 55432 is acceptodds'.
-name: papertrail-dev
+name: potentialpaper-dev
 
 services:
   postgres:
     image: postgres:16
     restart: unless-stopped
     environment:
-      POSTGRES_USER: papertrail
-      POSTGRES_PASSWORD: papertrail
-      POSTGRES_DB: papertrail
+      POSTGRES_USER: potentialpaper
+      POSTGRES_PASSWORD: potentialpaper
+      POSTGRES_DB: potentialpaper
     ports:
       - '127.0.0.1:55433:5432'
     volumes:
       - pgdata:/var/lib/postgresql/data
     healthcheck:
-      test: ['CMD-SHELL', 'pg_isready -U papertrail -d papertrail']
+      test: ['CMD-SHELL', 'pg_isready -U potentialpaper -d potentialpaper']
       interval: 30s
       timeout: 5s
       retries: 20

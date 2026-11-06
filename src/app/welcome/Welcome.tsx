@@ -30,7 +30,7 @@ export function Welcome({ next, institutionCount }: { next: string; institutionC
   }
 
   return (
-    <OnboardingCard title="Join PaperTrail" eyebrow="Anyone can read. Verified researchers can edit.">
+    <OnboardingCard title="Join PotentialPaper" eyebrow="Anyone can read. Verified researchers can edit.">
       <form
         onSubmit={async (e) => {
           e.preventDefault();

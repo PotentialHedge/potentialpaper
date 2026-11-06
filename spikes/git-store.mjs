@@ -26,7 +26,7 @@ async function commit(p, n, parent) {
   const au = obj('blob',Buffer.from('# TLDR\nAuthor text\n')), cm = obj('blob',Buffer.from(doc(p,n))), ln = obj('blob',Buffer.from(LINKS));
   const ta = tree([['README.md','100644',au.oid]]), tc = tree([['README.md','100644',cm.oid],['links.jsonl','100644',ln.oid]]);
   const root = tree([['author','40000',ta.oid],['community','40000',tc.oid]]);
-  const ts=1790000000+n; const c = obj('commit',Buffer.from(`tree ${root.oid.toString('hex')}\n${parent?`parent ${parent.toString('hex')}\n`:''}author u${n} <u${n}@users.papertrail> ${ts} +0000\ncommitter papertrail <bot@papertrail> ${ts} +0000\n\nedit ${n}\n`));
+  const ts=1790000000+n; const c = obj('commit',Buffer.from(`tree ${root.oid.toString('hex')}\n${parent?`parent ${parent.toString('hex')}\n`:''}author u${n} <u${n}@users.potentialpaper> ${ts} +0000\ncommitter potentialpaper <bot@potentialpaper> ${ts} +0000\n\nedit ${n}\n`));
   const cl = await pool.connect();
   try { await cl.query('begin');
     const os=[au,cm,ln,ta,tc,root,c];
