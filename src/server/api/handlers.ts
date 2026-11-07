@@ -6,7 +6,9 @@ import { addAffiliation, listAffiliations, removeAffiliation, verifyAffiliation 
 import { requireAuth, requireVerified, viewerFromHeaders, type Principal } from '../auth';
 import { attachDemo, removeDemo } from '../demos/attach';
 import { demoUrl } from '@/lib/demos';
-import type { Actor } from '../pages/commit';
+import { revertCommit, type Actor, type CommitResult } from '../pages/commit';
+import { editSection } from '../pages/edit';
+import { renderMarkdown } from '../pages/markdown';
 import { refreshPaperPages } from '../pages/refresh';
 import { setFirstPassword, startOnboarding } from '../onboarding';
 import { canonicalPaperId, paperPath, parsePaperId } from '@/lib/paper-ids';
@@ -192,4 +194,37 @@ export const deleteDemo = route(async (req) => {
   const commit = await removeDemo(paper.id, actorOf(principal), id);
   await refreshPaperPages(identifiers);
   return respond(S.DemoRemoved, { head: commit.oid }, { principal });
+});
+
+function committed(result: CommitResult) {
+  return result.status === 'committed'
+    ? { head: result.oid, merged: result.merged, changed: true }
+    : { head: result.oid, merged: false, changed: false };
+}
+
+/** One section of the community page, put back into the file as it was when the editor loaded it. */
+export const postSectionEdit = route(async (req) => {
+  const principal = await requireVerified(req);
+  const { paper: id, ...edit } = await parseBody(req, S.SectionEditBody);
+  const { paper, identifiers } = await knownPaper(id.scheme, id.value);
+  const result = await editSection(paper.id, actorOf(principal), edit);
+  if (result.status === 'committed') await refreshPaperPages(identifiers);
+  return respond(S.PageCommitted, committed(result), { principal });
+});
+
+/** The editor's preview, through the renderer commits use. Signed-in only, as only editors need it. */
+export const postRender = route(async (req) => {
+  const principal = await requireAuth(req);
+  const { content } = await parseBody(req, S.RenderBody);
+  return respond(S.Rendered, { html: renderMarkdown(content, 'preview') }, { principal });
+});
+
+/** Undoes one commit, keeping everything since, as `git revert` does. */
+export const postRevert = route(async (req) => {
+  const principal = await requireVerified(req);
+  const { paper: id, oid, summary } = await parseBody(req, S.RevertBody);
+  const { paper, identifiers } = await knownPaper(id.scheme, id.value);
+  const result = await revertCommit(paper.id, oid, actorOf(principal), summary?.trim() || undefined);
+  if (result.status === 'committed') await refreshPaperPages(identifiers);
+  return respond(S.PageCommitted, committed(result), { principal });
 });

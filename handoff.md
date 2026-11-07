@@ -16,7 +16,7 @@ GitHub repos come later.
 
 ## Current state
 
-Milestones 0, 1 and 2 are built, merged into `main` and deployed. Mail doesn't work yet.
+Milestones 0, 1 and 2 are built, merged into `main` and deployed, and Milestone 3's editor is live. Mail doesn't work yet.
 
 - **Stack:** Next 16.4.5, Drizzle, Postgres 16, Better Auth, Tailwind v4 and Vitest, with Cloudflare R2 for PDFs
   and images.
@@ -46,22 +46,35 @@ Milestones 0, 1 and 2 are built, merged into `main` and deployed. Mail doesn't w
   as Vite builds make) is redirected into the demo its `Referer` names. Pages run a demo on click, in a
   sandboxed iframe. That host shares a site with the app, so it is not a real sandbox yet: see `TODO.md`.
 
-## Next: Milestone 3, community editing
+## Milestone 3, community editing (in progress)
 
-Demos (above) came first, at the user's request. The editor is next.
+**Built:** the section editor, history, diff and revert.
 
-`IMPLEMENTATION.md` section 3 lists the scope: a section editor, history, diff and revert pages, `/changes`,
-watchlists, protection levels, reports, blocks and redaction. None of it has been started. The editor and the
-history, diff and revert pages depend on none of the user's open decisions, so start there. Before the alpha,
-these need decisions from the user (all are in `TODO.md`):
+- **Rendering:** `server/pages/markdown.ts`. markdown-it with raw HTML off, `rel="nofollow ugc noopener"` on
+  links, and KaTeX 0.19 for `$…$` and `$$…$$` through our own small rule, since `@vscode/markdown-it-katex`
+  pins KaTeX 0.16, which has an open advisory. KaTeX runs with `trust: false`, so `\href` stays text.
+  `writeCurrent` fills `page_current.community_html` and `author_html`, and `pages:rebuild` regenerates them.
+  `##` headings are a page's sections: the same parse splits the file for the editor and marks
+  `data-section` in the HTML, where `slots.tsx` adds the edit links.
+- **API:** `POST /api/v1/pages/edit` `{ paper, baseOid, section, content, summary }` (section 0 is the whole
+  community section) puts the section back into the file _as it was at `baseOid`_, then calls `commitPage`,
+  so edits to other sections merge. A conflict is `409 edit_conflict`, and adds `details.current`
+  `{ head, section, text }`. `POST /api/v1/pages/render` (signed in) serves the preview, and
+  `POST /api/v1/pages/revert` takes `{ paper, oid }`.
+- **Pages:** `/edit`, `/history` and `/diff`, each in front of the paper's own path
+  (`/history/abs/1706.03762`, `/diff/doi/…?oid=…`), because the paper routes are catch-alls. They're dynamic
+  and noindex, and `/edit/` is disallowed in robots. History shows handles through `historyWithHandles`
+  (`server/pages/edit.ts`) and never account ids.
+
+**Next in Milestone 3:** `/changes`, watchlists, protection levels, new-account limits, reports, blocks and
+redaction. Before the alpha, these need decisions from the user (all are in `TODO.md`):
 
 - the contribution license,
-- a Cloudflare token limited to cache purge, so each commit can purge its page,
+- a Cloudflare token limited to cache purge. Without one, an edit shows at once only past the edge (`?v=`),
+  and other readers see the edge's copy until it expires,
 - mail and the final domain.
 
-Also revisit the CSP before user-written content ships: scripts currently allow `'unsafe-inline'`.
-
-`page_current` holds Markdown for now. Milestone 3 is where rendering and sanitizing at commit time arrive.
+Also revisit the CSP now that user-written content ships: scripts currently allow `'unsafe-inline'`.
 
 ## Decisions already made (don't reopen)
 

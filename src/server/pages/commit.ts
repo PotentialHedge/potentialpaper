@@ -42,9 +42,9 @@ import {
  * projections and the event, so they can never disagree.
  *
  * Still to come with the features that need them: page protection and tighter limits for new accounts
- * (Milestone 3), links (4), author identities and trailers (5). Nothing shows page content yet, so nothing
- * needs purging from the edge: the editor adds that when pages start showing it (`info/refs` is never
- * cached, and objects never change).
+ * (Milestone 3), links (4), author identities and trailers (5). The routes that commit refresh the paper's
+ * pages afterwards (`refresh.ts`), since this runs in scripts too (`info/refs` is never cached, and objects
+ * never change).
  */
 
 export type Actor = { kind: 'system' } | { kind: 'account'; accountId: string; isAdmin: boolean };

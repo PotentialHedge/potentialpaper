@@ -125,3 +125,32 @@ export const DemoAttached = z.object({
 });
 
 export const DemoRemoved = z.object({ head: z.string().nullable() });
+
+const Oid = z.string().regex(/^[0-9a-f]{40}$/);
+
+export const SectionEditBody = z.object({
+  paper: PaperIdentifier,
+  /** The commit the editor loaded, or `null` for a page with no repo yet. */
+  baseOid: Oid.nullable(),
+  /** From 1 in order; 0 is the whole community section. */
+  section: z.number().int().min(0).max(1000),
+  content: z.string().max(256 * 1024),
+  summary: z.string().max(1000).default(''),
+});
+
+export const PageCommitted = z.object({
+  /** The page's head after the change. */
+  head: z.string().nullable(),
+  /** Whether it was merged with edits made since its base. */
+  merged: z.boolean(),
+  changed: z.boolean(),
+});
+
+export const RenderBody = z.object({ content: z.string().max(256 * 1024) });
+export const Rendered = z.object({ html: z.string() });
+
+export const RevertBody = z.object({
+  paper: PaperIdentifier,
+  oid: Oid,
+  summary: z.string().max(1000).optional(),
+});

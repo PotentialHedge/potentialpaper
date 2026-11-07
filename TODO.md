@@ -12,8 +12,9 @@ Things only you can do or decide, most urgent first. Milestones 1 and 2 and the 
 
 - [ ] **Contribution license.** The starting proposal is CC BY-SA for community content and CC BY for author
       sections.
-- [ ] **Decide how production purges the edge.** Once pages show edits, each commit has to purge that page from
-      Cloudflare, so the app needs a token. I'd make one limited to cache purge on this zone, and put it in
+- [ ] **Decide how production purges the edge.** Pages now show edits, so each commit has to purge that page from
+      Cloudflare, and the app needs a token. Until it has one, the editor sees its own edit (it reloads with
+      `?v=`), but other readers get the edge's copy until it expires. I'd make one limited to cache purge on this zone, and put it in
       `.env.production`. Production doesn't have one yet.
 - [ ] **Buy the domains and move demos onto their own.** Demos (sandboxed user code from GitHub repos)
       are served from `papers-content.potentialhedge.com` for now, one path per demo. That host shares a

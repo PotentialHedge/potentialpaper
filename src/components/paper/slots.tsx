@@ -6,6 +6,7 @@ import type { DemoPointer } from '@/lib/demos';
 import type { Submission } from '@/lib/submissions';
 import type { PdfPointer } from '@/server/pages/rules';
 import { DemosSection } from './Demos';
+import { toolPath } from './page-tools';
 import { SubmissionsBox, SubmissionsSection } from './Submissions';
 
 /**
@@ -25,6 +26,9 @@ export interface PanelProps {
   demos: DemoPointer[];
   /** The identifier the page's API calls name the paper by. */
   canonical: PaperId;
+  /** The two Markdown sections, as rendered at their last commit. */
+  authorHtml: string | null;
+  communityHtml: string | null;
 }
 
 /** `paper.main` sits beside `paper.aside`; `paper.body` follows both, across the page. */
@@ -39,20 +43,60 @@ function Abstract({ paper }: PanelProps) {
   );
 }
 
-function AuthorSection() {
+/** Rendered Markdown (`server/pages/markdown.ts`): HTML made at commit, with raw HTML off. */
+function Rendered({ html }: { html: string }) {
+  return <div className="md" dangerouslySetInnerHTML={{ __html: html }} />;
+}
+
+/**
+ * Each section's heading gets an edit link, wiki style. The stored HTML has only markdown-it's tags, so a
+ * heading with `data-section` is always one the renderer made.
+ */
+function withEditLinks(html: string, editPath: string): string {
+  return html.replace(
+    /(<h3 [^>]*data-section="(\d+)"[^>]*>)([\s\S]*?)<\/h3>/g,
+    (_, open: string, n: string, inner: string) =>
+      `${open}${inner}<a class="section-edit" href="${editPath}?section=${n}" rel="nofollow">edit</a></h3>`,
+  );
+}
+
+function AuthorSection({ authorHtml }: PanelProps) {
   return (
-    <section>
+    <section id="author">
       <h2 className={ui.groupHeading}>Author section</h2>
-      <p className={ui.empty}>The authors haven&apos;t written anything here yet.</p>
+      {authorHtml ? (
+        <Rendered html={authorHtml} />
+      ) : (
+        <p className={ui.empty}>The authors haven&apos;t written anything here yet.</p>
+      )}
     </section>
   );
 }
 
-function CommunitySection() {
+function CommunitySection({ communityHtml, canonical }: PanelProps) {
+  const editPath = toolPath('edit', canonical);
   return (
-    <section>
-      <h2 className={ui.groupHeading}>Community section</h2>
-      <p className={ui.empty}>Nobody has written anything here yet.</p>
+    <section id="community">
+      <h2 className={ui.groupHeading}>
+        Community section
+        <span className="ml-3 font-sans text-xs [font-variant-caps:normal] text-faint">
+          <a href={editPath} rel="nofollow">
+            edit
+          </a>{' '}
+          · <a href={toolPath('history', canonical)}>history</a>
+        </span>
+      </h2>
+      {communityHtml ? (
+        <Rendered html={withEditLinks(communityHtml, editPath)} />
+      ) : (
+        <p className={ui.empty}>
+          Nobody has written anything here yet.{' '}
+          <a href={editPath} rel="nofollow">
+            Start it
+          </a>
+          : a summary, why it matters, critique, errata, reproductions.
+        </p>
+      )}
     </section>
   );
 }

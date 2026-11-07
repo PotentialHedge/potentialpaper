@@ -276,6 +276,9 @@ export const pageCurrent = pgTable('page_current', {
   head: bytea('head').notNull(),
   authorMarkdown: text('author_markdown'),
   communityMarkdown: text('community_markdown'),
+  /** The two Markdown files, rendered at commit (`pages/markdown.ts`), which is all a reader is sent. */
+  authorHtml: text('author_html'),
+  communityHtml: text('community_html'),
   resources: jsonb('resources').$type<Record<string, unknown>>(),
   /** The page's `pdf.json`. */
   pdf: jsonb('pdf').$type<PdfPointer>(),

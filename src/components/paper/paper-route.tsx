@@ -1,3 +1,4 @@
+import 'katex/dist/katex.min.css';
 import { eq, sql } from 'drizzle-orm';
 import type { Metadata } from 'next';
 import { cache } from 'react';
@@ -42,6 +43,8 @@ export async function PaperRoute({ scheme, segments }: { scheme: PaperScheme; se
         pdf: pageCurrent.pdf,
         thumbnail: pageCurrent.thumbnail,
         demos: pageCurrent.demos,
+        authorHtml: pageCurrent.authorHtml,
+        communityHtml: pageCurrent.communityHtml,
         cover: pdfCovers.url,
       })
       .from(pageCurrent)
@@ -67,6 +70,8 @@ export async function PaperRoute({ scheme, segments }: { scheme: PaperScheme; se
     submissions,
     demos: current?.demos ?? [],
     canonical: canonicalPaperId(identifiers) ?? identifiers[0],
+    authorHtml: current?.authorHtml ?? null,
+    communityHtml: current?.communityHtml ?? null,
   };
   const about = [paper.venue, paper.year].filter(Boolean).join(', ');
   return (

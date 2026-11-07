@@ -8,6 +8,9 @@ import * as affiliationVerify from '@/app/api/v1/me/affiliations/[id]/verify/rou
 import * as password from '@/app/api/v1/me/password/route';
 import * as onboarding from '@/app/api/v1/onboarding/route';
 import * as demos from '@/app/api/v1/demos/route';
+import * as pageEdit from '@/app/api/v1/pages/edit/route';
+import * as pageRender from '@/app/api/v1/pages/render/route';
+import * as pageRevert from '@/app/api/v1/pages/revert/route';
 import { getDb, getPool } from '@/db';
 import { clearDevOutbox, devOutbox } from '@/server/mail';
 
@@ -32,6 +35,9 @@ const ROUTES: [RegExp, any][] = [
   [/^\/onboarding$/, onboarding],
   [/^\/me$/, me],
   [/^\/demos(\?.*)?$/, demos],
+  [/^\/pages\/edit$/, pageEdit],
+  [/^\/pages\/render$/, pageRender],
+  [/^\/pages\/revert$/, pageRevert],
   [/^\/me\/password$/, password],
   [/^\/me\/affiliations$/, affiliations],
   [/^\/me\/affiliations\/(?<id>[^/]+)$/, affiliation],

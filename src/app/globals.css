@@ -80,3 +80,66 @@
     margin-right: 0.75em;
   }
 }
+
+/*
+ * Rendered Markdown (`server/pages/markdown.ts`), set like the rest of a paper's body. Its headings are a
+ * level below the page's own: a `##` section is an `<h3>`, numbered as a subsection.
+ */
+@layer components {
+  .md > * + * {
+    margin-top: 0.75em;
+  }
+  .md h2 {
+    @apply mt-6 font-serif text-lg leading-snug font-normal text-ink [font-variant-caps:small-caps];
+  }
+  .md h3 {
+    @apply mt-5 font-serif text-[15px] leading-snug font-normal text-ink [font-variant-caps:small-caps] subsec-num;
+  }
+  .md h4,
+  .md h5,
+  .md h6 {
+    @apply mt-4 font-serif text-[15px] font-normal italic;
+  }
+  .md a {
+    color: var(--color-accent);
+  }
+  .md ul {
+    @apply list-disc pl-6;
+  }
+  .md ol {
+    @apply list-decimal pl-6;
+  }
+  .md li + li {
+    margin-top: 0.25em;
+  }
+  .md blockquote {
+    @apply border-l-2 border-rule-strong pl-3 text-subtle;
+  }
+  .md code {
+    @apply font-mono text-[13px];
+  }
+  .md pre {
+    @apply overflow-x-auto border border-rule bg-card p-3 leading-snug;
+  }
+  .md table {
+    @apply border-collapse border-y-[1.5px] border-ink;
+  }
+  .md th {
+    @apply border-b border-ink py-1.5 pr-3 text-left font-semibold;
+  }
+  .md td {
+    @apply py-1 pr-3;
+  }
+  .md hr {
+    @apply border-rule;
+  }
+  .md img {
+    @apply max-w-full;
+  }
+  .md .math-display {
+    @apply overflow-x-auto overflow-y-hidden;
+  }
+  .md .section-edit {
+    @apply ml-3 font-sans text-xs text-faint [font-variant-caps:normal];
+  }
+}
