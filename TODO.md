@@ -4,10 +4,14 @@ Things only you can do or decide. Most urgent first.
 
 - [ ] **acceptodds is running vulnerable Next 16.4.0 in production.** `npm audit` lists critical advisories,
       including unauthenticated remote code execution. Fix it, or ask me to.
-- [ ] **The live site still runs under the old name.** Its containers, volume and database are still `papertrail`,
-      and they keep running. A deploy from this code would start a new `potentialpaper` project with an empty
-      database, and its routes would clash with the old stack. Stop or migrate the old stack first, and replay the
-      page commits, because the system author in their hashes changed.
+- [ ] **The live site still runs under the old name.** Its containers, volume and database are still `papertrail`.
+      Until they are migrated, deploy into that project: add `-p papertrail` to every `docker compose` command in
+      `docker-compose.prod.yml`'s header, or it starts a new `potentialpaper` project with an empty database and
+      clashing routes. The server's `.env.production` names the `papertrail` database user and database again (its
+      copy from before 2026-11-07 is in `~/backups`). A migration must also replay the page commits, because the
+      system author in their hashes changed.
+- [ ] **Search results and paper pages show no first-page covers on the live site.** Production's `pdf_covers`
+      table is empty. If the covers are already in R2, run `papers:render-covers` against production to record them.
 - [ ] **Review Milestone 1 on the live site.** Try https://papers.potentialhedge.com/abs/1706.03762, the search
       link in the header, and the home page. It's on the branch `milestone-1-papers`, pushed and deployed. Tell me
       whether to merge it to `main`.
