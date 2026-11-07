@@ -38,6 +38,9 @@ COPY --from=build --chown=node:node /app/.next/static ./.next/static
 COPY --from=build --chown=node:node /app/public ./public
 # Read at runtime from the working directory (INSTITUTION_DOMAINS_PATH overrides).
 COPY --chown=node:node config ./config
+# Demo files, until production has R2 keys: a named volume mounts here (docker-compose.prod.yml), and takes
+# this folder's owner when it is first created.
+RUN mkdir -p /data/demos && chown node:node /data/demos
 USER node
 EXPOSE 3000
 CMD ["node", "server.js"]

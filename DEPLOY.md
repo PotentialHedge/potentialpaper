@@ -34,9 +34,9 @@ https://papers.potentialhedge.com loads.
 ## Demos
 
 Demos are served from `papers-content.potentialhedge.com`: a proxied A record (added 2026-11-07) in the `potentialhedge.com` zone,
-pointing at this host, with the Traefik router in `docker-compose.prod.yml`. `.env.production` needs the `R2_*`
-keys (see `.env.production.example`), or attaching a demo fails, rather than storing it on the container's
-disk, which the next deploy would wipe.
+pointing at this host, with the Traefik router in `docker-compose.prod.yml`. Their files are on the `demos`
+volume until `.env.production` has the `R2_*` keys (`TODO.md`). `dc down -v` deletes that volume as well as
+the database.
 
 ## When it goes wrong
 

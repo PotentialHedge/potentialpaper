@@ -4,7 +4,8 @@ import { AwsClient } from 'aws4fetch';
 
 /**
  * Demo files' bytes, stored once each under their SHA-256: in R2 when its keys are set, as PDFs and
- * thumbnails are, and otherwise in a local folder, for development and tests.
+ * thumbnails are, and otherwise in a local folder: in development and tests, and in production on a volume
+ * until it has R2 keys (TODO.md).
  */
 
 const BUCKET = process.env.R2_BUCKET ?? 'papertrail-pdfs';

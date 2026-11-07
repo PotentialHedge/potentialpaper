@@ -15,9 +15,10 @@ Things only you can do or decide, most urgent first. Milestones 1 and 2 and the 
 - [ ] **Decide how production purges the edge.** Once pages show edits, each commit has to purge that page from
       Cloudflare, so the app needs a token. I'd make one limited to cache purge on this zone, and put it in
       `.env.production`. Production doesn't have one yet.
-- [ ] **Check that production has R2 keys for demos.** Attaching a demo stores its files in R2, so
-      `.env.production` needs `R2_ACCOUNT_ID`, `R2_ACCESS_KEY_ID` and `R2_SECRET_ACCESS_KEY`, the same keys the
-      PDF scripts use. I couldn't reach the server to check.
+- [ ] **Give production R2 keys for demos.** `.env.production` has none, so demo files are on the `demos`
+      Docker volume for now. Add `R2_ACCOUNT_ID`, `R2_ACCESS_KEY_ID` and `R2_SECRET_ACCESS_KEY` (the keys the PDF
+      scripts use, or a new token limited to the bucket) and new demos go to R2. Copy the volume's files to
+      `demo/<sha256>` in the bucket at the same time, or the demos attached so far stop loading.
 - [ ] **Buy the domains and move demos onto their own.** Demos (sandboxed user code from GitHub repos)
       are served from `papers-content.potentialhedge.com` for now, one path per demo. That host shares a
       site with the app, so it isn't a real sandbox. Before anyone outside tries demos, buy a separate
