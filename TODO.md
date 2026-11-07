@@ -10,8 +10,6 @@ Things only you can do or decide. Most urgent first.
       clashing routes. The server's `.env.production` names the `papertrail` database user and database again (its
       copy from before 2026-11-07 is in `~/backups`). A migration must also replay the page commits, because the
       system author in their hashes changed.
-- [ ] **Search results and paper pages show no first-page covers on the live site.** Production's `pdf_covers`
-      table is empty. If the covers are already in R2, run `papers:render-covers` against production to record them.
 - [ ] **Review Milestone 1 on the live site.** Try https://papers.potentialhedge.com/abs/1706.03762, the search
       link in the header, and the home page. It's on the branch `milestone-1-papers`, pushed and deployed. Tell me
       whether to merge it to `main`.
