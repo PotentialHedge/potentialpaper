@@ -101,7 +101,7 @@ redoing it. They still describe an in-memory domain overlay, a `ror_id` / `reque
 ## Deployment
 
 - Production runs on the server at `77.244.248.196`, with its own Postgres, using `docker-compose.prod.yml`.
-  Steps are in that file's header.
+  `DEPLOY.md` has the full recipe.
 - **The live stack still uses the old Compose project name, `papertrail`.** Add `-p papertrail` to every
   command until it is migrated (see `TODO.md`), or Compose starts an empty `potentialpaper` project.
 - Commit first, because the image is tagged with `GIT_COMMIT`. Migrations are a separate step, and `build`
