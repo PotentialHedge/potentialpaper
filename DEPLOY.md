@@ -21,7 +21,8 @@ dc up -d app
 scripts/purge-edge-cache.sh       # required, see below
 ```
 
-Check it: `curl -s https://papers.potentialhedge.com/api/v1/version` reports the new commit.
+Check it: `docker inspect papertrail-app-1 --format '{{.Config.Image}}'` names the new commit, and
+https://papers.potentialhedge.com loads.
 
 ## Why each step is there
 
