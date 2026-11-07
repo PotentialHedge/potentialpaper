@@ -1,6 +1,6 @@
 import fc from 'fast-check';
 import { describe, expect, it } from 'vitest';
-import { canonicalPaperId, paperIdFromText, paperPath, parseDoi, parsePaperId } from '@/lib/paper-ids';
+import { canonicalPaperId, paperIdFromText, paperPath, parseDoi, parsePaperId, sourceName } from '@/lib/paper-ids';
 
 describe('arXiv ids', () => {
   it('drops the version, since a page is for the work', () => {
@@ -75,5 +75,14 @@ describe('addresses', () => {
         expect(parseDoi(path.split('/').map(decodeURIComponent).join('/'))).toEqual(id);
       }),
     );
+  });
+});
+
+describe('crediting a copy', () => {
+  it('names the site it came from', () => {
+    expect(sourceName('https://openreview.net/forum?id=4AEJkVBst5')).toBe('OpenReview');
+    expect(sourceName('https://www.arxiv.org/abs/1706.03762')).toBe('arXiv');
+    expect(sourceName('https://example.org/paper.pdf')).toBe('example.org');
+    expect(sourceName('not a url')).toBe('the source');
   });
 });

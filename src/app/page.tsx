@@ -124,7 +124,7 @@ export default async function Home({
           defaultValue={q ?? ''}
           maxLength={SEARCH_MAX_LENGTH}
           aria-label="Search papers"
-          placeholder="Title, arXiv id or DOI"
+          placeholder="Search for a paper"
           className={ui.searchInput}
         />
         <button type="submit" className={ui.searchBtn}>

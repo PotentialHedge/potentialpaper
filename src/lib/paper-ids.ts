@@ -98,3 +98,15 @@ export function sourceLinks({ scheme, value }: PaperId): { label: string; url: s
       return [{ label: 'OpenReview', url: `https://openreview.net/forum?id=${encodeURIComponent(value)}` }];
   }
 }
+
+/** Sites PDFs are copied from, by host, with the name to credit them by. */
+const SOURCE_NAMES: Record<string, string> = {
+  'openreview.net': 'OpenReview',
+  'arxiv.org': 'arXiv',
+};
+
+/** The name of the site a URL is on, to credit a copy to: "OpenReview", or the bare host. */
+export function sourceName(url: string): string {
+  const host = URL.parse(url)?.hostname.replace(/^www\./, '') ?? '';
+  return SOURCE_NAMES[host] ?? (host || 'the source');
+}

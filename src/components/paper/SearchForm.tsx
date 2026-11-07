@@ -10,7 +10,7 @@ export function SearchForm({ query = '' }: { query?: string }) {
         defaultValue={query}
         maxLength={200}
         aria-label="Search papers"
-        placeholder="Title, arXiv id or DOI"
+        placeholder="Search for a paper"
         className={ui.searchInput}
       />
       <button className={ui.searchBtn}>Search</button>

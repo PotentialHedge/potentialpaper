@@ -1,7 +1,7 @@
 import type { ComponentType } from 'react';
 import { ui } from '@/components/ui';
 import type { Paper } from '@/db/schema';
-import { sourceLinks, type PaperId } from '@/lib/paper-ids';
+import { sourceLinks, sourceName, type PaperId } from '@/lib/paper-ids';
 import type { PdfPointer } from '@/server/pages/rules';
 
 /**
@@ -46,6 +46,8 @@ function CommunitySection() {
 }
 
 function ReadThePaper({ identifiers, pdf }: PanelProps) {
+  // The PDF's credit already links its source, which is often the paper's own page there.
+  const links = identifiers.flatMap(sourceLinks).filter(({ url }) => url !== pdf?.source);
   return (
     <div className={ui.box}>
       <h2 className={ui.boxHeading}>Read the paper</h2>
@@ -58,12 +60,12 @@ function ReadThePaper({ identifiers, pdf }: PanelProps) {
             <span className={ui.fine}>
               {pdf.license}, from{' '}
               <a href={pdf.source} rel="noopener" className={ui.hyperref}>
-                the source
+                {sourceName(pdf.source)}
               </a>
             </span>
           </li>
         )}
-        {identifiers.flatMap(sourceLinks).map(({ label, url }) => (
+        {links.map(({ label, url }) => (
           <li key={url}>
             <a href={url} rel="noopener" className={ui.hyperref}>
               {label}
