@@ -13,13 +13,15 @@ function connectionString(): string {
   return url;
 }
 
-export function createPool(url: string = connectionString()): Pool {
+/** A stuck client must not hold a row lock forever. */
+const STATEMENT_TIMEOUT_MS = 15_000;
+
+export function createPool(url: string = connectionString(), statementTimeoutMs = STATEMENT_TIMEOUT_MS): Pool {
   return new Pool({
     connectionString: url,
     max: Number(process.env.PGPOOL_MAX ?? 10),
-    // A stuck client must not hold a row lock forever.
-    statement_timeout: 15_000,
-    idle_in_transaction_session_timeout: 15_000,
+    statement_timeout: statementTimeoutMs,
+    idle_in_transaction_session_timeout: STATEMENT_TIMEOUT_MS,
   });
 }
 
