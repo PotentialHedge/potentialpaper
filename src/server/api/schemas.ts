@@ -103,6 +103,7 @@ export const SearchResponse = z.object({
       year: z.number().int().nullable(),
       venue: z.string().nullable(),
       pdf: z.string().nullable(),
+      cover: z.string().nullable(),
       path: z.string(),
     }),
   ),

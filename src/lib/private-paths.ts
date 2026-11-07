@@ -15,4 +15,4 @@ export const PRIVATE_PAGES = [
 ];
 
 /** The home page's query parameters: its search results and filtered lists are endless, so kept out of indexes in the same two ways. */
-export const HOME_LIST_PARAMS = ['q', 'venue', 'sort', 'page', 'abstracts'];
+export const HOME_LIST_PARAMS = ['q', 'venue', 'sort', 'page', 'abstracts', 'view'];

@@ -2,7 +2,7 @@ import Link from 'next/link';
 import { redirect } from 'next/navigation';
 import { FilterIcon, MoreIcon } from '@/components/icons';
 import { Pager } from '@/components/Pager';
-import { PaperRow } from '@/components/paper/PaperRow';
+import { PaperCard, PaperRow } from '@/components/paper/PaperRow';
 import { SearchSyntax } from '@/components/paper/SearchSyntax';
 import { Popover, PopoverClose, PopoverContent, PopoverTrigger } from '@/components/Popover';
 import { SearchInput } from '@/components/SearchInput';
@@ -40,7 +40,8 @@ export default async function Home({
   const parsed = q ? parseSearch(q) : null;
   const venue = normalizeSearch(one(sp.venue));
   const venueFilter = parsed?.fields.has('venue') ? null : venue;
-  const showAbstracts = one(sp.abstracts) === '1';
+  // Compact rows by default; detailed shows each paper's cover and abstract. `abstracts=1` is the old name.
+  const detailed = one(sp.view) === 'detailed' || one(sp.abstracts) === '1';
 
   // A search sorts by relevance unless another sort is asked for; relevance needs a search.
   const defaultSort: SearchSort = q ? 'relevance' : 'activity';
@@ -63,10 +64,10 @@ export default async function Home({
       ...(q ? { q } : {}),
       ...(venue ? { venue } : {}),
       sort,
-      ...(showAbstracts ? { abstracts: '1' } : {}),
+      ...(detailed ? { view: 'detailed' } : {}),
       ...patch,
     });
-    for (const key of ['q', 'venue', 'abstracts']) if (!params.get(key)) params.delete(key);
+    for (const key of ['q', 'venue', 'view']) if (!params.get(key)) params.delete(key);
     // The default sort stays out of the address, and relevance is gone with the search.
     const chosen = params.get('sort');
     if (chosen === 'relevance' || (chosen === 'activity' && !params.has('q'))) params.delete('sort');
@@ -76,8 +77,15 @@ export default async function Home({
   };
 
   // Shown on the ⋯ trigger when not the defaults, since the row doesn't show them.
-  const moreLabel = [MENU_SORTS.includes(sort) && sort, venue, showAbstracts && 'abstracts'].filter(Boolean).join(', ');
-  const toggleAbstracts = href({ abstracts: showAbstracts ? '' : '1' });
+  const moreLabel = [MENU_SORTS.includes(sort) && sort, venue].filter(Boolean).join(', ');
+  const viewLink = (v: 'compact' | 'detailed') => (
+    <Link
+      href={href({ view: v === 'detailed' ? 'detailed' : '' })}
+      className={detailed === (v === 'detailed') ? ON : ''}
+    >
+      {v}
+    </Link>
+  );
 
   return (
     <main className={ui.page}>
@@ -110,7 +118,7 @@ export default async function Home({
       {/* A plain GET form, so search works without JavaScript. */}
       <form action="/" method="get" role="search" className="mt-5 flex gap-2">
         {venue && <input type="hidden" name="venue" value={venue} />}
-        {showAbstracts && <input type="hidden" name="abstracts" value="1" />}
+        {detailed && <input type="hidden" name="view" value="detailed" />}
         <SearchInput
           name="q"
           defaultValue={q ?? ''}
@@ -144,9 +152,7 @@ export default async function Home({
             className="relative hidden cursor-pointer px-2.5 text-muted hover:text-accent narrow:flex narrow:items-center"
           >
             <FilterIcon className="size-5" />
-            {(venue || showAbstracts) && (
-              <span className="absolute top-1.5 right-1.5 size-1.5 rounded-full bg-accent" />
-            )}
+            {venue && <span className="absolute top-1.5 right-1.5 size-1.5 rounded-full bg-accent" />}
           </PopoverTrigger>
           <PopoverContent align="end" className="flex max-h-[70vh] flex-col gap-3 overflow-y-auto text-[13px]">
             <div>
@@ -178,11 +184,13 @@ export default async function Home({
                 ))}
               </div>
             </div>
-            <PopoverClose asChild>
-              <Link href={toggleAbstracts} className={showAbstracts ? ON : ''}>
-                show abstracts
-              </Link>
-            </PopoverClose>
+            <div>
+              <h3 className={ui.boxHeading}>View</h3>
+              <div className="flex flex-wrap gap-x-4 gap-y-2">
+                <PopoverClose asChild>{viewLink('compact')}</PopoverClose>
+                <PopoverClose asChild>{viewLink('detailed')}</PopoverClose>
+              </div>
+            </div>
             <details className="border-t border-rule pt-2.5">
               <summary className={`${ui.runIn} cursor-pointer`}>Search syntax</summary>
               <div className="mt-2 text-xs leading-normal text-muted">
@@ -205,6 +213,11 @@ export default async function Home({
       )}
 
       <div className="mt-2 mb-1 flex flex-wrap items-baseline gap-x-4.5 gap-y-1.5 font-sans text-[13px] text-muted narrow:hidden">
+        <span className="flex gap-x-3">
+          view:
+          {viewLink('compact')}
+          {viewLink('detailed')}
+        </span>
         <span className="flex-1" />
         <span className="flex flex-wrap gap-x-3 gap-y-1">
           sort:
@@ -221,7 +234,7 @@ export default async function Home({
           {/* Not a flex box: an icon alone gives a flex item no text baseline, and the row aligns on
               baselines. Inline, `align-middle` centres the dots on the text's x-height. */}
           <PopoverTrigger
-            title="More sorts and filters: venue, abstracts"
+            title="More sorts and filters: venue"
             className="-my-1 cursor-pointer px-1 py-1 text-ink hover:text-accent"
           >
             {moreLabel}
@@ -247,11 +260,6 @@ export default async function Home({
                 </Link>
               </PopoverClose>
             ))}
-            <PopoverClose asChild>
-              <Link href={toggleAbstracts} className={`mt-1 border-t border-rule pt-1.5 ${showAbstracts ? ON : ''}`}>
-                show abstracts
-              </Link>
-            </PopoverClose>
           </PopoverContent>
         </Popover>
       </div>
@@ -266,7 +274,7 @@ export default async function Home({
         <section>
           <div className="h-3.5" />
           {hits.map((hit) => (
-            <Row key={`${hit.scheme}:${hit.value}`} hit={hit} abstracts={showAbstracts} />
+            <Row key={`${hit.scheme}:${hit.value}`} hit={hit} detailed={detailed} />
           ))}
           <Pager page={page} pages={pages} href={(p) => href({ page: String(p) })} />
         </section>
@@ -275,16 +283,14 @@ export default async function Home({
   );
 }
 
-function Row({ hit, abstracts }: { hit: SearchHit; abstracts: boolean }) {
-  return (
-    <PaperRow
-      title={hit.title}
-      authors={hit.authors}
-      abstract={abstracts ? hit.abstract : null}
-      venue={hit.venue}
-      year={hit.year}
-      pdf={hit.pdf ?? sourceLinks(hit).find((link) => link.label === 'PDF')?.url ?? null}
-      href={paperPath(hit)}
-    />
-  );
+function Row({ hit, detailed }: { hit: SearchHit; detailed: boolean }) {
+  const props = {
+    title: hit.title,
+    authors: hit.authors,
+    venue: hit.venue,
+    year: hit.year,
+    pdf: hit.pdf ?? sourceLinks(hit).find((link) => link.label === 'PDF')?.url ?? null,
+    href: paperPath(hit),
+  };
+  return detailed ? <PaperCard {...props} abstract={hit.abstract} cover={hit.cover} /> : <PaperRow {...props} />;
 }

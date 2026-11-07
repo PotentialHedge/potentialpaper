@@ -18,6 +18,7 @@
     "papers:import-iclr": "tsx scripts/import-iclr.ts",
     "papers:upload-pdfs": "tsx scripts/upload-pdfs.ts",
     "papers:attach-pdfs": "tsx scripts/attach-pdfs.ts",
+    "papers:render-covers": "tsx scripts/render-covers.ts",
     "pages:edit": "tsx scripts/edit-page.ts",
     "pages:rebuild": "tsx scripts/rebuild-page-projections.ts",
     "institutions:build": "NODE_OPTIONS=--max-old-space-size=4096 tsx scripts/build-institution-domains.ts",

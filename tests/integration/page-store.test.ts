@@ -19,6 +19,7 @@ import {
   pageRevisions,
   paperIdentifiers,
   papers,
+  pdfCovers,
 } from '@/db/schema';
 import { ApiError } from '@/server/api/errors';
 import { answerGitRequest, clonePath } from '@/server/pages/clone';
@@ -29,6 +30,7 @@ import { rebuildAllPages } from '@/server/pages/projections';
 import { diffCommits, pageHistory, readHead } from '@/server/pages/repo';
 import { MAX_CHANGES, PDF_PATH } from '@/server/pages/rules';
 import { savePaper } from '@/server/papers';
+import { searchPapers } from '@/server/search';
 import { closePool, resetDatabase } from './helpers';
 
 const NO_LIMIT = { burst: 100_000, perSecond: 1000 };
@@ -1023,6 +1025,16 @@ describe('pdf.json', () => {
     expect(current.pdf).toEqual(POINTER);
     const [revision] = await getDb().select().from(pageRevisions).where(eq(pageRevisions.paperId, id));
     expect(revision.paths.toSorted()).toEqual(['metadata.json', PDF_PATH]);
+  });
+
+  it('gives search results its cover once one is rendered', async () => {
+    const id = await paper();
+    await commitPage(id, null, SYSTEM_ACTOR, change(POINTER), 'Add the PDF');
+    const hit = async () => (await searchPapers({ q: 'paper' })).hits[0];
+    expect(await hit()).toMatchObject({ pdf: POINTER.url, cover: null });
+    const cover = `https://pdfs.example.org/cover/${POINTER.sha256}.jpg`;
+    await getDb().insert(pdfCovers).values({ sha256: POINTER.sha256, url: cover });
+    expect(await hit()).toMatchObject({ pdf: POINTER.url, cover });
   });
 
   it('refuses a pointer that a page could not safely link to', async () => {

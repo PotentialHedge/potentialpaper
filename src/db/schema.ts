@@ -323,3 +323,15 @@ export const pageEvents = pgTable(
   },
   (t) => [uniqueIndex('page_events_paper_seq_key').on(t.paperId, t.seq)],
 );
+
+/**
+ * A picture of a hosted PDF's first page, for search results. Keyed by the PDF's SHA-256, as the bytes in
+ * R2 are, so a page that points at the same PDF shares it. Written by `scripts/render-covers.ts`; a PDF
+ * without a row has no cover yet.
+ */
+export const pdfCovers = pgTable('pdf_covers', {
+  sha256: text('sha256').primaryKey(),
+  /** The JPEG in R2. */
+  url: text('url').notNull(),
+  createdAt: createdAt(),
+});

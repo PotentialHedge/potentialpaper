@@ -8,7 +8,6 @@ import Link from 'next/link';
 export function PaperRow({
   title,
   authors,
-  abstract,
   venue,
   year,
   pdf,
@@ -16,8 +15,6 @@ export function PaperRow({
 }: {
   title: string;
   authors: string[];
-  /** Shown under the authors when given. */
-  abstract?: string | null;
   venue: string | null;
   year: number | null;
   pdf: string | null;
@@ -38,7 +35,6 @@ export function PaperRow({
           {title}
         </Link>
         <span className="block font-sans text-xs text-muted">{authorLine(authors)}</span>
-        {abstract && <span className="mt-0.5 line-clamp-3 text-[13px] leading-snug text-muted">{abstract}</span>}
       </span>
       <span className="truncate text-right font-sans text-xs text-muted narrow:hidden" title={venue ?? undefined}>
         {venue}
@@ -52,4 +48,81 @@ export function PaperRow({
 function authorLine(names: string[]): string {
   if (names.length === 0) return 'Anonymous authors';
   return names.length > 3 ? `${names.slice(0, 3).join(', ')} et al.` : names.join(', ');
+}
+
+/**
+ * One paper in the detailed list: a picture of its first page beside the title, authors, abstract, venue
+ * and year. As in `PaperRow`, the title's link covers the card; the cover sits above it and opens the PDF.
+ * A paper with no cover gets a blank title page instead, so the column stays even.
+ */
+export function PaperCard({
+  title,
+  authors,
+  abstract,
+  venue,
+  year,
+  pdf,
+  cover,
+  href,
+}: {
+  title: string;
+  authors: string[];
+  abstract: string | null;
+  venue: string | null;
+  year: number | null;
+  pdf: string | null;
+  cover: string | null;
+  href: string;
+}) {
+  const page = cover ? (
+    // A remote JPEG already sized for this box: Next's optimizer would only fetch it again.
+    // eslint-disable-next-line @next/next/no-img-element
+    <img src={cover} alt="" loading="lazy" decoding="async" className="size-full object-cover object-top" />
+  ) : (
+    <span className="flex size-full items-start justify-center px-1.5 pt-3 text-center font-serif text-[7px] leading-tight text-faint">
+      <span className="line-clamp-4">{title}</span>
+    </span>
+  );
+  const frame =
+    'relative z-10 block aspect-[17/22] w-[92px] shrink-0 overflow-hidden border border-rule bg-card shadow-[0_1px_2px_rgb(0_0_0/0.08)] narrow:w-[64px]';
+  return (
+    <div className="relative flex gap-4 border-b border-dotted border-rule-strong py-3.5 hover:bg-highlight narrow:gap-3">
+      {pdf ? (
+        <a
+          href={pdf}
+          className={`${frame} hover:border-frame`}
+          rel="noopener noreferrer"
+          target="_blank"
+          title="Open the PDF"
+        >
+          {page}
+        </a>
+      ) : (
+        <span className={frame} aria-hidden>
+          {page}
+        </span>
+      )}
+      <div className="min-w-0 flex-1">
+        <Link
+          href={href}
+          className="line-clamp-2 text-[17px] leading-snug after:absolute after:inset-0 hover:no-underline narrow:text-[15px]"
+          title={title}
+        >
+          {title}
+        </Link>
+        <div className="mt-0.5 font-sans text-xs text-muted">{authorLine(authors)}</div>
+        {abstract && (
+          <p className="mt-1.5 line-clamp-3 text-[13px] leading-snug text-subtle narrow:line-clamp-2">{abstract}</p>
+        )}
+        <div className="mt-1.5 flex flex-wrap items-baseline gap-x-2 font-sans text-xs text-muted">
+          {[venue, year].filter(Boolean).join(' · ')}
+          {pdf && (
+            <a href={pdf} className="relative z-10 text-accent" rel="noopener noreferrer" target="_blank">
+              [pdf]
+            </a>
+          )}
+        </div>
+      </div>
+    </div>
+  );
 }
