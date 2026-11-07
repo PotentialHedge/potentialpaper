@@ -1,11 +1,16 @@
 import { headers as nextHeaders } from 'next/headers';
+import type { z } from 'zod';
 import type { Account, Affiliation } from '@/db/schema';
 import { updateProfile } from '../accounts';
 import { addAffiliation, listAffiliations, removeAffiliation, verifyAffiliation } from '../affiliations';
-import { requireAuth, viewerFromHeaders } from '../auth';
+import { requireAuth, requireVerified, viewerFromHeaders, type Principal } from '../auth';
+import { attachDemo, removeDemo } from '../demos/attach';
+import { demoUrl } from '@/lib/demos';
+import type { Actor } from '../pages/commit';
+import { refreshPaperPages } from '../pages/refresh';
 import { setFirstPassword, startOnboarding } from '../onboarding';
 import { canonicalPaperId, paperPath, parsePaperId } from '@/lib/paper-ids';
-import { lookupPaper } from '../papers';
+import { findPaper, lookupPaper } from '../papers';
 import { searchPapers } from '../search';
 import { ApiError } from './errors';
 import { parseBody, parseParam, parseQuery, respond, route, toIso, toIsoOrNull } from './http';
@@ -152,4 +157,39 @@ export const search = route(async (req) => {
     total,
     hasMore: page * limit < total,
   });
+});
+
+function actorOf(principal: Principal): Actor {
+  return { kind: 'account', accountId: principal.account.id, isAdmin: principal.isAdmin };
+}
+
+/** A paper that already has a page here: demos are added from that page, so it exists. */
+async function knownPaper(scheme: z.infer<typeof S.PaperSchemeParam>, value: string) {
+  const id = parsePaperId(scheme, value);
+  const found = id && (await findPaper(id));
+  if (!found) throw new ApiError(404, 'not_found', 'no paper with that identifier');
+  return found;
+}
+
+/** Copies a demo from a public GitHub repo or gist and adds it to the paper's page. Slow: it downloads the repo. */
+export const postDemo = route(async (req) => {
+  const principal = await requireVerified(req);
+  const body = await parseBody(req, S.DemoAttachBody);
+  const { paper, identifiers } = await knownPaper(body.paper.scheme, body.paper.value);
+  const { snapshot, demo, commit } = await attachDemo(paper.id, actorOf(principal), body);
+  await refreshPaperPages(identifiers);
+  return respond(
+    S.DemoAttached,
+    { demo, url: demoUrl(demo.id), files: snapshot.fileCount, bytes: snapshot.totalBytes, head: commit.oid },
+    { status: 201, principal },
+  );
+});
+
+export const deleteDemo = route(async (req) => {
+  const principal = await requireVerified(req);
+  const { scheme, value, id } = parseQuery(req, S.DemoRemoveQuery);
+  const { paper, identifiers } = await knownPaper(scheme, value);
+  const commit = await removeDemo(paper.id, actorOf(principal), id);
+  await refreshPaperPages(identifiers);
+  return respond(S.DemoRemoved, { head: commit.oid }, { principal });
 });

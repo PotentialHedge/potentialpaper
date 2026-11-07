@@ -2,8 +2,10 @@ import type { ComponentType } from 'react';
 import { ui } from '@/components/ui';
 import type { Paper } from '@/db/schema';
 import { sourceLinks, sourceName, type PaperId } from '@/lib/paper-ids';
+import type { DemoPointer } from '@/lib/demos';
 import type { Submission } from '@/lib/submissions';
 import type { PdfPointer } from '@/server/pages/rules';
+import { DemosSection } from './Demos';
 import { SubmissionsBox, SubmissionsSection } from './Submissions';
 
 /**
@@ -19,6 +21,10 @@ export interface PanelProps {
   /** The authors' thumbnail, or else the PDF's first page. */
   picture: { url: string; alt: string | null; caption: string } | null;
   submissions: Submission[];
+  /** The page's demos, in order. */
+  demos: DemoPointer[];
+  /** The identifier the page's API calls name the paper by. */
+  canonical: PaperId;
 }
 
 /** `paper.main` sits beside `paper.aside`; `paper.body` follows both, across the page. */
@@ -104,6 +110,10 @@ function ReadThePaper({ identifiers, pdf, picture }: PanelProps) {
   );
 }
 
+function Demos({ demos, canonical }: PanelProps) {
+  return <DemosSection demos={demos} paper={canonical} />;
+}
+
 function Submissions({ submissions }: PanelProps) {
   return <SubmissionsSection submissions={submissions} />;
 }
@@ -115,7 +125,7 @@ function SubmissionsAside({ submissions }: PanelProps) {
 const PANELS: Record<PaperSlot, ComponentType<PanelProps>[]> = {
   'paper.main': [Abstract, AuthorSection],
   'paper.aside': [ReadThePaper, SubmissionsAside],
-  'paper.body': [CommunitySection, Submissions],
+  'paper.body': [Demos, CommunitySection, Submissions],
 };
 
 export function Slot({ name, ...props }: PanelProps & { name: PaperSlot }) {

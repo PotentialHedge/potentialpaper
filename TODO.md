@@ -15,6 +15,16 @@ Things only you can do or decide, most urgent first. Milestones 1 and 2 and the 
 - [ ] **Decide how production purges the edge.** Once pages show edits, each commit has to purge that page from
       Cloudflare, so the app needs a token. I'd make one limited to cache purge on this zone, and put it in
       `.env.production`. Production doesn't have one yet.
+- [ ] **Check that production has R2 keys for demos.** Attaching a demo stores its files in R2, so
+      `.env.production` needs `R2_ACCOUNT_ID`, `R2_ACCESS_KEY_ID` and `R2_SECRET_ACCESS_KEY`, the same keys the
+      PDF scripts use. I couldn't reach the server to check.
+- [ ] **Buy the domains and move demos onto their own.** Demos (sandboxed user code from GitHub repos)
+      are served from `papers-content.potentialhedge.com` for now, one path per demo. That host shares a
+      site with the app, so it isn't a real sandbox. Before anyone outside tries demos, buy a separate
+      domain (`ppusercontent.com`, $11.17/yr on Cloudflare, was available on 2026-11-07), give each demo its
+      own subdomain with wildcard DNS, set `DEMO_ORIGIN`, and harden it: `__Host-` auth cookies, Origin
+      checks on writes, and a strict CSP on the demo host. `potentialpaper.com` was also available at the
+      same price.
 - [ ] **Mail and final domain.** Sign-up fails on the live site until production has `RESEND_API_KEY` and
       `MAIL_FROM`, and watchlist digests will need them too. Set up the domain (`potentialpaper.com` is the
       candidate) and a Resend key.

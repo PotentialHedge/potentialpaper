@@ -7,6 +7,7 @@ import * as affiliation from '@/app/api/v1/me/affiliations/[id]/route';
 import * as affiliationVerify from '@/app/api/v1/me/affiliations/[id]/verify/route';
 import * as password from '@/app/api/v1/me/password/route';
 import * as onboarding from '@/app/api/v1/onboarding/route';
+import * as demos from '@/app/api/v1/demos/route';
 import { getDb, getPool } from '@/db';
 import { clearDevOutbox, devOutbox } from '@/server/mail';
 
@@ -14,7 +15,7 @@ export const ORIGIN = 'http://test.local';
 
 export async function resetDatabase(): Promise<void> {
   await getDb().execute(sql`
-    truncate table submission_notes, submissions, venues, pdf_covers, page_events, page_current, page_revisions, page_refs, page_objects, commit_identities, paper_lookup_misses, paper_identifiers, papers, institution_domains, affiliations, accounts, rate_limit_buckets,
+    truncate table demo_snapshots, submission_notes, submissions, venues, pdf_covers, page_events, page_current, page_revisions, page_refs, page_objects, commit_identities, paper_lookup_misses, paper_identifiers, papers, institution_domains, affiliations, accounts, rate_limit_buckets,
       session, account, verification, "user"
     restart identity cascade
   `);
@@ -30,6 +31,7 @@ export async function closePool(): Promise<void> {
 const ROUTES: [RegExp, any][] = [
   [/^\/onboarding$/, onboarding],
   [/^\/me$/, me],
+  [/^\/demos(\?.*)?$/, demos],
   [/^\/me\/password$/, password],
   [/^\/me\/affiliations$/, affiliations],
   [/^\/me\/affiliations\/(?<id>[^/]+)$/, affiliation],

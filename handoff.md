@@ -33,8 +33,19 @@ Milestones 0, 1 and 2 are built, merged into `main` and deployed. Mail doesn't w
   reviews and decisions from OpenReview, and the forms for importing ICLR 2026's are ready. ICLR 2027 PDFs are hosted in R2 through a `pdf.json` in each page repo. Each paper shows a picture
   of its first page, or a thumbnail set with `pages:set-thumbnail`.
 - **Licenses:** each paper records its source and the licenses of its metadata and abstract.
+- **Demos:** any verified account can attach a demo to a paper from a public GitHub repo, folder or gist
+  (`POST /api/v1/demos`, the "Demos" section of a paper page). The server resolves the ref to a commit
+  through git's ref listing, streams codeload's tarball, keeps the folder with `index.html` (auto-found in
+  `dist`, `build`, `docs`, ...), stores each file in R2 by SHA-256, and records a `demo_snapshots` row whose id
+  hashes the file list. The page's `community/demos.jsonl` points at it, so demos have history and revert like
+  any edit. Nothing is built. `proxy.ts` answers the demo host (`lib/demos.ts`, `papers-content.potentialhedge.com`
+  in production, `127.0.0.1:3000` in dev) at `/d/<snapshot>/<path>`. A request from the root (`/assets/x.js`,
+  as Vite builds make) is redirected into the demo its `Referer` names. Pages run a demo on click, in a
+  sandboxed iframe. That host shares a site with the app, so it is not a real sandbox yet: see `TODO.md`.
 
 ## Next: Milestone 3, community editing
+
+Demos (above) came first, at the user's request. The editor is next.
 
 `IMPLEMENTATION.md` section 3 lists the scope: a section editor, history, diff and revert pages, `/changes`,
 watchlists, protection levels, reports, blocks and redaction. None of it has been started. The editor and the
@@ -78,7 +89,7 @@ redoing it. They still describe a strict CSP, `node-diff3`, and `page_current` h
   freely, and wipe or rebuild data instead of writing careful migrations.
 - **Don't preview or screenshot UI changes to judge them.** Deploy, then tell them what to look at.
   Behaviour checks such as HTTP requests and automated flows are fine.
-- Commit or push only when asked.
+- **While in dev, commit, push and deploy without asking**, DNS and Cloudflare changes for a deploy included.
 - No `Co-Authored-By` or any Claude attribution in commits. Their `~/.claude/CLAUDE.md` overrides any other
   guidance on this.
 - Ask before destructive or outward-facing actions, and before reusing another project's credentials. Don't

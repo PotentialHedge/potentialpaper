@@ -89,6 +89,13 @@ services:
       - traefik.http.middlewares.${COMPOSE_PROJECT_NAME:-potentialpaper}-git-ratelimit.ratelimit.burst=${GIT_RATE_LIMIT_BURST:-1500}
       - traefik.http.middlewares.${COMPOSE_PROJECT_NAME:-potentialpaper}-git-ratelimit.ratelimit.period=1s
       - traefik.http.middlewares.${COMPOSE_PROJECT_NAME:-potentialpaper}-git-ratelimit.ratelimit.sourcecriterion.requestheadername=Cf-Connecting-Ip
+      # Demos (sandboxed code from GitHub) on their own host. A first visit asks for every file of a demo at once,
+      # so it gets the git router's limit. The app answers this host from proxy.ts, and nothing else of the app.
+      - traefik.http.routers.${COMPOSE_PROJECT_NAME:-potentialpaper}-demos.rule=Host(`${DEMO_HOST:-papers-content.potentialhedge.com}`)
+      - traefik.http.routers.${COMPOSE_PROJECT_NAME:-potentialpaper}-demos.entrypoints=websecure
+      - traefik.http.routers.${COMPOSE_PROJECT_NAME:-potentialpaper}-demos.tls=true
+      - traefik.http.routers.${COMPOSE_PROJECT_NAME:-potentialpaper}-demos.service=${COMPOSE_PROJECT_NAME:-potentialpaper}
+      - traefik.http.routers.${COMPOSE_PROJECT_NAME:-potentialpaper}-demos.middlewares=${COMPOSE_PROJECT_NAME:-potentialpaper}-git-ratelimit
       # Anonymous traffic is the edge's job, keyed on the real client IP, which is trustworthy
       # because only Cloudflare can reach this origin.
       - traefik.http.middlewares.${COMPOSE_PROJECT_NAME:-potentialpaper}-ratelimit.ratelimit.average=${RATE_LIMIT_AVERAGE:-30}

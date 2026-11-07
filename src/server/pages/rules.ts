@@ -1,3 +1,5 @@
+import { parseDemosFile } from '@/lib/demos';
+
 /**
  * What may be written to a page repo, and by whom (DESIGN.md §4.3). Pure, and the only place these rules
  * are decided. Paths reach people's disks through `git clone`, so a path has to be safe on every
@@ -12,6 +14,8 @@ export const RESOURCES_PATH = 'author/resources.json';
 export const PDF_PATH = 'pdf.json';
 /** A picture the authors chose for the paper, in place of its PDF's first page: a pointer, as `pdf.json` is. */
 export const THUMBNAIL_PATH = 'author/thumbnail.json';
+/** Demos attached to the paper: pointers to snapshots of code from GitHub (`lib/demos.ts`). */
+export const DEMOS_PATH = 'community/demos.jsonl';
 
 export const MAX_FILE_BYTES = 256 * 1024;
 export const MAX_CHANGES = 50;
@@ -224,6 +228,7 @@ export function contentProblem(path: string, content: string): string | null {
   if (Buffer.byteLength(content) > MAX_FILE_BYTES) return `is larger than ${MAX_FILE_BYTES} bytes`;
   if (path === PDF_PATH) return parsePdfPointer(content) ? null : 'is not a valid PDF pointer';
   if (path === THUMBNAIL_PATH) return parseThumbnailPointer(content) ? null : 'is not a valid thumbnail pointer';
+  if (path === DEMOS_PATH) return parseDemosFile(content) ? null : 'has a line that is not a valid demo';
   if (path.endsWith('.jsonl')) {
     for (const line of content.split('\n')) {
       if (line === '') continue;

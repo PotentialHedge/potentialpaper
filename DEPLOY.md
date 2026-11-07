@@ -31,6 +31,13 @@ https://papers.potentialhedge.com loads.
 - **The edge-cache purge is not optional.** Cloudflare caches whole pages. They name the old build's scripts,
   which the new container no longer serves, so cached pages break until the cache is purged.
 
+## Demos
+
+Demos are served from `papers-content.potentialhedge.com`: a proxied A record (added 2026-11-07) in the `potentialhedge.com` zone,
+pointing at this host, with the Traefik router in `docker-compose.prod.yml`. `.env.production` needs the `R2_*`
+keys (see `.env.production.example`), or attaching a demo fails, rather than storing it on the container's
+disk, which the next deploy would wipe.
+
 ## When it goes wrong
 
 Read `dc logs -f app`, fix the problem, commit and run the recipe again. If the database is beyond saving,

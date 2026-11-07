@@ -1,0 +1,204 @@
+import { execFileSync } from 'node:child_process';
+import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs';
+import { tmpdir } from 'node:os';
+import { dirname, join } from 'node:path';
+import { gzipSync } from 'node:zlib';
+import { eq } from 'drizzle-orm';
+import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it, vi } from 'vitest';
+import { getDb } from '@/db';
+import { demoSnapshots, pageCurrent } from '@/db/schema';
+import { DEMO_ORIGIN } from '@/lib/demos';
+import { serveDemo } from '@/server/demos/serve';
+import { rebuildAllPages } from '@/server/pages/projections';
+import { pageHistory } from '@/server/pages/repo';
+import { savePaper } from '@/server/papers';
+import { api, closePool, resetDatabase, signUp } from './helpers';
+
+const OWNER = 'someone';
+const REPO = 'attention-3d';
+const MAIN = '1'.repeat(40);
+const PAPER = { scheme: 'arxiv', value: '1706.03762' } as const;
+
+/** A repo at `MAIN`: a Vite-style build in `dist/`, whose page loads its script from the site root. */
+const FILES: Record<string, string> = {
+  'README.md': '# A demo',
+  'src/main.ts': 'console.log(1)',
+  'dist/index.html': '<!doctype html><script type="module" src="/assets/index.js"></script>',
+  'dist/assets/index.js': 'import "/assets/chunk.js";',
+  'dist/assets/chunk.js': 'document.title = "ok";',
+};
+
+function pkt(line: string): string {
+  return (line.length + 4).toString(16).padStart(4, '0') + line;
+}
+
+function tarball(files: Record<string, string>): Buffer {
+  const dir = mkdtempSync(join(tmpdir(), 'demo-repo-'));
+  try {
+    for (const [path, content] of Object.entries(files)) {
+      const full = join(dir, `${OWNER}-${REPO}-${MAIN.slice(0, 7)}`, path);
+      mkdirSync(dirname(full), { recursive: true });
+      writeFileSync(full, content);
+    }
+    // No `._` files from a Mac's tar.
+    return gzipSync(
+      execFileSync('tar', ['-cf', '-', '-C', dir, '.'], { env: { ...process.env, COPYFILE_DISABLE: '1' } }),
+    );
+  } finally {
+    rmSync(dir, { recursive: true, force: true });
+  }
+}
+
+/** GitHub, as far as demos see it: the ref listing and codeload. */
+function fakeGitHub(files: Record<string, string> = FILES) {
+  const archive = tarball(files);
+  return vi.fn(async (input: string | URL | Request) => {
+    const url = String(input instanceof Request ? input.url : input);
+    if (url === `https://github.com/${OWNER}/${REPO}.git/info/refs?service=git-upload-pack`) {
+      return new Response(
+        pkt('# service=git-upload-pack\n') +
+          '0000' +
+          pkt(`${MAIN} HEAD\0symref=HEAD:refs/heads/main\n`) +
+          pkt(`${MAIN} refs/heads/main\n`) +
+          '0000',
+      );
+    }
+    if (url === `https://codeload.github.com/${OWNER}/${REPO}/tar.gz/${MAIN}`)
+      return new Response(new Uint8Array(archive));
+    return new Response('not found', { status: 404 });
+  });
+}
+
+function demoRequest(path: string, referer?: string): Request {
+  return new Request(new URL(path, DEMO_ORIGIN), {
+    headers: referer ? { referer: new URL(referer, DEMO_ORIGIN).href } : {},
+  });
+}
+
+let store: string;
+
+beforeAll(() => {
+  store = mkdtempSync(join(tmpdir(), 'demo-store-'));
+  process.env.DEMOS_DIR = store;
+});
+afterAll(async () => {
+  rmSync(store, { recursive: true, force: true });
+  await closePool();
+});
+beforeEach(resetDatabase);
+afterEach(() => vi.unstubAllGlobals());
+
+async function paper(): Promise<string> {
+  return savePaper({
+    title: 'Attention Is All You Need',
+    authors: [],
+    abstract: null,
+    year: 2017,
+    venue: null,
+    identifiers: [PAPER],
+    source: 'arxiv',
+    metadataLicense: 'CC0-1.0',
+    abstractLicense: null,
+  });
+}
+
+describe('attaching a demo', () => {
+  it('copies the built folder at a pinned commit, commits a pointer, and serves the files', async () => {
+    const paperId = await paper();
+    const cookie = await signUp('ada@ethz.ch');
+    vi.stubGlobal('fetch', fakeGitHub());
+
+    const res = await api('POST', '/demos', {
+      cookie,
+      body: { paper: PAPER, url: `https://github.com/${OWNER}/${REPO}`, title: 'Attention, in 3D' },
+    });
+    expect(res.status).toBe(201);
+    expect(res.body.demo).toMatchObject({ title: 'Attention, in 3D', commit: MAIN, root: 'dist' });
+    expect(res.body.files).toBe(3);
+    const id: string = res.body.demo.id;
+
+    const [current] = await getDb().select().from(pageCurrent).where(eq(pageCurrent.paperId, paperId));
+    expect(current.demos).toEqual([res.body.demo]);
+    const [history] = await pageHistory(paperId, { limit: 1 });
+    expect(history).toMatchObject({
+      summary: 'Add demo "Attention, in 3D"',
+      paths: ['community/demos.jsonl', 'metadata.json'],
+    });
+
+    const index = await serveDemo(demoRequest(`/d/${id}/`));
+    expect(index.status).toBe(200);
+    expect(index.headers.get('content-type')).toMatch(/^text\/html/);
+    expect(index.headers.get('cache-control')).toContain('immutable');
+    expect(await index.text()).toContain('/assets/index.js');
+
+    // The build asks from the root; the page that asked says which demo it belongs to.
+    const fromRoot = await serveDemo(demoRequest('/assets/index.js', `/d/${id}/`));
+    expect(fromRoot.status).toBe(302);
+    expect(fromRoot.headers.get('location')).toBe(`${DEMO_ORIGIN}/d/${id}/assets/index.js`);
+    const chained = await serveDemo(demoRequest('/assets/chunk.js', `/d/${id}/assets/index.js`));
+    expect(chained.headers.get('location')).toBe(`${DEMO_ORIGIN}/d/${id}/assets/chunk.js`);
+    const script = await serveDemo(demoRequest(`/d/${id}/assets/chunk.js`));
+    expect(script.headers.get('content-type')).toMatch(/^text\/javascript/);
+    expect(await script.text()).toBe('document.title = "ok";');
+
+    expect((await serveDemo(demoRequest(`/d/${id}`))).headers.get('location')).toBe(`${DEMO_ORIGIN}/d/${id}/`);
+    expect((await serveDemo(demoRequest(`/d/${id}/README.md`))).status).toBe(404);
+    expect((await serveDemo(demoRequest('/assets/index.js'))).status).toBe(404);
+  });
+
+  it('stores the same files once, refuses them twice on one page, and survives a rebuild', async () => {
+    const paperId = await paper();
+    const cookie = await signUp('ada@ethz.ch');
+    vi.stubGlobal('fetch', fakeGitHub());
+    const body = { paper: PAPER, url: `https://github.com/${OWNER}/${REPO}/tree/main/dist`, title: 'Again' };
+    expect((await api('POST', '/demos', { cookie, body })).status).toBe(201);
+    const again = await api('POST', '/demos', { cookie, body });
+    expect(again.status).toBe(422);
+    expect(again.body.error.message).toMatch(/already on the page/);
+    expect(await getDb().select().from(demoSnapshots)).toHaveLength(1);
+
+    const [before] = await getDb().select().from(pageCurrent).where(eq(pageCurrent.paperId, paperId));
+    await rebuildAllPages();
+    const [after] = await getDb().select().from(pageCurrent).where(eq(pageCurrent.paperId, paperId));
+    expect(after.demos).toEqual(before.demos);
+  });
+
+  it('removes one, as a commit', async () => {
+    const paperId = await paper();
+    const cookie = await signUp('ada@ethz.ch');
+    vi.stubGlobal('fetch', fakeGitHub());
+    const added = await api('POST', '/demos', {
+      cookie,
+      body: { paper: PAPER, url: `https://github.com/${OWNER}/${REPO}`, title: 'Gone soon' },
+    });
+    const query = new URLSearchParams({ ...PAPER, id: added.body.demo.id });
+    const removed = await api('DELETE', `/demos?${query}`, { cookie });
+    expect(removed.status).toBe(200);
+    const [current] = await getDb().select().from(pageCurrent).where(eq(pageCurrent.paperId, paperId));
+    expect(current.demos).toBeNull();
+    const [last] = await pageHistory(paperId, { limit: 1 });
+    expect(last.summary).toBe('Remove demo "Gone soon"');
+  });
+
+  it('explains what is wrong with a repo it cannot use', async () => {
+    await paper();
+    const cookie = await signUp('ada@ethz.ch');
+    vi.stubGlobal('fetch', fakeGitHub({ 'src/index.ts': 'x' }));
+    const post = (url: string) => api('POST', '/demos', { cookie, body: { paper: PAPER, url, title: 'T' } });
+
+    const noIndex = await post(`https://github.com/${OWNER}/${REPO}`);
+    expect(noIndex.status).toBe(422);
+    expect(noIndex.body.error.message).toMatch(/no index\.html/);
+    expect((await post('https://github.com/nobody/private-thing')).body.error.message).toMatch(/isn't public/);
+    expect((await post('https://gitlab.com/a/b')).body.error.message).toMatch(/GitHub/);
+    expect((await post(`https://github.com/${OWNER}/${REPO}/tree/nope`)).body.error.message).toMatch(/branch/);
+  });
+
+  it('needs a verified account', async () => {
+    await paper();
+    const res = await api('POST', '/demos', {
+      body: { paper: PAPER, url: `https://github.com/${OWNER}/${REPO}`, title: 'T' },
+    });
+    expect(res.status).toBe(401);
+  });
+});

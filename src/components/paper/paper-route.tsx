@@ -38,7 +38,12 @@ export async function PaperRoute({ scheme, segments }: { scheme: PaperScheme; se
   const { paper, identifiers } = await load(scheme, segments);
   const [[current], submissions] = await Promise.all([
     getDb()
-      .select({ pdf: pageCurrent.pdf, thumbnail: pageCurrent.thumbnail, cover: pdfCovers.url })
+      .select({
+        pdf: pageCurrent.pdf,
+        thumbnail: pageCurrent.thumbnail,
+        demos: pageCurrent.demos,
+        cover: pdfCovers.url,
+      })
       .from(pageCurrent)
       .leftJoin(pdfCovers, sql`${pdfCovers.sha256} = ${pageCurrent.pdf} ->> 'sha256'`)
       .where(eq(pageCurrent.paperId, paper.id)),
@@ -54,7 +59,15 @@ export async function PaperRoute({ scheme, segments }: { scheme: PaperScheme; se
     : current?.cover
       ? { url: current.cover, alt: null, caption: "The paper's first page." }
       : null;
-  const panel = { paper, identifiers, pdf: current?.pdf ?? null, picture, submissions };
+  const panel = {
+    paper,
+    identifiers,
+    pdf: current?.pdf ?? null,
+    picture,
+    submissions,
+    demos: current?.demos ?? [],
+    canonical: canonicalPaperId(identifiers) ?? identifiers[0],
+  };
   const about = [paper.venue, paper.year].filter(Boolean).join(', ');
   return (
     <main className={ui.paperPage}>

@@ -17,6 +17,7 @@ import {
   uuid,
 } from 'drizzle-orm/pg-core';
 import { NOTE_KINDS, SUBMISSION_STATUSES, type FieldValue, type VenueForms } from '../lib/submissions';
+import type { DemoPointer } from '../lib/demos';
 import type { PdfPointer, ThumbnailPointer } from '@/server/pages/rules';
 import { PAPER_ORIGINS } from '../server/paper-sources/types';
 import { user } from './auth-schema';
@@ -280,6 +281,8 @@ export const pageCurrent = pgTable('page_current', {
   pdf: jsonb('pdf').$type<PdfPointer>(),
   /** The page's `author/thumbnail.json`. */
   thumbnail: jsonb('thumbnail').$type<ThumbnailPointer>(),
+  /** The page's `community/demos.jsonl`, in order. */
+  demos: jsonb('demos').$type<DemoPointer[]>(),
   updatedAt: timestamp('updated_at', { withTimezone: true, mode: 'date' }).notNull(),
 });
 
@@ -309,6 +312,30 @@ export const pageEvents = pgTable(
  * R2 are, so a page that points at the same PDF shares it. Written by `scripts/render-covers.ts`; a PDF
  * without a row has no cover yet.
  */
+/** One file of a demo snapshot: its bytes are in the blob store under `sha256`. */
+export interface DemoFile {
+  sha256: string;
+  bytes: number;
+  type: string;
+}
+
+/**
+ * The files of a demo, copied from a repo at one commit (`server/demos/snapshot.ts`). The id is a hash of
+ * the file list, so a snapshot never changes, and the same files are stored once whoever attaches them.
+ * Not a projection: pages point at snapshots by id from `demos.jsonl`.
+ */
+export const demoSnapshots = pgTable('demo_snapshots', {
+  id: text('id').primaryKey(),
+  /** The repo or gist page. */
+  source: text('source').notNull(),
+  commit: text('commit').notNull(),
+  root: text('root').notNull(),
+  /** Path under `root` → file. */
+  files: jsonb('files').$type<Record<string, DemoFile>>().notNull(),
+  totalBytes: bigint('total_bytes', { mode: 'number' }).notNull(),
+  createdAt: createdAt(),
+});
+
 export const pdfCovers = pgTable('pdf_covers', {
   sha256: text('sha256').primaryKey(),
   /** The JPEG in R2. */

@@ -90,3 +90,38 @@ export const SearchResponse = z.object({
   total: z.number().int(),
   hasMore: z.boolean(),
 });
+
+const SnapshotId = z.string().regex(/^[0-9a-f]{32}$/);
+
+export const DemoAttachBody = z.object({
+  paper: PaperIdentifier,
+  url: z.url().max(2000),
+  title: z.string().trim().min(1).max(120),
+  description: z.string().max(500).optional(),
+});
+
+export const DemoRemoveQuery = z.object({
+  scheme: PaperSchemeParam,
+  value: z.string().min(1).max(300),
+  id: SnapshotId,
+});
+
+export const DemoPointer = z.object({
+  id: SnapshotId,
+  title: z.string(),
+  description: z.string().optional(),
+  source: z.string(),
+  commit: z.string(),
+  root: z.string(),
+});
+
+export const DemoAttached = z.object({
+  demo: DemoPointer,
+  url: z.string(),
+  files: z.number().int(),
+  bytes: z.number().int(),
+  /** The page's head after the change. */
+  head: z.string().nullable(),
+});
+
+export const DemoRemoved = z.object({ head: z.string().nullable() });

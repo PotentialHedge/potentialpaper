@@ -1,4 +1,5 @@
 import type { NextConfig } from 'next';
+import { DEMO_HOSTNAME, DEMO_ORIGIN } from './src/lib/demos';
 import { HOME_LIST_PARAMS, PRIVATE_PAGES } from './src/lib/private-paths';
 
 const dev = process.env.NODE_ENV !== 'production';
@@ -7,7 +8,7 @@ const dev = process.env.NODE_ENV !== 'production';
  * The content security policy, on every response. Scripts keep `'unsafe-inline'` because Next's inline
  * bootstrap scripts otherwise need a per-request nonce, and a nonce makes every page dynamic, which
  * rules out caching pages at the edge (DESIGN.md §2). Everything else is closed: scripts only from this
- * origin, inline and the analytics host, no frames, nothing fetched elsewhere but analytics, and no plugin, base or form tricks. User
+ * origin, inline and the analytics host, frames only from the demo host, nothing fetched elsewhere but analytics, and no plugin, base or form tricks. User
  * content is sanitized when committed, so this is the second lock, not the first.
  */
 // Page analytics (`lib/analytics.ts`): the tracker script and the beacons it sends back to its own origin.
@@ -20,7 +21,8 @@ const CSP = [
   "img-src 'self' data: https:",
   "font-src 'self'",
   `connect-src 'self' ${ANALYTICS}${dev ? ' ws:' : ''}`,
-  "frame-src 'none'",
+  // Demos, which run on a host of their own (`lib/demos.ts`).
+  `frame-src ${DEMO_ORIGIN}`,
   "object-src 'none'",
   "base-uri 'self'",
   "form-action 'self'",
@@ -30,6 +32,9 @@ const CSP = [
 const nextConfig: NextConfig = {
   // No `X-Powered-By: Next.js`: it tells a scanner which advisories to try.
   poweredByHeader: false,
+  // A demo's folder needs its slash, or its relative addresses resolve one level up. `proxy.ts` removes the
+  // slash on the app's own host, as Next would.
+  skipTrailingSlashRedirect: true,
   async redirects() {
     // A guessed address: there is no sign-up page of that name.
     return [
@@ -42,6 +47,8 @@ const nextConfig: NextConfig = {
     return [
       {
         source: '/:path*',
+        // The demo host sends its own headers (`server/demos/serve.ts`).
+        missing: [{ type: 'host' as const, value: DEMO_HOSTNAME.replaceAll('.', '\\.') }],
         headers: [
           { key: 'Content-Security-Policy', value: CSP },
           { key: 'X-Content-Type-Options', value: 'nosniff' },
