@@ -36,6 +36,13 @@
       "when": 1793962619451,
       "tag": "0004_pdf_covers",
       "breakpoints": true
+    },
+    {
+      "idx": 5,
+      "version": "7",
+      "when": 1793962933757,
+      "tag": "0005_paper_licenses",
+      "breakpoints": true
     }
   ]
 }

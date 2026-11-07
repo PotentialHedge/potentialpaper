@@ -92,6 +92,9 @@ export async function savePaper(source: SourcePaper, database: Database = getDb(
           abstract: source.abstract,
           year: source.year,
           venue: source.venue,
+          source: source.source,
+          metadataLicense: source.metadataLicense,
+          abstractLicense: source.abstractLicense,
         })
         .returning({ id: papers.id });
       paperId = created.id;

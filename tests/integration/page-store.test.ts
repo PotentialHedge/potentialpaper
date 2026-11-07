@@ -71,6 +71,9 @@ async function newPaper(identifier: { scheme: 'arxiv' | 'doi' | 'openreview'; va
     abstract: 'An abstract.',
     year: 2020,
     venue: null,
+    source: 'arxiv',
+    metadataLicense: 'CC0-1.0',
+    abstractLicense: 'CC0-1.0',
     identifiers: [identifier ?? { scheme: 'arxiv', value: `2001.${String(paperCount).padStart(5, '0')}` }],
   });
 }
@@ -484,6 +487,8 @@ describe('commitPage', () => {
       abstract: 'An abstract.',
       year: 2020,
       venue: null,
+      source: 'arxiv',
+      license: { metadata: 'CC0-1.0', abstract: 'CC0-1.0' },
     });
     expect(await commitPage(paperId, first.oid, person, [{ path: 'community/page.md', content: '' }], 'Same')).toEqual({
       status: 'unchanged',
@@ -1014,7 +1019,17 @@ describe('pdf.json', () => {
   const change = (value: unknown): FileChange[] => [{ path: PDF_PATH, content: `${JSON.stringify(value)}\n` }];
 
   async function paper(): Promise<string> {
-    return savePaper({ title: 'A paper', authors: [], abstract: null, year: 2026, venue: null, identifiers: [ARXIV] });
+    return savePaper({
+      title: 'A paper',
+      authors: [],
+      abstract: null,
+      year: 2026,
+      venue: null,
+      identifiers: [ARXIV],
+      source: 'arxiv',
+      metadataLicense: 'CC0-1.0',
+      abstractLicense: null,
+    });
   }
 
   it('is projected for the page, with the metadata snapshot, and survives a rebuild', async () => {

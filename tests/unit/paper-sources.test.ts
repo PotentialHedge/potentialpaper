@@ -34,6 +34,9 @@ describe('arXiv feed', () => {
         { scheme: 'arxiv', value: '1706.03762' },
         { scheme: 'doi', value: '10.1000/abc' },
       ],
+      source: 'arxiv',
+      metadataLicense: 'CC0-1.0',
+      abstractLicense: 'CC0-1.0',
     });
   });
 
@@ -46,6 +49,7 @@ describe('arXiv feed', () => {
     );
     expect(paper?.title).toBe('2024');
     expect(paper?.authors).toEqual(['A']);
+    expect(paper?.abstractLicense).toBeNull();
   });
 
   it('no entry means no such paper', () => {
@@ -82,12 +86,17 @@ describe('OpenAlex work', () => {
     ]);
   });
 
-  it('keeps an abstract only under an open license', () => {
-    expect(parseOpenAlexWork(work, '10.1/a')?.abstract).toBeNull();
+  it('keeps an abstract only under an open license, and records that license', () => {
+    expect(parseOpenAlexWork(work, '10.1/a')).toMatchObject({ abstract: null, abstractLicense: null });
     const closed = { ...work, primary_location: { license: 'acm-tdm' } };
-    expect(parseOpenAlexWork(closed, '10.1/a')?.abstract).toBeNull();
+    expect(parseOpenAlexWork(closed, '10.1/a')).toMatchObject({ abstract: null, abstractLicense: null });
     const open = { ...work, best_oa_location: { license: 'cc-by' } };
-    expect(parseOpenAlexWork(open, '10.1/a')?.abstract).toBe('We trained a trained');
+    expect(parseOpenAlexWork(open, '10.1/a')).toMatchObject({
+      abstract: 'We trained a trained',
+      abstractLicense: 'cc-by',
+      source: 'openalex',
+      metadataLicense: 'CC0-1.0',
+    });
   });
 
   it('a work with no title is no paper', () => {

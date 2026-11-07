@@ -106,8 +106,9 @@ async function metadataSnapshot(tx: Writer, paperId: string): Promise<string> {
     .from(paperIdentifiers)
     .where(eq(paperIdentifiers.paperId, paperId));
   identifiers.sort((a, b) => `${a.scheme}:${a.value}`.localeCompare(`${b.scheme}:${b.value}`, 'en'));
-  const { title, authors, abstract, year, venue } = paper;
-  return `${JSON.stringify({ identifiers, title, authors, abstract, year, venue }, null, 2)}\n`;
+  const { title, authors, abstract, year, venue, source, metadataLicense, abstractLicense } = paper;
+  const license = { metadata: metadataLicense, abstract: abstractLicense };
+  return `${JSON.stringify({ identifiers, title, authors, abstract, year, venue, source, license }, null, 2)}\n`;
 }
 
 function normalizeChanges(changes: readonly FileChange[]): FileChange[] {

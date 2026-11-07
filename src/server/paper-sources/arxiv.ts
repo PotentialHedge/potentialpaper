@@ -1,6 +1,6 @@
 import { XMLParser } from 'fast-xml-parser';
 import { normalizeArxivId, parseDoi, type PaperId } from '@/lib/paper-ids';
-import { fetchSource, SourceUnavailable, tidy, type PaperSource, type SourcePaper } from './types';
+import { CC0, fetchSource, SourceUnavailable, tidy, type PaperSource, type SourcePaper } from './types';
 
 const parser = new XMLParser({
   ignoreAttributes: true,
@@ -34,17 +34,22 @@ export function parseArxivFeed(xml: string, id: string): SourcePaper | null {
   const doi = entry['arxiv:doi'] ? parseDoi(entry['arxiv:doi']) : null;
   if (doi?.scheme === 'doi') identifiers.push(doi);
   const year = Number(entry.published?.slice(0, 4));
+  const abstract = entry.summary ? tidy(entry.summary) || null : null;
   return {
     title: tidy(entry.title),
     authors: (entry.author ?? []).map((a) => tidy(a.name ?? '')).filter(Boolean),
-    abstract: entry.summary ? tidy(entry.summary) : null,
+    abstract,
     year: Number.isInteger(year) && year > 0 ? year : null,
     venue: entry['arxiv:journal_ref'] ? tidy(entry['arxiv:journal_ref']) : null,
     identifiers,
+    source: 'arxiv',
+    // arXiv's API terms: descriptive metadata, "title, abstract, authors, identifiers", is CC0.
+    metadataLicense: CC0,
+    abstractLicense: abstract ? CC0 : null,
   };
 }
 
-/** arXiv's metadata is CC0. Its API terms ask for at most one request every three seconds. */
+/** arXiv's metadata is CC0, abstracts included. Its API terms ask for at most one request every three seconds. */
 export const arxivSource: PaperSource = {
   name: 'arxiv',
   budget: { burst: 1, perSecond: 1 / 3 },

@@ -87,6 +87,13 @@ paper_identifiers(scheme, value, paper_id, pk(scheme, value))   -- arxiv, doi, o
   can come later through the same adapters.
 - **Source adapters** cover arXiv and OpenAlex or Crossref first. Check each source's current rate
   limits and metadata license before bulk use, publisher abstracts especially.
+- **Everything imported records its source and license.** A paper row keeps `source`,
+  `metadata_license` and `abstract_license`, `pdf.json` keeps `license`, and anything imported later
+  (venue reviews, paper text) gets the same. Licenses are SPDX ids where the source names a version
+  (`CC0-1.0`, `CC-BY-4.0`) and the source's own label otherwise. arXiv and OpenReview dedicate
+  metadata, abstracts included, to CC0; OpenAlex's data is CC0 but an abstract keeps the work's own
+  open license, and is dropped without one. OpenReview reviews, scores and comments are CC BY 4.0,
+  which requires attribution and a link on every one we show.
 - **Duplicates get merged.** An admin or moderator sets `merged_into`. The old address redirects,
   and its repo's content is folded into the survivor with one commit that records where it came
   from. Links resolve through the merge when read.

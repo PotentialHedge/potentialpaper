@@ -31,6 +31,12 @@ Things only you can do or decide. Most urgent first.
 - [ ] **Decide about 16 ICLR 2027 PDFs I didn't link.** They open with "Published as a conference paper at ICLR 2027"
       during review, so they may name their authors. Their bytes are in R2, public to anyone with the hash.
 - [ ] **Set up a takedown route** for hosted PDFs, and consider asking policy@openreview.net about re-hosting.
+- [ ] **Decide the license policy for paper text across versions.** The plan is to extract each version's
+      text (arXiv LaTeX, OpenReview PDFs) into `refs/heads/paper` so versions can be diffed. Unlike metadata
+      and reviews, full text belongs to the authors: most arXiv papers are under arXiv's non-exclusive
+      license, which doesn't allow redistribution, and OpenReview's terms say not to modify downloaded
+      submissions. Options: only papers under an open license, everything with a takedown route, or ask
+      policy@openreview.net. Parked for now; each version's commit will record the license either way.
 - [ ] **Check the abstract policy.** For papers found by DOI, I only show abstracts under an open license, so
       many publisher papers show none. arXiv abstracts always show. Loosen this only if you're comfortable
       with the licensing.

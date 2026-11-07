@@ -23,6 +23,9 @@ const ATTENTION: SourcePaper = {
   year: 2017,
   venue: null,
   identifiers: [{ scheme: 'arxiv', value: '1706.03762' }],
+  source: 'arxiv',
+  metadataLicense: 'CC0-1.0',
+  abstractLicense: 'CC0-1.0',
 };
 const ID = { scheme: 'arxiv', value: '1706.03762' } as const;
 
@@ -105,6 +108,7 @@ describe('looking up a paper', () => {
     expect(await getDb().select().from(papers)).toHaveLength(1);
     const found = await lookupPaper(doi);
     expect(found.status === 'found' && found.paper.title).toBe(ATTENTION.title);
+    expect(found.status === 'found' && found.paper).toMatchObject({ source: 'arxiv', abstractLicense: 'CC0-1.0' });
     expect(found.status === 'found' && found.identifiers).toHaveLength(2);
   });
 
@@ -188,6 +192,11 @@ describe('importing submissions', () => {
     expect(await importSubmissions(submissions, venue)).toBe(0);
     const found = await lookupPaper({ scheme: 'openreview', value: 'submission1' });
     expect(found.status === 'found' && found.paper.authors).toEqual([]);
+    expect(found.status === 'found' && found.paper).toMatchObject({
+      source: 'openreview',
+      metadataLicense: 'CC0-1.0',
+      abstractLicense: 'CC0-1.0',
+    });
     expect(await getDb().select().from(paperIdentifiers)).toHaveLength(1);
   });
 

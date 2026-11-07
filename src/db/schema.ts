@@ -17,6 +17,7 @@ import {
   uuid,
 } from 'drizzle-orm/pg-core';
 import type { PdfPointer } from '@/server/pages/rules';
+import { PAPER_ORIGINS } from '../server/paper-sources/types';
 import { user } from './auth-schema';
 
 export * from './auth-schema';
@@ -165,6 +166,13 @@ export const papers = pgTable(
     abstract: text('abstract'),
     year: integer('year'),
     venue: text('venue'),
+    /**
+     * Where the row came from, and the licenses of what we copied (`paper-sources/types.ts`). `null` only
+     * on rows from before these were kept whose source can't be told.
+     */
+    source: text('source', { enum: PAPER_ORIGINS }),
+    metadataLicense: text('metadata_license'),
+    abstractLicense: text('abstract_license'),
     /** The duplicate's survivor. Its identifiers still resolve, and redirect there. */
     mergedInto: uuid('merged_into').references((): AnyPgColumn => papers.id, { onDelete: 'set null' }),
     search: tsvector('search')
@@ -178,6 +186,7 @@ export const papers = pgTable(
     index('papers_search_idx').using('gin', t.search),
     index('papers_title_trgm_idx').using('gin', t.title.op('gin_trgm_ops')),
     index('papers_merged_into_idx').on(t.mergedInto),
+    check('papers_source_check', sql`${t.source} in ('arxiv', 'openalex', 'openreview')`),
   ],
 );
 

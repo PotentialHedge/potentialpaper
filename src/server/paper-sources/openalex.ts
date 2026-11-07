@@ -1,5 +1,5 @@
 import { normalizeArxivId, parseDoi, type PaperId } from '@/lib/paper-ids';
-import { fetchSource, tidy, type PaperSource, type SourcePaper } from './types';
+import { CC0, fetchSource, tidy, type License, type PaperSource, type SourcePaper } from './types';
 
 const FIELDS =
   'title,publication_year,doi,authorships,primary_location,best_oa_location,locations,abstract_inverted_index';
@@ -30,12 +30,13 @@ function abstractText(index: Record<string, number[]>): string {
 }
 
 /**
- * Whether we may show the abstract. OpenAlex's own data is CC0, but an abstract can still belong to its
- * publisher (DESIGN.md §3), so it is kept only from a work under an open license.
+ * The open license of the work, or `null`. OpenAlex's own data is CC0, but an abstract can still belong
+ * to its publisher (DESIGN.md §3), so it is kept only from a work under an open license, and keeps that
+ * license.
  */
-function openlyLicensed(work: Work): boolean {
+function openLicense(work: Work): License | null {
   const license = work.best_oa_location?.license ?? work.primary_location?.license;
-  return !!license && /^(cc|public-domain)/i.test(license);
+  return license && /^(cc|public-domain)/i.test(license) ? license : null;
 }
 
 export function parseOpenAlexWork(work: Work, doi: string): SourcePaper | null {
@@ -49,16 +50,20 @@ export function parseOpenAlexWork(work: Work, doi: string): SourcePaper | null {
       break;
     }
   }
+  const license = openLicense(work);
+  const abstract = work.abstract_inverted_index && license ? abstractText(work.abstract_inverted_index) || null : null;
   return {
     title: tidy(work.title),
     authors: (work.authorships ?? [])
       .map((a) => tidy(a.raw_author_name ?? a.author?.display_name ?? ''))
       .filter(Boolean),
-    abstract:
-      work.abstract_inverted_index && openlyLicensed(work) ? abstractText(work.abstract_inverted_index) || null : null,
+    abstract,
     year: work.publication_year ?? null,
     venue: work.primary_location?.source?.display_name ?? null,
     identifiers,
+    source: 'openalex',
+    metadataLicense: CC0,
+    abstractLicense: abstract ? license : null,
   };
 }
 

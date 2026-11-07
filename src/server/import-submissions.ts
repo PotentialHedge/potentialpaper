@@ -2,6 +2,7 @@ import { randomUUID } from 'node:crypto';
 import { inArray } from 'drizzle-orm';
 import { getDb, type Database } from '@/db';
 import { paperIdentifiers, papers } from '@/db/schema';
+import { CC0 } from './paper-sources/types';
 
 export interface Submission {
   /** The OpenReview id. */
@@ -53,6 +54,10 @@ export async function importSubmissions(
           authors: s.authors ?? [],
           year: venue.year,
           venue: s.venue ?? venue.name,
+          source: 'openreview' as const,
+          // OpenReview's terms define title, authors and abstract as metadata, dedicated to CC0.
+          metadataLicense: CC0,
+          abstractLicense: CC0,
         })),
       );
       await tx
