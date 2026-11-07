@@ -5,7 +5,7 @@ import { join } from 'node:path';
 import { describe, expect, it } from 'vitest';
 import { encodeDemosFile, parseDemosFile, type DemoPointer } from '@/lib/demos';
 import { parseRefAdvertisement, parseSourceUrl, resolveRest } from '@/server/demos/github';
-import { findFile, splitDemoPath } from '@/server/demos/serve';
+import { findFile, HEIGHT_REPORTER, splitDemoPath, withHeightReporter } from '@/server/demos/serve';
 import { chooseRoot, contentType, selectFiles, snapshotId } from '@/server/demos/snapshot';
 import { readTar } from '@/server/demos/tar';
 import { contentProblem, DEMOS_PATH } from '@/server/pages/rules';
@@ -183,5 +183,20 @@ describe('demos.jsonl', () => {
     ]) {
       expect(contentProblem(DEMOS_PATH, JSON.stringify(bad) + '\n')).toBe('has a line that is not a valid demo');
     }
+  });
+});
+
+describe("a demo's page", () => {
+  it('gets the height reporter after <head>, or after the doctype, so it keeps standards mode', () => {
+    expect(withHeightReporter('<!doctype html><html><head><title>x</title></head></html>')).toBe(
+      `<!doctype html><html><head>${HEIGHT_REPORTER}<title>x</title></head></html>`,
+    );
+    expect(withHeightReporter('<!DOCTYPE html>\n<HEAD lang="en">x')).toBe(
+      `<!DOCTYPE html>\n<HEAD lang="en">${HEIGHT_REPORTER}x`,
+    );
+    expect(withHeightReporter('<!doctype html><canvas>')).toBe(`<!doctype html>${HEIGHT_REPORTER}<canvas>`);
+    expect(withHeightReporter('<canvas>')).toBe(`${HEIGHT_REPORTER}<canvas>`);
+    // A <header> is not the head.
+    expect(withHeightReporter('<!doctype html><body><header>')).toBe(`<!doctype html>${HEIGHT_REPORTER}<body><header>`);
   });
 });

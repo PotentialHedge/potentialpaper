@@ -128,8 +128,12 @@ describe('attaching a demo', () => {
     const index = await serveDemo(demoRequest(`/d/${id}/`));
     expect(index.status).toBe(200);
     expect(index.headers.get('content-type')).toMatch(/^text\/html/);
-    expect(index.headers.get('cache-control')).toContain('immutable');
-    expect(await index.text()).toContain('/assets/index.js');
+    // A page has the height reporter added, so it isn't kept as long as the files are.
+    expect(index.headers.get('cache-control')).toBe('public, max-age=300');
+    const page = await index.text();
+    expect(page).toContain('/assets/index.js');
+    expect(page).toMatch(/^<!doctype html><script data-potentialpaper>/);
+    expect(Number(index.headers.get('content-length'))).toBe(Buffer.byteLength(page));
 
     // The build asks from the root; the page that asked says which demo it belongs to.
     const fromRoot = await serveDemo(demoRequest('/assets/index.js', `/d/${id}/`));
@@ -139,6 +143,7 @@ describe('attaching a demo', () => {
     expect(chained.headers.get('location')).toBe(`${DEMO_ORIGIN}/d/${id}/assets/chunk.js`);
     const script = await serveDemo(demoRequest(`/d/${id}/assets/chunk.js`));
     expect(script.headers.get('content-type')).toMatch(/^text\/javascript/);
+    expect(script.headers.get('cache-control')).toContain('immutable');
     expect(await script.text()).toBe('document.title = "ok";');
 
     expect((await serveDemo(demoRequest(`/d/${id}`))).headers.get('location')).toBe(`${DEMO_ORIGIN}/d/${id}/`);

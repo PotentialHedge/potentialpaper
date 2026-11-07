@@ -3,7 +3,14 @@
 import { usePathname } from 'next/navigation';
 import { useEffect, useRef, useState, type FormEvent } from 'react';
 import { ui } from '@/components/ui';
-import { demoUrl, type DemoPointer } from '@/lib/demos';
+import {
+  DEMO_HEIGHT_MESSAGE,
+  DEMO_ORIGIN,
+  demoUrl,
+  MAX_DEMO_HEIGHT,
+  MIN_DEMO_HEIGHT,
+  type DemoPointer,
+} from '@/lib/demos';
 import type { PaperId } from '@/lib/paper-ids';
 import { authHref } from '@/lib/return-to';
 
@@ -44,7 +51,31 @@ function Demo({ demo, index, canEdit, paper }: { demo: DemoPointer; index: numbe
   const frame = useRef<HTMLIFrameElement>(null);
   const [problem, setProblem] = useState<string | null>(null);
   const [shown, setShown] = useState(false);
+  // The demo's own height, once its page says; until then, and for a page that fills any frame, 16:9.
+  const [height, setHeight] = useState<number | null>(null);
   const url = demoUrl(demo.id);
+
+  useEffect(() => {
+    // A page sized by its frame (`height: 80vh`) answers each resize with another, the same way: one
+    // that comes straight after ours and goes the same way is that, and is ignored.
+    let last: { height: number; at: number; grew: boolean } | null = null;
+    function onMessage(event: MessageEvent) {
+      if (event.origin !== DEMO_ORIGIN || event.source !== frame.current?.contentWindow) return;
+      const data = event.data as { type?: unknown; height?: unknown } | null;
+      if (data?.type !== DEMO_HEIGHT_MESSAGE || typeof data.height !== 'number' || !Number.isFinite(data.height))
+        return;
+      const next = Math.round(Math.min(MAX_DEMO_HEIGHT, data.height));
+      if (next < MIN_DEMO_HEIGHT) return;
+      const current = frame.current?.getBoundingClientRect().height ?? 0;
+      if (Math.abs(next - current) < 2) return;
+      const grew = next > current;
+      if (last && performance.now() - last.at < 300 && last.grew === grew) return;
+      last = { height: next, at: performance.now(), grew };
+      setHeight(next);
+    }
+    window.addEventListener('message', onMessage);
+    return () => window.removeEventListener('message', onMessage);
+  }, []);
 
   // Loaded once it is about to come on screen, and kept from then on: the browser's own `loading="lazy"`
   // starts a frame more than a screen away, which is every demo on a short page.
@@ -80,7 +111,8 @@ function Demo({ demo, index, canEdit, paper }: { demo: DemoPointer; index: numbe
         sandbox={SANDBOX}
         allow={ALLOW}
         allowFullScreen
-        className="block aspect-video w-full border-0 bg-transparent"
+        style={height ? { height } : undefined}
+        className={`block w-full border-0 bg-transparent ${height ? '' : 'aspect-video'}`}
       />
       <figcaption className={ui.caption}>
         <b>Demo {index + 1}:</b> {demo.title}

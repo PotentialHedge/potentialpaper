@@ -1,7 +1,7 @@
 import { eq } from 'drizzle-orm';
 import { getDb } from '@/db';
 import { demoSnapshots, type DemoFile } from '@/db/schema';
-import { DEMO_ORIGIN, DEMO_PREFIX, isSnapshotId } from '@/lib/demos';
+import { DEMO_HEIGHT_MESSAGE, DEMO_ORIGIN, DEMO_PREFIX, isSnapshotId } from '@/lib/demos';
 import { siteUrl } from '../site';
 import { getBlob } from './store';
 
@@ -31,11 +31,34 @@ async function manifest(id: string): Promise<Record<string, DemoFile> | null> {
   return files;
 }
 
+/**
+ * Added to each HTML page of a demo: tells the paper page how tall the content is, whenever that changes,
+ * so the frame takes the demo's own shape. It measures the body rather than the document, which is never
+ * shorter than the frame and so could only grow.
+ */
+export const HEIGHT_REPORTER = `<script data-potentialpaper>(()=>{if(parent===window)return;let last=0;const send=()=>{const b=document.body;if(!b)return;const s=getComputedStyle(b);const h=Math.ceil(b.getBoundingClientRect().bottom+parseFloat(s.marginBottom)+window.scrollY);if(h!==last){last=h;parent.postMessage({type:${JSON.stringify(DEMO_HEIGHT_MESSAGE)},height:h},"*")}};const watch=()=>{send();new ResizeObserver(send).observe(document.body)};document.body?watch():addEventListener("DOMContentLoaded",watch);addEventListener("load",send)})()</script>`;
+
+/** The page with the reporter, after `<head>` (or the doctype), so the page keeps its standards mode. */
+export function withHeightReporter(html: string): string {
+  const head = /<head(\s[^>]*)?>/i.exec(html);
+  if (head)
+    return html.slice(0, head.index + head[0].length) + HEIGHT_REPORTER + html.slice(head.index + head[0].length);
+  const doctype = /^\s*<!doctype[^>]*>/i.exec(html);
+  if (doctype) return doctype[0] + HEIGHT_REPORTER + html.slice(doctype[0].length);
+  return HEIGHT_REPORTER + html;
+}
+
+async function readAll(body: ReadableStream<Uint8Array> | Uint8Array<ArrayBuffer>): Promise<string> {
+  if (body instanceof Uint8Array) return Buffer.from(body).toString('utf8');
+  return new Response(body).text();
+}
+
 function headers(type: string): Record<string, string> {
   return {
     'Content-Type': type,
-    // The snapshot id is a hash of its files, so an address always means the same bytes.
-    'Cache-Control': 'public, max-age=31536000, immutable',
+    // The snapshot id is a hash of its files, so an address always means the same bytes. Except a page,
+    // which has the reporter added and may get a newer one.
+    'Cache-Control': type.startsWith('text/html') ? 'public, max-age=300' : 'public, max-age=31536000, immutable',
     // Only the paper pages may frame a demo.
     'Content-Security-Policy': `frame-ancestors ${new URL(siteUrl()).origin}`,
     'Access-Control-Allow-Origin': '*',
@@ -113,6 +136,12 @@ export async function serveDemo(req: Request): Promise<Response> {
   if (!body) {
     console.error(`demo ${inside.id}: ${path} (${file.sha256}) is not in the store`);
     return new Response('The file is missing\n', { status: 502, headers: { 'Cache-Control': 'no-store' } });
+  }
+  if (file.type.startsWith('text/html')) {
+    const page = Buffer.from(withHeightReporter(await readAll(body)));
+    return new Response(req.method === 'HEAD' ? null : new Uint8Array(page), {
+      headers: { ...headers(file.type), 'Content-Length': String(page.length) },
+    });
   }
   return new Response(req.method === 'HEAD' ? null : body, {
     headers: { ...headers(file.type), 'Content-Length': String(file.bytes) },

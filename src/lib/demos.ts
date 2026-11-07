@@ -28,6 +28,15 @@ export function demoUrl(snapshot: string, path = ''): string {
   return `${DEMO_ORIGIN}${DEMO_PREFIX}${snapshot}/${path}`;
 }
 
+/**
+ * The message a demo's page posts to the paper page with its content's height, so the frame fits it. The
+ * demo host adds a script that sends it (`server/demos/serve.ts`); a demo may also send it itself.
+ */
+export const DEMO_HEIGHT_MESSAGE = 'potentialpaper:demo-height';
+/** Below this a reported height is a page whose content is all fixed or absolute, which fills any frame. */
+export const MIN_DEMO_HEIGHT = 120;
+export const MAX_DEMO_HEIGHT = 4000;
+
 export const MAX_DEMO_TITLE = 120;
 export const MAX_DEMO_DESCRIPTION = 500;
 
