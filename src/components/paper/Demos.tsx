@@ -8,8 +8,8 @@ import type { PaperId } from '@/lib/paper-ids';
 import { authHref } from '@/lib/return-to';
 
 /**
- * A paper's demos: code from GitHub, each run on click in a frame on the demo host, so a heavy scene costs
- * nothing until someone asks for it. The list is in the cached page; whether the reader may add or remove
+ * A paper's demos: code from GitHub, each shown in the page from the demo host, and loaded as it scrolls
+ * into view. The list is in the cached page; whether the reader may add or remove
  * one is filled in afterwards, as the navbar's viewer is.
  */
 
@@ -41,8 +41,7 @@ function reloadAt(pathname: string, head: string | null) {
 
 function Demo({ demo, index, canEdit, paper }: { demo: DemoPointer; index: number; canEdit: boolean; paper: PaperId }) {
   const pathname = usePathname();
-  const frame = useRef<HTMLDivElement>(null);
-  const [running, setRunning] = useState(false);
+  const frame = useRef<HTMLIFrameElement>(null);
   const [problem, setProblem] = useState<string | null>(null);
   const url = demoUrl(demo.id);
 
@@ -55,57 +54,39 @@ function Demo({ demo, index, canEdit, paper }: { demo: DemoPointer; index: numbe
   }
 
   return (
-    <figure className="mt-4">
-      <div ref={frame} className="relative aspect-video w-full border border-frame bg-[#111]">
-        {running ? (
-          <iframe
-            src={url}
-            title={demo.title}
-            sandbox={SANDBOX}
-            allow={ALLOW}
-            allowFullScreen
-            className="absolute inset-0 h-full w-full border-0 bg-white"
-          />
-        ) : (
-          <button
-            type="button"
-            onClick={() => setRunning(true)}
-            className="absolute inset-0 flex cursor-pointer flex-col items-center justify-center gap-2 font-sans text-white"
-          >
-            <span aria-hidden className="text-4xl leading-none">
-              ▶
-            </span>
-            <span className="text-sm font-semibold">Run demo</span>
-          </button>
-        )}
-      </div>
+    <figure className="mt-5">
+      {/* Part of the page, as a paper's figure is: no box around it. The browser loads it as it nears the
+          screen, so a page of heavy scenes costs nothing until someone scrolls to them. */}
+      <iframe
+        ref={frame}
+        src={url}
+        title={demo.title}
+        loading="lazy"
+        sandbox={SANDBOX}
+        allow={ALLOW}
+        allowFullScreen
+        className="block aspect-video w-full border-0 bg-transparent"
+      />
       <figcaption className={ui.caption}>
         <b>Demo {index + 1}:</b> {demo.title}
         {demo.description && <span>. {demo.description}</span>}
-      </figcaption>
-      <p className="mt-1 flex flex-wrap gap-x-3 gap-y-1 font-sans text-xs text-muted">
-        {running && (
+        <span className="ml-2 inline-flex flex-wrap gap-x-2.5 font-sans text-xs text-faint">
           <button type="button" className={ui.linkBtn} onClick={() => frame.current?.requestFullscreen?.()}>
             full screen
           </button>
-        )}
-        {running && (
-          <button type="button" className={ui.linkBtn} onClick={() => setRunning(false)}>
-            stop
-          </button>
-        )}
-        <a href={url} target="_blank" rel="noopener">
-          open in a new tab
-        </a>
-        <a href={sourceAt(demo)} rel="noopener" className="font-mono">
-          {sourceLabel(demo)}
-        </a>
-        {canEdit && (
-          <button type="button" className={ui.linkBtn} onClick={remove}>
-            remove
-          </button>
-        )}
-      </p>
+          <a href={url} target="_blank" rel="noopener">
+            new tab
+          </a>
+          <a href={sourceAt(demo)} rel="noopener" className="font-mono">
+            {sourceLabel(demo)}
+          </a>
+          {canEdit && (
+            <button type="button" className={ui.linkBtn} onClick={remove}>
+              remove
+            </button>
+          )}
+        </span>
+      </figcaption>
       {problem && <p className={ui.note(false)}>{problem}</p>}
     </figure>
   );
