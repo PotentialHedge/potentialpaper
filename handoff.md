@@ -20,6 +20,9 @@ Milestones 0, 1 and 2 are built, merged into `main` and deployed. Mail doesn't w
 
 - **Stack:** Next 16.4.5, Drizzle, Postgres 16, Better Auth, Tailwind v4 and Vitest, with Cloudflare R2 for PDFs
   and images.
+- **Deploying:** SSH to `ben-docker-1` (Tailscale), repo at `~/projects/papertrail`. If it times out, this
+  Mac's Tailscale is disconnected. The server's `curl --aws-sigv4` gets 403 from R2 with good keys; test keys
+  with `aws4fetch` instead.
 - **Milestone 0:** sign-up by institutional email, accounts with a handle, CSP and CI.
 - **Milestone 1:** `/abs`, `/doi` and `/openreview` pages, created the first time someone visits them. Their
   metadata comes from arXiv or OpenAlex, within a request budget shared by all readers, and misses are
@@ -36,7 +39,7 @@ Milestones 0, 1 and 2 are built, merged into `main` and deployed. Mail doesn't w
 - **Demos:** any verified account can attach a demo to a paper from a public GitHub repo, folder or gist
   (`POST /api/v1/demos`, the "Demos" section of a paper page). The server resolves the ref to a commit
   through git's ref listing, streams codeload's tarball, keeps the folder with `index.html` (auto-found in
-  `dist`, `build`, `docs`, ...), stores each file in R2 by SHA-256, and records a `demo_snapshots` row whose id
+  `dist`, `build`, `docs`, ...), stores each file in R2 by SHA-256 (production's `R2_*` keys are a token limited to the bucket's objects), and records a `demo_snapshots` row whose id
   hashes the file list. The page's `community/demos.jsonl` points at it, so demos have history and revert like
   any edit. Nothing is built. `proxy.ts` answers the demo host (`lib/demos.ts`, `papers-content.potentialhedge.com`
   in production, `127.0.0.1:3000` in dev) at `/d/<snapshot>/<path>`. A request from the root (`/assets/x.js`,

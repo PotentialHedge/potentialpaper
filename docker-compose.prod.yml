@@ -52,11 +52,6 @@ services:
     restart: unless-stopped
     logging: *logging
     env_file: .env.production
-    environment:
-      # Used only while .env.production has no R2_* keys (server/demos/store.ts).
-      DEMOS_DIR: /data/demos
-    volumes:
-      - demos:/data/demos
     depends_on:
       postgres:
         condition: service_healthy
@@ -121,7 +116,6 @@ services:
 
 volumes:
   pgdata:
-  demos:
 
 networks:
   web:

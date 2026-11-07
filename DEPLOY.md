@@ -34,9 +34,9 @@ https://papers.potentialhedge.com loads.
 ## Demos
 
 Demos are served from `papers-content.potentialhedge.com`: a proxied A record (added 2026-11-07) in the `potentialhedge.com` zone,
-pointing at this host, with the Traefik router in `docker-compose.prod.yml`. Their files are on the `demos`
-volume until `.env.production` has the `R2_*` keys (`TODO.md`). `dc down -v` deletes that volume as well as
-the database.
+pointing at this host, with the Traefik router in `docker-compose.prod.yml`. Their files are in R2, through the `R2_*`
+keys in `.env.production`: an account token limited to objects in `papertrail-pdfs` (id `3b0d7789…`, minted
+2026-11-07). Without the keys, attaching a demo fails rather than storing it on the container's disk.
 
 ## When it goes wrong
 
