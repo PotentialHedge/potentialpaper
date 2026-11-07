@@ -7,16 +7,19 @@ const dev = process.env.NODE_ENV !== 'production';
  * The content security policy, on every response. Scripts keep `'unsafe-inline'` because Next's inline
  * bootstrap scripts otherwise need a per-request nonce, and a nonce makes every page dynamic, which
  * rules out caching pages at the edge (DESIGN.md §2). Everything else is closed: scripts only from this
- * origin and inline, no frames, nothing fetched elsewhere, and no plugin, base or form tricks. User
+ * origin, inline and the analytics host, no frames, nothing fetched elsewhere but analytics, and no plugin, base or form tricks. User
  * content is sanitized when committed, so this is the second lock, not the first.
  */
+// Page analytics (`lib/analytics.ts`): the tracker script and the beacons it sends back to its own origin.
+const ANALYTICS = 'https://analytics.potentialhedge.com';
+
 const CSP = [
   "default-src 'self'",
-  `script-src 'self' 'unsafe-inline'${dev ? " 'unsafe-eval'" : ''}`,
+  `script-src 'self' 'unsafe-inline' ${ANALYTICS}${dev ? " 'unsafe-eval'" : ''}`,
   "style-src 'self' 'unsafe-inline'",
   "img-src 'self' data: https:",
   "font-src 'self'",
-  `connect-src 'self'${dev ? ' ws:' : ''}`,
+  `connect-src 'self' ${ANALYTICS}${dev ? ' ws:' : ''}`,
   "frame-src 'none'",
   "object-src 'none'",
   "base-uri 'self'",

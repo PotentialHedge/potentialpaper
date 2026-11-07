@@ -1,5 +1,6 @@
 import type { Metadata } from 'next';
 import Link from 'next/link';
+import { Analytics } from '@/components/Analytics';
 import { LogoMark, Wordmark } from '@/components/Logo';
 import { NavUser } from '@/components/NavUser';
 import './globals.css';
@@ -28,6 +29,7 @@ export default function RootLayout({ children }: Readonly<{ children: React.Reac
           <NavUser />
         </header>
         {children}
+        <Analytics />
       </body>
     </html>
   );
