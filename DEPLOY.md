@@ -12,7 +12,7 @@ commit, so uncommitted changes would ship under the wrong name):
 ```sh
 git checkout main && git pull --ff-only
 export GIT_COMMIT=$(git rev-parse --short HEAD)
-dc() { docker compose -p papertrail -f docker-compose.prod.yml --env-file .env.production "$@"; }
+dc() { docker compose -f docker-compose.prod.yml --env-file .env.production "$@"; }
 
 dc --profile tools build          # app and tools images; without --profile tools, migrations go stale
 dc up -d postgres
@@ -21,14 +21,11 @@ dc up -d app
 scripts/purge-edge-cache.sh       # required, see below
 ```
 
-Check it: `docker inspect papertrail-app-1 --format '{{.Config.Image}}'` names the new commit, and
+Check it: `docker inspect potentialpaper-app-1 --format '{{.Config.Image}}'` names the new commit, and
 https://papers.potentialhedge.com loads.
 
 ## Why each step is there
 
-- **`-p papertrail`**: the live stack still runs under its old project name, `papertrail`, as do its volume
-  and database. Without the flag, compose starts a new, empty `potentialpaper` project whose routes clash with
-  the old one. Drop the flag once the stack is migrated (see `TODO.md`).
 - **Migrations run as their own step**, never at app start. `dc run --rm tools npm run <script>` runs any
   other script against production the same way.
 - **The edge-cache purge is not optional.** Cloudflare caches whole pages. They name the old build's scripts,
@@ -38,4 +35,6 @@ https://papers.potentialhedge.com loads.
 
 Read `dc logs -f app`, fix the problem, commit and run the recipe again. If the database is beyond saving,
 resetting it is fine for now: `dc down -v` deletes the volume, and the next `up` and migrate start fresh. You'd
-have to re-import papers afterwards (the `papers:*` scripts in `package.json`).
+have to re-import papers afterwards (the `papers:*` scripts in `package.json`). The last reset, on
+2026-11-07, was scripted in `~/backups/reimport.sh` on this host: it mounts the scrapes into the tools
+container and runs the imports in order.

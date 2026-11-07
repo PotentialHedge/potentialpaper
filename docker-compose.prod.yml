@@ -3,7 +3,7 @@
 # APP_HOST in .env.production names the host, so one file serves staging and production: use a
 # different project name (`-p potentialpaper-staging`) and env file for each.
 #
-# Deploy: DEPLOY.md is the full recipe (it adds `-p papertrail` while the live stack keeps its old name).
+# Deploy: DEPLOY.md is the full recipe.
 # Commit first: the image is tagged with HEAD's commit.
 #   test -z "$(git status --porcelain)" && export GIT_COMMIT=$(git rev-parse --short HEAD)
 #   docker compose -f docker-compose.prod.yml --env-file .env.production --profile tools build

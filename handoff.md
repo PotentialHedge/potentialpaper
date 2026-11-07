@@ -91,7 +91,8 @@ redoing it. They still describe an in-memory domain overlay, a `ror_id` / `reque
 
 - Dev database: `docker compose -f docker-compose.dev.yml up -d` (`127.0.0.1:55433`). It also holds
   `potentialpaper_test`.
-- `.env` and `.env.production` are gitignored. `ADMIN_EMAILS` is `benedict.armstrong@inf.ethz.ch` in both.
+- `.env` and `.env.production` are gitignored. `ADMIN_EMAILS` is `benedict.armstrong@inf.ethz.ch` locally, but
+  empty in the server's `.env.production`.
 - Checks: `npm run lint && npm run format:check && npm run typecheck && npm run test:all`.
 - Integration tests truncate every table in `$TEST_DATABASE_URL`.
 - Scripts for data and pages are in `package.json` (`papers:*`, `pages:*`). `pages:rebuild` rebuilds the
@@ -102,8 +103,6 @@ redoing it. They still describe an in-memory domain overlay, a `ror_id` / `reque
 
 - Production runs on the server at `77.244.248.196`, with its own Postgres, using `docker-compose.prod.yml`.
   `DEPLOY.md` has the full recipe.
-- **The live stack still uses the old Compose project name, `papertrail`.** Add `-p papertrail` to every
-  command until it is migrated (see `TODO.md`), or Compose starts an empty `potentialpaper` project.
 - Commit first, because the image is tagged with `GIT_COMMIT`. Migrations are a separate step, and `build`
   needs `--profile tools`, or migrate silently applies nothing new. Migrations get ten minutes per statement.
 - After every deploy, run `scripts/purge-edge-cache.sh`, because cached pages name the old build's scripts.
