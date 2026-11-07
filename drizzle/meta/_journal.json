@@ -57,6 +57,13 @@
       "when": 1794061106177,
       "tag": "0007_page_thumbnail",
       "breakpoints": true
+    },
+    {
+      "idx": 8,
+      "version": "7",
+      "when": 1794078101375,
+      "tag": "0008_drop_institution_requests",
+      "breakpoints": true
     }
   ]
 }

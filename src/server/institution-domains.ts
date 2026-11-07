@@ -14,9 +14,9 @@ import { emailDomain, hasSubaddress } from '@/lib/email-address';
  * - `config/institution-domains.json` (`INSTITUTION_DOMAINS_PATH` overrides): about 55k generated
  *   domains (`npm run institutions:build`). Edit the curated file and rebuild, never this one. Read
  *   once per process.
- * - the `institution_domains` table: requests admins approved (`server/institution-requests.ts`).
+ * - the `institution_domains` table: domains an admin added by hand, with an SQL insert.
  *   **Queried on every check, not cached:** Next can load a module more than once, so a copy in memory
- *   could miss an approval, and an approval has to work at once. Checks come with sign-ups, which are
+ *   could miss an addition, and an addition has to work at once. Checks come with sign-ups, which are
  *   rare and need the database anyway.
  *
  * A domain also admits its subdomains (`inf.ethz.ch` matches `ethz.ch`), the longest match winning,

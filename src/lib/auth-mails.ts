@@ -126,36 +126,3 @@ export function affiliationTakenMail(handle: string, siteUrl: string): RenderedM
     ],
   });
 }
-
-/** An institution request was approved: the person can sign up now. */
-export function institutionApprovedMail(institution: string, domain: string, signUpUrl: string): RenderedMail {
-  return mail(signUpUrl, {
-    subject: `${institution} can now join ${SITE}`,
-    title: 'Your institution was added',
-    byline: institution,
-    blocks: [
-      { kind: 'p', text: `You asked us to add your institution. Addresses at ${domain} can now sign up:` },
-      { kind: 'link', label: 'Sign up', url: signUpUrl },
-      { kind: 'p', text: 'We have deleted your address from the request. If you did not ask for this, ignore it.' },
-    ],
-  });
-}
-
-/** An institution request was declined. */
-export function institutionRejectedMail(domain: string, siteUrl: string, reason: string | null): RenderedMail {
-  return mail(siteUrl, {
-    subject: `We could not add ${domain} to ${SITE}`,
-    title: 'Your institution was not added',
-    blocks: [
-      {
-        kind: 'p',
-        text: `You asked us to add ${domain}. We only list domains whose mailboxes an organization gives to its own staff or students, and we could not confirm that here.`,
-      },
-      ...(reason ? [{ kind: 'quote' as const, text: reason }] : []),
-      {
-        kind: 'p',
-        text: 'We have deleted your address from the request. You can always read the site without an account.',
-      },
-    ],
-  });
-}

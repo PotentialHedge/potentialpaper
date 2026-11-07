@@ -45,7 +45,6 @@ export function NavUser() {
   return (
     <>
       <nav aria-label="Main navigation" className="flex flex-wrap items-baseline gap-x-4.5 gap-y-1 text-sm">
-        {viewer?.isAdmin && <Link href="/admin/institutions">admin</Link>}
         {viewer ? (
           viewer.profileComplete ? (
             <Link href="/profile">@{viewer.handle}</Link>

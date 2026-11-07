@@ -101,7 +101,7 @@ paper_identifiers(scheme, value, paper_id, pk(scheme, value))   -- arxiv, doi, o
   since nobody edits them on the site and a re-import replaces them. Nothing is venue-specific: a
   `venues` row's `forms` gives each kind of note its labels, field order, score ranges and summary
   columns, and fields no form names are shown by what their values look like.
-- **Duplicates get merged.** An admin or moderator sets `merged_into`. The old address redirects,
+- **Duplicates get merged.** A moderator, or an admin by script, sets `merged_into`. The old address redirects,
   and its repo's content is folded into the survivor with one commit that records where it came
   from. Links resolve through the merge when read.
 
@@ -250,7 +250,7 @@ commit through the same path rules.
 ### 4.7 Redaction
 
 Git history is immutable, but libel, doxxing and legal takedowns require removal. Redaction is a
-rare admin action that rewrites that one page's commits from the bad one onward, replacing the blob,
+rare admin action, run as a script, that rewrites that one page's commits from the bad one onward, replacing the blob,
 and records the old-to-new oid map and the reason in a public log. Existing clones keep the old
 history and diverge. Having a repo per page limits the damage to one page, which is a real
 advantage of this model.
@@ -277,34 +277,21 @@ in production:
 - **Unconfirmed sign-ups** are pruned weekly.
 
 acceptodds built ORCID sign-in and removed it, so **ORCID is not a way to join here**. It is used only
-as evidence for author claims. People with no eligible address use the request form below.
+as evidence for author claims. People with no eligible address can't join until their institution is added.
 
 Reading never requires an account.
 
-### 5.2 Requesting an institution
+### 5.2 Adding an institution
 
-A refused address now gets a short form instead of a dead end:
+There is no request form and no admin UI. A refused address is told its institution isn't on the list.
+An admin adds a missing domain with one SQL insert into `institution_domains(domain pk, name, added_by,
+created_at)`, which is read on every check, so it works at once with no restart. The curated file's
+rule applies: only a domain whose mailboxes the organization gives to its own staff. Lasting additions
+go in the curated file.
 
-```
-institution_requests(id, email, domain, institution_name, website, ror_id null, note,
-                     status, reviewed_by, decided_at, created_at)
-institution_domains(domain pk, name, added_by, request_id null, created_at)
-```
-
-- The form is prefilled with the address and domain. Each request is rate limited, duplicates for a
-  domain are grouped, and public suffixes and free-mail domains are refused automatically. Company
-  labs can request this way too.
-- An admin queue at `/admin/institutions` shows the request with its domain's website and any ROR
-  match, then approves or rejects it. The curated file's rule applies: only a domain whose mailboxes
-  the organization gives to its own staff.
-- Approving mails the requester a sign-up link. The requester's email is deleted from the request
-  once it is decided.
-- acceptodds reads its allowlist from a file once per process, so a change needs a restart. Here the
-  generated domains remain a file, and the **`institution_domains` table overlays it** in the same
-  in-process map, refreshed on approval. `institutionForEmail` stays synchronous, so its call sites
-  copy across unchanged. This assumes one app process, as acceptodds' caches do.
-
-Roles are `admin` (by env, as acceptodds does it) and `moderator`.
+Roles are `admin` (by env, as acceptodds does it) and `moderator`. **Admins get no UI.** What only an
+admin does, such as adding a domain, merging duplicates, redacting or making an extension default, is
+done with scripts or SQL on the server.
 
 ### 5.3 Public identity
 
@@ -357,12 +344,12 @@ institutional email alone proves nothing about authorship, and name matching is 
 author_claims(paper_id, author_index, account_id, method, evidence jsonb, status, decided_by, at)
 ```
 
-| Route              | Evidence                                                                                          | Result                   |
-| ------------------ | ------------------------------------------------------------------------------------------------- | ------------------------ |
-| Email in the paper | A verified address on the account appears in the paper's first page or source                     | Automatic                |
-| ORCID              | ORCID sign-in, and the work appears on that record **from a third-party source** such as Crossref | Automatic                |
-| Co-author vouch    | A confirmed author approves the claim                                                             | Automatic                |
-| Manual             | Name match, a self-added ORCID work, or an explanation                                            | Admin or moderator queue |
+| Route              | Evidence                                                                                          | Result          |
+| ------------------ | ------------------------------------------------------------------------------------------------- | --------------- |
+| Email in the paper | A verified address on the account appears in the paper's first page or source                     | Automatic       |
+| ORCID              | ORCID sign-in, and the work appears on that record **from a third-party source** such as Crossref | Automatic       |
+| Co-author vouch    | A confirmed author approves the claim                                                             | Automatic       |
+| Manual             | Name match, a self-added ORCID work, or an explanation                                            | Moderator queue |
 
 - **A self-added ORCID work isn't proof.** Anyone can add any paper to their own ORCID record, so
   the check has to look at each work's `source`. Confirm those semantics against the ORCID API when
@@ -545,7 +532,7 @@ restyling the host page or reading its session. That limit is what makes it safe
 ### Trust levels
 
 Each user installs what they want, and it affects only them. Admins can review specific versions and
-make them default for everyone. A kill switch disables any extension site-wide.
+make them default for everyone, by script. A kill switch disables any extension site-wide.
 
 ### Server-side extensions
 
@@ -580,7 +567,7 @@ Decided on 2026-11-05:
 
 - **Storage:** git objects in Postgres (section 4).
 - **Identity:** real names are optional, with anonymous commenting available (section 5.3).
-- **Joining:** institutional email or the request form, following acceptodds (section 5).
+- **Joining:** institutional email only, following acceptodds (section 5).
 - **Name:** PotentialPaper.
 
 ### Later

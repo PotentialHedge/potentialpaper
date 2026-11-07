@@ -1,9 +1,6 @@
 /* eslint-disable @typescript-eslint/no-explicit-any -- response bodies are checked field by field */
 import { sql } from 'drizzle-orm';
 import * as authRoute from '@/app/api/auth/[...all]/route';
-import * as adminApprove from '@/app/api/v1/admin/institutions/approve/route';
-import * as adminReject from '@/app/api/v1/admin/institutions/reject/route';
-import * as institutionRequests from '@/app/api/v1/institution-requests/route';
 import * as me from '@/app/api/v1/me/route';
 import * as affiliations from '@/app/api/v1/me/affiliations/route';
 import * as affiliation from '@/app/api/v1/me/affiliations/[id]/route';
@@ -17,7 +14,7 @@ export const ORIGIN = 'http://test.local';
 
 export async function resetDatabase(): Promise<void> {
   await getDb().execute(sql`
-    truncate table submission_notes, submissions, venues, pdf_covers, page_events, page_current, page_revisions, page_refs, page_objects, commit_identities, paper_lookup_misses, paper_identifiers, papers, institution_requests, institution_domains, affiliations, accounts, rate_limit_buckets,
+    truncate table submission_notes, submissions, venues, pdf_covers, page_events, page_current, page_revisions, page_refs, page_objects, commit_identities, paper_lookup_misses, paper_identifiers, papers, institution_domains, affiliations, accounts, rate_limit_buckets,
       session, account, verification, "user"
     restart identity cascade
   `);
@@ -37,9 +34,6 @@ const ROUTES: [RegExp, any][] = [
   [/^\/me\/affiliations$/, affiliations],
   [/^\/me\/affiliations\/(?<id>[^/]+)$/, affiliation],
   [/^\/me\/affiliations\/(?<id>[^/]+)\/verify$/, affiliationVerify],
-  [/^\/institution-requests$/, institutionRequests],
-  [/^\/admin\/institutions\/approve$/, adminApprove],
-  [/^\/admin\/institutions\/reject$/, adminReject],
 ];
 
 export interface ApiResult {

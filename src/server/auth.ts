@@ -82,13 +82,6 @@ export async function requireAuth(req: Request): Promise<Principal> {
   return principal;
 }
 
-/** A principal whose email is in `ADMIN_EMAILS`, or a 401/403. */
-export async function requireAdmin(req: Request): Promise<Principal> {
-  const principal = await requireAuth(req);
-  if (!principal.isAdmin) throw new ApiError(403, 'forbidden', 'admins only');
-  return principal;
-}
-
 /** A principal with a confirmed institutional address, the gate on everything that writes to a page. */
 export async function requireVerified(req: Request): Promise<Principal> {
   const principal = await requireAuth(req);

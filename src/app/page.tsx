@@ -104,10 +104,6 @@ export default async function Home({
               site&apos;s. Paper pages can be read, but not yet edited. You can already{' '}
               <Link href="/welcome" className="text-accent">
                 join with your institutional email
-              </Link>{' '}
-              or{' '}
-              <Link href="/institutions/request" className="text-accent">
-                request your institution
               </Link>
               .
             </p>

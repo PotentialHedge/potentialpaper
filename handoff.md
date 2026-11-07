@@ -20,8 +20,7 @@ Milestones 0, 1 and 2 are built, merged into `main` and deployed. Mail doesn't w
 
 - **Stack:** Next 16.4.5, Drizzle, Postgres 16, Better Auth, Tailwind v4 and Vitest, with Cloudflare R2 for PDFs
   and images.
-- **Milestone 0:** sign-up by institutional email, accounts with a handle, an institution request form and an
-  admin queue, CSP and CI.
+- **Milestone 0:** sign-up by institutional email, accounts with a handle, CSP and CI.
 - **Milestone 1:** `/abs`, `/doi` and `/openreview` pages, created the first time someone visits them. Their
   metadata comes from arXiv or OpenAlex, within a request budget shared by all readers, and misses are
   remembered for a day. A proxy answers junk, unknown papers and redirects, so they are never cached, and only
@@ -52,6 +51,8 @@ Also revisit the CSP before user-written content ships: scripts currently allow 
 
 ## Decisions already made (don't reopen)
 
+- **No admin UI.** Admins act through scripts or SQL on the server. The institution request form and its
+  admin queue were removed, so an admin adds a missing domain with an insert into `institution_domains`.
 - Git objects live in Postgres, not bare repos on disk.
 - Merging uses `diff`'s bounded Myers algorithm, not `node-diff3`, which took 12 seconds on a repetitive
   2,000-line file while holding the page's lock.
@@ -68,8 +69,7 @@ Also revisit the CSP before user-written content ships: scripts currently allow 
 ## Stale docs
 
 The user stopped an earlier update of `DESIGN.md` and `IMPLEMENTATION.md` without saying why, so ask before
-redoing it. They still describe an in-memory domain overlay, a `ror_id` / `request_id` schema, a strict CSP,
-`node-diff3`, and `page_current` holding HTML. `README.md` doesn't exist.
+redoing it. They still describe a strict CSP, `node-diff3`, and `page_current` holding HTML. `README.md` doesn't exist.
 
 ## How to work with this user
 
@@ -91,8 +91,7 @@ redoing it. They still describe an in-memory domain overlay, a `ror_id` / `reque
 
 - Dev database: `docker compose -f docker-compose.dev.yml up -d` (`127.0.0.1:55433`). It also holds
   `potentialpaper_test`.
-- `.env` and `.env.production` are gitignored. `ADMIN_EMAILS` is `benedict.armstrong@inf.ethz.ch` locally, but
-  empty in the server's `.env.production`.
+- `.env` and `.env.production` are gitignored. `ADMIN_EMAILS` is `benedict.armstrong@inf.ethz.ch` in both.
 - Checks: `npm run lint && npm run format:check && npm run typecheck && npm run test:all`.
 - Integration tests truncate every table in `$TEST_DATABASE_URL`.
 - Scripts for data and pages are in `package.json` (`papers:*`, `pages:*`). `pages:rebuild` rebuilds the

@@ -2,14 +2,13 @@ import { headers as nextHeaders } from 'next/headers';
 import type { Account, Affiliation } from '@/db/schema';
 import { updateProfile } from '../accounts';
 import { addAffiliation, listAffiliations, removeAffiliation, verifyAffiliation } from '../affiliations';
-import { requireAdmin, requireAuth, viewerFromHeaders } from '../auth';
-import { approveDomain, rejectDomain, requestInstitution } from '../institution-requests';
+import { requireAuth, viewerFromHeaders } from '../auth';
 import { setFirstPassword, startOnboarding } from '../onboarding';
 import { canonicalPaperId, paperPath, parsePaperId } from '@/lib/paper-ids';
 import { lookupPaper } from '../papers';
 import { searchPapers } from '../search';
 import { ApiError } from './errors';
-import { clientIp, parseBody, parseParam, parseQuery, respond, route, toIso, toIsoOrNull } from './http';
+import { parseBody, parseParam, parseQuery, respond, route, toIso, toIsoOrNull } from './http';
 import * as S from './schemas';
 
 /** The `/api/v1` handlers; the route files only re-export them. */
@@ -103,25 +102,6 @@ export const deleteAffiliation = route(async (req, params) => {
   const id = parseParam(params.id, S.IdParam, 'id');
   await removeAffiliation({ accountId: principal.account.id, id });
   return respond(S.Ok, { status: 'ok' }, { principal });
-});
-
-export const postInstitutionRequest = route(async (req) => {
-  await requestInstitution(await parseBody(req, S.InstitutionRequestBody), clientIp(req));
-  return respond(S.Accepted, { status: 'accepted' }, { status: 202 });
-});
-
-export const approveInstitution = route(async (req) => {
-  const principal = await requireAdmin(req);
-  const body = await parseBody(req, S.ApproveBody);
-  const result = await approveDomain({ ...body, adminAccountId: principal.account.id });
-  return respond(S.Decided, result, { principal });
-});
-
-export const rejectInstitution = route(async (req) => {
-  const principal = await requireAdmin(req);
-  const body = await parseBody(req, S.RejectBody);
-  const result = await rejectDomain({ ...body, adminAccountId: principal.account.id });
-  return respond(S.Decided, result, { principal });
 });
 
 /** Empty, which no identifier is, when a segment is not valid percent-encoding. */

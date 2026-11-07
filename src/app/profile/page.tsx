@@ -1,5 +1,4 @@
 import type { Metadata } from 'next';
-import Link from 'next/link';
 import { headers } from 'next/headers';
 import { redirect } from 'next/navigation';
 import { SignOut } from '@/components/SignOut';
@@ -49,9 +48,6 @@ export default async function Profile() {
           createdAt: r.createdAt.toISOString(),
         }))}
       />
-      <p className={ui.fine}>
-        Institution not listed? <Link href="/institutions/request">Request it</Link>.
-      </p>
     </main>
   );
 }

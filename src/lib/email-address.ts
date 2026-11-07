@@ -13,6 +13,10 @@ export function hasSubaddress(email: string): boolean {
 /** What a form says to an address with a `+tag`. */
 export const SUBADDRESS_REFUSED = 'Use your address without the “+…” part: one inbox, one account.';
 
+/** Shown when sign-up refuses an address: its domain is not on the institution list. */
+export const DOMAIN_NOT_LISTED =
+  'That address is not from an institution on our list. Use the address your university or lab gave you.';
+
 /** The lower-cased domain of an address, or `null` when it has none. */
 export function emailDomain(email: string): string | null {
   const at = email.lastIndexOf('@');

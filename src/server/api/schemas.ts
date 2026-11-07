@@ -52,26 +52,6 @@ export const Affiliation = z.object({
 export const AffiliationList = z.object({ affiliations: z.array(Affiliation) });
 
 /** Only http(s), so an admin's link to it cannot run anything. */
-const Website = z
-  .url()
-  .max(500)
-  .refine((u) => /^https?:\/\//i.test(u), { message: 'must be an http(s) URL' });
-
-export const InstitutionRequestBody = z.object({
-  email: Email,
-  institutionName: z.string().trim().min(2).max(200),
-  website: Website.nullable().optional(),
-  note: z.string().max(1000).nullable().optional(),
-});
-
-const Domain = z
-  .string()
-  .max(253)
-  .regex(/^[a-z0-9-]+(\.[a-z0-9-]+)+$/, 'must be a lower-case domain');
-
-export const ApproveBody = z.object({ domain: Domain, institutionName: z.string().trim().min(2).max(200) });
-export const RejectBody = z.object({ domain: Domain, reason: z.string().max(1000).nullable().optional() });
-export const Decided = z.object({ decided: z.number(), mailed: z.number(), mailFailed: z.number() });
 export const Accepted = z.object({ status: z.literal('accepted') });
 export const Ok = z.object({ status: z.literal('ok') });
 export const IdParam = z.uuid();

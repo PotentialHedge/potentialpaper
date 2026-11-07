@@ -2,7 +2,6 @@
 drizzle/
 src/db/auth-schema.ts
 config/institution-domains.json
-config/refused-domains.json
 spikes/
 package-lock.json
 next-env.d.ts

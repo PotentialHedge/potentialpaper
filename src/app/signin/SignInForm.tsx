@@ -2,10 +2,9 @@
 
 import { useRouter } from 'next/navigation';
 import { useEffect, useRef, useState } from 'react';
-import { InstitutionRequestForm } from '@/components/InstitutionRequestForm';
 import { ui } from '@/components/ui';
 import { authClient } from '@/lib/auth-client';
-import { hasSubaddress, SUBADDRESS_REFUSED } from '@/lib/email-address';
+import { DOMAIN_NOT_LISTED, hasSubaddress, SUBADDRESS_REFUSED } from '@/lib/email-address';
 import { setPasswordPath } from '@/lib/links';
 import { rememberPending } from '@/lib/pending-confirmation';
 import { authHref, VERIFY_EMAIL } from '@/lib/return-to';
@@ -41,7 +40,6 @@ export function SignInForm({ next }: { next: string }) {
   const [linkSent, setLinkSent] = useState<string | null>(null);
   const [resetSent, setResetSent] = useState<string | null>(null);
   const [withPassword, setWithPassword] = useState(false);
-  const [refused, setRefused] = useState<string | null>(null);
   const emailField = useRef<HTMLInputElement>(null);
   const passwordField = useRef<HTMLInputElement>(null);
 
@@ -57,7 +55,6 @@ export function SignInForm({ next }: { next: string }) {
     const address = email.trim();
     setLinkSent(null);
     setResetSent(null);
-    setRefused(null);
     if (hasSubaddress(address)) return setError(SUBADDRESS_REFUSED);
     setBusy(true);
     setError(null);
@@ -70,7 +67,7 @@ export function SignInForm({ next }: { next: string }) {
     });
     setBusy(false);
     if (error) {
-      if (error.code === 'EMAIL_DOMAIN_NOT_ALLOWED') return setRefused(address);
+      if (error.code === 'EMAIL_DOMAIN_NOT_ALLOWED') return setError(DOMAIN_NOT_LISTED);
       setError(
         error.status === 429
           ? 'Too many links to this address. Try again later, or use your password.'
@@ -93,8 +90,6 @@ export function SignInForm({ next }: { next: string }) {
     if (error) return setError(error.message ?? 'Could not send a reset link.');
     setResetSent(address);
   }
-
-  if (refused) return <InstitutionRequestForm email={refused} onBack={() => setRefused(null)} />;
 
   return (
     <form

@@ -26,7 +26,7 @@ milestone ends with something you can use and goes through `/api/v1` from the st
 - Accounts with a handle, optional real name and an explicit choice about showing the institution.
 - Read the Next.js docs in `node_modules/next/dist/docs/` first; acceptodds' `AGENTS.md` warns that
   this version breaks older assumptions.
-- **Institution request form, admin queue, `institution_domains` overlay.**
+- `institution_domains` table for domains an admin adds by hand. No request form or admin UI.
 - Set a strict CSP. Staging can use a temporary domain, since the name isn't final.
 
 ## 1. Papers, read-only
@@ -57,7 +57,7 @@ Most of the risk is here, so it comes before the editor.
 - Section editor with preview, summary and conflict UI; Markdown rendered and sanitized at commit.
 - History, diff and revert pages.
 - `/changes`, watchlist, digest mail, protection levels, new-account rate limits, reports, blocks.
-- Redaction tool and its public log.
+- Redaction script and its public log.
 - **Blocker for the alpha: choose the contribution license** (design section 12, still to discuss).
 - Alpha with a few dozen invited researchers, in one field, on ICLR papers. Most of what matters is
   learned here: do people edit, and does patrolling hold up?

@@ -108,8 +108,8 @@ export const rateLimitBuckets = pgTable('rate_limit_buckets', {
 });
 
 /**
- * Domains admins have approved, on top of the generated `config/institution-domains.json`. Read on
- * every check (`server/institution-domains.ts`), so an approval needs no restart.
+ * Domains added by hand (an SQL insert), on top of the generated `config/institution-domains.json`. Read
+ * on every check (`server/institution-domains.ts`), so an addition needs no restart.
  */
 export const institutionDomains = pgTable('institution_domains', {
   domain: text('domain').primaryKey(),
@@ -117,38 +117,6 @@ export const institutionDomains = pgTable('institution_domains', {
   addedBy: uuid('added_by').references(() => accounts.id, { onDelete: 'set null' }),
   createdAt: createdAt(),
 });
-
-/**
- * Someone refused at sign-up asking for their institution to be added. Written only by
- * `server/institution-requests.ts`. **`email` is deleted once the decision has been mailed**: it is
- * kept only to tell the person the answer.
- */
-export const institutionRequests = pgTable(
-  'institution_requests',
-  {
-    id: uuid('id').primaryKey().defaultRandom(),
-    email: text('email'),
-    domain: text('domain').notNull(),
-    institutionName: text('institution_name').notNull(),
-    website: text('website'),
-    note: text('note'),
-    status: text('status', { enum: ['pending', 'approved', 'rejected'] })
-      .notNull()
-      .default('pending'),
-    decidedBy: uuid('decided_by').references(() => accounts.id, { onDelete: 'set null' }),
-    decidedAt: timestamp('decided_at', { withTimezone: true, mode: 'date' }),
-    createdAt: createdAt(),
-  },
-  (t) => [
-    index('institution_requests_status_domain_idx').on(t.status, t.domain),
-    uniqueIndex('institution_requests_pending_email_key')
-      .on(t.email)
-      .where(sql`status = 'pending'`),
-    check('institution_requests_status_check', sql`${t.status} in ('pending', 'approved', 'rejected')`),
-  ],
-);
-
-export type InstitutionRequest = typeof institutionRequests.$inferSelect;
 
 const tsvector = customType<{ data: string }>({ dataType: () => 'tsvector' });
 
