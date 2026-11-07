@@ -43,7 +43,23 @@ function Demo({ demo, index, canEdit, paper }: { demo: DemoPointer; index: numbe
   const pathname = usePathname();
   const frame = useRef<HTMLIFrameElement>(null);
   const [problem, setProblem] = useState<string | null>(null);
+  const [shown, setShown] = useState(false);
   const url = demoUrl(demo.id);
+
+  // Loaded once it is about to come on screen, and kept from then on: the browser's own `loading="lazy"`
+  // starts a frame more than a screen away, which is every demo on a short page.
+  useEffect(() => {
+    const element = frame.current;
+    if (!element || shown) return;
+    const observer = new IntersectionObserver(
+      (entries) => {
+        if (entries.some((entry) => entry.isIntersecting)) setShown(true);
+      },
+      { rootMargin: '150px 0px' },
+    );
+    observer.observe(element);
+    return () => observer.disconnect();
+  }, [shown]);
 
   async function remove() {
     setProblem(null);
@@ -55,13 +71,12 @@ function Demo({ demo, index, canEdit, paper }: { demo: DemoPointer; index: numbe
 
   return (
     <figure className="mt-5">
-      {/* Part of the page, as a paper's figure is: no box around it. The browser loads it as it nears the
-          screen, so a page of heavy scenes costs nothing until someone scrolls to them. */}
+      {/* Part of the page, as a paper's figure is: no box around it. Without a `src` until it nears the screen,
+          so a page of heavy scenes costs nothing until someone scrolls to them. */}
       <iframe
         ref={frame}
-        src={url}
+        src={shown ? url : undefined}
         title={demo.title}
-        loading="lazy"
         sandbox={SANDBOX}
         allow={ALLOW}
         allowFullScreen
