@@ -16,7 +16,8 @@ import {
   uniqueIndex,
   uuid,
 } from 'drizzle-orm/pg-core';
-import type { PdfPointer } from '@/server/pages/rules';
+import { NOTE_KINDS, SUBMISSION_STATUSES, type FieldValue, type VenueForms } from '../lib/submissions';
+import type { PdfPointer, ThumbnailPointer } from '@/server/pages/rules';
 import { PAPER_ORIGINS } from '../server/paper-sources/types';
 import { user } from './auth-schema';
 
@@ -309,6 +310,8 @@ export const pageCurrent = pgTable('page_current', {
   resources: jsonb('resources').$type<Record<string, unknown>>(),
   /** The page's `pdf.json`. */
   pdf: jsonb('pdf').$type<PdfPointer>(),
+  /** The page's `author/thumbnail.json`. */
+  thumbnail: jsonb('thumbnail').$type<ThumbnailPointer>(),
   updatedAt: timestamp('updated_at', { withTimezone: true, mode: 'date' }).notNull(),
 });
 
@@ -344,3 +347,84 @@ export const pdfCovers = pgTable('pdf_covers', {
   url: text('url').notNull(),
   createdAt: createdAt(),
 });
+
+/**
+ * A venue that publishes its reviews, such as a conference on OpenReview. `forms` says how to show each
+ * kind of note it publishes (`lib/submissions.ts`), so the page knows no venue by name. Written by
+ * imports (`server/import-reviews.ts`).
+ */
+export const venues = pgTable('venues', {
+  /** The source and its id for the venue: `openreview:ICLR.cc/2027/Conference`. */
+  id: text('id').primaryKey(),
+  /** "ICLR 2027". */
+  name: text('name').notNull(),
+  url: text('url'),
+  forms: jsonb('forms').$type<VenueForms>().notNull().default({}),
+  createdAt: createdAt(),
+});
+
+/**
+ * A paper's submission to a venue. A paper can have several: rejected at one venue, accepted at the next.
+ * Imported, never edited on the site, so it is not part of the page's repo.
+ */
+export const submissions = pgTable(
+  'submissions',
+  {
+    id: uuid('id').primaryKey().defaultRandom(),
+    paperId: uuid('paper_id')
+      .notNull()
+      .references(() => papers.id, { onDelete: 'cascade' }),
+    venueId: text('venue_id')
+      .notNull()
+      .references(() => venues.id, { onDelete: 'cascade' }),
+    /** The source's id for it: an OpenReview forum id. */
+    externalId: text('external_id').notNull(),
+    number: integer('number'),
+    /** `null` when the source doesn't say. */
+    status: text('status', { enum: SUBMISSION_STATUSES }),
+    /** As the venue words it: "Accept (Poster)". */
+    decision: text('decision'),
+    url: text('url'),
+    /** When the source was read: its notes are as they stood then. */
+    fetchedAt: timestamp('fetched_at', { withTimezone: true, mode: 'date' }).notNull(),
+  },
+  (t) => [
+    uniqueIndex('submissions_venue_external_key').on(t.venueId, t.externalId),
+    index('submissions_paper_id_idx').on(t.paperId),
+    check(
+      'submissions_status_check',
+      sql.raw(`status in (${SUBMISSION_STATUSES.map((status) => `'${status}'`).join(', ')})`),
+    ),
+  ],
+);
+
+/**
+ * What a venue published about a submission: a review, meta-review, decision or comment, as a thread by
+ * `reply_to`. Only notes the source shows everyone are imported. Each keeps its license and source link,
+ * since OpenReview's CC BY 4.0 needs both wherever one is shown (DESIGN.md §3).
+ */
+export const submissionNotes = pgTable(
+  'submission_notes',
+  {
+    submissionId: uuid('submission_id')
+      .notNull()
+      .references(() => submissions.id, { onDelete: 'cascade' }),
+    externalId: text('external_id').notNull(),
+    /** The note it answers, by `external_id`; `null` when it answers the submission. */
+    replyTo: text('reply_to'),
+    kind: text('kind', { enum: NOTE_KINDS }).notNull(),
+    /** The source's name for its kind, which picks its form: `Official_Review`. */
+    invitation: text('invitation').notNull(),
+    /** As the venue shows its writer: "Reviewer B3x7". */
+    signature: text('signature').notNull(),
+    content: jsonb('content').$type<Record<string, FieldValue>>().notNull(),
+    license: text('license').notNull(),
+    url: text('url'),
+    createdAt: timestamp('created_at', { withTimezone: true, mode: 'date' }).notNull(),
+    modifiedAt: timestamp('modified_at', { withTimezone: true, mode: 'date' }),
+  },
+  (t) => [
+    primaryKey({ columns: [t.submissionId, t.externalId] }),
+    check('submission_notes_kind_check', sql.raw(`kind in (${NOTE_KINDS.map((kind) => `'${kind}'`).join(', ')})`)),
+  ],
+);

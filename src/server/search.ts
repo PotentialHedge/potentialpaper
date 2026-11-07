@@ -15,7 +15,10 @@ export interface SearchHit {
   venue: string | null;
   /** The copy this site hosts, from the page's `pdf.json`. */
   pdf: string | null;
-  /** A picture of the hosted PDF's first page (`pdf_covers`), once one has been rendered. */
+  /**
+   * The paper's picture: the thumbnail its authors chose, or else the hosted PDF's first page
+   * (`pdf_covers`), once one has been rendered.
+   */
   cover: string | null;
 }
 
@@ -158,7 +161,7 @@ async function readPage(
     database.execute<{ total: number }>(sql`select count(*)::int as total from papers p where ${where}`),
     database.execute<SearchHit & Record<string, unknown>>(sql`
       select i.scheme, i.value, p.title, p.authors, left(p.abstract, 400) as abstract, p.year, p.venue,
-             c.pdf ->> 'url' as pdf, pc.url as cover
+             c.pdf ->> 'url' as pdf, coalesce(c.thumbnail ->> 'url', pc.url) as cover
       from unnest(array(
         select p.id from papers p
         left join page_current c on c.paper_id = p.id

@@ -19,3 +19,4 @@ next-env.d.ts
 # Manifests of uploaded PDFs
 /data/
 /public/covers/
+/public/thumbnails/

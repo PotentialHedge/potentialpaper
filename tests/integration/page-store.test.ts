@@ -28,7 +28,7 @@ import { looseObject } from '@/server/pages/git-objects';
 import { mergeFile } from '@/server/pages/merge';
 import { rebuildAllPages } from '@/server/pages/projections';
 import { diffCommits, pageHistory, readHead } from '@/server/pages/repo';
-import { MAX_CHANGES, PDF_PATH } from '@/server/pages/rules';
+import { MAX_CHANGES, PDF_PATH, THUMBNAIL_PATH } from '@/server/pages/rules';
 import { savePaper } from '@/server/papers';
 import { searchPapers } from '@/server/search';
 import { closePool, resetDatabase } from './helpers';
@@ -1069,6 +1069,60 @@ describe('pdf.json', () => {
       commitPage(id, null, { kind: 'account', accountId: bot.id, isAdmin: false }, change(POINTER), 'Mine', {
         rateLimit: NO_LIMIT,
       }),
+    ).rejects.toMatchObject({ status: 403 });
+  });
+});
+
+describe('author/thumbnail.json', () => {
+  const PDF = {
+    sha256: 'a'.repeat(64),
+    bytes: 2_000_000,
+    url: `https://pdfs.example.org/pdf/${'a'.repeat(64)}.pdf`,
+    source: 'https://openreview.net/forum?id=submission1',
+    license: 'CC BY 4.0',
+    fetchedAt: '2026-10-06T14:18:10.000Z',
+  };
+  const THUMBNAIL = {
+    sha256: 'b'.repeat(64),
+    bytes: 300_000,
+    type: 'image/gif',
+    url: `https://pdfs.example.org/thumbnail/${'b'.repeat(64)}.gif`,
+    alt: 'The method, animated',
+  };
+  const change = (value: unknown): FileChange[] => [{ path: THUMBNAIL_PATH, content: `${JSON.stringify(value)}\n` }];
+
+  it("is projected, survives a rebuild, and replaces the PDF's cover in search results", async () => {
+    const id = await newPaper();
+    await commitPage(id, null, SYSTEM_ACTOR, [{ path: PDF_PATH, content: JSON.stringify(PDF) }], 'Add the PDF');
+    await getDb().insert(pdfCovers).values({ sha256: PDF.sha256, url: 'https://pdfs.example.org/cover/a.jpg' });
+    const admin = { ...(await newAccount()), isAdmin: true };
+    await commitPage(id, await readHead(getDb(), id), admin, change(THUMBNAIL), 'Set the thumbnail', {
+      rateLimit: NO_LIMIT,
+    });
+    await rebuildAllPages();
+    const [current] = await getDb().select().from(pageCurrent).where(eq(pageCurrent.paperId, id));
+    expect(current.thumbnail).toEqual(THUMBNAIL);
+    const [paper] = await getDb().select().from(papers).where(eq(papers.id, id));
+    const { hits } = await searchPapers({ q: paper.title.split(' ')[0] });
+    expect(hits.find((hit) => hit.title === paper.title)).toMatchObject({ cover: THUMBNAIL.url });
+  });
+
+  it('refuses what is not an image pointer, and anyone but its authors and admins', async () => {
+    const id = await newPaper();
+    const admin = { ...(await newAccount()), isAdmin: true };
+    for (const bad of [
+      { ...THUMBNAIL, type: 'text/html' },
+      { ...THUMBNAIL, url: 'javascript:alert(1)' },
+      { ...THUMBNAIL, url: '//evil.example/x.gif' },
+      { ...THUMBNAIL, bytes: 100 * 1024 * 1024 },
+    ]) {
+      await expect(commitPage(id, null, admin, change(bad), 'Bad', { rateLimit: NO_LIMIT })).rejects.toMatchObject({
+        status: 422,
+      });
+    }
+    const someone = await newAccount();
+    await expect(
+      commitPage(id, null, someone, change(THUMBNAIL), 'Mine', { rateLimit: NO_LIMIT }),
     ).rejects.toMatchObject({ status: 403 });
   });
 });

@@ -62,6 +62,8 @@ export const ui = {
   num: 'text-right font-mono text-[13px]',
   /** A body row is highlighted on hover, as the home list's rows are. */
   table: 'mt-3 w-full border-collapse border-y-[1.5px] border-ink [&>tbody>tr:hover]:bg-highlight/50',
+  /** A table only as wide as its columns, centered as a paper sets a small one. */
+  tableCentered: 'mx-auto mt-3 border-collapse border-y-[1.5px] border-ink [&>tbody>tr:hover]:bg-highlight/50',
   /** Around a table, so one too wide for a phone scrolls sideways rather than the page. */
   tableScroll: 'overflow-x-auto',
   /** A table note's mark on a column heading, "Net worth<sup>a</sup>": an italic letter, as threeparttable sets it. */

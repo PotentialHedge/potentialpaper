@@ -52,8 +52,8 @@ function authorLine(names: string[]): string {
 
 /**
  * One paper in the detailed list: a picture of its first page beside the title, authors, abstract, venue
- * and year. As in `PaperRow`, the title's link covers the card; the cover sits above it and opens the PDF.
- * A paper with no cover gets a blank title page instead, so the column stays even.
+ * and year. As in `PaperRow`, the title's link covers the card, picture included, and opens the paper's
+ * page. A paper with no cover gets a blank title page instead, so the column stays even. The frame is A4.
  */
 export function PaperCard({
   title,
@@ -75,33 +75,23 @@ export function PaperCard({
   href: string;
 }) {
   const page = cover ? (
-    // A remote JPEG already sized for this box: Next's optimizer would only fetch it again.
+    // A remote image already sized for this box: Next's optimizer would only fetch it again, and stop a GIF.
+    // Fitted whole into the A4 frame, not cropped: an authors' thumbnail need not be a page.
     // eslint-disable-next-line @next/next/no-img-element
-    <img src={cover} alt="" loading="lazy" decoding="async" className="size-full object-cover object-top" />
+    <img src={cover} alt="" loading="lazy" decoding="async" className="size-full object-contain" />
   ) : (
     <span className="flex size-full items-start justify-center px-1.5 pt-3 text-center font-serif text-[7px] leading-tight text-faint">
       <span className="line-clamp-4">{title}</span>
     </span>
   );
   const frame =
-    'relative z-10 block aspect-[17/22] w-[92px] shrink-0 overflow-hidden border border-rule bg-card shadow-[0_1px_2px_rgb(0_0_0/0.08)] narrow:w-[64px]';
+    'relative block aspect-[210/297] w-[92px] shrink-0 overflow-hidden border border-rule bg-card shadow-[0_1px_2px_rgb(0_0_0/0.08)] narrow:w-[64px]';
   return (
     <div className="relative flex gap-4 border-b border-dotted border-rule-strong py-3.5 hover:bg-highlight narrow:gap-3">
-      {pdf ? (
-        <a
-          href={pdf}
-          className={`${frame} hover:border-frame`}
-          rel="noopener noreferrer"
-          target="_blank"
-          title="Open the PDF"
-        >
-          {page}
-        </a>
-      ) : (
-        <span className={frame} aria-hidden>
-          {page}
-        </span>
-      )}
+      {/* Not a link of its own: a click falls through to the title's, which covers the card. */}
+      <span className={frame} aria-hidden>
+        {page}
+      </span>
       <div className="min-w-0 flex-1">
         <Link
           href={href}

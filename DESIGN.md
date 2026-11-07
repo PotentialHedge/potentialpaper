@@ -94,6 +94,13 @@ paper_identifiers(scheme, value, paper_id, pk(scheme, value))   -- arxiv, doi, o
   metadata, abstracts included, to CC0; OpenAlex's data is CC0 but an abstract keeps the work's own
   open license, and is dropped without one. OpenReview reviews, scores and comments are CC BY 4.0,
   which requires attribution and a link on every one we show.
+- **Submissions and their reviews are imported, not edited.** `submissions` ties a paper to a venue
+  (status, decision, source link), and `submission_notes` holds what the venue published about it:
+  reviews, meta-reviews, decisions and comments, threaded by `reply_to`, each with its license and link.
+  Only notes the source shows everyone are imported. They live in tables rather than the page's repo,
+  since nobody edits them on the site and a re-import replaces them. Nothing is venue-specific: a
+  `venues` row's `forms` gives each kind of note its labels, field order, score ranges and summary
+  columns, and fields no form names are shown by what their values look like.
 - **Duplicates get merged.** An admin or moderator sets `merged_into`. The old address redirects,
   and its repo's content is folded into the survivor with one commit that records where it came
   from. Links resolve through the merge when read.
@@ -162,6 +169,7 @@ metadata.json            system: identifiers, title, authors, abstract snapshot
 author/page.md           the author section
 author/resources.json    code, data, demo, video, slides, poster, BibTeX
 author/assets.json       uploaded media as pointers: sha256, type, size
+author/thumbnail.json    the paper's picture, in place of its PDF's first page: a pointer, as pdf.json
 author/links.jsonl       links the authors assert
 community/page.md        the community section
 community/links.jsonl    links the community asserts

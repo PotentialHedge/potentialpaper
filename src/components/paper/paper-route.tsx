@@ -1,11 +1,12 @@
-import { eq } from 'drizzle-orm';
+import { eq, sql } from 'drizzle-orm';
 import type { Metadata } from 'next';
 import { cache } from 'react';
 import { ui } from '@/components/ui';
 import { canonicalPaperId, paperPath, parsePaperId, type PaperScheme } from '@/lib/paper-ids';
 import { getDb } from '@/db';
-import { pageCurrent } from '@/db/schema';
+import { pageCurrent, pdfCovers } from '@/db/schema';
 import { findPaper, type FoundPaper } from '@/server/papers';
+import { submissionsOf } from '@/server/submissions';
 import { Slot } from './slots';
 
 /**
@@ -35,11 +36,25 @@ export async function paperMetadata(scheme: PaperScheme, segments: string[]): Pr
 
 export async function PaperRoute({ scheme, segments }: { scheme: PaperScheme; segments: string[] }) {
   const { paper, identifiers } = await load(scheme, segments);
-  const [current] = await getDb()
-    .select({ pdf: pageCurrent.pdf })
-    .from(pageCurrent)
-    .where(eq(pageCurrent.paperId, paper.id));
-  const panel = { paper, identifiers, pdf: current?.pdf ?? null };
+  const [[current], submissions] = await Promise.all([
+    getDb()
+      .select({ pdf: pageCurrent.pdf, thumbnail: pageCurrent.thumbnail, cover: pdfCovers.url })
+      .from(pageCurrent)
+      .leftJoin(pdfCovers, sql`${pdfCovers.sha256} = ${pageCurrent.pdf} ->> 'sha256'`)
+      .where(eq(pageCurrent.paperId, paper.id)),
+    submissionsOf(paper.id),
+  ]);
+  // The authors' choice of picture wins over the PDF's first page.
+  const picture = current?.thumbnail
+    ? {
+        url: current.thumbnail.url,
+        alt: current.thumbnail.alt ?? null,
+        caption: current.thumbnail.caption ?? current.thumbnail.alt ?? 'The paper, as its authors picture it.',
+      }
+    : current?.cover
+      ? { url: current.cover, alt: null, caption: "The paper's first page." }
+      : null;
+  const panel = { paper, identifiers, pdf: current?.pdf ?? null, picture, submissions };
   const about = [paper.venue, paper.year].filter(Boolean).join(', ');
   return (
     <main className={ui.paperPage}>
@@ -61,6 +76,7 @@ export async function PaperRoute({ scheme, segments }: { scheme: PaperScheme; se
             <Slot name="paper.aside" {...panel} />
           </aside>
         </div>
+        <Slot name="paper.body" {...panel} />
       </article>
     </main>
   );

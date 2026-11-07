@@ -10,6 +10,8 @@ export const COMMUNITY_PAGE_PATH = 'community/page.md';
 export const RESOURCES_PATH = 'author/resources.json';
 /** Where the paper's PDF is: the bytes are in R2 (DESIGN.md §4.3), and this says which ones. */
 export const PDF_PATH = 'pdf.json';
+/** A picture the authors chose for the paper, in place of its PDF's first page: a pointer, as `pdf.json` is. */
+export const THUMBNAIL_PATH = 'author/thumbnail.json';
 
 export const MAX_FILE_BYTES = 256 * 1024;
 export const MAX_CHANGES = 50;
@@ -151,6 +153,66 @@ export function parsePdfPointer(text: string): PdfPointer | null {
   return { sha256, bytes, url: url as string, source: source as string, license, fetchedAt };
 }
 
+export const THUMBNAIL_TYPES = ['image/jpeg', 'image/png', 'image/gif', 'image/webp', 'image/avif'] as const;
+export type ThumbnailType = (typeof THUMBNAIL_TYPES)[number];
+/** It shows in a 230px box: an animated GIF larger than this is a mistake, and slows every reader. */
+export const MAX_THUMBNAIL_BYTES = 8 * 1024 * 1024;
+/** Of the alt text and of the caption. */
+const MAX_ALT_LENGTH = 500;
+
+export interface ThumbnailPointer {
+  sha256: string;
+  bytes: number;
+  type: ThumbnailType;
+  /** Where the bytes are: `https:`, or a path on this site in development. */
+  url: string;
+  /** What it shows, for a reader who can't see it. */
+  alt?: string;
+  /** The figure's caption, after "Figure 1:". */
+  caption?: string;
+}
+
+/** An image's type from its first bytes, or `null` if it isn't one a thumbnail can be. */
+export function imageType(bytes: Uint8Array): ThumbnailType | null {
+  const ascii = (from: number, to: number) => String.fromCharCode(...bytes.subarray(from, to));
+  if (bytes[0] === 0xff && bytes[1] === 0xd8 && bytes[2] === 0xff) return 'image/jpeg';
+  if (ascii(0, 8) === '\x89PNG\r\n\x1a\n') return 'image/png';
+  if (ascii(0, 6) === 'GIF87a' || ascii(0, 6) === 'GIF89a') return 'image/gif';
+  if (ascii(0, 4) === 'RIFF' && ascii(8, 12) === 'WEBP') return 'image/webp';
+  if (ascii(4, 8) === 'ftyp' && ['avif', 'avis'].includes(ascii(8, 12))) return 'image/avif';
+  return null;
+}
+
+/** The pointer in an `author/thumbnail.json`, or `null` if it isn't one. */
+export function parseThumbnailPointer(text: string): ThumbnailPointer | null {
+  let value: Partial<ThumbnailPointer> | null;
+  try {
+    value = JSON.parse(text) as Partial<ThumbnailPointer> | null;
+  } catch {
+    return null;
+  }
+  if (value === null || typeof value !== 'object' || Array.isArray(value)) return null;
+  const { sha256, bytes, type, url, alt, caption } = value;
+  if (typeof sha256 !== 'string' || !/^[0-9a-f]{64}$/.test(sha256)) return null;
+  if (typeof bytes !== 'number' || !Number.isSafeInteger(bytes) || bytes <= 0 || bytes > MAX_THUMBNAIL_BYTES) {
+    return null;
+  }
+  if (!THUMBNAIL_TYPES.includes(type as ThumbnailType)) return null;
+  const sitePath = typeof url === 'string' && /^\/[^/\\]/.test(url);
+  if (!isHttps(url) && !sitePath) return null;
+  for (const text of [alt, caption]) {
+    if (text !== undefined && (typeof text !== 'string' || text.length > MAX_ALT_LENGTH)) return null;
+  }
+  return {
+    sha256,
+    bytes,
+    type: type as ThumbnailType,
+    url: url as string,
+    ...(alt ? { alt } : {}),
+    ...(caption ? { caption } : {}),
+  };
+}
+
 /**
  * Why this can't be the file's content, or `null`. Files are text, since media goes to R2 (DESIGN.md
  * §4.3). Checked after merging as well, because two valid edits can merge into invalid JSON. What a link
@@ -161,6 +223,7 @@ export function contentProblem(path: string, content: string): string | null {
   if (content.includes('\0')) return 'is not text';
   if (Buffer.byteLength(content) > MAX_FILE_BYTES) return `is larger than ${MAX_FILE_BYTES} bytes`;
   if (path === PDF_PATH) return parsePdfPointer(content) ? null : 'is not a valid PDF pointer';
+  if (path === THUMBNAIL_PATH) return parseThumbnailPointer(content) ? null : 'is not a valid thumbnail pointer';
   if (path.endsWith('.jsonl')) {
     for (const line of content.split('\n')) {
       if (line === '') continue;
