@@ -56,21 +56,29 @@ function Demo({ demo, index, canEdit, paper }: { demo: DemoPointer; index: numbe
   const url = demoUrl(demo.id);
 
   useEffect(() => {
-    // A page sized by its frame (`height: 80vh`) answers each resize with another, the same way: one
-    // that comes straight after ours and goes the same way is that, and is ignored.
-    let last: { height: number; at: number; grew: boolean } | null = null;
+    // A page sized by its frame (`height: 80vh`) answers each resize with another, by the same ratio, and
+    // would shrink or grow for ever. Two steps the same way by the same ratio are that: the first step was
+    // its height, so the frame goes back to it and stops following.
+    let last: { from: number; to: number } | null = null;
+    let frozen = false;
     function onMessage(event: MessageEvent) {
-      if (event.origin !== DEMO_ORIGIN || event.source !== frame.current?.contentWindow) return;
+      if (frozen || event.origin !== DEMO_ORIGIN || event.source !== frame.current?.contentWindow) return;
       const data = event.data as { type?: unknown; height?: unknown } | null;
       if (data?.type !== DEMO_HEIGHT_MESSAGE || typeof data.height !== 'number' || !Number.isFinite(data.height))
         return;
       const next = Math.round(Math.min(MAX_DEMO_HEIGHT, data.height));
       if (next < MIN_DEMO_HEIGHT) return;
       const current = frame.current?.getBoundingClientRect().height ?? 0;
-      if (Math.abs(next - current) < 2) return;
-      const grew = next > current;
-      if (last && performance.now() - last.at < 300 && last.grew === grew) return;
-      last = { height: next, at: performance.now(), grew };
+      if (current === 0 || Math.abs(next - current) < 2) return;
+      if (last && Math.abs(last.to - current) < 2) {
+        const sameWay = next > current === last.to > last.from;
+        if (sameWay && Math.abs(next / current - last.to / last.from) < 0.02) {
+          frozen = true;
+          setHeight(last.to);
+          return;
+        }
+      }
+      last = { from: current, to: next };
       setHeight(next);
     }
     window.addEventListener('message', onMessage);
