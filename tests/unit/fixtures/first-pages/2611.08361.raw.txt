@@ -1,0 +1,6 @@
+Radio-to-Pose Information for
+Gauge-Drift Correction in Cooperative Localization
+Aditya Iyer, Andy Ye, Akshay Narayan, Nora Ayanian
+{aditya iyer, akshayn, nora ayanian}@brown.edu
+andy132@cs.washington.edu
+Abstract—Cooperative localization uses odometry and

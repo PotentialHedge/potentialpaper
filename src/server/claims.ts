@@ -15,6 +15,7 @@ import {
 import { ApiError } from './api/errors';
 import { newIdentity } from './pages/commit';
 import { refreshPaperPages } from './pages/refresh';
+import { authorsForEmails } from './pdfs/authors';
 
 /**
  * Claims of authorship (DESIGN.md §6). A paper is claimed once one of its printed authors has a confirmed
@@ -23,9 +24,11 @@ import { refreshPaperPages } from './pages/refresh';
  *
  * - **`email`, automatic:** one of the account's confirmed addresses (an affiliation, or the sign-up address)
  *   is among the emails on the first page of the paper's current PDF (`pdf_documents.emails`, from
- *   `server/pdfs/ingest.ts`). The claimant still says which author they are, since an address doesn't.
- *   Checked when the claim is made, again when the account confirms an address, and again when ingest
- *   finds new emails for the paper's PDF (`recheckPendingClaims`).
+ *   `server/pdfs/ingest.ts`). When the page also says unambiguously which printed author the address is
+ *   (`server/pdfs/authors.ts`), the account is made that author with no claim at all; otherwise it
+ *   claims, picking the author, and is confirmed at once. `claimByEmail` does both, when an account is
+ *   created, when it confirms an address, and when ingest reads a PDF. An automatic author can take it
+ *   back (`withdrawClaim`), which leaves the claim `declined` so it isn't made again.
  * - **`manual`:** everything else waits for an admin (`scripts/decide-claim.ts`).
  * - `vouch`, by a confirmed co-author, comes next.
  *
@@ -186,7 +189,7 @@ export async function requestClaim(
   }
 
   const existing = await ownClaim(paperId, account.id, database);
-  if (existing && existing.status !== 'pending') {
+  if (existing && existing.status !== 'pending' && existing.status !== 'declined') {
     throw new ApiError(409, 'claim_decided', `your claim was already ${existing.status}`);
   }
   const verification = await emailEvidence(paperId, account.id, database);
@@ -268,15 +271,92 @@ export async function recheckPendingClaims(
   return confirmed;
 }
 
-/** Takes back a claim that hasn't been decided. */
+/**
+ * Everything an address on a first page does, for the accounts and PDFs selected: confirms pending claims
+ * (`recheckPendingClaims`), and makes each verified account with no claim on a paper that paper's author,
+ * where its address says which printed author it is (`server/pdfs/authors.ts`). Never takes an author
+ * someone is already confirmed as. Returns how many claims it confirmed or made.
+ */
+export async function claimByEmail(
+  scope: { accountId?: string; sha256?: string },
+  database: Database = getDb(),
+): Promise<number> {
+  let count = await recheckPendingClaims(scope, database);
+  const filters: SQL[] = [sql`true`];
+  if (scope.accountId) filters.push(sql`a.id = ${scope.accountId}`);
+  if (scope.sha256) filters.push(sql`d.sha256 = ${scope.sha256}`);
+  const { rows } = await database.execute<{
+    account_id: string;
+    paper_id: string;
+    email: string;
+    sha256: string;
+    emails: string[];
+    first_page_raw: string | null;
+    authors: string[];
+  }>(sql`
+    select distinct on (a.id, c.paper_id, own.email)
+           a.id as account_id, c.paper_id, own.email, d.sha256, d.emails, d.first_page_raw, p.authors
+    from (
+      select f.account_id, f.email from affiliations f where f.verified_at is not null
+      union
+      select a.id, lower(u.email) from accounts a join "user" u on u.id = a.user_id where u.email_verified
+    ) own
+    join accounts a on a.id = own.account_id and a.verified_at is not null and not a.is_bot
+    join pdf_documents d on own.email = any(d.emails)
+    join page_current c on c.pdf ->> 'sha256' = d.sha256
+    join papers p on p.id = c.paper_id
+    where ${sql.join(filters, sql` and `)}
+      and not exists (select from author_claims ac where ac.paper_id = c.paper_id and ac.account_id = a.id)
+  `);
+  for (const row of rows) {
+    const authorIndex = authorsForEmails(row.emails, row.authors, row.first_page_raw ?? '').get(row.email);
+    if (authorIndex === undefined) continue;
+    try {
+      const made = await database
+        .insert(authorClaims)
+        .values({
+          paperId: row.paper_id,
+          accountId: row.account_id,
+          authorIndex,
+          authorName: row.authors[authorIndex],
+          status: 'confirmed',
+          method: 'email',
+          verification: { email: row.email, sha256: row.sha256 },
+          decidedAt: new Date(),
+          identityId: newIdentity('a'),
+        })
+        .onConflictDoNothing()
+        .returning({ id: authorClaims.id });
+      if (made.length > 0) {
+        count += 1;
+        await refreshPaper(row.paper_id, database);
+      }
+    } catch (err) {
+      // `onConflictDoNothing` covers a claim made meanwhile; this is someone confirmed as that author.
+      if (pgErrorCode(err) !== '23505') throw err;
+    }
+  }
+  return count;
+}
+
+/**
+ * Takes back a claim that hasn't been decided, or steps down as an author the site made automatically
+ * (`method: 'email'`), which is kept as `declined` so it isn't made again. An admin's decision stays.
+ */
 export async function withdrawClaim(paperId: string, accountId: string, database: Database = getDb()): Promise<void> {
+  const mine = and(eq(authorClaims.paperId, paperId), eq(authorClaims.accountId, accountId));
   const removed = await database
     .delete(authorClaims)
-    .where(
-      and(eq(authorClaims.paperId, paperId), eq(authorClaims.accountId, accountId), eq(authorClaims.status, 'pending')),
-    )
+    .where(and(mine, eq(authorClaims.status, 'pending')))
     .returning({ id: authorClaims.id });
-  if (removed.length === 0) throw new ApiError(404, 'not_found', 'you have no pending claim on this paper');
+  if (removed.length > 0) return;
+  const declined = await database
+    .update(authorClaims)
+    .set({ status: 'declined', decidedAt: new Date() })
+    .where(and(mine, eq(authorClaims.status, 'confirmed'), eq(authorClaims.method, 'email')))
+    .returning({ id: authorClaims.id });
+  if (declined.length === 0) throw new ApiError(404, 'not_found', 'you have no claim on this paper to take back');
+  await refreshPaper(paperId, database);
 }
 
 /** An admin's decision (`method: 'manual'`). Confirming fails if someone else is already confirmed as that author. */

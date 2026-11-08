@@ -164,7 +164,7 @@ export const OwnClaim = z.object({
     .object({
       authorIndex: z.number().int(),
       authorName: z.string(),
-      status: z.enum(['pending', 'confirmed', 'rejected']),
+      status: z.enum(['pending', 'confirmed', 'rejected', 'declined']),
       /** How it was decided: `email` when an address of the claimant's on the paper confirmed it at once. */
       method: z.enum(['manual', 'email', 'vouch']),
       evidence: z.string(),

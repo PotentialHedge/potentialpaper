@@ -1,0 +1,2 @@
+ALTER TABLE "author_claims" DROP CONSTRAINT "author_claims_status_check";--> statement-breakpoint
+ALTER TABLE "author_claims" ADD CONSTRAINT "author_claims_status_check" CHECK (status in ('pending', 'confirmed', 'rejected', 'declined'));

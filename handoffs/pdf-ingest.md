@@ -150,3 +150,24 @@ deployed, because Tailscale was down. Deploy it with your work: run migrations 0
   `npx tsx scripts/move-demos-into-markdown.ts --as <admin handle>`, then `dc --profile tools up -d ingest`,
   then `scripts/purge-edge-cache.sh`. The first pass downloads every PDF once (~42k, roughly 7–8 MB each in
   dev's sample, so a few hundred GB); `INGEST_WORKERS` sets its concurrency (default 4).
+
+## Follow-up: automatic authors (2026-11-08)
+
+Benedict asked that an account with an address on a paper be made its author without claiming. An address
+doesn't say which printed author it is, so `src/server/pdfs/authors.ts` works that out, and only assigns when
+it is unambiguous; anything unclear still goes through the claim page (confirmed at once with the address).
+
+- **By name:** the local part spells one author's name (`ashish.vaswani`, `avaswani`, `nikip`, `noam`,
+  `lukaszkaiser` for Łukasz Kaiser), at the strongest level any author matches, and only one author does.
+- **By block:** the address alone on its line, with a line that is just that author's name within three lines
+  above and no other address between (`usz@google.com` under Jakob Uszkoreit). A looser "nearest name above"
+  rule was wrong too often on real papers (`luoyf24@` → the last name in a line of names) and was dropped.
+- Several addresses on one author keep only the best-evidenced, and none if that is a single name.
+- **Measured** on the 168 arXiv first pages with their arXiv author lists: 222 of 332 addresses assigned, none
+  wrong on a full check by hand. Attention Is All You Need: all eight authors.
+- `claimByEmail` runs at account creation, after an affiliation is confirmed, and after the emails stage (now
+  version 2, so a deploy re-reads every PDF's addresses and assigns authors for existing accounts).
+- **Stepping down:** DELETE `/api/v1/claims` on an automatic claim sets the new status `declined` (migration
+  0016), so it isn't assigned again; claiming afresh is still allowed.
+- The same check found an extractor bug: in `{aditya iyer, akshayn}@brown.edu` the spaces are lost
+  underscores, and it had produced `aditya@` and `iyer@`. Groups now split only on their separators.

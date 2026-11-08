@@ -7,7 +7,7 @@ import { paperPath } from '@/lib/paper-ids';
 import { authHref } from '@/lib/return-to';
 import { viewerFromHeaders } from '@/server/auth';
 import { confirmedAuthors, ownAddressesOnPaper, ownClaim } from '@/server/claims';
-import { ClaimForm } from './ClaimForm';
+import { ClaimForm, StepDown } from './ClaimForm';
 
 export const dynamic = 'force-dynamic';
 
@@ -54,14 +54,28 @@ export default async function ClaimPage({ params }: Props) {
             <a href="/profile#affiliations">Add one on your profile</a>.
           </p>
         ) : mine?.status === 'confirmed' ? (
-          <p className="mt-4">
-            You are a confirmed author of this paper, as {mine.authorName}.{' '}
-            <a href={toolPath('edit', found.id, 'part=author')}>Write the author section</a>.
-          </p>
+          <div className="mt-4">
+            <p>
+              You are a confirmed author of this paper, as {mine.authorName}
+              {mine.method === 'email' &&
+                (addresses.onPaper.length > 0
+                  ? `, because your address ${addresses.onPaper.join(' and ')} is printed on its first page`
+                  : ', from an address of yours printed on its first page')}
+              . <a href={toolPath('edit', found.id, 'part=author')}>Write the author section</a>.
+            </p>
+            {mine.method === 'email' && (
+              <p className={ui.fine}>
+                <StepDown paper={found.canonical} />
+              </p>
+            )}
+          </div>
         ) : mine?.status === 'rejected' ? (
           <p className="mt-4">Your claim to be {mine.authorName} was not confirmed.</p>
         ) : (
           <>
+            {mine?.status === 'declined' && (
+              <p className="mt-4">You stepped down as {mine.authorName}. You can claim the paper again below.</p>
+            )}
             {addresses.onPaper.length > 0 ? (
               <p className={`${ui.box} mt-4`}>
                 Your address {addresses.onPaper.join(' and ')} is printed on this paper&apos;s first page, so your claim
@@ -84,7 +98,7 @@ export default async function ClaimPage({ params }: Props) {
               pagePath={paperPath(found.id)}
               authors={found.paper.authors}
               taken={taken}
-              pending={mine}
+              pending={mine?.status === 'pending' ? mine : null}
               instant={addresses.onPaper.length > 0}
             />
           </>

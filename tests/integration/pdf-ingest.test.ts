@@ -7,7 +7,7 @@ import { afterAll, beforeAll, beforeEach, describe, expect, it } from 'vitest';
 import { getDb } from '@/db';
 import { authorClaims, pageCurrent, pageObjects, pdfDocuments } from '@/db/schema';
 import { getPaper, search } from '@/server/api/handlers';
-import { ownAddressesOnPaper } from '@/server/claims';
+import { claimByEmail, ownAddressesOnPaper } from '@/server/claims';
 import { commitPage, SYSTEM_ACTOR } from '@/server/pages/commit';
 import { readHead } from '@/server/pages/repo';
 import { PDF_PATH } from '@/server/pages/rules';
@@ -18,7 +18,7 @@ import { ORIGIN, api, closePool, lastMailTo, resetDatabase, signUp } from './hel
 const PAPER = { scheme: 'arxiv', value: '1706.03762' } as const;
 const AUTHORS = ['Ashish Vaswani', 'Noam Shazeer', 'Niki Parmar'];
 /** The addresses printed on the test PDF's first page. */
-const ON_PAPER = ['ashish@ethz.ch', 'noam@ethz.ch', 'niki@inf.ethz.ch'];
+const ON_PAPER = ['ashish@ethz.ch', 'noam@ethz.ch', 'niki@inf.ethz.ch', 'brain-team@ethz.ch'];
 
 /** A one-page PDF with these lines of text, in Helvetica: enough for pdftotext and pdftoppm. */
 function tinyPdf(lines: string[]): Buffer {
@@ -50,6 +50,7 @@ const PDF = tinyPdf([
   'Google Brain',
   '{ashish, noam}@ethz.ch',
   'niki@inf.ethz.ch',
+  'Contact: brain-team@ethz.ch',
   'Abstract. We measure pass@1 and NDCG@10.',
 ]);
 const SHA = createHash('sha256').update(PDF).digest('hex');
@@ -158,51 +159,78 @@ describe('pdfs:ingest', () => {
   }, 30_000);
 });
 
-describe('claims by an email on the first page', () => {
-  it('confirms a claim at once from an address on the paper, and leaves one without pending', async () => {
+describe('authors by an email on the first page', () => {
+  it('makes an account the author when it signs up, if its address says which one, with no claim', async () => {
     const paperId = await paperWithPdf();
     await ingest({ pdfDir });
-    const ashish = await signUp('ashish@ethz.ch');
+    await signUp('ashish@ethz.ch');
+    expect(await claimRow(paperId, 0)).toMatchObject({
+      authorName: 'Ashish Vaswani',
+      status: 'confirmed',
+      method: 'email',
+      verification: { email: 'ashish@ethz.ch', sha256: SHA },
+    });
+    // An account whose address isn't on the paper gets nothing, and its claim waits for an admin.
     const stranger = await signUp('someone@ethz.ch');
-
-    const confirmed = await claim(ashish, 0);
-    expect(confirmed.status).toBe(201);
-    expect(confirmed.body.claim).toMatchObject({ authorName: 'Ashish Vaswani', status: 'confirmed', method: 'email' });
-    const row = await claimRow(paperId, 0);
-    expect(row).toMatchObject({ status: 'confirmed', method: 'email' });
-    expect(row?.verification).toEqual({ email: 'ashish@ethz.ch', sha256: SHA });
-
-    const pending = await claim(stranger, 1);
-    expect(pending.body.claim).toMatchObject({ status: 'pending', method: 'manual' });
-    // Nobody can take an author who is confirmed, address or not.
+    expect(await claimRow(paperId, 1)).toBeNull();
+    expect((await claim(stranger, 1)).body.claim).toMatchObject({ status: 'pending', method: 'manual' });
+    // Nobody can take an author who is confirmed.
     expect((await claim(stranger, 0)).status).toBe(409);
   });
 
-  it('confirms a pending claim once ingest reads the PDF, or once the address is confirmed', async () => {
+  it('makes existing accounts authors once ingest reads the PDF, or once they confirm the address', async () => {
     const paperId = await paperWithPdf();
-    const noam = await signUp('noam@ethz.ch');
+    await signUp('noam@ethz.ch');
     const niki = await signUp('niki@ethz.ch');
-    // Claimed before the PDF was read: pending.
-    expect((await claim(noam, 1)).body.claim.status).toBe('pending');
-    expect((await claim(niki, 2)).body.claim.status).toBe('pending');
+    expect(await claimRow(paperId, 1)).toBeNull();
 
     await ingest({ pdfDir });
-    expect(await claimRow(paperId, 1)).toMatchObject({ status: 'confirmed', method: 'email' });
+    expect(await claimRow(paperId, 1)).toMatchObject({ authorName: 'Noam Shazeer', status: 'confirmed' });
     // Niki's address on the paper isn't the one she signed up with.
-    expect(await claimRow(paperId, 2)).toMatchObject({ status: 'pending', method: 'manual' });
+    expect(await claimRow(paperId, 2)).toBeNull();
 
     const added = await api('POST', '/me/affiliations', { cookie: niki, body: { email: 'niki@inf.ethz.ch' } });
     expect(added.status).toBe(201);
     // An address added but not confirmed proves nothing.
-    expect((await claim(niki, 2)).body.claim.status).toBe('pending');
+    await claimByEmail({});
+    expect(await claimRow(paperId, 2)).toBeNull();
     const code = /\b(\d{6})\b/.exec(lastMailTo('niki@inf.ethz.ch')!.subject)![1];
     const verified = await api('POST', `/me/affiliations/${added.body.id}/verify`, { cookie: niki, body: { code } });
     expect(verified.status).toBe(200);
     expect(await claimRow(paperId, 2)).toMatchObject({
+      authorName: 'Niki Parmar',
       status: 'confirmed',
-      method: 'email',
       verification: { email: 'niki@inf.ethz.ch', sha256: SHA },
     });
+  });
+
+  it('confirms at once a claim from an address that says no name, and a pending one once ingest reads it', async () => {
+    const paperId = await paperWithPdf();
+    const team = await signUp('brain-team@ethz.ch');
+    // Claimed before the PDF was read: pending, then confirmed by ingest as the author it picked.
+    expect((await claim(team, 2)).body.claim.status).toBe('pending');
+    await ingest({ pdfDir });
+    expect(await claimRow(paperId, 2)).toMatchObject({ status: 'confirmed', method: 'email' });
+
+    // After ingest, a claim from an address on the paper is confirmed when made.
+    const other = await api('DELETE', `/claims?${new URLSearchParams(PAPER)}`, { cookie: team });
+    expect(other.status).toBe(200);
+    expect((await claim(team, 1)).body.claim).toMatchObject({ status: 'confirmed', method: 'email' });
+  });
+
+  it('lets an automatic author step down, and does not make them the author again', async () => {
+    const paperId = await paperWithPdf();
+    await ingest({ pdfDir });
+    const ashish = await signUp('ashish@ethz.ch');
+    const query = new URLSearchParams(PAPER);
+    expect((await api('DELETE', `/claims?${query}`, { cookie: ashish })).status).toBe(200);
+    expect(await claimRow(paperId, 0)).toMatchObject({ status: 'declined' });
+
+    await ingest({ pdfDir, stages: ['emails'], force: true });
+    await claimByEmail({});
+    expect(await claimRow(paperId, 0)).toMatchObject({ status: 'declined' });
+    // Claiming again is up to them.
+    expect((await claim(ashish, 0)).body.claim).toMatchObject({ status: 'confirmed', method: 'email' });
   });
 
   it('never shows the PDF’s addresses, in an endpoint, the page’s data or its repo', async () => {
@@ -210,10 +238,13 @@ describe('claims by an email on the first page', () => {
     await ingest({ pdfDir });
     const stranger = await signUp('someone@ethz.ch');
     const ashish = await signUp('ashish@ethz.ch');
-    const responses: unknown[] = [];
-    responses.push((await claim(stranger, 1)).body, (await claim(ashish, 0)).body);
+    const team = await signUp('brain-team@ethz.ch');
     const query = new URLSearchParams(PAPER);
-    responses.push((await api('GET', `/claims?${query}`, { cookie: stranger })).body);
+    const responses: unknown[] = [];
+    responses.push((await claim(stranger, 1)).body, (await claim(team, 2)).body);
+    for (const cookie of [stranger, ashish, team]) {
+      responses.push((await api('GET', `/claims?${query}`, { cookie })).body);
+    }
     responses.push((await api('GET', '/me', { cookie: stranger })).body);
     const paper = await getPaper(new Request(new URL(`/api/v1/papers/arxiv/1706.03762`, ORIGIN)), {
       params: Promise.resolve({ scheme: 'arxiv', value: ['1706.03762'] }),
@@ -231,7 +262,7 @@ describe('claims by an email on the first page', () => {
     const visible = JSON.stringify(responses);
     expect(visible).toContain('Attention Is All You Need');
     for (const email of ON_PAPER) expect(visible).not.toContain(email);
-    for (const name of ['ashish', 'noam', 'niki']) expect(visible).not.toContain(`${name}@`);
+    for (const name of ['ashish', 'noam', 'niki', 'brain-team']) expect(visible).not.toContain(`${name}@`);
 
     // The claim page learns only which of the viewer's own addresses are on the paper.
     const [strangerId, ashishId] = await Promise.all(

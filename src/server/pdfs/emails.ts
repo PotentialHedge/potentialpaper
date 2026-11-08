@@ -144,7 +144,10 @@ function joinBrokenLines(text: string): string {
 function scan(text: string, found: string[]): void {
   // Groups first, then blanked out, so `bob}@ethz.ch` isn't read again as a lone address.
   const rest = text.replace(GROUP, (match, locals: string, domain: string) => {
-    for (const local of locals.split(/[\s,;|/]+/)) {
+    // Split on the separators when there are any; a part with a space in it then lost a character to the
+    // PDF (`{aditya iyer, akshayn}@`, where `_` didn't survive), so it isn't anyone's address.
+    const parts = /[,;|/]/.test(locals) ? locals.split(/[,;|/]/).map((p) => p.trim()) : locals.trim().split(/\s+/);
+    for (const local of parts) {
       if (!new RegExp(`^${LOCAL}$`).test(local)) continue;
       const address = clean(local, domain);
       if (address) found.push(address);

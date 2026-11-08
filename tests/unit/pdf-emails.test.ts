@@ -104,6 +104,9 @@ describe('extractEmails on what PDFs do to addresses', () => {
       'carol@epfl.ch',
     ]);
     expect(extractEmails('{alice,\nbob}\n@ethz.ch')).toEqual(['alice@ethz.ch', 'bob@ethz.ch']);
+    expect(extractEmails('{alice bob}@ethz.ch')).toEqual(['alice@ethz.ch', 'bob@ethz.ch']);
+    // With separators, a space inside a part is a character the PDF lost, not two addresses.
+    expect(extractEmails(page('2611.08361.raw.txt'))).toEqual(['akshayn@brown.edu', 'andy132@cs.washington.edu']);
   });
 
   it('joins addresses broken around the @ or inside the domain', () => {

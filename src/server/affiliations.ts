@@ -4,7 +4,7 @@ import { getDb, type Database } from '@/db';
 import { isUniqueViolation } from '@/db/errors';
 import { accounts, affiliations, type Account, type Affiliation } from '@/db/schema';
 import { ApiError } from './api/errors';
-import { recheckPendingClaims } from './claims';
+import { claimByEmail } from './claims';
 import { institutionForEmail } from './institution-domains';
 import { affiliationCodeMail, affiliationTakenMail } from '@/lib/auth-mails';
 import { sendMail } from './mail';
@@ -260,8 +260,8 @@ export async function verifyAffiliation(
   if ('failure' in outcome) {
     throw new ApiError(422, 'invalid_code', FAILURE_MESSAGE[outcome.failure], { reason: outcome.failure });
   }
-  // A newly confirmed address may be on the first page of a paper the account has claimed.
-  await recheckPendingClaims({ accountId: input.accountId }, database);
+  // A newly confirmed address may be on the first page of a paper, claimed or not.
+  await claimByEmail({ accountId: input.accountId }, database);
   return outcome.row;
 }
 

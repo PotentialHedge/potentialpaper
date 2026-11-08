@@ -122,3 +122,32 @@ export function ClaimForm({ paper, pagePath, authors, taken, pending, instant }:
     </form>
   );
 }
+
+/** For an author the site made automatically: takes it back, so they aren't made the author again. */
+export function StepDown({ paper }: { paper: PaperId }) {
+  const router = useRouter();
+  const [busy, setBusy] = useState(false);
+  const [problem, setProblem] = useState<string | null>(null);
+  async function stepDown() {
+    setBusy(true);
+    setProblem(null);
+    try {
+      const query = new URLSearchParams({ scheme: paper.scheme, value: paper.value });
+      const res = await fetch(`/api/v1/claims?${query}`, { method: 'DELETE' });
+      if (!res.ok) return setProblem(await messageOf(res));
+      router.refresh();
+    } catch {
+      setProblem('Could not reach the server.');
+    } finally {
+      setBusy(false);
+    }
+  }
+  return (
+    <>
+      <button type="button" className={ui.linkBtn} onClick={stepDown} disabled={busy}>
+        {busy ? 'Stepping down…' : 'Not you, or rather not be listed? Step down as its author'}
+      </button>
+      {problem && <p className={ui.note(false)}>{problem}</p>}
+    </>
+  );
+}

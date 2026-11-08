@@ -49,17 +49,20 @@ Milestones 0, 1 and 2 are built, merged into `main` and deployed, and Milestone 
   `POST /api/v1/pages/thumbnail`, multipart) and `links.json` (extra links under the title; one named like a
   built-in link replaces it, `POST /api/v1/pages/links`). Any verified account may change them while the paper
   is unclaimed, and only its confirmed authors (and admins) once it is claimed.
-- **Claims:** `author_claims`. A paper is claimed once it has a confirmed claim. `/claim/<paper>` asks to be
-  one of the printed authors (`POST/GET/DELETE /api/v1/claims`). `method` records how it was decided: **`email`**,
-  at once, when one of the account's confirmed addresses (an affiliation, or the sign-up address) is among the
-  emails on the first page of the paper's current PDF, with the address and sha256 in the private
-  `verification` column; otherwise **`manual`**, pending until an admin runs `npm run claims:decide` (lists
-  pending; `--confirm <id> --as <handle>` or `--reject`). Pending claims are checked again when the account
-  confirms an address and when ingest finds new emails on the PDF (`recheckPendingClaims`). The claim page names
-  only the viewer's own addresses that are on the paper. A confirmed author can edit the author section
+- **Claims:** `author_claims`. A paper is claimed once it has a confirmed claim. **An account with a confirmed
+  address (an affiliation, or the sign-up address) on the first page of a paper's current PDF is made its
+  author automatically**, with no claim, when the address says unambiguously which printed author it is
+  (`server/pdfs/authors.ts`: the local part spells the name, or the address sits alone in that name's block).
+  `claimByEmail` does this at sign-up, when an address is confirmed, and when ingest reads a PDF. Otherwise
+  `/claim/<paper>` asks which author they are (`POST/GET/DELETE /api/v1/claims`), and is confirmed at once if
+  an address of theirs is on the paper, or waits for an admin (`npm run claims:decide`; `--confirm <id> --as
+<handle>` or `--reject`). `method` records the route (`email`, `manual`; `vouch` reserved for co-author
+  vouching, next), and the private `verification` column the address and sha256. An automatic author can step
+  down on the claim page, which leaves the claim `declined` so it isn't made again. The claim page names only
+  the viewer's own addresses that are on the paper. A confirmed author can edit the author section
   (`/edit/<paper>?part=author`) and, on that paper, every commit they make carries their per-claim `a_` id and
-  shows the printed name with an "author" badge, never their handle. Not built: ORCID and co-author vouching
-  (`method: 'vouch'` is reserved for it; it's next).
+  shows the printed name with an "author" badge, never their handle. Not built: ORCID, vouching, and any mail
+  telling someone they were made an author.
 - **PDF ingest:** `npm run pdfs:ingest` (`server/pdfs/ingest.ts`) runs versioned stages on every distinct PDF
   in `page_current.pdf`, one row per sha256 in `pdf_documents`: `text` (pages, bytes, page 1 through
   `pdftotext -raw` and `-layout`), `emails` (`server/pdfs/emails.ts`) and `cover` (the old `render-covers`,

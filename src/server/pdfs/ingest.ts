@@ -9,7 +9,7 @@ import { AwsClient } from 'aws4fetch';
 import { sql, type SQL } from 'drizzle-orm';
 import { getDb, type Database } from '@/db';
 import type { PdfStageState } from '@/db/schema';
-import { recheckPendingClaims } from '../claims';
+import { claimByEmail } from '../claims';
 import { extractEmails } from './emails';
 import { firstPageText, pageCount, renderFirstPage } from './poppler';
 
@@ -87,15 +87,15 @@ export const STAGES: Stage[] = [
   },
   {
     name: 'emails',
-    version: 1,
+    // 2: groups split on their separators only, not on spaces inside them.
+    version: 2,
     needs: ['text'],
     async run({ doc, database }) {
       const emails = extractEmails(doc.firstPageRaw ?? '', doc.firstPageLayout ?? '');
-      const added = emails.some((e) => !doc.emails.includes(e));
       return {
         set: { emails },
-        // Someone may have claimed the paper before its PDF was read.
-        after: added ? async () => void (await recheckPendingClaims({ sha256: doc.sha256 }, database)) : undefined,
+        // Accounts with these addresses may exist already, with or without a claim on the paper.
+        after: emails.length > 0 ? async () => void (await claimByEmail({ sha256: doc.sha256 }, database)) : undefined,
       };
     },
   },

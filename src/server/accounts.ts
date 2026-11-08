@@ -6,6 +6,7 @@ import { accounts, affiliations, type Account } from '@/db/schema';
 import { handleProblem } from '@/lib/profile';
 import { normalizeEmail, syncAccount } from './affiliations';
 import { ApiError } from './api/errors';
+import { claimByEmail } from './claims';
 import { institutionForEmail } from './institution-domains';
 
 function placeholderHandle(): string {
@@ -37,7 +38,7 @@ export async function ensureAccountForUser(
   const institution = await institutionForEmail(user.email, database);
   for (let attempt = 0; attempt < 8; attempt += 1) {
     try {
-      return await database.transaction(async (tx) => {
+      const created = await database.transaction(async (tx) => {
         const [account] = await tx
           .insert(accounts)
           .values({ handle: placeholderHandle(), userId: user.id })
@@ -57,9 +58,17 @@ export async function ensureAccountForUser(
             .returning();
           if (primary) await syncAccount(tx, account.id);
         }
-        const [created] = await tx.select().from(accounts).where(eq(accounts.id, account.id));
-        return created;
+        const [row] = await tx.select().from(accounts).where(eq(accounts.id, account.id));
+        return row;
       });
+      // The sign-up address may be printed on papers: make the account their author where it says which.
+      // A failure here mustn't stop the sign-up; the next confirmed address or ingest pass tries again.
+      try {
+        await claimByEmail({ accountId: created.id }, database);
+      } catch (err) {
+        console.error('claim by email', err);
+      }
+      return created;
     } catch (err) {
       if (!isUniqueViolation(err)) throw err;
       const [raced] = await database.select().from(accounts).where(eq(accounts.userId, user.id));

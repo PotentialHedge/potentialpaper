@@ -461,7 +461,11 @@ export const submissionNotes = pgTable(
   ],
 );
 
-export const CLAIM_STATUSES = ['pending', 'confirmed', 'rejected'] as const;
+/**
+ * `declined`: the account was made this author automatically, from an address on the paper, and took it
+ * back. Kept, so it isn't made the author again; claiming afresh is still open to it.
+ */
+export const CLAIM_STATUSES = ['pending', 'confirmed', 'rejected', 'declined'] as const;
 export type ClaimStatus = (typeof CLAIM_STATUSES)[number];
 /**
  * How a claim was (or is to be) decided: `manual` by an admin, `email` because one of the account's

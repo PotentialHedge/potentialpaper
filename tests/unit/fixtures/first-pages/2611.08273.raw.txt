@@ -1,0 +1,8 @@
+Accelerating Safe Reinforcement Learning with
+Massive Parallelism
+Joonyoung Lim
+Department of Information Convergence Engineering
+Pusan National University
+ingyuh1015@pusan.ac.kr
+Younghwan Yoo∗
+School of Computer Science and Engineering
