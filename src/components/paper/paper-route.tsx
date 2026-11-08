@@ -108,7 +108,6 @@ export async function PaperRoute({ scheme, segments }: { scheme: PaperScheme; se
         />
         <TitleActions
           bibtex={bibtex({ paper, identifiers })}
-          path={paperPath(panel.canonical)}
           editPath="#edit-community"
           historyPath={toolPath('history', panel.canonical)}
         />

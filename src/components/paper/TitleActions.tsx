@@ -4,19 +4,13 @@ import { useState } from 'react';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/Popover';
 import { ui } from '@/components/ui';
 
-/**
- * The quick actions under a paper's title. A client island only for the clipboard: the page is cached
- * for everyone, so the links it builds are the same for every reader and the origin is read here.
- */
+/** The quick actions under a paper's title. A client island only for the BibTeX's clipboard. */
 export function TitleActions({
   bibtex,
-  path,
   editPath,
   historyPath,
 }: {
   bibtex: string;
-  /** The paper's canonical page. */
-  path: string;
   editPath: string;
   historyPath: string;
 }) {
@@ -32,7 +26,6 @@ export function TitleActions({
           <Copy value={() => bibtex} label="Copy BibTeX" />
         </PopoverContent>
       </Popover>
-      <Copy value={() => `${window.location.origin}${path}`} label="copy link" />
       <a href={editPath} rel="nofollow" className="text-accent">
         edit
       </a>
