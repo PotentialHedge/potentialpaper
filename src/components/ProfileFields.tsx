@@ -1,6 +1,6 @@
 'use client';
 
-import { REAL_NAME_MAX } from '@/lib/profile';
+import { cleanHandleInput, REAL_NAME_MAX } from '@/lib/profile';
 import { ui } from './ui';
 
 export interface ProfileValues {
@@ -41,7 +41,9 @@ export function ProfileFields({
         Handle (required, can be a pseudonym)
         <input
           value={values.handle}
-          onChange={(e) => onChange({ ...values, handle: e.target.value.toLowerCase() })}
+          onChange={(e) => onChange({ ...values, handle: cleanHandleInput(e.target.value) })}
+          autoCapitalize="none"
+          autoCorrect="off"
           required
           maxLength={30}
           autoComplete="off"

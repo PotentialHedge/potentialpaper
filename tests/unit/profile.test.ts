@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import fc from 'fast-check';
-import { handleProblem, HANDLE_PATTERN } from '@/lib/profile';
+import { cleanHandleInput, handleProblem, HANDLE_PATTERN } from '@/lib/profile';
 
 describe('handleProblem', () => {
   it('accepts ordinary handles, including pseudonyms', () => {
@@ -25,5 +25,17 @@ describe('handleProblem', () => {
         if (handleProblem(s) === null) expect(HANDLE_PATTERN.test(s)).toBe(true);
       }),
     );
+  });
+});
+
+describe('cleanHandleInput', () => {
+  it('lowercases and keeps only ASCII letters, digits and hyphens', () => {
+    expect(cleanHandleInput('Ada-Lovelace')).toBe('ada-lovelace');
+    expect(cleanHandleInput('ada 🚀 lö_vé!')).toBe('adalv');
+    expect(cleanHandleInput('İstanbul')).toBe('istanbul');
+  });
+
+  it('only ever yields characters a handle may hold', () => {
+    fc.assert(fc.property(fc.string({ unit: 'binary' }), (s) => /^[a-z0-9-]*$/.test(cleanHandleInput(s))));
   });
 });

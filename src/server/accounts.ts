@@ -84,9 +84,10 @@ export interface ProfileChange {
  */
 export async function updateProfile(
   account: Account,
-  change: ProfileChange,
+  requested: ProfileChange,
   database: Database = getDb(),
 ): Promise<Account> {
+  const change = { ...requested, handle: requested.handle?.trim().toLowerCase() };
   if (!account.profileCompletedAt && (change.handle === undefined || change.showInstitution === undefined)) {
     throw new ApiError(400, 'validation_error', 'choose a handle and whether to show your institution');
   }

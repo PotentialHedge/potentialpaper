@@ -22,6 +22,14 @@ const RESERVED = new Set([
   'verified',
 ]);
 
+/**
+ * What a handle field keeps of what was typed: lower case, and only the ASCII letters, digits and
+ * hyphens a handle may hold, so emoji, accents and spaces never reach it.
+ */
+export function cleanHandleInput(typed: string): string {
+  return typed.toLowerCase().replace(/[^a-z0-9-]/g, '');
+}
+
 /** The sentence to show for a bad handle, or `null` for a good one. */
 export function handleProblem(handle: string): string | null {
   if (!HANDLE_PATTERN.test(handle)) {
