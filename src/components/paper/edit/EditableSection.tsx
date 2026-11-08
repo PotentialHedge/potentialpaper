@@ -140,18 +140,20 @@ function SectionForm({
   const [conflict, setConflict] = useState<Conflict | null>(null);
   const cursor = useRef<number | null>(null);
   const area = useRef<HTMLTextAreaElement>(null);
+  const [mode, setMode] = useState<ViewMode>('split');
 
   const dirty = text !== opened.text;
   useEffect(() => onDirty(dirty), [dirty, onDirty]);
   useEffect(() => () => onDirty(false), [onDirty]);
 
-  // As tall as its text, so that it and the preview scroll with the page, side by side.
+  // As tall as its text, so that it and the preview scroll with the page, side by side. Hidden, it has no
+  // height to measure, so it is measured again once it shows.
   useLayoutEffect(() => {
     const el = area.current;
     if (!el) return;
     el.style.height = 'auto';
     el.style.height = `${Math.max(el.scrollHeight + 2, 160)}px`;
-  }, [text]);
+  }, [text, mode]);
 
   // The preview, through the server's renderer: the same HTML a commit stores.
   useEffect(() => {
@@ -230,9 +232,10 @@ function SectionForm({
           Nothing is written here yet. The headings are a start: keep the ones you fill in, and delete the rest.
         </p>
       )}
-      <div className="grid grid-cols-2 items-start gap-4 narrow:grid-cols-1">
-        <div>
-          <p className="mb-1 text-xs text-faint">Markdown</p>
+      <ViewModes mode={mode} onChange={setMode} />
+      <div className={`grid items-start gap-4 ${mode === 'split' ? 'grid-cols-2 narrow:grid-cols-1' : 'grid-cols-1'}`}>
+        {/* Hidden rather than gone, so that a demo in the preview keeps running across a switch. */}
+        <div hidden={mode === 'preview'}>
           <textarea
             ref={area}
             value={text}
@@ -246,19 +249,16 @@ function SectionForm({
             className={`${ui.input} resize-none overflow-hidden font-mono text-[13px] leading-relaxed`}
           />
         </div>
-        <div>
-          <p className="mb-1 text-xs text-faint">As it will look</p>
-          {/* The page's own type, so this reads as the section it replaces. */}
-          <div className="md min-h-40 font-serif text-[15px]">
-            {preview ? (
-              <>
-                <PreviewHtml html={preview} />
-                <DemoFrames watch={preview} />
-              </>
-            ) : (
-              <p className="text-muted italic">Nothing yet.</p>
-            )}
-          </div>
+        {/* The page's own type, so this reads as the section it replaces. */}
+        <div hidden={mode === 'markdown'} className="md min-h-40 font-serif text-[15px]">
+          {preview ? (
+            <>
+              <PreviewHtml html={preview} />
+              <DemoFrames watch={preview} />
+            </>
+          ) : (
+            <p className="text-muted italic">Nothing yet.</p>
+          )}
         </div>
       </div>
       {conflict && (
@@ -304,6 +304,35 @@ function SectionForm({
       </div>
       {problem && <p className={ui.note(false)}>{problem}</p>}
     </form>
+  );
+}
+
+type ViewMode = 'markdown' | 'split' | 'preview';
+
+const VIEW_MODES: { mode: ViewMode; label: string }[] = [
+  { mode: 'markdown', label: 'Markdown' },
+  { mode: 'split', label: 'Split' },
+  { mode: 'preview', label: 'Preview' },
+];
+
+/** The Markdown alone, it beside its preview, or the preview alone. */
+function ViewModes({ mode, onChange }: { mode: ViewMode; onChange: (mode: ViewMode) => void }) {
+  return (
+    <div role="group" aria-label="View" className="mb-2 inline-flex border border-rule text-xs">
+      {VIEW_MODES.map((m) => (
+        <button
+          key={m.mode}
+          type="button"
+          aria-pressed={mode === m.mode}
+          onClick={() => onChange(m.mode)}
+          className={`cursor-pointer px-2.5 py-1 not-first:border-l not-first:border-rule ${
+            mode === m.mode ? 'bg-rule-soft font-semibold text-ink' : 'text-muted hover:text-ink'
+          }`}
+        >
+          {m.label}
+        </button>
+      ))}
+    </div>
   );
 }
 
