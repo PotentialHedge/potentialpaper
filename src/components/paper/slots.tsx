@@ -153,8 +153,8 @@ function CommunitySection({ communityHtml, canonical }: PanelProps) {
 }
 
 function ReadThePaper({ identifiers, pdf, picture, cover, canonical }: PanelProps) {
-  // The PDF's credit already links its source, which is often the paper's own page there.
-  const links = identifiers.flatMap(sourceLinks).filter(({ url }) => url !== pdf?.source);
+  // The PDF and its credit already link the file and its source, which are often the paper's own there.
+  const links = identifiers.flatMap(sourceLinks).filter(({ url }) => url !== pdf?.source && url !== pdf?.url);
   const opens = pdf?.url ?? links[0]?.url;
   // A plain <img>, not next/image: a GIF has to stay animated, and the bytes are already sized for this.
   // The caption is the alt text; a picture set before that, with alt text of its own, keeps it.
