@@ -7,7 +7,7 @@ import { closeEditor, messageOf, reloadAt, useEditing, useOpened, type CardOpene
 import { EditorFrame, NotOpened } from './EditorFrame';
 
 /**
- * The picture in "Read the paper", which turns into its editor in place (`#edit-picture`): the figure as it
+ * The picture in the box beside the paper, over its PDF and links, which turns into its editor in place (`#edit-picture`): the figure as it
  * will be, with the picture to click to choose another, and its caption written where it shows. The
  * caption is its alt text too.
  */
@@ -25,12 +25,7 @@ export function EditablePicture({ paper, cover, claimPath, children }: Props) {
   const [dirty, setDirty] = useState(false);
   const active = useEditing((target) => target === 'picture', dirty);
   if (!active) return children;
-  return (
-    // Marks the editor open, for the box around it to drop its heading (`slots.tsx`).
-    <div data-picture-editor>
-      <PictureEditor paper={paper} cover={cover} claimPath={claimPath} onDirty={setDirty} />
-    </div>
-  );
+  return <PictureEditor paper={paper} cover={cover} claimPath={claimPath} onDirty={setDirty} />;
 }
 
 function PictureEditor({
