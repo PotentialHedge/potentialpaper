@@ -165,8 +165,9 @@ function ReadThePaper({ identifiers, pdf, picture, cover, canonical }: PanelProp
     <img src={picture.url} alt={picture.caption ?? picture.alt ?? ''} decoding="async" className="w-full" />
   );
   return (
-    <div className={ui.box}>
-      <h2 className={ui.boxHeading}>Read the paper</h2>
+    <div className={`${ui.box} group/read`}>
+      {/* Not over the picture's editor, which is about the picture, not reading. */}
+      <h2 className={`${ui.boxHeading} group-has-[[data-picture-editor]]/read:hidden`}>Read the paper</h2>
       <EditablePicture paper={canonical} cover={cover} claimPath={toolPath('claim', canonical)}>
         {picture && image && (
           <figure className="mb-3">

@@ -25,7 +25,12 @@ export function EditablePicture({ paper, cover, claimPath, children }: Props) {
   const [dirty, setDirty] = useState(false);
   const active = useEditing((target) => target === 'picture', dirty);
   if (!active) return children;
-  return <PictureEditor paper={paper} cover={cover} claimPath={claimPath} onDirty={setDirty} />;
+  return (
+    // Marks the editor open, for the page around it to make room (`paper-route.tsx`, `slots.tsx`).
+    <div data-picture-editor>
+      <PictureEditor paper={paper} cover={cover} claimPath={claimPath} onDirty={setDirty} />
+    </div>
+  );
 }
 
 function PictureEditor({
