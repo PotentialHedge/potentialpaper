@@ -7,6 +7,7 @@ import { demoBlockMarkdown, MAX_DEMO_DESCRIPTION, MAX_DEMO_TITLE } from '@/lib/d
 import type { PaperId } from '@/lib/paper-ids';
 import { closeEditor, messageOf, reloadAt, useEditing, useOpened, type SectionOpened } from './editing';
 import { EditorFrame, NotOpened } from './EditorFrame';
+import { PreviewHtml } from './PreviewHtml';
 
 /**
  * The author or community section, as the page renders it, which turns into its editor in place: the whole
@@ -251,7 +252,7 @@ function SectionForm({
           <div className="md min-h-40 font-serif text-[15px]">
             {preview ? (
               <>
-                <div dangerouslySetInnerHTML={{ __html: preview }} />
+                <PreviewHtml html={preview} />
                 <DemoFrames watch={preview} />
               </>
             ) : (
