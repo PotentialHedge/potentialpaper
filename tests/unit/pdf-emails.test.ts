@@ -7,6 +7,19 @@ import { extractEmails } from '@/server/pdfs/emails';
 const page = (name: string) => readFileSync(join(__dirname, 'fixtures/first-pages', name), 'utf8');
 
 describe('extractEmails on real first pages', () => {
+  it('reads one address under each author, past the footnote markers (Attention Is All You Need)', () => {
+    expect(extractEmails(page('1706.03762.raw.txt'), page('1706.03762.layout.txt'))).toEqual([
+      'avaswani@google.com',
+      'noam@google.com',
+      'nikip@google.com',
+      'usz@google.com',
+      'llion@google.com',
+      'aidan@cs.toronto.edu',
+      'lukaszkaiser@google.com',
+      'illia.polosukhin@gmail.com',
+    ]);
+  });
+
   it('expands a group in braces, with spaces after the commas', () => {
     expect(extractEmails(page('2611.07726.raw.txt'))).toEqual([
       'm.reza.alizadeh@ut.ac.ir',

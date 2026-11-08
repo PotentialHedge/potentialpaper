@@ -1,0 +1,24 @@
+                                            Provided proper attribution is provided, Google hereby grants permission to
+                                            reproduce the tables and figures in this paper solely for use in journalistic or
+                                                                           scholarly works.
+
+
+
+                                                                     Attention Is All You Need
+arXiv:1706.03762v7 [cs.CL] 2 Aug 2023
+
+
+
+
+                                             Ashish Vaswani∗                Noam Shazeer∗               Niki Parmar∗             Jakob Uszkoreit∗
+                                              Google Brain                   Google Brain             Google Research            Google Research
+                                          avaswani@google.com             noam@google.com            nikip@google.com            usz@google.com
+
+                                                Llion Jones∗                   Aidan N. Gomez∗ †                       Łukasz Kaiser∗
+                                              Google Research                 University of Toronto                     Google Brain
+                                             llion@google.com               aidan@cs.toronto.edu                 lukaszkaiser@google.com
+
+                                                                                   Illia Polosukhin∗ ‡
+                                                                             illia.polosukhin@gmail.com
+
+
