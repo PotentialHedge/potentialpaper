@@ -93,8 +93,9 @@ function AuthorSection({ authorHtml, canonical, confirmedAuthors }: PanelProps) 
       ) : (
         <div className="py-6 text-center font-sans">
           <p className="text-sm text-muted">Are you an author? Claim the paper to write here.</p>
-          <a href={claimPath} rel="nofollow" className={`${ui.btn({ inline: true, flush: true })} mt-3`}>
-            Claim this paper
+          {/* Set as the actions under the title are. */}
+          <a href={claimPath} rel="nofollow" className="mt-1 inline-block text-[13px] text-accent">
+            claim this paper
           </a>
         </div>
       )}
