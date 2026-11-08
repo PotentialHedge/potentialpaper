@@ -1,0 +1,16 @@
+                                        factors are not independent, and changes in one may affect                     constraints interact.
+                                        several others.                                                                   Research on urban-scale operations has expanded to corridor
+                                                                                                                       and route-network design [16]–[18], risk-aware unmanned
+                                           H.-S. Nam, J. Cho, and H.-T. Lee are with the Department of Aerospace
+                                        Engineering and the Program in Aerospace Systems Convergence, Inha             aerial vehicle traffic networks [19], urban airspace availability
+                                        University, Incheon 21999, Republic of Korea (e-mail: namhs501@inha.edu;       assessment [20], [21] and very-low-level traffic-density esti-
+                                        jungwoo.cho@inha.ac.kr; haktae.lee@inha.ac.kr).                                mation [22]. Online demand planning [23], consumer delivery
+                                           S. Lee was with the Department of Aerospace Engineering, Inha University,
+                                        Incheon 21999, Republic of Korea. He is now with the Aerospace R&D             preferences [24], third-party ground-risk assessment [25], and
+                                        Center, Korean Air, Daejeon 34054, Republic of Korea (e-mail: seokhwan-        barriers to urban air mobility adoption [26] further highlight
+                                        lee@koreanair.com).                                                            the role of demand, safety, and institutional conditions.
+                                           J. Cho and H.-T. Lee are also with the Aerospace Systems Research
+                                        Institute, Inha University, Incheon 21999, Republic of Korea. Corresponding       Doole et al. [22] estimated drone-based food-delivery costs
+                                        author: Hak-Tae Lee.                                                           of 0.40–2.51 EUR per meal order across scenarios that in-
+                                                                                                                       cluded annualized investment and operating costs. Bao et al.
+

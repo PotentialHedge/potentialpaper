@@ -1,0 +1,1 @@
+DROP TABLE "pdf_covers" CASCADE;

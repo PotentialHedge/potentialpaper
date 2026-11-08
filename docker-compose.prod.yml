@@ -10,6 +10,7 @@
 #   docker compose -f docker-compose.prod.yml --env-file .env.production up -d postgres
 #   docker compose -f docker-compose.prod.yml --env-file .env.production run --rm tools
 #   docker compose -f docker-compose.prod.yml --env-file .env.production up -d app
+#   docker compose -f docker-compose.prod.yml --env-file .env.production --profile tools up -d ingest
 #   scripts/purge-edge-cache.sh
 #
 # The purge is required: cached pages name the old build's scripts, which the new container no longer has.
@@ -110,6 +111,20 @@ services:
     image: potentialpaper-tools
     profiles: [tools]
     env_file: .env.production
+    depends_on:
+      postgres:
+        condition: service_healthy
+
+  # The PDF ingest pipeline (src/server/pdfs/ingest.ts): every minute, runs each stage that is missing or
+  # out of date on every PDF a page points at, so a new pdf.json is read without anyone running anything.
+  # One-off runs: `dc run --rm tools npm run pdfs:ingest -- --help`.
+  ingest:
+    image: potentialpaper-tools
+    profiles: [tools]
+    restart: unless-stopped
+    logging: *logging
+    env_file: .env.production
+    command: ['npm', 'run', 'pdfs:ingest', '--', '--watch']
     depends_on:
       postgres:
         condition: service_healthy

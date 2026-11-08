@@ -13,6 +13,8 @@ interface Props {
   /** Authors someone is already confirmed as. */
   taken: number[];
   pending: { authorIndex: number; evidence: string } | null;
+  /** One of the viewer's addresses is on the paper, so the claim will be confirmed when sent. */
+  instant: boolean;
 }
 
 async function messageOf(res: Response): Promise<string> {
@@ -21,7 +23,7 @@ async function messageOf(res: Response): Promise<string> {
   return body?.error?.message ?? `Something went wrong (${res.status}).`;
 }
 
-export function ClaimForm({ paper, pagePath, authors, taken, pending }: Props) {
+export function ClaimForm({ paper, pagePath, authors, taken, pending, instant }: Props) {
   const router = useRouter();
   const [busy, setBusy] = useState(false);
   const [problem, setProblem] = useState<string | null>(null);
@@ -93,20 +95,22 @@ export function ClaimForm({ paper, pagePath, authors, taken, pending }: Props) {
           ))}
         </div>
       </fieldset>
-      <label className="mt-3 block">
-        <span className="text-muted">How can we tell it&apos;s you?</span>
-        <textarea
-          name="evidence"
-          rows={4}
-          maxLength={2000}
-          defaultValue={pending?.evidence ?? ''}
-          placeholder="The address on the paper, your ORCID, your homepage listing it, a co-author who can vouch…"
-          className={ui.input}
-        />
-      </label>
+      {!instant && (
+        <label className="mt-3 block">
+          <span className="text-muted">How can we tell it&apos;s you?</span>
+          <textarea
+            name="evidence"
+            rows={4}
+            maxLength={2000}
+            defaultValue={pending?.evidence ?? ''}
+            placeholder="Your ORCID, your homepage listing it, a co-author who can vouch…"
+            className={ui.input}
+          />
+        </label>
+      )}
       <p className={ui.fine}>
-        Claims are checked by hand for now. If the paper is still under double-blind review, claiming it reveals that
-        you wrote it once your claim is confirmed.
+        {instant ? '' : 'Without an address on the paper, a claim is checked by hand. '}If the paper is still under
+        double-blind review, claiming it reveals that you wrote it once your claim is confirmed.
       </p>
       <div className="flex items-baseline gap-4">
         <button type="submit" disabled={busy} className={ui.btn({ inline: true })}>

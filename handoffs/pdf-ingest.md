@@ -100,3 +100,53 @@ Commit `03331f3` (demos inside Markdown, an editable picture and links, author c
 deployed, because Tailscale was down. Deploy it with your work: run migrations 0011 and 0012, then once
 `npx tsx scripts/move-demos-into-markdown.ts --as <admin handle>` (the admin is the account of
 `benedict.armstrong@inf.ethz.ch`), then `scripts/purge-edge-cache.sh`.
+
+## What was built (2026-11-08)
+
+- **`pdf_documents`** (migrations 0013–0015), one row per sha256: `bytes`, `pages`, `first_page_raw`,
+  `first_page_layout`, `emails`, `cover_url`, and `stages`, a jsonb map from stage name to
+  `{ version, at }` or `{ error, failedVersion, attempts, retryAt }`. `pdf_covers` is merged in: 0014 copies
+  its rows as the `cover` stage at version 1, 0015 drops it, and search and the paper page read `cover_url`.
+- **`npm run pdfs:ingest`** (`src/server/pdfs/ingest.ts`, CLI `scripts/ingest-pdfs.ts`). Stages `text` (pdfinfo,
+  pdftotext raw and layout of page 1), `emails` (reads the stored text, so a new extractor version needs no
+  download) and `cover`. Each pass adds a row for every new sha256 in `page_current.pdf`, then runs the stages
+  that are missing, out of date, or failed and due for a retry (10 min, 40 min, ~3 h; four attempts per
+  version, then left alone). A stage that reads another waits until that one is current. Downloads are
+  checked against the sha256. `--stage` (repeatable), `--force`, `--sha` (one PDF, every stage, whatever its
+  state), `--dir` (`<sha256>.pdf` files to read before downloading), `--workers`, `--watch`.
+  `scripts/render-covers.ts` is gone.
+- **New PDFs** are picked up by **polling**, not a queue: the `ingest` service in `docker-compose.prod.yml`
+  (tools image, which now installs `poppler-utils`) runs `--watch`, a pass every minute. A pass over ~42k rows
+  with nothing due is one indexed scan; a queue would need every writer of `pdf.json` to feed it.
+- **Extractor** (`src/server/pdfs/emails.ts`, tests in `tests/unit/pdf-emails.test.ts` with excerpts of real
+  arXiv first pages in `tests/unit/fixtures/first-pages/`): groups in `{}`, `[]` or `()` split by `,` `;` `|`,
+  across lines; addresses broken over lines in raw mode (not layout, whose next line may be another column);
+  footnote markers; NFKC and zero-width characters; templates and placeholders dropped; a domain needs a known
+  TLD (any two-letter one, or a listed generic one), which is what rules out `pass@1` and `NDCG@10.The`.
+- **Hit rate:** dev database, 0 of 500 (all anonymous ICLR 2027 submissions; only `pass@k`-style tokens). On
+  168 recent arXiv first pages (cs.LG, cs.CV, cs.CL, cs.RO), 116 (69%) gave at least one address. Checked by
+  hand: all 52 misses print no address (one prints only `{firstname.lastname}@…`, correctly dropped), and none of the
+  addresses found looked wrong.
+- **Claims:** `author_claims.method` (`manual`, `email`, `vouch`) and private `verification`
+  (`{ email, sha256 }`). `requestClaim` confirms at once on a match; `recheckPendingClaims` runs after an
+  affiliation is confirmed and after the emails stage finds new addresses; an admin's decision sets `manual`.
+  The claim page says which of the viewer's own addresses are on the paper, and drops the evidence box when
+  one is. Integration tests in `tests/integration/pdf-ingest.test.ts` (ingest on a generated PDF, retries, a
+  match confirmed at once, no match pending, rechecks, and no endpoint, `page_current` or repo object holding
+  the extracted addresses). CI installs poppler.
+
+### Changed from the plan
+
+- Stage state is one jsonb map rather than `<stage>_version` / `_at` / error columns, so adding a stage is one
+  entry in `STAGES` plus its own columns.
+- Text and emails are separate stages, so re-extracting emails never downloads PDFs again.
+- The sign-up address counts through Better Auth's `user.email` (when `email_verified`) as well as its
+  primary affiliation.
+
+### Not done yet
+
+- **Production ingest has not run:** Tailscale on the Mac was down (`ssh ben-docker-1` timed out), so this and
+  `03331f3` are pushed but not deployed. Deploy per `DEPLOY.md`: migrations 0011–0015, then
+  `npx tsx scripts/move-demos-into-markdown.ts --as <admin handle>`, then `dc --profile tools up -d ingest`,
+  then `scripts/purge-edge-cache.sh`. The first pass downloads every PDF once (~42k, roughly 7–8 MB each in
+  dev's sample, so a few hundred GB); `INGEST_WORKERS` sets its concurrency (default 4).

@@ -6,8 +6,9 @@ import { accounts, paperIdentifiers } from '@/db/schema';
 import { decideClaim, pendingClaims } from '@/server/claims';
 import { refreshPaperPages } from '@/server/pages/refresh';
 
-const USAGE = `List claims of authorship waiting for a decision, or decide one. How claims should be verified is
-still open (DESIGN.md §6), so for now an admin reads the evidence and decides here.
+const USAGE = `List claims of authorship waiting for a decision, or decide one. A claim from an account with a
+confirmed address on the paper's first page is confirmed on its own (method 'email'); the rest wait here for
+an admin to read the evidence and decide (method 'manual', DESIGN.md §6).
 
   npm run claims:decide                                  # list pending claims
   npm run claims:decide -- --confirm <claim id> --as <admin handle>

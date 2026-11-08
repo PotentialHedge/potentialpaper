@@ -2,7 +2,8 @@
 #
 #   app    the Next.js standalone server (~200 MB). What runs behind Traefik.
 #   tools  full dependencies + source, for the tsx scripts that are not part of
-#          the server: migrations, users:prune. Run one-off with
+#          the server: migrations, users:prune, and the PDF ingest pipeline
+#          (the `ingest` service), which needs poppler. Run one-off with
 #          `docker compose run --rm tools npm run <script>`.
 
 FROM node:26-bookworm-slim AS deps
@@ -11,6 +12,9 @@ COPY package.json package-lock.json ./
 RUN npm ci
 
 FROM deps AS tools
+RUN apt-get update \
+ && apt-get install -y --no-install-recommends poppler-utils \
+ && rm -rf /var/lib/apt/lists/*
 COPY . .
 ENV NODE_ENV=production
 CMD ["npm", "run", "db:migrate"]

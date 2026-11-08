@@ -1,0 +1,23 @@
+CoRD: Coupled Rollouts Fill the Blind Spot of On-Policy Distillation
+Guhan Chen1*, Bohan Li1∗
+, Jun Rao2
+, Hejin Wang1
+, Songtao Tian1
+, Yexin Xie3
+,
+Xiaojun Meng4
+, Peng Yuan4
+, Jiansheng Wei4
+, Xuebo Liu2
+, Zixiong Yu4†
+1
+Tsinghua University 2
+Harbin Institute of Technology, Shenzhen, China
+3
+Nanjing University 4
+Huawei Large Model Data Technology Lab
+chen-gh23@mails.tsinghua.edu.cn rao7jun@gmail.com
+{libh19,wanghj20,tiansongtao.2020,yuzx19}@tsinghua.org.cn
+{xiaojun.meng,yuanpeng126,weijiansheng}@huawei.com
+xieye-xin@qq.com liuxuebo@hit.edu.cn
+Abstract

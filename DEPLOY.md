@@ -18,6 +18,7 @@ dc --profile tools build          # app and tools images; without --profile tool
 dc up -d postgres
 dc run --rm tools                 # migrations (npm run db:migrate)
 dc up -d app
+dc --profile tools up -d ingest   # the PDF ingest pipeline, restarted on the new image
 scripts/purge-edge-cache.sh       # required, see below
 ```
 
@@ -30,6 +31,14 @@ https://papers.potentialhedge.com loads.
   other script against production the same way.
 - **The edge-cache purge is not optional.** Cloudflare caches whole pages. They name the old build's scripts,
   which the new container no longer serves, so cached pages break until the cache is purged.
+
+## PDF ingest
+
+The `ingest` service runs `npm run pdfs:ingest -- --watch` from the tools image (which has poppler): every
+minute it runs each stage that is missing or out of date (text and emails of page 1, cover) on every PDF a page
+points at, recording results in `pdf_documents`. `dc logs -f ingest` shows its progress. For a one-off rerun,
+`dc run --rm tools npm run pdfs:ingest -- --stage emails --force` or `-- --sha <sha256>`; `-- --help` lists the
+rest. It needs the `R2_*` keys for covers.
 
 ## Demos
 

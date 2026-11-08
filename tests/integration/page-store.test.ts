@@ -20,7 +20,7 @@ import {
   pageRevisions,
   paperIdentifiers,
   papers,
-  pdfCovers,
+  pdfDocuments,
 } from '@/db/schema';
 import { ApiError } from '@/server/api/errors';
 import { answerGitRequest, clonePath } from '@/server/pages/clone';
@@ -1049,7 +1049,7 @@ describe('pdf.json', () => {
     const hit = async () => (await searchPapers({ q: 'paper' })).hits[0];
     expect(await hit()).toMatchObject({ pdf: POINTER.url, cover: null });
     const cover = `https://pdfs.example.org/cover/${POINTER.sha256}.jpg`;
-    await getDb().insert(pdfCovers).values({ sha256: POINTER.sha256, url: cover });
+    await getDb().insert(pdfDocuments).values({ sha256: POINTER.sha256, url: POINTER.url, coverUrl: cover });
     expect(await hit()).toMatchObject({ pdf: POINTER.url, cover });
   });
 
@@ -1095,7 +1095,9 @@ describe('thumbnail.json', () => {
   it("is projected, survives a rebuild, and replaces the PDF's cover in search results", async () => {
     const id = await newPaper();
     await commitPage(id, null, SYSTEM_ACTOR, [{ path: PDF_PATH, content: JSON.stringify(PDF) }], 'Add the PDF');
-    await getDb().insert(pdfCovers).values({ sha256: PDF.sha256, url: 'https://pdfs.example.org/cover/a.jpg' });
+    await getDb()
+      .insert(pdfDocuments)
+      .values({ sha256: PDF.sha256, url: PDF.url, coverUrl: 'https://pdfs.example.org/cover/a.jpg' });
     const admin = { ...(await newAccount()), isAdmin: true };
     await commitPage(id, await readHead(getDb(), id), admin, change(THUMBNAIL), 'Set the thumbnail', {
       rateLimit: NO_LIMIT,

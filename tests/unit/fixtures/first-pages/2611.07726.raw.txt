@@ -1,0 +1,9 @@
+Dual-Arm Tabletop Rearrangement with Movable
+Stacking and Gap-Aware Push Transfers
+Mohammadreza Firoozalizadeh, Zakiye Rostamirad, Arman Barghi,
+Ahmad Kalhor, Mohammadreza Nayeri, Mehdi Tale Masouleh
+Human and Robot Interaction Laboratory (TaarLab)
+School of Electrical and Computer Engineering
+University of Tehran
+Tehran, Iran
+Email: {m.reza.alizadeh, zakiye.rostamirad, arman.barghi, akalhor, m.nayeri, m.t.masouleh}@ut.ac.ir

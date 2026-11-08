@@ -1,0 +1,22 @@
+Do Recommenders Need to Think in Words? Latent Reasoning
+for Efficient LLM-Based Recommendation
+Hongyang Su
+supersusu@tencent.com
+Tencent
+Shenzhen, Guangdong, China
+Beibei Kong∗
+echokong@tencent.com
+Tencent
+Shenzhen, Guangdong, China
+Lei Cheng
+raycheng@tencent.com
+Tencent
+Shenzhen, Guangdong, China
+Chengxiang Zhuo
+felixzhuo@tencent.com
+Tencent
+Shenzhen, Guangdong, China
+Zang Li
+gavinzli@tencent.com
+Tencent
+Shenzhen, Guangdong, China

@@ -1,0 +1,14 @@
+fleet size, and facility and staffing costs. Furthermore, these
+factors are not independent, and changes in one may affect
+several others.
+H.-S. Nam, J. Cho, and H.-T. Lee are with the Department of Aerospace
+Engineering and the Program in Aerospace Systems Convergence, Inha
+University, Incheon 21999, Republic of Korea (e-mail: namhs501@inha.edu;
+jungwoo.cho@inha.ac.kr; haktae.lee@inha.ac.kr).
+S. Lee was with the Department of Aerospace Engineering, Inha University,
+Incheon 21999, Republic of Korea. He is now with the Aerospace R&D
+Center, Korean Air, Daejeon 34054, Republic of Korea (e-mail: seokhwan-
+lee@koreanair.com).
+J. Cho and H.-T. Lee are also with the Aerospace Systems Research
+Institute, Inha University, Incheon 21999, Republic of Korea. Corresponding
+author: Hak-Tae Lee.

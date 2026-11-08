@@ -36,7 +36,7 @@ Milestones 0, 1 and 2 are built, merged into `main` and deployed, and Milestone 
   reviews and decisions from OpenReview, and the forms for importing ICLR 2026's are ready. ICLR 2027 PDFs are hosted in R2 through a `pdf.json` in each page repo. Each paper shows a picture
   of its first page, or a thumbnail set with `pages:set-thumbnail`.
 - **Licenses:** each paper records its source and the licenses of its metadata and abstract.
-- **Demos:** a demo is a ```` ```demo <snapshot> ```` block (title on the first line, description after) in
+- **Demos:** a demo is a ` ```demo <snapshot> ` block (title on the first line, description after) in
   either Markdown section, author or community; there is no separate demos section or `demos.jsonl` any more.
   The editor's "Insert a demo" calls `POST /api/v1/demos { url }`, which only snapshots (resolves the ref
   through git's ref listing, streams codeload's tarball, keeps the folder with `index.html`, stores each file
@@ -50,12 +50,26 @@ Milestones 0, 1 and 2 are built, merged into `main` and deployed, and Milestone 
   built-in link replaces it, `POST /api/v1/pages/links`). Any verified account may change them while the paper
   is unclaimed, and only its confirmed authors (and admins) once it is claimed.
 - **Claims:** `author_claims`. A paper is claimed once it has a confirmed claim. `/claim/<paper>` asks to be
-  one of the printed authors, with evidence in the claimant's words (`POST/GET/DELETE /api/v1/claims`).
-  **Verification is undecided:** for now an admin decides with `npm run claims:decide` (lists pending;
-  `--confirm <id> --as <handle>` or `--reject`). A confirmed author can edit the author section
+  one of the printed authors (`POST/GET/DELETE /api/v1/claims`). `method` records how it was decided: **`email`**,
+  at once, when one of the account's confirmed addresses (an affiliation, or the sign-up address) is among the
+  emails on the first page of the paper's current PDF, with the address and sha256 in the private
+  `verification` column; otherwise **`manual`**, pending until an admin runs `npm run claims:decide` (lists
+  pending; `--confirm <id> --as <handle>` or `--reject`). Pending claims are checked again when the account
+  confirms an address and when ingest finds new emails on the PDF (`recheckPendingClaims`). The claim page names
+  only the viewer's own addresses that are on the paper. A confirmed author can edit the author section
   (`/edit/<paper>?part=author`) and, on that paper, every commit they make carries their per-claim `a_` id and
-  shows the printed name with an "author" badge, never their handle. The DESIGN.md §6 routes (email in the
-  paper, ORCID, co-author vouch) are not built.
+  shows the printed name with an "author" badge, never their handle. Not built: ORCID and co-author vouching
+  (`method: 'vouch'` is reserved for it; it's next).
+- **PDF ingest:** `npm run pdfs:ingest` (`server/pdfs/ingest.ts`) runs versioned stages on every distinct PDF
+  in `page_current.pdf`, one row per sha256 in `pdf_documents`: `text` (pages, bytes, page 1 through
+  `pdftotext -raw` and `-layout`), `emails` (`server/pdfs/emails.ts`) and `cover` (the old `render-covers`,
+  and `pdf_covers` is merged into the table). Each stage records its version, or its error with an attempt
+  count and a retry time, so a pass redoes only what is missing or out of date; bump a stage's `version` to
+  redo it everywhere. `--stage`, `--force`, `--sha`, `--dir`, `--watch`. In production the `ingest` service
+  (tools image, which has poppler) polls every minute, so new `pdf.json`s need nobody to run anything.
+  **`first_page_*` and `emails` are private:** never in a page repo, `page_current` or a response.
+  ICLR 2027 submissions are anonymous, so almost none have emails (0 of the dev database's 500); recent arXiv
+  first pages give at least one for 69%.
 
 ## Milestone 3, community editing (in progress)
 

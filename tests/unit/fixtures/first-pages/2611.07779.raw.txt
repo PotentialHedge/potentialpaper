@@ -1,0 +1,14 @@
+true in emerging domains like bio-inspired soft robotics, where
+robotic sensing systems are engineered from materials that
+mimic the soft human skin [2]. However, to fully mimic the
+Razan Khalifeh, Mohamad Yaacoub, Christian Gianoglio,
+Maurizio Valle, and Yahya Abbass are with the Department
+of Electrical, Electronic, Telecommunications Engineering,
+and Naval Architecture (DITEN), University of Genoa,
+16145 Genoa, Italy (e-mail: razan.khalifeh@edu.unige.it;
+mohamad.yaacoub@edu.unige.it;christian.gianoglio@unige.it;
+maurizio.valle@unige.it; yahya.abbass@unige.it).
+Moustafa Saleh is also with the Department of Computer and Com-
+munication Engineering, Lebanese International University (LIU), Beirut,
+Lebanon. (email: moustafa.saleh@liu.edu.lb)
+(Corresponding author: Razan Khalifeh)

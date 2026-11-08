@@ -1,0 +1,109 @@
+000
+001
+002
+003
+004
+005
+006
+007
+008
+009
+010
+011
+012
+013
+014
+015
+016
+017
+018
+019
+020
+021
+022
+023
+024
+025
+026
+027
+028
+029
+030
+031
+032
+033
+034
+035
+036
+037
+038
+039
+040
+041
+042
+043
+044
+045
+046
+047
+048
+049
+050
+051
+052
+053
+Under review as a conference paper at ICLR 2027
+INTER-TRAJECTORY DEPENDENCE LIMITS
+ANSWER COVERAGE IN LOCAL DLLM REPAIR
+Anonymous authors
+Paper under double-blind review
+ABSTRACT
+Test-time compute scaling improves large language model performance by allo-
+cating more computation during inference. For diffusion large language models
+(dLLMs), sequential repair offers a natural instantiation: it iteratively remasks
+low-confidence tokens and regenerates them while retaining the surrounding com-
+pletion. However, additional repair rounds often yield limited performance gains.
+While recent work has studied inference dynamics within individual trajectories,
+our focus is inter-trajectory dependence: whether successive repair candidates
+explore distinct answer states. We introduce a diagnostic framework that com-
+bines answer-level metrics, hyperparameter sweeps, and remasking interventions
+to characterize this dependence. We assess pairwise answer agreement, unique-
+answer counts, oracle pass@k, and correction/regression rates across four dLLMs
+and three verifiable tasks. We find that sequential local repair produces highly
+correlated candidates with substantially lower answer coverage than independent
+sampling. The evaluated local-remasking variants do not reliably close this gap.
+These findings suggest prioritizing trajectory-level diversification when allocat-
+ing test-time compute for answer coverage, with local repair used for refinement.
+Our study adds an inter-trajectory perspective to the analysis of dLLM inference
+dynamics and provides practical guidance for allocating inference compute.
+1 INTRODUCTION
+Test-time compute scaling is a central approach for improving large language model perfor-
+mance (Wang et al., 2023; Cobbe et al., 2021; Lightman et al., 2024; Snell et al., 2024; Muennighoff
+et al., 2025). In diffusion large language models (dLLMs) (Austin et al., 2021a; Nie et al., 2025),
+extra inference can be spent on trajectory-level resampling or sequential repair. Resampling starts
+each candidate from a fresh masked sequence; repair remasks and regenerates part of an existing
+completion. Prior work has developed several remasking-based refinement strategies (Wang et al.,
+2025; Zhai et al., 2026; Yao, 2026; Hong et al., 2025), while answer-level coverage across successive
+local repairs remains less characterized. We study this coverage by comparing candidates from
+retained-state repair with independent restart trajectories under the same model, using budget and
+generation-schedule controls to interpret the observed differences.
+Recent studies describe commitment and uncertainty within individual dLLM trajectories, including
+proximity effects, anchor tokens, confusion zones, and irreversible block decisions (Kim et al.,
+2026; Guo & Tan, 2026; Chen et al., 2025a; Wang et al., 2026). These phenomena motivate a
+complementary question at the candidate-set level: when a completion is repeatedly repaired, how
+much does the resulting chain expand the set of answer hypotheses? We refer to this quantity as
+inter-trajectory answer coverage across the candidate set.
+Figure 1 contrasts the two regimes. Repeated repair reuses a partially denoised sequence, so regener-
+ated tokens condition on the context that survives remasking. Confidence-based remasking preserves
+many high-confidence answer-bearing tokens, and bidirectional attention propagates this context
+to newly generated tokens. The resulting chain can vary in wording while remaining concentrated
+around a small set of answer states.
+We characterize this coverage with four complementary quantities: pairwise answer agreement ρ̂,
+unique-answer count, oracle pass@k, and wrong-to-correct/correct-to-wrong transitions. Across four
+models and three tasks, independent restart trajectories expand answer coverage, whereas sequential
+1
+Reviewers: please read the Reviewer Guidelines (iclr.cc/Conferences/2027/ReviewerGuidelines) and the AI Policy for Reviewers (iclr.cc/Conferences/2027/AIPolicyForReviewers).
+If you used AI to expand, edit, or polish your review, please provide the input text to the LLM. Better still, consider skipping the LLM and submitting your original text: we,
+and the authors, are much more interested in your unedited thoughts than in what an LLM has to say. AI-assisted or not, you are putting your name and reputation behind
+your review: LLM-generated falsehoods, hallucinations or misrepresentations are subject to disciplinary action, which may include desk-rejecting all papers you have authored.
+

@@ -29,6 +29,8 @@ jobs:
           node-version-file: .node-version
           cache: npm
       - run: npm ci
+      # The PDF ingest pipeline's tests run poppler.
+      - run: sudo apt-get update && sudo apt-get install -y --no-install-recommends poppler-utils
       - run: npm run lint
       - run: npm run format:check
       - run: npm run typecheck

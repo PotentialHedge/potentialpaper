@@ -5,7 +5,7 @@ import { cache } from 'react';
 import { ui } from '@/components/ui';
 import { canonicalPaperId, paperPath, parsePaperId, type PaperScheme } from '@/lib/paper-ids';
 import { getDb } from '@/db';
-import { pageCurrent, pdfCovers } from '@/db/schema';
+import { pageCurrent, pdfDocuments } from '@/db/schema';
 import { confirmedAuthors } from '@/server/claims';
 import { findPaper, type FoundPaper } from '@/server/papers';
 import { submissionsOf } from '@/server/submissions';
@@ -50,10 +50,10 @@ export async function PaperRoute({ scheme, segments }: { scheme: PaperScheme; se
         links: pageCurrent.links,
         authorHtml: pageCurrent.authorHtml,
         communityHtml: pageCurrent.communityHtml,
-        cover: pdfCovers.url,
+        cover: pdfDocuments.coverUrl,
       })
       .from(pageCurrent)
-      .leftJoin(pdfCovers, sql`${pdfCovers.sha256} = ${pageCurrent.pdf} ->> 'sha256'`)
+      .leftJoin(pdfDocuments, sql`${pdfDocuments.sha256} = ${pageCurrent.pdf} ->> 'sha256'`)
       .where(eq(pageCurrent.paperId, paper.id)),
     submissionsOf(paper.id),
     confirmedAuthors(paper.id),

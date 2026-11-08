@@ -310,11 +310,6 @@ export const pageEvents = pgTable(
   (t) => [uniqueIndex('page_events_paper_seq_key').on(t.paperId, t.seq)],
 );
 
-/**
- * A picture of a hosted PDF's first page, for search results. Keyed by the PDF's SHA-256, as the bytes in
- * R2 are, so a page that points at the same PDF shares it. Written by `scripts/render-covers.ts`; a PDF
- * without a row has no cover yet.
- */
 /** One file of a demo snapshot: its bytes are in the blob store under `sha256`. */
 export interface DemoFile {
   sha256: string;
@@ -339,12 +334,51 @@ export const demoSnapshots = pgTable('demo_snapshots', {
   createdAt: createdAt(),
 });
 
-export const pdfCovers = pgTable('pdf_covers', {
-  sha256: text('sha256').primaryKey(),
-  /** The JPEG in R2. */
-  url: text('url').notNull(),
-  createdAt: createdAt(),
-});
+/** Where one ingest stage stands for one PDF (`server/pdfs/ingest.ts`). */
+export interface PdfStageState {
+  /** The stage's version that last succeeded; absent until one has. */
+  version?: number;
+  at?: string;
+  /** The last failure, for the version in `failedVersion`, and how many runs in a row have failed. */
+  error?: string;
+  failedVersion?: number;
+  attempts?: number;
+  /** Not retried before this. */
+  retryAt?: string;
+}
+
+/**
+ * One row per distinct hosted PDF, keyed by its SHA-256 as the bytes in R2 are, so pages that point at the
+ * same PDF share it. Written only by the ingest pipeline (`server/pdfs/ingest.ts`, `npm run pdfs:ingest`),
+ * one stage at a time, each recording in `stages` the version of the code that produced its columns.
+ *
+ * **Private:** `first_page_*` and `emails` are personal data. They never go into a page repo, `page_current`
+ * or any response; only `cover_url` is public. Read them only through `server/claims.ts`.
+ */
+export const pdfDocuments = pgTable(
+  'pdf_documents',
+  {
+    sha256: text('sha256').primaryKey(),
+    /** Where the bytes are fetched from (the pointer's `url`). */
+    url: text('url').notNull(),
+    bytes: integer('bytes'),
+    pages: integer('pages'),
+    /** Page 1 through `pdftotext -raw` and `-layout`. */
+    firstPageRaw: text('first_page_raw'),
+    firstPageLayout: text('first_page_layout'),
+    /** The addresses printed on page 1: normalized, lower-cased, distinct (`server/pdfs/emails.ts`). */
+    emails: text('emails')
+      .array()
+      .notNull()
+      .default(sql`'{}'::text[]`),
+    /** The JPEG of page 1, in R2 beside the PDF. **Public.** */
+    coverUrl: text('cover_url'),
+    stages: jsonb('stages').$type<Record<string, PdfStageState>>().notNull().default({}),
+    createdAt: createdAt(),
+    updatedAt: timestamp('updated_at', { withTimezone: true, mode: 'date' }).notNull().defaultNow(),
+  },
+  (t) => [index('pdf_documents_emails_idx').using('gin', t.emails)],
+);
 
 /**
  * A venue that publishes its reviews, such as a conference on OpenReview. `forms` says how to show each
@@ -429,6 +463,14 @@ export const submissionNotes = pgTable(
 
 export const CLAIM_STATUSES = ['pending', 'confirmed', 'rejected'] as const;
 export type ClaimStatus = (typeof CLAIM_STATUSES)[number];
+/**
+ * How a claim was (or is to be) decided: `manual` by an admin, `email` because one of the account's
+ * confirmed addresses is on the paper's first page, and later `vouch`, by a confirmed co-author.
+ */
+export const CLAIM_METHODS = ['manual', 'email', 'vouch'] as const;
+export type ClaimMethod = (typeof CLAIM_METHODS)[number];
+/** What confirmed a claim automatically. **Private**, like the PDF's addresses. */
+export type ClaimVerification = { email: string; sha256: string };
 
 /**
  * An account's claim to be one of a paper's authors (DESIGN.md §6). A paper with a confirmed claim is
@@ -453,6 +495,9 @@ export const authorClaims = pgTable(
     /** Their own words: why they are this author. */
     evidence: text('evidence').notNull().default(''),
     status: text('status', { enum: CLAIM_STATUSES }).notNull().default('pending'),
+    method: text('method', { enum: CLAIM_METHODS }).notNull().default('manual'),
+    /** **Private:** which address on which PDF confirmed it, for `method: 'email'`. */
+    verification: jsonb('verification').$type<ClaimVerification>(),
     identityId: text('identity_id').notNull(),
     decidedBy: uuid('decided_by').references(() => accounts.id, { onDelete: 'set null' }),
     decidedAt: timestamp('decided_at', { withTimezone: true, mode: 'date' }),
@@ -466,6 +511,7 @@ export const authorClaims = pgTable(
       .where(sql`${t.status} = 'confirmed'`),
     index('author_claims_status_idx').on(t.status),
     check('author_claims_status_check', sql.raw(`status in (${CLAIM_STATUSES.map((s) => `'${s}'`).join(', ')})`)),
+    check('author_claims_method_check', sql.raw(`method in (${CLAIM_METHODS.map((s) => `'${s}'`).join(', ')})`)),
   ],
 );
 
