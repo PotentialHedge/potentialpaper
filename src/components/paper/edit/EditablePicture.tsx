@@ -146,14 +146,14 @@ function PictureForm({
         </figcaption>
       </figure>
       <p className="mt-3 text-xs text-faint">
-        The caption is also the picture&apos;s text for someone who can&apos;t see it. Shown in place of the PDF&apos;s
-        first page: a teaser figure, a diagram, or an animated GIF. JPEG, PNG, GIF, WebP or AVIF, up to 8 MB.
+        Shown in place of the PDF&apos;s first page: a teaser figure, a diagram, or an animated GIF. JPEG, PNG, GIF,
+        WebP or AVIF, up to 8 MB.
       </p>
       <div className="flex flex-wrap items-baseline gap-x-4">
         <button type="submit" disabled={busy} className={ui.btn({ inline: true })}>
           {busy ? 'Saving…' : 'Save'}
         </button>
-        <button type="button" onClick={cancel} className={ui.linkBtn}>
+        <button type="button" onClick={cancel} className={ui.btn({ inline: true, ghost: true })}>
           Cancel
         </button>
       </div>

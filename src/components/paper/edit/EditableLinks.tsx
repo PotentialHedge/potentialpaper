@@ -189,7 +189,7 @@ function LinksForm({
             <button type="submit" disabled={busy} className={ui.btn({ inline: true })}>
               {busy ? 'Saving…' : 'Save'}
             </button>
-            <button type="button" onClick={cancel} className={ui.linkBtn}>
+            <button type="button" onClick={cancel} className={ui.btn({ inline: true, ghost: true })}>
               Cancel
             </button>
           </div>

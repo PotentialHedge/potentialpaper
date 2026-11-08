@@ -298,7 +298,7 @@ function SectionForm({
         <button type="submit" disabled={busy || conflict !== null} className={ui.btn({ inline: true, flush: true })}>
           {busy ? 'Saving…' : 'Save'}
         </button>
-        <button type="button" onClick={cancel} className={ui.linkBtn}>
+        <button type="button" onClick={cancel} className={ui.btn({ inline: true, ghost: true, flush: true })}>
           Cancel
         </button>
       </div>
