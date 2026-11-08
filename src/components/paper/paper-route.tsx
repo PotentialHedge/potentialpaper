@@ -8,7 +8,10 @@ import { getDb } from '@/db';
 import { pageCurrent, pdfCovers } from '@/db/schema';
 import { findPaper, type FoundPaper } from '@/server/papers';
 import { submissionsOf } from '@/server/submissions';
+import { bibtex, titleLinks } from '@/lib/paper-links';
+import { toolPath } from './page-tools';
 import { Slot } from './slots';
+import { TitleActions } from './TitleActions';
 
 /**
  * What the routes at `/abs`, `/doi` and `/openreview` share. Each page is rendered once and cached, by
@@ -74,6 +77,12 @@ export async function PaperRoute({ scheme, segments }: { scheme: PaperScheme; se
     communityHtml: current?.communityHtml ?? null,
   };
   const about = [paper.venue, paper.year].filter(Boolean).join(', ');
+  const links = titleLinks({
+    identifiers,
+    title: paper.title,
+    pdf: current?.pdf?.url,
+    forums: submissions.map((s) => s.url),
+  });
   return (
     <main className={ui.paperPage}>
       <article>
@@ -85,7 +94,23 @@ export async function PaperRoute({ scheme, segments }: { scheme: PaperScheme; se
             <span className="text-muted italic">Anonymous authors</span>
           )}
         </p>
-        {about && <p className={`${ui.fine} mb-5 text-center`}>{about}</p>}
+        {about && <p className={`${ui.fine} text-center`}>{about}</p>}
+        <nav
+          className="mt-1.5 flex flex-wrap justify-center gap-x-3 font-sans text-[13px]"
+          aria-label="The paper elsewhere"
+        >
+          {links.map((l) => (
+            <a key={l.label} href={l.url} className="text-accent" rel="noopener noreferrer" target="_blank">
+              [{l.label}]
+            </a>
+          ))}
+        </nav>
+        <TitleActions
+          bibtex={bibtex({ paper, identifiers })}
+          path={paperPath(panel.canonical)}
+          editPath={toolPath('edit', panel.canonical)}
+          historyPath={toolPath('history', panel.canonical)}
+        />
         <div className="mt-5 grid grid-cols-[minmax(0,1fr)_230px] items-start gap-8 narrow:grid-cols-1">
           <div>
             <Slot name="paper.main" {...panel} />
