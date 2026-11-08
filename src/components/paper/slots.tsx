@@ -159,8 +159,11 @@ function ReadThePaper({ identifiers, pdf, picture, cover, canonical }: PanelProp
   const links = identifiers.flatMap(sourceLinks).filter(({ url }) => url !== pdf?.source);
   const opens = pdf?.url ?? links[0]?.url;
   // A plain <img>, not next/image: a GIF has to stay animated, and the bytes are already sized for this.
-  // eslint-disable-next-line @next/next/no-img-element
-  const image = picture && <img src={picture.url} alt={picture.alt ?? ''} decoding="async" className="w-full" />;
+  // The caption is the alt text; a picture set before that, with alt text of its own, keeps it.
+  const image = picture && (
+    // eslint-disable-next-line @next/next/no-img-element
+    <img src={picture.url} alt={picture.caption ?? picture.alt ?? ''} decoding="async" className="w-full" />
+  );
   return (
     <div className={ui.box}>
       <h2 className={ui.boxHeading}>Read the paper</h2>

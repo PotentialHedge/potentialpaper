@@ -8,7 +8,8 @@ import { EditorFrame, NotOpened } from './EditorFrame';
 
 /**
  * The picture in "Read the paper", which turns into its editor in place (`#edit-picture`): the figure as it
- * will be, with the picture to click to choose another, and its caption written where it shows.
+ * will be, with the picture to click to choose another, and its caption written where it shows. The
+ * caption is its alt text too.
  */
 
 interface Props {
@@ -59,12 +60,11 @@ function PictureForm({
   onDirty: (dirty: boolean) => void;
 }) {
   const [chosen, setChosen] = useState<string | null>(null);
-  const [alt, setAlt] = useState(thumbnail?.alt ?? '');
   const [caption, setCaption] = useState(thumbnail?.caption ?? '');
   const [busy, setBusy] = useState(false);
   const [problem, setProblem] = useState<string | null>(null);
 
-  const dirty = chosen !== null || alt !== (thumbnail?.alt ?? '') || caption !== (thumbnail?.caption ?? '');
+  const dirty = chosen !== null || caption !== (thumbnail?.caption ?? '');
   useEffect(() => onDirty(dirty), [dirty, onDirty]);
   useEffect(() => () => onDirty(false), [onDirty]);
 
@@ -110,7 +110,7 @@ function PictureForm({
         <label className="group relative block cursor-pointer border border-rule bg-white">
           {shown ? (
             // eslint-disable-next-line @next/next/no-img-element
-            <img src={shown} alt={alt} className="w-full" />
+            <img src={shown} alt={caption} className="w-full" />
           ) : (
             <span className="block p-6 text-center text-muted italic">No picture yet</span>
           )}
@@ -145,13 +145,9 @@ function PictureForm({
           />
         </figcaption>
       </figure>
-      <label className="mt-3 block">
-        <span className="text-xs text-muted">What it shows, for someone who can&apos;t see it</span>
-        <input name="alt" value={alt} onChange={(e) => setAlt(e.target.value)} maxLength={500} className={ui.input} />
-      </label>
-      <p className="text-xs text-faint">
-        Shown in place of the PDF&apos;s first page: a teaser figure, a diagram, or an animated GIF. JPEG, PNG, GIF,
-        WebP or AVIF, up to 8 MB.
+      <p className="mt-3 text-xs text-faint">
+        The caption is also the picture&apos;s text for someone who can&apos;t see it. Shown in place of the PDF&apos;s
+        first page: a teaser figure, a diagram, or an animated GIF. JPEG, PNG, GIF, WebP or AVIF, up to 8 MB.
       </p>
       <div className="flex flex-wrap items-baseline gap-x-4">
         <button type="submit" disabled={busy} className={ui.btn({ inline: true })}>
