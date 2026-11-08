@@ -1,7 +1,7 @@
 import type { Metadata } from 'next';
 import { headers } from 'next/headers';
 import { redirect } from 'next/navigation';
-import { ToolHeader, toolPaper, toolPath, type ToolParams } from '@/components/paper/page-tools';
+import { editHref, ToolHeader, toolPaper, toolPath, type ToolParams } from '@/components/paper/page-tools';
 import { ui } from '@/components/ui';
 import { paperPath } from '@/lib/paper-ids';
 import { authHref } from '@/lib/return-to';
@@ -61,7 +61,7 @@ export default async function ClaimPage({ params }: Props) {
                 (addresses.onPaper.length > 0
                   ? `, because your address ${addresses.onPaper.join(' and ')} is printed on its first page`
                   : ', from an address of yours printed on its first page')}
-              . <a href={toolPath('edit', found.id, 'part=author')}>Write the author section</a>.
+              . <a href={editHref(found.id, 'author')}>Write the author section</a>.
             </p>
             {mine.method === 'email' && (
               <p className={ui.fine}>

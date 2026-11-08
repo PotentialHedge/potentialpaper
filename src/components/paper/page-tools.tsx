@@ -53,6 +53,16 @@ export function toolPath(tool: Tool, id: PaperId, query = ''): string {
   return `/${tool}${paperPath(id)}${query ? `?${query}` : ''}`;
 }
 
+/**
+ * What an edit link asks for: the part, or one of its sections, opens as its editor on the paper's page
+ * (`components/paper/edit`).
+ */
+export type EditTarget = 'community' | 'author' | 'links' | 'picture' | `${'community' | 'author'}-${number}`;
+
+export function editHref(id: PaperId, target: EditTarget = 'community'): string {
+  return `${paperPath(id)}#edit-${target}`;
+}
+
 export function first(value: string | string[] | undefined): string | undefined {
   return Array.isArray(value) ? value[0] : value;
 }
@@ -61,7 +71,7 @@ export function first(value: string | string[] | undefined): string | undefined 
 export function ToolHeader({ paper, tool, title }: { paper: ToolPaper; tool: Tool; title: string }) {
   const links: { tool: Tool | 'page'; label: string; href: string }[] = [
     { tool: 'page', label: 'Page', href: paperPath(paper.id) },
-    { tool: 'edit', label: 'Edit', href: toolPath('edit', paper.id) },
+    { tool: 'edit', label: 'Edit', href: editHref(paper.id) },
     { tool: 'history', label: 'History', href: toolPath('history', paper.id) },
   ];
   return (

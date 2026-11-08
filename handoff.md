@@ -45,7 +45,7 @@ Milestones 0, 1 and 2 are built, merged into `main` and deployed, and Milestone 
   `DemoFrames` (client) loads it near the screen, fits its height and runs full screen. `proxy.ts` answers the
   demo host (`lib/demos.ts`, `papers-content.potentialhedge.com` in production, `127.0.0.1:3000` in dev) at
   `/d/<snapshot>/<path>`. That host shares a site with the app, so it is not a real sandbox yet: see `TODO.md`.
-- **The card:** `thumbnail.json` (the picture, uploaded at `/edit/<paper>?part=card` through
+- **The card:** `thumbnail.json` (the picture, uploaded from the page's `#edit-picture` editor through
   `POST /api/v1/pages/thumbnail`, multipart) and `links.json` (extra links under the title; one named like a
   built-in link replaces it, `POST /api/v1/pages/links`). Any verified account may change them while the paper
   is unclaimed, and only its confirmed authors (and admins) once it is claimed.
@@ -60,7 +60,7 @@ Milestones 0, 1 and 2 are built, merged into `main` and deployed, and Milestone 
   vouching, next), and the private `verification` column the address and sha256. An automatic author can step
   down on the claim page, which leaves the claim `declined` so it isn't made again. The claim page names only
   the viewer's own addresses that are on the paper. A confirmed author can edit the author section
-  (`/edit/<paper>?part=author`) and, on that paper, every commit they make carries their per-claim `a_` id and
+  (`#edit-author` on its page) and, on that paper, every commit they make carries their per-claim `a_` id and
   shows the printed name with an "author" badge, never their handle. Not built: ORCID, vouching, and any mail
   telling someone they were made an author.
 - **PDF ingest:** `npm run pdfs:ingest` (`server/pdfs/ingest.ts`) runs versioned stages on every distinct PDF
@@ -88,8 +88,15 @@ Milestones 0, 1 and 2 are built, merged into `main` and deployed, and Milestone 
   community section) puts the section back into the file _as it was at `baseOid`_, then calls `commitPage`,
   so edits to other sections merge. A conflict is `409 edit_conflict`, and adds `details.current`
   `{ head, section, text }`. `POST /api/v1/pages/render` (signed in) serves the preview, and
-  `POST /api/v1/pages/revert` takes `{ paper, oid }`.
-- **Pages:** `/edit`, `/history` and `/diff`, each in front of the paper's own path
+  `POST /api/v1/pages/revert` takes `{ paper, oid }`. `GET /api/v1/pages/editor?scheme&value&part&section`
+  (part `author`, `community` or `card`) is what an editor opens with, and answers 403 up front by the same
+  rules the commit enforces.
+- **Editing in place:** every edit link on a paper's page is a hash (`#edit-community`, `#edit-community-2`,
+  `#edit-author`, `#edit-links`, `#edit-picture`), and the part it names turns into its editor where it was
+  (`components/paper/edit`): Markdown beside a live preview in the page's own type, the links row as it will
+  be, the figure with its caption typed under it. The page stays the same cached HTML for everyone; a visitor
+  is sent to sign in and back to that hash. `/edit/<paper>?part=…&section=…` only redirects there.
+- **Pages:** `/history` and `/diff` (and `/edit`, now a redirect), each in front of the paper's own path
   (`/history/abs/1706.03762`, `/diff/doi/…?oid=…`), because the paper routes are catch-alls. They're dynamic
   and noindex, and `/edit/` is disallowed in robots. History shows handles through `historyWithHandles`
   (`server/pages/edit.ts`) and never account ids.

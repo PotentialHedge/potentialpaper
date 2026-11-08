@@ -7,12 +7,14 @@ import { requireAuth, requireVerified, viewerFromHeaders, type Principal } from 
 import { demoSources } from '../demos/attach';
 import { snapshotDemo } from '../demos/snapshot';
 import { demoUrl } from '@/lib/demos';
-import { ownClaim, requestClaim, withdrawClaim } from '../claims';
+import { claimRoles, ownClaim, requestClaim, withdrawClaim } from '../claims';
 import { removeThumbnail, setLinks, setThumbnail } from '../pages/card';
 import { revertCommit, type Actor, type CommitResult } from '../pages/commit';
-import { editSection } from '../pages/edit';
+import { editorState, editSection } from '../pages/edit';
 import { demoIds, renderMarkdown } from '../pages/markdown';
 import { getDb } from '@/db';
+import { pageCurrent } from '@/db/schema';
+import { eq } from 'drizzle-orm';
 import { refreshPaperPages } from '../pages/refresh';
 import { setFirstPassword, startOnboarding } from '../onboarding';
 import { canonicalPaperId, paperPath, parsePaperId } from '@/lib/paper-ids';
@@ -205,6 +207,48 @@ function committed(result: CommitResult) {
     ? { head: result.oid, merged: result.merged, changed: true }
     : { head: result.oid, merged: false, changed: false };
 }
+
+/**
+ * What the editor on a paper's page opens with, and whether this viewer may save it: the same rules the
+ * commit enforces (`pages/rules.ts`), asked up front so that the page can say so before anything is typed.
+ */
+export const getEditor = route(async (req) => {
+  const principal = await requireAuth(req);
+  const { scheme, value, part, section } = parseQuery(req, S.EditorQuery);
+  const { paper } = await knownPaper(scheme, value);
+  const verified = principal.account.isBot || principal.account.verifiedAt !== null;
+  const roles = await claimRoles(paper.id, principal.account.id);
+  const may = principal.isAdmin || roles.confirmedAuthor;
+  if (!verified && !principal.isAdmin) {
+    throw new ApiError(403, 'not_verified', 'editing needs a confirmed institutional email address');
+  }
+  if (part === 'author' && !may) {
+    throw new ApiError(403, 'forbidden', "only this paper's confirmed authors can write its author section");
+  }
+  if (part === 'card') {
+    if (roles.claimed && !may) {
+      throw new ApiError(403, 'forbidden', 'this paper is claimed, so its authors choose its picture and links');
+    }
+    const [current] = await getDb()
+      .select({ thumbnail: pageCurrent.thumbnail, links: pageCurrent.links })
+      .from(pageCurrent)
+      .where(eq(pageCurrent.paperId, paper.id));
+    const thumbnail = current?.thumbnail ?? null;
+    return respond(
+      S.EditorOpened,
+      {
+        part,
+        thumbnail: thumbnail && { url: thumbnail.url, alt: thumbnail.alt ?? null, caption: thumbnail.caption ?? null },
+        links: current?.links ?? [],
+        claimed: roles.claimed,
+      },
+      { principal },
+    );
+  }
+  const state = await editorState(paper.id, part, section);
+  if (!state) throw new ApiError(404, 'not_found', `the page has no section ${section} any more`);
+  return respond(S.EditorOpened, state, { principal });
+});
 
 /** One section of the author or community page, put back into the file as it was when the editor loaded it. */
 export const postSectionEdit = route(async (req) => {

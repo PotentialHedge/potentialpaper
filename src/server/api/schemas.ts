@@ -153,6 +153,29 @@ export const ThumbnailFields = z.object({
 
 export const PaperQuery = z.object({ scheme: PaperSchemeParam, value: z.string().min(1).max(300) });
 
+/** What the page's editor opens with: one section's Markdown, or the picture and links. */
+export const EditorQuery = PaperQuery.extend({
+  part: z.enum(['author', 'community', 'card']).default('community'),
+  section: z.coerce.number().int().min(0).max(1000).default(0),
+});
+
+export const EditorOpened = z.discriminatedUnion('part', [
+  z.object({
+    part: z.enum(['author', 'community']),
+    baseOid: z.string().nullable(),
+    section: z.number().int(),
+    title: z.string().nullable(),
+    text: z.string(),
+    starter: z.boolean(),
+  }),
+  z.object({
+    part: z.literal('card'),
+    thumbnail: z.object({ url: z.string(), alt: z.string().nullable(), caption: z.string().nullable() }).nullable(),
+    links: z.array(z.object({ label: z.string(), url: z.string() })),
+    claimed: z.boolean(),
+  }),
+]);
+
 export const ClaimBody = z.object({
   paper: PaperIdentifier,
   authorIndex: z.number().int().min(0).max(10_000),

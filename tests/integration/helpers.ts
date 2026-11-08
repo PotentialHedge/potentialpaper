@@ -9,6 +9,7 @@ import * as password from '@/app/api/v1/me/password/route';
 import * as onboarding from '@/app/api/v1/onboarding/route';
 import * as demos from '@/app/api/v1/demos/route';
 import * as pageEdit from '@/app/api/v1/pages/edit/route';
+import * as pageEditor from '@/app/api/v1/pages/editor/route';
 import * as pageRender from '@/app/api/v1/pages/render/route';
 import * as pageRevert from '@/app/api/v1/pages/revert/route';
 import * as pageLinks from '@/app/api/v1/pages/links/route';
@@ -39,6 +40,7 @@ const ROUTES: [RegExp, any][] = [
   [/^\/me$/, me],
   [/^\/demos(\?.*)?$/, demos],
   [/^\/pages\/edit$/, pageEdit],
+  [/^\/pages\/editor(\?.*)?$/, pageEditor],
   [/^\/pages\/render$/, pageRender],
   [/^\/pages\/revert$/, pageRevert],
   [/^\/pages\/links$/, pageLinks],

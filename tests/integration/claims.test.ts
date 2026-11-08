@@ -169,3 +169,37 @@ describe("a paper's picture and links", () => {
     expect(allowed.status).toBe(200);
   });
 });
+
+describe('opening an editor on the page', () => {
+  const opened = (cookie: string, part: string, section = 0) =>
+    api('GET', `/pages/editor?${new URLSearchParams({ ...PAPER, part, section: String(section) })}`, { cookie });
+
+  it('says up front who may edit what, by the rules the commit enforces', async () => {
+    await paper();
+    const ada = await accountOf('ada@ethz.ch');
+    const ashish = await accountOf('ashish@ethz.ch');
+
+    expect((await opened('', 'community')).status).toBe(401);
+    const community = await opened(ada.cookie, 'community');
+    expect(community.status).toBe(200);
+    expect(community.body).toMatchObject({ part: 'community', section: 0, starter: true, baseOid: null });
+    expect((await opened(ada.cookie, 'community', 3)).status).toBe(404);
+    expect((await opened(ada.cookie, 'author')).body.error.code).toBe('forbidden');
+    expect((await opened(ada.cookie, 'card')).body).toEqual({
+      part: 'card',
+      thumbnail: null,
+      links: [],
+      claimed: false,
+    });
+
+    await api('POST', '/claims', { cookie: ashish.cookie, body: { paper: PAPER, authorIndex: 0 } });
+    const [claim] = await getDb().select().from(authorClaims);
+    await decideClaim(claim.id, 'confirmed', null);
+    expect((await opened(ada.cookie, 'card')).status).toBe(403);
+    expect((await opened(ashish.cookie, 'card')).body.claimed).toBe(true);
+    expect((await opened(ashish.cookie, 'author')).body).toMatchObject({ part: 'author', starter: true });
+
+    await getDb().update(accounts).set({ verifiedAt: null }).where(eq(accounts.id, ada.account.id));
+    expect((await opened(ada.cookie, 'community')).body.error.code).toBe('not_verified');
+  });
+});

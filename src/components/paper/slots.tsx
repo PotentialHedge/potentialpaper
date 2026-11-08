@@ -4,6 +4,8 @@ import type { Paper } from '@/db/schema';
 import { sourceLinks, sourceName, type PaperId } from '@/lib/paper-ids';
 import type { Submission } from '@/lib/submissions';
 import type { PdfPointer } from '@/server/pages/rules';
+import { EditablePicture } from './edit/EditablePicture';
+import { EditableSection } from './edit/EditableSection';
 import { toolPath } from './page-tools';
 import { SubmissionsBox, SubmissionsSection } from './Submissions';
 
@@ -19,6 +21,8 @@ export interface PanelProps {
   pdf: PdfPointer | null;
   /** The authors' thumbnail, or else the PDF's first page. */
   picture: { url: string; alt: string | null; caption: string } | null;
+  /** The PDF's first page, which the picture editor falls back to. */
+  cover: string | null;
   submissions: Submission[];
   /** Who has a confirmed claim, by the names on the paper. None: the paper is unclaimed. */
   confirmedAuthors: { authorIndex: number; authorName: string }[];
@@ -41,21 +45,16 @@ function Abstract({ paper }: PanelProps) {
   );
 }
 
-/** Rendered Markdown (`server/pages/markdown.ts`): HTML made at commit, with raw HTML off. */
-function Rendered({ html }: { html: string }) {
-  return <div className="md" dangerouslySetInnerHTML={{ __html: html }} />;
-}
-
 /**
- * Each section's heading gets an edit link, wiki style. The stored HTML has only markdown-it's tags, so a
- * heading with `data-section` is always one the renderer made.
+ * Each section's heading gets an edit link, wiki style, which opens that section's editor in place. The
+ * stored HTML (`server/pages/markdown.ts`, made at commit with raw HTML off) has only markdown-it's tags,
+ * so a heading with `data-section` is always one the renderer made.
  */
-function withEditLinks(html: string, editPath: string): string {
-  const join = editPath.includes('?') ? '&' : '?';
+function withEditLinks(html: string, part: 'author' | 'community'): string {
   return html.replace(
     /(<h3 [^>]*data-section="(\d+)"[^>]*>)([\s\S]*?)<\/h3>/g,
     (_, open: string, n: string, inner: string) =>
-      `${open}${inner}<a class="section-edit" href="${editPath}${join}section=${n}" rel="nofollow">edit</a></h3>`,
+      `${open}${inner}<a class="section-edit" href="#edit-${part}-${n}" rel="nofollow">edit</a></h3>`,
   );
 }
 
@@ -69,7 +68,7 @@ function names(list: string[]): string {
  * authors is confirmed; until then the section asks them to claim it.
  */
 function AuthorSection({ authorHtml, canonical, confirmedAuthors }: PanelProps) {
-  const editPath = toolPath('edit', canonical, 'part=author');
+  const editPath = '#edit-author';
   const claimPath = toolPath('claim', canonical);
   const claimed = confirmedAuthors.length > 0;
   return (
@@ -102,23 +101,29 @@ function AuthorSection({ authorHtml, canonical, confirmedAuthors }: PanelProps) 
           </>
         )}
       </p>
-      {authorHtml ? (
-        <Rendered html={claimed ? withEditLinks(authorHtml, editPath) : authorHtml} />
-      ) : claimed ? (
-        <p className={ui.empty}>
-          The authors haven&apos;t written anything here yet.{' '}
-          <a href={editPath} rel="nofollow">
-            Start it
-          </a>
-          .
-        </p>
-      ) : null}
+      <EditableSection
+        paper={canonical}
+        part="author"
+        html={authorHtml && (claimed ? withEditLinks(authorHtml, 'author') : authorHtml)}
+        claimPath={claimPath}
+        empty={
+          claimed ? (
+            <p className={ui.empty}>
+              The authors haven&apos;t written anything here yet.{' '}
+              <a href={editPath} rel="nofollow">
+                Start it
+              </a>
+              .
+            </p>
+          ) : null
+        }
+      />
     </section>
   );
 }
 
 function CommunitySection({ communityHtml, canonical }: PanelProps) {
-  const editPath = toolPath('edit', canonical);
+  const editPath = '#edit-community';
   return (
     <section id="community">
       <h2 className={ui.groupHeading}>
@@ -130,22 +135,26 @@ function CommunitySection({ communityHtml, canonical }: PanelProps) {
           · <a href={toolPath('history', canonical)}>history</a>
         </span>
       </h2>
-      {communityHtml ? (
-        <Rendered html={withEditLinks(communityHtml, editPath)} />
-      ) : (
-        <p className={ui.empty}>
-          Nobody has written anything here yet.{' '}
-          <a href={editPath} rel="nofollow">
-            Start it
-          </a>
-          : a summary, why it matters, critique, errata, reproductions.
-        </p>
-      )}
+      <EditableSection
+        paper={canonical}
+        part="community"
+        html={communityHtml && withEditLinks(communityHtml, 'community')}
+        claimPath={toolPath('claim', canonical)}
+        empty={
+          <p className={ui.empty}>
+            Nobody has written anything here yet.{' '}
+            <a href={editPath} rel="nofollow">
+              Start it
+            </a>
+            : a summary, why it matters, critique, errata, reproductions.
+          </p>
+        }
+      />
     </section>
   );
 }
 
-function ReadThePaper({ identifiers, pdf, picture, canonical }: PanelProps) {
+function ReadThePaper({ identifiers, pdf, picture, cover, canonical }: PanelProps) {
   // The PDF's credit already links its source, which is often the paper's own page there.
   const links = identifiers.flatMap(sourceLinks).filter(({ url }) => url !== pdf?.source);
   const opens = pdf?.url ?? links[0]?.url;
@@ -155,28 +164,30 @@ function ReadThePaper({ identifiers, pdf, picture, canonical }: PanelProps) {
   return (
     <div className={ui.box}>
       <h2 className={ui.boxHeading}>Read the paper</h2>
-      {picture && image && (
-        <figure className="mb-3">
-          <div className="border border-rule bg-white">
-            {opens ? (
-              <a href={opens} rel="noopener" aria-label={pdf ? 'Open the PDF' : 'Open the paper'} className="block">
-                {image}
-              </a>
-            ) : (
-              image
-            )}
-          </div>
-          {/* The page's only figure, so always the first. */}
-          <figcaption className={ui.caption}>
-            <b>Figure 1:</b> {picture.caption}
-          </figcaption>
-        </figure>
-      )}
-      <p className={`${ui.fine} -mt-1 mb-2`}>
-        <a href={`${toolPath('edit', canonical, 'part=card')}#picture`} rel="nofollow">
-          {picture ? 'change the picture' : 'add a picture'}
-        </a>
-      </p>
+      <EditablePicture paper={canonical} cover={cover} claimPath={toolPath('claim', canonical)}>
+        {picture && image && (
+          <figure className="mb-3">
+            <div className="border border-rule bg-white">
+              {opens ? (
+                <a href={opens} rel="noopener" aria-label={pdf ? 'Open the PDF' : 'Open the paper'} className="block">
+                  {image}
+                </a>
+              ) : (
+                image
+              )}
+            </div>
+            {/* The page's only figure, so always the first. */}
+            <figcaption className={ui.caption}>
+              <b>Figure 1:</b> {picture.caption}
+            </figcaption>
+          </figure>
+        )}
+        <p className={`${ui.fine} -mt-1 mb-2`}>
+          <a href="#edit-picture" rel="nofollow">
+            {picture ? 'change the picture' : 'add a picture'}
+          </a>
+        </p>
+      </EditablePicture>
       <ul className="space-y-1">
         {pdf && (
           <li>

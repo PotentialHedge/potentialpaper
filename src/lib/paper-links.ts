@@ -45,14 +45,20 @@ export function titleLinks({
       url: `https://scholar.google.com/scholar?${new URLSearchParams({ q: `"${title}"` })}`,
     },
   ];
+  return mergeLinks(
+    links.filter((link): link is TitleLink => link !== null),
+    extra,
+  );
+}
+
+/** The built-in links with the page's own: one with a built-in link's label replaces it, the rest follow. */
+export function mergeLinks(builtIn: readonly TitleLink[], extra: readonly TitleLink[]): TitleLink[] {
   const own = new Map(extra.map((link) => [link.label.toLowerCase(), link]));
-  const merged = links
-    .filter((link): link is TitleLink => link !== null)
-    .map((link) => {
-      const replaced = own.get(link.label.toLowerCase());
-      own.delete(link.label.toLowerCase());
-      return replaced ?? link;
-    });
+  const merged = builtIn.map((link) => {
+    const replaced = own.get(link.label.toLowerCase());
+    own.delete(link.label.toLowerCase());
+    return replaced ?? link;
+  });
   return [...merged, ...own.values()];
 }
 

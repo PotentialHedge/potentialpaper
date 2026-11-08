@@ -11,6 +11,7 @@ import { findPaper, type FoundPaper } from '@/server/papers';
 import { submissionsOf } from '@/server/submissions';
 import { bibtex, titleLinks } from '@/lib/paper-links';
 import { DemoFrames } from './DemoFrames';
+import { EditableLinks } from './edit/EditableLinks';
 import { toolPath } from './page-tools';
 import { Slot } from './slots';
 import { TitleActions } from './TitleActions';
@@ -73,6 +74,7 @@ export async function PaperRoute({ scheme, segments }: { scheme: PaperScheme; se
     identifiers,
     pdf: current?.pdf ?? null,
     picture,
+    cover: current?.cover ?? null,
     submissions,
     confirmedAuthors: authors,
     canonical: canonicalPaperId(identifiers) ?? identifiers[0],
@@ -80,14 +82,12 @@ export async function PaperRoute({ scheme, segments }: { scheme: PaperScheme; se
     communityHtml: current?.communityHtml ?? null,
   };
   const about = [paper.venue, paper.year].filter(Boolean).join(', ');
-  const links = titleLinks({
+  const linkSources = {
     identifiers,
     title: paper.title,
     pdf: current?.pdf?.url,
     forums: submissions.map((s) => s.url),
-    extra: current?.links ?? [],
-  });
-  const cardPath = toolPath('edit', panel.canonical, 'part=card');
+  };
   return (
     <main className={ui.paperPage}>
       <article>
@@ -100,23 +100,16 @@ export async function PaperRoute({ scheme, segments }: { scheme: PaperScheme; se
           )}
         </p>
         {about && <p className={`${ui.fine} text-center`}>{about}</p>}
-        <nav
-          className="mt-1.5 flex flex-wrap justify-center gap-x-3 font-sans text-[13px]"
-          aria-label="The paper elsewhere"
-        >
-          {links.map((l) => (
-            <a key={l.label} href={l.url} className="text-accent" rel="noopener noreferrer" target="_blank">
-              [{l.label}]
-            </a>
-          ))}
-          <a href={`${cardPath}#links`} rel="nofollow" className="text-faint">
-            edit links
-          </a>
-        </nav>
+        <EditableLinks
+          paper={panel.canonical}
+          builtIn={titleLinks(linkSources)}
+          shown={titleLinks({ ...linkSources, extra: current?.links ?? [] })}
+          claimPath={toolPath('claim', panel.canonical)}
+        />
         <TitleActions
           bibtex={bibtex({ paper, identifiers })}
           path={paperPath(panel.canonical)}
-          editPath={toolPath('edit', panel.canonical)}
+          editPath="#edit-community"
           historyPath={toolPath('history', panel.canonical)}
         />
         <div className="mt-5 grid grid-cols-[minmax(0,1fr)_230px] items-start gap-8 narrow:grid-cols-1">
