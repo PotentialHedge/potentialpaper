@@ -1,14 +1,15 @@
 import { eq, notInArray, sql } from 'drizzle-orm';
 import { getDb, type Database } from '@/db';
-import { commitIdentities, pageCurrent, pageRefs, pageRevisions } from '@/db/schema';
-import { parseDemosFile } from '@/lib/demos';
+import { authorClaims, commitIdentities, pageCurrent, pageRefs, pageRevisions } from '@/db/schema';
+import { parseLinksFile } from '@/lib/paper-links';
+import { demoSources } from '../demos/attach';
 import { type Commit, SYSTEM_AUTHOR_ID } from './git-objects';
-import { renderOrNull } from './markdown';
+import { demoIds, renderOrNull } from './markdown';
 import { changedFiles, readCommit, readFiles, readHead, readText, toBytes, type Reader } from './repo';
 import {
   AUTHOR_PAGE_PATH,
   COMMUNITY_PAGE_PATH,
-  DEMOS_PATH,
+  LINKS_PATH,
   parsePdfPointer,
   parseThumbnailPointer,
   PDF_PATH,
@@ -42,6 +43,13 @@ async function blobSize(db: Reader, paperId: string, blob: string | undefined): 
 
 async function accountOf(db: Reader, authorId: string): Promise<string | null> {
   if (authorId === SYSTEM_AUTHOR_ID) return null;
+  if (authorId.startsWith('a_')) {
+    const [claim] = await db
+      .select({ accountId: authorClaims.accountId })
+      .from(authorClaims)
+      .where(eq(authorClaims.identityId, authorId));
+    return claim?.accountId ?? null;
+  }
   const [row] = await db
     .select({ accountId: commitIdentities.accountId })
     .from(commitIdentities)
@@ -86,19 +94,20 @@ export async function writeCurrent(tx: Writer, paperId: string, head: string, co
   const resources = await readText(tx, paperId, files.get(RESOURCES_PATH));
   const pdf = await readText(tx, paperId, files.get(PDF_PATH));
   const thumbnail = await readText(tx, paperId, files.get(THUMBNAIL_PATH));
-  const demos = await readText(tx, paperId, files.get(DEMOS_PATH));
+  const links = await readText(tx, paperId, files.get(LINKS_PATH));
   const authorMarkdown = await readText(tx, paperId, files.get(AUTHOR_PAGE_PATH));
   const communityMarkdown = await readText(tx, paperId, files.get(COMMUNITY_PAGE_PATH));
+  const demos = await demoSources(tx, [...demoIds(authorMarkdown), ...demoIds(communityMarkdown)]);
   const row = {
     head: toBytes(head),
     authorMarkdown,
     communityMarkdown,
-    authorHtml: renderOrNull(authorMarkdown, 'author'),
-    communityHtml: renderOrNull(communityMarkdown, 'community'),
+    authorHtml: renderOrNull(authorMarkdown, 'author', demos),
+    communityHtml: renderOrNull(communityMarkdown, 'community', demos),
     resources: resources === null ? null : (JSON.parse(resources) as Record<string, unknown>),
     pdf: pdf === null ? null : parsePdfPointer(pdf),
     thumbnail: thumbnail === null ? null : parseThumbnailPointer(thumbnail),
-    demos: demos === null ? null : parseDemosFile(demos),
+    links: links === null ? null : parseLinksFile(links),
     updatedAt: commit.at,
   };
   await tx

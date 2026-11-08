@@ -93,46 +93,29 @@ export const SearchResponse = z.object({
 
 const SnapshotId = z.string().regex(/^[0-9a-f]{32}$/);
 
-export const DemoAttachBody = z.object({
-  paper: PaperIdentifier,
-  url: z.url().max(2000),
-  title: z.string().trim().min(1).max(120),
-  description: z.string().max(500).optional(),
-});
+/** Copies a demo from GitHub, for the editor to insert as a block. Nothing is committed. */
+export const DemoSnapshotBody = z.object({ url: z.url().max(2000) });
 
-export const DemoRemoveQuery = z.object({
-  scheme: PaperSchemeParam,
-  value: z.string().min(1).max(300),
+export const DemoSnapshotted = z.object({
   id: SnapshotId,
-});
-
-export const DemoPointer = z.object({
-  id: SnapshotId,
-  title: z.string(),
-  description: z.string().optional(),
   source: z.string(),
   commit: z.string(),
   root: z.string(),
-});
-
-export const DemoAttached = z.object({
-  demo: DemoPointer,
   url: z.string(),
   files: z.number().int(),
   bytes: z.number().int(),
-  /** The page's head after the change. */
-  head: z.string().nullable(),
 });
-
-export const DemoRemoved = z.object({ head: z.string().nullable() });
 
 const Oid = z.string().regex(/^[0-9a-f]{40}$/);
 
+export const PagePartParam = z.enum(['author', 'community']);
+
 export const SectionEditBody = z.object({
   paper: PaperIdentifier,
+  part: PagePartParam.default('community'),
   /** The commit the editor loaded, or `null` for a page with no repo yet. */
   baseOid: Oid.nullable(),
-  /** From 1 in order; 0 is the whole community section. */
+  /** From 1 in order; 0 is the whole part. */
   section: z.number().int().min(0).max(1000),
   content: z.string().max(256 * 1024),
   summary: z.string().max(1000).default(''),
@@ -153,4 +136,36 @@ export const RevertBody = z.object({
   paper: PaperIdentifier,
   oid: Oid,
   summary: z.string().max(1000).optional(),
+});
+
+export const LinksBody = z.object({
+  paper: PaperIdentifier,
+  links: z.array(z.object({ label: z.string().max(100), url: z.string().max(2000) })).max(50),
+});
+
+/** The picture's words, sent beside the image in a multipart form. */
+export const ThumbnailFields = z.object({
+  scheme: PaperSchemeParam,
+  value: z.string().min(1).max(300),
+  alt: z.string().max(1000).optional(),
+  caption: z.string().max(1000).optional(),
+});
+
+export const PaperQuery = z.object({ scheme: PaperSchemeParam, value: z.string().min(1).max(300) });
+
+export const ClaimBody = z.object({
+  paper: PaperIdentifier,
+  authorIndex: z.number().int().min(0).max(10_000),
+  evidence: z.string().max(5000).default(''),
+});
+
+export const OwnClaim = z.object({
+  claim: z
+    .object({
+      authorIndex: z.number().int(),
+      authorName: z.string(),
+      status: z.enum(['pending', 'confirmed', 'rejected']),
+      evidence: z.string(),
+    })
+    .nullable(),
 });

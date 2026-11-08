@@ -6,9 +6,11 @@ import { ui } from '@/components/ui';
 import { canonicalPaperId, paperPath, parsePaperId, type PaperScheme } from '@/lib/paper-ids';
 import { getDb } from '@/db';
 import { pageCurrent, pdfCovers } from '@/db/schema';
+import { confirmedAuthors } from '@/server/claims';
 import { findPaper, type FoundPaper } from '@/server/papers';
 import { submissionsOf } from '@/server/submissions';
 import { bibtex, titleLinks } from '@/lib/paper-links';
+import { DemoFrames } from './DemoFrames';
 import { toolPath } from './page-tools';
 import { Slot } from './slots';
 import { TitleActions } from './TitleActions';
@@ -40,12 +42,12 @@ export async function paperMetadata(scheme: PaperScheme, segments: string[]): Pr
 
 export async function PaperRoute({ scheme, segments }: { scheme: PaperScheme; segments: string[] }) {
   const { paper, identifiers } = await load(scheme, segments);
-  const [[current], submissions] = await Promise.all([
+  const [[current], submissions, authors] = await Promise.all([
     getDb()
       .select({
         pdf: pageCurrent.pdf,
         thumbnail: pageCurrent.thumbnail,
-        demos: pageCurrent.demos,
+        links: pageCurrent.links,
         authorHtml: pageCurrent.authorHtml,
         communityHtml: pageCurrent.communityHtml,
         cover: pdfCovers.url,
@@ -54,6 +56,7 @@ export async function PaperRoute({ scheme, segments }: { scheme: PaperScheme; se
       .leftJoin(pdfCovers, sql`${pdfCovers.sha256} = ${pageCurrent.pdf} ->> 'sha256'`)
       .where(eq(pageCurrent.paperId, paper.id)),
     submissionsOf(paper.id),
+    confirmedAuthors(paper.id),
   ]);
   // The authors' choice of picture wins over the PDF's first page.
   const picture = current?.thumbnail
@@ -71,7 +74,7 @@ export async function PaperRoute({ scheme, segments }: { scheme: PaperScheme; se
     pdf: current?.pdf ?? null,
     picture,
     submissions,
-    demos: current?.demos ?? [],
+    confirmedAuthors: authors,
     canonical: canonicalPaperId(identifiers) ?? identifiers[0],
     authorHtml: current?.authorHtml ?? null,
     communityHtml: current?.communityHtml ?? null,
@@ -82,7 +85,9 @@ export async function PaperRoute({ scheme, segments }: { scheme: PaperScheme; se
     title: paper.title,
     pdf: current?.pdf?.url,
     forums: submissions.map((s) => s.url),
+    extra: current?.links ?? [],
   });
+  const cardPath = toolPath('edit', panel.canonical, 'part=card');
   return (
     <main className={ui.paperPage}>
       <article>
@@ -104,6 +109,9 @@ export async function PaperRoute({ scheme, segments }: { scheme: PaperScheme; se
               [{l.label}]
             </a>
           ))}
+          <a href={`${cardPath}#links`} rel="nofollow" className="text-faint">
+            edit links
+          </a>
         </nav>
         <TitleActions
           bibtex={bibtex({ paper, identifiers })}
@@ -121,6 +129,7 @@ export async function PaperRoute({ scheme, segments }: { scheme: PaperScheme; se
         </div>
         <Slot name="paper.body" {...panel} />
       </article>
+      <DemoFrames />
     </main>
   );
 }

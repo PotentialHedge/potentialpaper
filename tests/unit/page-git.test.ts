@@ -176,20 +176,24 @@ describe('paths', () => {
 });
 
 describe('who may write where', () => {
-  const nobody: Roles = { system: false, admin: false, verified: false, confirmedAuthor: false };
+  const nobody: Roles = { system: false, admin: false, verified: false, confirmedAuthor: false, claimed: false };
   const roles = {
     system: { ...nobody, system: true },
     admin: { ...nobody, admin: true },
     verified: { ...nobody, verified: true },
-    author: { ...nobody, verified: true, confirmedAuthor: true },
+    author: { ...nobody, verified: true, confirmedAuthor: true, claimed: true },
+    verifiedOnClaimed: { ...nobody, verified: true, claimed: true },
     unverified: nobody,
   };
   const table: [string, (keyof typeof roles)[]][] = [
     ['metadata.json', ['system', 'admin']],
     ['author/page.md', ['admin', 'author']],
+    // The card: the authors' once the paper is claimed, anyone verified's until then.
+    ['thumbnail.json', ['admin', 'verified', 'author']],
+    ['links.json', ['admin', 'verified', 'author']],
     ['author/resources.json', ['admin', 'author']],
-    ['community/page.md', ['admin', 'verified', 'author']],
-    ['community/x/y.md', ['admin', 'verified', 'author']],
+    ['community/page.md', ['admin', 'verified', 'author', 'verifiedOnClaimed']],
+    ['community/x/y.md', ['admin', 'verified', 'author', 'verifiedOnClaimed']],
     ['extensions/x/data.json', []],
     ['README.md', []],
     ['authors/page.md', []],

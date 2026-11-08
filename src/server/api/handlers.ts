@@ -4,11 +4,15 @@ import type { Account, Affiliation } from '@/db/schema';
 import { updateProfile } from '../accounts';
 import { addAffiliation, listAffiliations, removeAffiliation, verifyAffiliation } from '../affiliations';
 import { requireAuth, requireVerified, viewerFromHeaders, type Principal } from '../auth';
-import { attachDemo, removeDemo } from '../demos/attach';
+import { demoSources } from '../demos/attach';
+import { snapshotDemo } from '../demos/snapshot';
 import { demoUrl } from '@/lib/demos';
+import { ownClaim, requestClaim, withdrawClaim } from '../claims';
+import { removeThumbnail, setLinks, setThumbnail } from '../pages/card';
 import { revertCommit, type Actor, type CommitResult } from '../pages/commit';
 import { editSection } from '../pages/edit';
-import { renderMarkdown } from '../pages/markdown';
+import { demoIds, renderMarkdown } from '../pages/markdown';
+import { getDb } from '@/db';
 import { refreshPaperPages } from '../pages/refresh';
 import { setFirstPassword, startOnboarding } from '../onboarding';
 import { canonicalPaperId, paperPath, parsePaperId } from '@/lib/paper-ids';
@@ -173,27 +177,27 @@ async function knownPaper(scheme: z.infer<typeof S.PaperSchemeParam>, value: str
   return found;
 }
 
-/** Copies a demo from a public GitHub repo or gist and adds it to the paper's page. Slow: it downloads the repo. */
-export const postDemo = route(async (req) => {
+/**
+ * Copies a demo from a public GitHub repo or gist, for the editor to insert into a section as a block.
+ * Slow: it downloads the repo. Commits nothing: the block does, with the edit.
+ */
+export const postDemoSnapshot = route(async (req) => {
   const principal = await requireVerified(req);
-  const body = await parseBody(req, S.DemoAttachBody);
-  const { paper, identifiers } = await knownPaper(body.paper.scheme, body.paper.value);
-  const { snapshot, demo, commit } = await attachDemo(paper.id, actorOf(principal), body);
-  await refreshPaperPages(identifiers);
+  const { url } = await parseBody(req, S.DemoSnapshotBody);
+  const snapshot = await snapshotDemo(url);
   return respond(
-    S.DemoAttached,
-    { demo, url: demoUrl(demo.id), files: snapshot.fileCount, bytes: snapshot.totalBytes, head: commit.oid },
+    S.DemoSnapshotted,
+    {
+      id: snapshot.id,
+      source: snapshot.source,
+      commit: snapshot.commit,
+      root: snapshot.root,
+      url: demoUrl(snapshot.id),
+      files: snapshot.fileCount,
+      bytes: snapshot.totalBytes,
+    },
     { status: 201, principal },
   );
-});
-
-export const deleteDemo = route(async (req) => {
-  const principal = await requireVerified(req);
-  const { scheme, value, id } = parseQuery(req, S.DemoRemoveQuery);
-  const { paper, identifiers } = await knownPaper(scheme, value);
-  const commit = await removeDemo(paper.id, actorOf(principal), id);
-  await refreshPaperPages(identifiers);
-  return respond(S.DemoRemoved, { head: commit.oid }, { principal });
 });
 
 function committed(result: CommitResult) {
@@ -202,7 +206,7 @@ function committed(result: CommitResult) {
     : { head: result.oid, merged: false, changed: false };
 }
 
-/** One section of the community page, put back into the file as it was when the editor loaded it. */
+/** One section of the author or community page, put back into the file as it was when the editor loaded it. */
 export const postSectionEdit = route(async (req) => {
   const principal = await requireVerified(req);
   const { paper: id, ...edit } = await parseBody(req, S.SectionEditBody);
@@ -216,7 +220,8 @@ export const postSectionEdit = route(async (req) => {
 export const postRender = route(async (req) => {
   const principal = await requireAuth(req);
   const { content } = await parseBody(req, S.RenderBody);
-  return respond(S.Rendered, { html: renderMarkdown(content, 'preview') }, { principal });
+  const demos = await demoSources(getDb(), demoIds(content));
+  return respond(S.Rendered, { html: renderMarkdown(content, 'preview', demos) }, { principal });
 });
 
 /** Undoes one commit, keeping everything since, as `git revert` does. */
@@ -227,4 +232,73 @@ export const postRevert = route(async (req) => {
   const result = await revertCommit(paper.id, oid, actorOf(principal), summary?.trim() || undefined);
   if (result.status === 'committed') await refreshPaperPages(identifiers);
   return respond(S.PageCommitted, committed(result), { principal });
+});
+
+/** The page's own links under its title, replaced as a whole. */
+export const postLinks = route(async (req) => {
+  const principal = await requireVerified(req);
+  const { paper: id, links } = await parseBody(req, S.LinksBody);
+  const { paper, identifiers } = await knownPaper(id.scheme, id.value);
+  const result = await setLinks(paper.id, actorOf(principal), links);
+  if (result.status === 'committed') await refreshPaperPages(identifiers);
+  return respond(S.PageCommitted, committed(result), { principal });
+});
+
+/** A new picture (multipart `image`), or new words for the current one. */
+export const postThumbnail = route(async (req) => {
+  const principal = await requireVerified(req);
+  let form: FormData;
+  try {
+    form = await req.formData();
+  } catch {
+    throw new ApiError(400, 'validation_error', 'send a multipart form');
+  }
+  const fields = S.ThumbnailFields.safeParse(
+    Object.fromEntries([...form.entries()].filter(([, v]) => typeof v === 'string')),
+  );
+  if (!fields.success) throw new ApiError(400, 'validation_error', 'invalid form');
+  const { paper, identifiers } = await knownPaper(fields.data.scheme, fields.data.value);
+  const file = form.get('image');
+  const image = file instanceof File && file.size > 0 ? Buffer.from(await file.arrayBuffer()) : undefined;
+  const result = await setThumbnail(paper.id, actorOf(principal), {
+    image,
+    alt: fields.data.alt,
+    caption: fields.data.caption,
+  });
+  if (result.status === 'committed') await refreshPaperPages(identifiers);
+  return respond(S.PageCommitted, committed(result), { principal });
+});
+
+export const deleteThumbnail = route(async (req) => {
+  const principal = await requireVerified(req);
+  const { scheme, value } = parseQuery(req, S.PaperQuery);
+  const { paper, identifiers } = await knownPaper(scheme, value);
+  const result = await removeThumbnail(paper.id, actorOf(principal));
+  if (result.status === 'committed') await refreshPaperPages(identifiers);
+  return respond(S.PageCommitted, committed(result), { principal });
+});
+
+/** The viewer's own claim on the paper. */
+export const getClaim = route(async (req) => {
+  const principal = await requireAuth(req);
+  const { scheme, value } = parseQuery(req, S.PaperQuery);
+  const { paper } = await knownPaper(scheme, value);
+  return respond(S.OwnClaim, { claim: await ownClaim(paper.id, principal.account.id) }, { principal });
+});
+
+/** Asks to be confirmed as one of the paper's authors. An admin decides, for now. */
+export const postClaim = route(async (req) => {
+  const principal = await requireVerified(req);
+  const { paper: id, authorIndex, evidence } = await parseBody(req, S.ClaimBody);
+  const { paper } = await knownPaper(id.scheme, id.value);
+  const claim = await requestClaim(paper.id, principal.account, { authorIndex, evidence });
+  return respond(S.OwnClaim, { claim }, { status: 201, principal });
+});
+
+export const deleteClaim = route(async (req) => {
+  const principal = await requireAuth(req);
+  const { scheme, value } = parseQuery(req, S.PaperQuery);
+  const { paper } = await knownPaper(scheme, value);
+  await withdrawClaim(paper.id, principal.account.id);
+  return respond(S.OwnClaim, { claim: null }, { principal });
 });

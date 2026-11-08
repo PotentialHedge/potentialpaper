@@ -11,6 +11,7 @@ import * as gitRoute from '@/app/git/[...path]/route';
 import { getDb } from '@/db';
 import {
   accounts,
+  authorClaims,
   commitIdentities,
   pageCurrent,
   pageEvents,
@@ -1073,7 +1074,7 @@ describe('pdf.json', () => {
   });
 });
 
-describe('author/thumbnail.json', () => {
+describe('thumbnail.json', () => {
   const PDF = {
     sha256: 'a'.repeat(64),
     bytes: 2_000_000,
@@ -1107,7 +1108,7 @@ describe('author/thumbnail.json', () => {
     expect(hits.find((hit) => hit.title === paper.title)).toMatchObject({ cover: THUMBNAIL.url });
   });
 
-  it('refuses what is not an image pointer, and anyone but its authors and admins', async () => {
+  it('refuses what is not an image pointer, and anyone but its authors and admins once claimed', async () => {
     const id = await newPaper();
     const admin = { ...(await newAccount()), isAdmin: true };
     for (const bad of [
@@ -1120,9 +1121,28 @@ describe('author/thumbnail.json', () => {
         status: 422,
       });
     }
+    // Unclaimed, the picture is anyone verified's.
     const someone = await newAccount();
+    const set = await commitPage(id, null, someone, change(THUMBNAIL), 'Mine', { rateLimit: NO_LIMIT });
+    expect(set.status).toBe('committed');
+    const author = await newAccount();
+    await getDb().insert(authorClaims).values({
+      paperId: id,
+      accountId: author.accountId,
+      authorIndex: 0,
+      authorName: 'An Author',
+      identityId: 'a_testtest',
+      status: 'confirmed',
+    });
+    const head = await readHead(getDb(), id);
     await expect(
-      commitPage(id, null, someone, change(THUMBNAIL), 'Mine', { rateLimit: NO_LIMIT }),
+      commitPage(id, head, someone, change({ ...THUMBNAIL, alt: 'Mine' }), 'Mine', { rateLimit: NO_LIMIT }),
     ).rejects.toMatchObject({ status: 403 });
+    const byAuthor = await commitPage(id, head, author, change({ ...THUMBNAIL, alt: 'Ours' }), 'Ours', {
+      rateLimit: NO_LIMIT,
+    });
+    expect(byAuthor.status).toBe('committed');
+    const [last] = await pageHistory(id, { limit: 1 });
+    expect(last.authorId).toBe('a_testtest');
   });
 });

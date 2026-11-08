@@ -1,7 +1,8 @@
 /**
  * Demos: someone's own code from a GitHub repo or gist, shown on a paper's page in an iframe. The files
  * are copied once, at a pinned commit, and served unchanged from a host of their own, never this site's.
- * Shared by the server and the browser, so nothing here touches Node.
+ * A page's Markdown embeds one with a ```` ```demo ```` block, in either section. Shared by the server and
+ * the browser, so nothing here touches Node.
  */
 
 /**
@@ -40,12 +41,15 @@ export const MAX_DEMO_HEIGHT = 4000;
 export const MAX_DEMO_TITLE = 120;
 export const MAX_DEMO_DESCRIPTION = 500;
 
-/** One line of `community/demos.jsonl`: which files, where they came from, and what to call them. */
-export interface DemoPointer {
-  /** The snapshot: its files are stored by hash, and `demo_snapshots` lists them. */
+/** What a frame running a demo may do: run scripts, keep its own storage, and take the pointer, the screen and a headset. */
+export const DEMO_SANDBOX =
+  'allow-scripts allow-same-origin allow-pointer-lock allow-popups allow-forms allow-downloads';
+export const DEMO_ALLOW =
+  'fullscreen; xr-spatial-tracking; gamepad; autoplay; accelerometer; gyroscope; clipboard-write';
+
+/** Where a snapshot's files came from (`demo_snapshots`): enough to link to them on GitHub. */
+export interface DemoSource {
   id: string;
-  title: string;
-  description?: string;
   /** The repo or gist, as a page to link to. */
   source: string;
   /** The commit the files were copied from. */
@@ -54,39 +58,51 @@ export interface DemoPointer {
   root: string;
 }
 
-/** The pointer on one line of `demos.jsonl`, or `null` if it isn't one. Pages link to `source`. */
-export function parseDemoPointer(value: unknown): DemoPointer | null {
-  if (value === null || typeof value !== 'object' || Array.isArray(value)) return null;
-  const { id, title, description, source, commit, root } = value as Record<string, unknown>;
-  if (!isSnapshotId(id)) return null;
-  if (typeof title !== 'string' || title.trim() === '' || title.length > MAX_DEMO_TITLE) return null;
-  if (description !== undefined && (typeof description !== 'string' || description.length > MAX_DEMO_DESCRIPTION)) {
-    return null;
-  }
-  if (typeof source !== 'string' || !/^https:\/\/(gist\.)?github\.com\//.test(source)) return null;
-  if (typeof commit !== 'string' || !/^[0-9a-f]{40}$/.test(commit)) return null;
-  if (typeof root !== 'string' || root.startsWith('/') || root.endsWith('/') || root.includes('..')) return null;
-  return { id, title, ...(description ? { description } : {}), source, commit, root };
+/**
+ * A demo in a page's Markdown:
+ *
+ *     ```demo 0123456789abcdef0123456789abcdef
+ *     Its title
+ *     What it shows, optionally, on the lines after.
+ *     ```
+ */
+export interface DemoBlock {
+  id: string;
+  title: string;
+  description?: string;
 }
 
-/** Every pointer in a `demos.jsonl`, or `null` if any line isn't one. */
-export function parseDemosFile(text: string): DemoPointer[] | null {
-  const demos: DemoPointer[] = [];
-  for (const line of text.split('\n')) {
-    if (line.trim() === '') continue;
-    let value: unknown;
-    try {
-      value = JSON.parse(line);
-    } catch {
-      return null;
-    }
-    const demo = parseDemoPointer(value);
-    if (!demo) return null;
-    demos.push(demo);
-  }
-  return demos;
+const DEMO_INFO = /^demo\s+([0-9a-f]{32})$/;
+
+/** The snapshot a fence's info string names, if it is a demo block's. */
+export function demoBlockId(info: string): string | null {
+  return DEMO_INFO.exec(info.trim())?.[1] ?? null;
 }
 
-export function encodeDemosFile(demos: readonly DemoPointer[]): string {
-  return demos.map((demo) => JSON.stringify(demo) + '\n').join('');
+/** A demo block's title and description, from its body: the first line, then the rest. */
+export function demoBlockText(body: string): { title: string; description?: string } {
+  const lines = body
+    .split('\n')
+    .map((line) => line.trim())
+    .filter(Boolean);
+  const title = (lines[0] ?? '').slice(0, MAX_DEMO_TITLE);
+  const description = lines.slice(1).join(' ').slice(0, MAX_DEMO_DESCRIPTION);
+  return { title, ...(description ? { description } : {}) };
+}
+
+/** The Markdown for a demo, as the editor inserts it. */
+export function demoBlockMarkdown({ id, title, description }: DemoBlock): string {
+  const line = (text: string | undefined) => (text ?? '').replace(/\s+/g, ' ').replaceAll('`', "'").trim();
+  return ['```demo ' + id, line(title), line(description), '```'].filter(Boolean).join('\n').concat('\n');
+}
+
+/** The files' own page on GitHub, at the commit they were copied from. */
+export function sourceAt(demo: DemoSource): string {
+  if (demo.source.startsWith('https://gist.github.com/')) return `${demo.source}/${demo.commit}`;
+  return `${demo.source}/tree/${demo.commit}${demo.root ? `/${demo.root}` : ''}`;
+}
+
+export function sourceLabel(demo: DemoSource): string {
+  const name = demo.source.replace(/^https:\/\/(gist\.)?github\.com\//, '');
+  return `${name}${demo.root ? `/${demo.root}` : ''}@${demo.commit.slice(0, 7)}`;
 }

@@ -2,10 +2,8 @@ import type { ComponentType } from 'react';
 import { ui } from '@/components/ui';
 import type { Paper } from '@/db/schema';
 import { sourceLinks, sourceName, type PaperId } from '@/lib/paper-ids';
-import type { DemoPointer } from '@/lib/demos';
 import type { Submission } from '@/lib/submissions';
 import type { PdfPointer } from '@/server/pages/rules';
-import { DemosSection } from './Demos';
 import { toolPath } from './page-tools';
 import { SubmissionsBox, SubmissionsSection } from './Submissions';
 
@@ -22,8 +20,8 @@ export interface PanelProps {
   /** The authors' thumbnail, or else the PDF's first page. */
   picture: { url: string; alt: string | null; caption: string } | null;
   submissions: Submission[];
-  /** The page's demos, in order. */
-  demos: DemoPointer[];
+  /** Who has a confirmed claim, by the names on the paper. None: the paper is unclaimed. */
+  confirmedAuthors: { authorIndex: number; authorName: string }[];
   /** The identifier the page's API calls name the paper by. */
   canonical: PaperId;
   /** The two Markdown sections, as rendered at their last commit. */
@@ -53,22 +51,68 @@ function Rendered({ html }: { html: string }) {
  * heading with `data-section` is always one the renderer made.
  */
 function withEditLinks(html: string, editPath: string): string {
+  const join = editPath.includes('?') ? '&' : '?';
   return html.replace(
     /(<h3 [^>]*data-section="(\d+)"[^>]*>)([\s\S]*?)<\/h3>/g,
     (_, open: string, n: string, inner: string) =>
-      `${open}${inner}<a class="section-edit" href="${editPath}?section=${n}" rel="nofollow">edit</a></h3>`,
+      `${open}${inner}<a class="section-edit" href="${editPath}${join}section=${n}" rel="nofollow">edit</a></h3>`,
   );
 }
 
-function AuthorSection({ authorHtml }: PanelProps) {
+function names(list: string[]): string {
+  if (list.length <= 1) return list.join('');
+  return `${list.slice(0, -1).join(', ')} and ${list[list.length - 1]}`;
+}
+
+/**
+ * The authors' own voice, so only a paper's confirmed authors write it. A paper is claimed once one of its
+ * authors is confirmed; until then the section asks them to claim it.
+ */
+function AuthorSection({ authorHtml, canonical, confirmedAuthors }: PanelProps) {
+  const editPath = toolPath('edit', canonical, 'part=author');
+  const claimPath = toolPath('claim', canonical);
+  const claimed = confirmedAuthors.length > 0;
   return (
     <section id="author">
-      <h2 className={ui.groupHeading}>Author section</h2>
+      <h2 className={ui.groupHeading}>
+        Author section
+        {claimed && (
+          <span className="ml-3 font-sans text-xs [font-variant-caps:normal] text-faint">
+            <a href={editPath} rel="nofollow">
+              edit
+            </a>
+          </span>
+        )}
+      </h2>
+      <p className={`${ui.fine} -mt-1 mb-2 font-sans`}>
+        {claimed ? (
+          <>
+            Claimed. Maintained by {names(confirmedAuthors.map((a) => a.authorName))}.{' '}
+            <a href={claimPath} rel="nofollow">
+              Also an author?
+            </a>
+          </>
+        ) : (
+          <>
+            Unclaimed.{' '}
+            <a href={claimPath} rel="nofollow">
+              Are you an author? Claim this paper
+            </a>
+            , then write here in your own words. Until then, the <a href="#community">community section</a> is below.
+          </>
+        )}
+      </p>
       {authorHtml ? (
-        <Rendered html={authorHtml} />
-      ) : (
-        <p className={ui.empty}>The authors haven&apos;t written anything here yet.</p>
-      )}
+        <Rendered html={claimed ? withEditLinks(authorHtml, editPath) : authorHtml} />
+      ) : claimed ? (
+        <p className={ui.empty}>
+          The authors haven&apos;t written anything here yet.{' '}
+          <a href={editPath} rel="nofollow">
+            Start it
+          </a>
+          .
+        </p>
+      ) : null}
     </section>
   );
 }
@@ -101,7 +145,7 @@ function CommunitySection({ communityHtml, canonical }: PanelProps) {
   );
 }
 
-function ReadThePaper({ identifiers, pdf, picture }: PanelProps) {
+function ReadThePaper({ identifiers, pdf, picture, canonical }: PanelProps) {
   // The PDF's credit already links its source, which is often the paper's own page there.
   const links = identifiers.flatMap(sourceLinks).filter(({ url }) => url !== pdf?.source);
   const opens = pdf?.url ?? links[0]?.url;
@@ -128,6 +172,11 @@ function ReadThePaper({ identifiers, pdf, picture }: PanelProps) {
           </figcaption>
         </figure>
       )}
+      <p className={`${ui.fine} -mt-1 mb-2`}>
+        <a href={`${toolPath('edit', canonical, 'part=card')}#picture`} rel="nofollow">
+          {picture ? 'change the picture' : 'add a picture'}
+        </a>
+      </p>
       <ul className="space-y-1">
         {pdf && (
           <li>
@@ -154,10 +203,6 @@ function ReadThePaper({ identifiers, pdf, picture }: PanelProps) {
   );
 }
 
-function Demos({ demos, canonical }: PanelProps) {
-  return <DemosSection demos={demos} paper={canonical} />;
-}
-
 function Submissions({ submissions }: PanelProps) {
   return <SubmissionsSection submissions={submissions} />;
 }
@@ -169,7 +214,7 @@ function SubmissionsAside({ submissions }: PanelProps) {
 const PANELS: Record<PaperSlot, ComponentType<PanelProps>[]> = {
   'paper.main': [Abstract, AuthorSection],
   'paper.aside': [ReadThePaper, SubmissionsAside],
-  'paper.body': [Demos, CommunitySection, Submissions],
+  'paper.body': [CommunitySection, Submissions],
 };
 
 export function Slot({ name, ...props }: PanelProps & { name: PaperSlot }) {

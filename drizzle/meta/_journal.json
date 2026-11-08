@@ -78,6 +78,20 @@
       "when": 1794088920226,
       "tag": "0010_page_html",
       "breakpoints": true
+    },
+    {
+      "idx": 11,
+      "version": "7",
+      "when": 1794148152394,
+      "tag": "0011_claims_links",
+      "breakpoints": true
+    },
+    {
+      "idx": 12,
+      "version": "7",
+      "when": 1794148153029,
+      "tag": "0012_drop_page_demos",
+      "breakpoints": true
     }
   ]
 }

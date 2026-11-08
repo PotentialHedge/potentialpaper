@@ -36,15 +36,26 @@ Milestones 0, 1 and 2 are built, merged into `main` and deployed, and Milestone 
   reviews and decisions from OpenReview, and the forms for importing ICLR 2026's are ready. ICLR 2027 PDFs are hosted in R2 through a `pdf.json` in each page repo. Each paper shows a picture
   of its first page, or a thumbnail set with `pages:set-thumbnail`.
 - **Licenses:** each paper records its source and the licenses of its metadata and abstract.
-- **Demos:** any verified account can attach a demo to a paper from a public GitHub repo, folder or gist
-  (`POST /api/v1/demos`, the "Demos" section of a paper page). The server resolves the ref to a commit
-  through git's ref listing, streams codeload's tarball, keeps the folder with `index.html` (auto-found in
-  `dist`, `build`, `docs`, ...), stores each file in R2 by SHA-256 (production's `R2_*` keys are a token limited to the bucket's objects), and records a `demo_snapshots` row whose id
-  hashes the file list. The page's `community/demos.jsonl` points at it, so demos have history and revert like
-  any edit. Nothing is built. `proxy.ts` answers the demo host (`lib/demos.ts`, `papers-content.potentialhedge.com`
-  in production, `127.0.0.1:3000` in dev) at `/d/<snapshot>/<path>`. A request from the root (`/assets/x.js`,
-  as Vite builds make) is redirected into the demo its `Referer` names. Pages run a demo on click, in a
-  sandboxed iframe. That host shares a site with the app, so it is not a real sandbox yet: see `TODO.md`.
+- **Demos:** a demo is a ```` ```demo <snapshot> ```` block (title on the first line, description after) in
+  either Markdown section, author or community; there is no separate demos section or `demos.jsonl` any more.
+  The editor's "Insert a demo" calls `POST /api/v1/demos { url }`, which only snapshots (resolves the ref
+  through git's ref listing, streams codeload's tarball, keeps the folder with `index.html`, stores each file
+  in R2 by SHA-256, records `demo_snapshots`) and returns the id; the block goes in with the edit, which
+  refuses a block naming an unknown snapshot. The renderer writes a sandboxed iframe with `data-src`, and
+  `DemoFrames` (client) loads it near the screen, fits its height and runs full screen. `proxy.ts` answers the
+  demo host (`lib/demos.ts`, `papers-content.potentialhedge.com` in production, `127.0.0.1:3000` in dev) at
+  `/d/<snapshot>/<path>`. That host shares a site with the app, so it is not a real sandbox yet: see `TODO.md`.
+- **The card:** `thumbnail.json` (the picture, uploaded at `/edit/<paper>?part=card` through
+  `POST /api/v1/pages/thumbnail`, multipart) and `links.json` (extra links under the title; one named like a
+  built-in link replaces it, `POST /api/v1/pages/links`). Any verified account may change them while the paper
+  is unclaimed, and only its confirmed authors (and admins) once it is claimed.
+- **Claims:** `author_claims`. A paper is claimed once it has a confirmed claim. `/claim/<paper>` asks to be
+  one of the printed authors, with evidence in the claimant's words (`POST/GET/DELETE /api/v1/claims`).
+  **Verification is undecided:** for now an admin decides with `npm run claims:decide` (lists pending;
+  `--confirm <id> --as <handle>` or `--reject`). A confirmed author can edit the author section
+  (`/edit/<paper>?part=author`) and, on that paper, every commit they make carries their per-claim `a_` id and
+  shows the printed name with an "author" badge, never their handle. The DESIGN.md §6 routes (email in the
+  paper, ORCID, co-author vouch) are not built.
 
 ## Milestone 3, community editing (in progress)
 

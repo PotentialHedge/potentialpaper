@@ -27,6 +27,8 @@ export const API_ERROR_CODES = [
   'edit_conflict',
   'paper_merged',
   'page_busy',
+  'claim_taken',
+  'claim_decided',
   'method_not_allowed',
   'internal_error',
 ] as const;

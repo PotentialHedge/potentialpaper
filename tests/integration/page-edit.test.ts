@@ -58,16 +58,16 @@ beforeEach(resetDatabase);
 describe('editing the community section', () => {
   it('starts an empty page from the starter headings, then commits and renders it', async () => {
     const paperId = await paper();
-    const state = await editorState(paperId, 0);
+    const state = await editorState(paperId, 'community', 0);
     expect(state).toMatchObject({ baseOid: null, section: 0, starter: true });
     expect(state?.text).toMatch(/^## Summary\n\n## Why it matters\n/);
-    expect(await editorState(paperId, 1)).toBeNull();
+    expect(await editorState(paperId, 'community', 1)).toBeNull();
 
     const ada = await signUp('ada@ethz.ch');
     const res = await edit(ada, { baseOid: null, section: 0, content: state!.text });
     expect(res.status).toBe(200);
     expect(res.body.head).toMatch(/^[0-9a-f]{40}$/);
-    expect((await editorState(paperId, 6))?.title).toBe('Follow-ups');
+    expect((await editorState(paperId, 'community', 6))?.title).toBe('Follow-ups');
   });
 
   it('stores the rendered HTML, which survives a rebuild', async () => {
@@ -81,7 +81,7 @@ describe('editing the community section', () => {
 
   it('replaces one section and leaves the others alone', async () => {
     const { paperId, ada, head } = await started();
-    const state = await editorState(paperId, 2);
+    const state = await editorState(paperId, 'community', 2);
     expect(state).toMatchObject({ baseOid: head, title: 'Critique', text: '## Critique\nQuadratic in length.\n\n' });
     const res = await edit(ada, { baseOid: head, section: 2, content: '## Critique\nQuadratic, but parallel.\n' });
     expect(res.body).toMatchObject({ changed: true, merged: false });
@@ -180,7 +180,7 @@ describe('history and revert', () => {
     expect(json).not.toContain(account.id);
     expect(json).not.toMatch(/accountId|account_id/);
     expect(Object.keys(history[0]).sort()).toEqual(
-      ['at', 'authorId', 'bytesDelta', 'handle', 'kind', 'oid', 'paths', 'seq', 'summary'].sort(),
+      ['at', 'authorId', 'authorName', 'bytesDelta', 'handle', 'kind', 'oid', 'paths', 'seq', 'summary'].sort(),
     );
   });
 });

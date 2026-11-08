@@ -4,6 +4,7 @@ import { getDb, type Database } from '@/db';
 import { pgErrorCode } from '@/db/errors';
 import {
   accounts,
+  authorClaims,
   commitIdentities,
   pageEvents,
   pageObjects,
@@ -82,8 +83,8 @@ export const COMMIT_RATE_LIMIT: RateLimitConfig = { burst: 30, perSecond: 0.2 };
 const IDENTITY_ALPHABET = 'abcdefghijkmnpqrstuvwxyz23456789';
 const IDENTITY_LENGTH = 8;
 
-function newIdentity(): string {
-  return `u_${[...randomBytes(IDENTITY_LENGTH)].map((b) => IDENTITY_ALPHABET[b % IDENTITY_ALPHABET.length]).join('')}`;
+export function newIdentity(prefix: 'u' | 'a' = 'u'): string {
+  return `${prefix}_${[...randomBytes(IDENTITY_LENGTH)].map((b) => IDENTITY_ALPHABET[b % IDENTITY_ALPHABET.length]).join('')}`;
 }
 
 /** The account's stable public id in commits, made on its first commit. */
@@ -129,10 +130,26 @@ function normalizeChanges(changes: readonly FileChange[]): FileChange[] {
   });
 }
 
-async function rolesOf(tx: Writer, actor: Actor): Promise<Roles & { bot: boolean }> {
+type ActorRoles = Roles & { bot: boolean; claimIdentity: string | null };
+
+async function rolesOf(tx: Writer, actor: Actor, paperId: string): Promise<ActorRoles> {
+  const confirmed = await tx
+    .select({ accountId: authorClaims.accountId, identityId: authorClaims.identityId })
+    .from(authorClaims)
+    .where(and(eq(authorClaims.paperId, paperId), eq(authorClaims.status, 'confirmed')));
+  const claimed = confirmed.length > 0;
   if (actor.kind === 'system') {
-    return { system: true, admin: false, verified: false, confirmedAuthor: false, bot: false };
+    return {
+      system: true,
+      admin: false,
+      verified: false,
+      confirmedAuthor: false,
+      claimed,
+      bot: false,
+      claimIdentity: null,
+    };
   }
+  const claim = confirmed.find((c) => c.accountId === actor.accountId);
   const [account] = await tx
     .select({ isBot: accounts.isBot, verifiedAt: accounts.verifiedAt })
     .from(accounts)
@@ -142,8 +159,11 @@ async function rolesOf(tx: Writer, actor: Actor): Promise<Roles & { bot: boolean
     system: false,
     admin: actor.isAdmin,
     verified: account.isBot || account.verifiedAt !== null,
-    confirmedAuthor: false,
+    confirmedAuthor: claim !== undefined,
+    claimed,
     bot: account.isBot,
+    // On their own paper an author is always named, never their handle (DESIGN.md §5.3).
+    claimIdentity: claim?.identityId ?? null,
   };
 }
 
@@ -230,7 +250,7 @@ export async function commitPage(
 
   try {
     return await database.transaction(async (tx) => {
-      const roles = await rolesOf(tx, actor);
+      const roles = await rolesOf(tx, actor, paperId);
       checkPermissions(wanted, roles);
 
       const [paper] = await tx.select({ mergedInto: papers.mergedInto }).from(papers).where(eq(papers.id, paperId));
@@ -295,7 +315,10 @@ export async function commitPage(
       const commit: Commit = {
         tree: root,
         parent: head,
-        authorId: actor.kind === 'system' ? SYSTEM_AUTHOR_ID : await commitIdentity(tx, actor.accountId),
+        authorId:
+          actor.kind === 'system'
+            ? SYSTEM_AUTHOR_ID
+            : (roles.claimIdentity ?? (await commitIdentity(tx, actor.accountId))),
         at: new Date(Math.floor(Date.now() / 1000) * 1000),
         summary: cleanSummary(summary),
         kind,

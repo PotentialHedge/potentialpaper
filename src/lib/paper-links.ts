@@ -18,12 +18,15 @@ export function titleLinks({
   title,
   pdf,
   forums = [],
+  extra = [],
 }: {
   identifiers: readonly PaperId[];
   title: string;
   pdf?: string | null;
   /** Submissions' pages, kept only where they are on OpenReview. */
   forums?: readonly (string | null)[];
+  /** The page's own `links.json`: one with a built-in link's label replaces it, the rest follow. */
+  extra?: readonly TitleLink[];
 }): TitleLink[] {
   const arxiv = identifiers.find((id) => id.scheme === 'arxiv')?.value;
   const doi = identifiers.find((id) => id.scheme === 'doi')?.value;
@@ -42,7 +45,62 @@ export function titleLinks({
       url: `https://scholar.google.com/scholar?${new URLSearchParams({ q: `"${title}"` })}`,
     },
   ];
-  return links.filter((link): link is TitleLink => link !== null);
+  const own = new Map(extra.map((link) => [link.label.toLowerCase(), link]));
+  const merged = links
+    .filter((link): link is TitleLink => link !== null)
+    .map((link) => {
+      const replaced = own.get(link.label.toLowerCase());
+      own.delete(link.label.toLowerCase());
+      return replaced ?? link;
+    });
+  return [...merged, ...own.values()];
+}
+
+export const MAX_LINKS = 12;
+export const MAX_LINK_LABEL = 30;
+const MAX_LINK_URL = 2000;
+
+/** A link's problem, or `null`. Only http(s), so a link can't run anything. */
+export function linkProblem(link: TitleLink): string | null {
+  const label = link.label.trim();
+  if (label === '' || label.length > MAX_LINK_LABEL) return `needs a label of 1 to ${MAX_LINK_LABEL} characters`;
+  if (/[[\]\p{C}]/u.test(label)) return 'has a label with a bracket or a control character';
+  const url = URL.parse(link.url);
+  if (!url || (url.protocol !== 'https:' && url.protocol !== 'http:') || link.url.length > MAX_LINK_URL) {
+    return 'needs an http or https address';
+  }
+  return null;
+}
+
+/** The links in a `links.json`, or `null` if it isn't a list of good, distinct links. */
+export function parseLinksFile(text: string): TitleLink[] | null {
+  let value: unknown;
+  try {
+    value = JSON.parse(text);
+  } catch {
+    return null;
+  }
+  if (!Array.isArray(value) || value.length > MAX_LINKS) return null;
+  const links: TitleLink[] = [];
+  const labels = new Set<string>();
+  for (const item of value) {
+    if (item === null || typeof item !== 'object' || Array.isArray(item)) return null;
+    const { label, url } = item as Record<string, unknown>;
+    if (typeof label !== 'string' || typeof url !== 'string') return null;
+    const link = { label: label.trim(), url };
+    if (linkProblem(link) || labels.has(link.label.toLowerCase())) return null;
+    labels.add(link.label.toLowerCase());
+    links.push(link);
+  }
+  return links;
+}
+
+export function encodeLinksFile(links: readonly TitleLink[]): string {
+  return `${JSON.stringify(
+    links.map(({ label, url }) => ({ label, url })),
+    null,
+    2,
+  )}\n`;
 }
 
 /** Braces protect capitals and stop a stray `{` or `}` from unbalancing the entry. */

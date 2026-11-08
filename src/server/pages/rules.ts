@@ -1,4 +1,4 @@
-import { parseDemosFile } from '@/lib/demos';
+import { parseLinksFile } from '@/lib/paper-links';
 
 /**
  * What may be written to a page repo, and by whom (DESIGN.md §4.3). Pure, and the only place these rules
@@ -12,10 +12,14 @@ export const COMMUNITY_PAGE_PATH = 'community/page.md';
 export const RESOURCES_PATH = 'author/resources.json';
 /** Where the paper's PDF is: the bytes are in R2 (DESIGN.md §4.3), and this says which ones. */
 export const PDF_PATH = 'pdf.json';
-/** A picture the authors chose for the paper, in place of its PDF's first page: a pointer, as `pdf.json` is. */
-export const THUMBNAIL_PATH = 'author/thumbnail.json';
-/** Demos attached to the paper: pointers to snapshots of code from GitHub (`lib/demos.ts`). */
-export const DEMOS_PATH = 'community/demos.jsonl';
+/**
+ * A picture of the paper, in place of its PDF's first page: a pointer, as `pdf.json` is. It and the links
+ * are the paper's card: its confirmed authors' once it is claimed, and anyone verified's until then.
+ */
+export const THUMBNAIL_PATH = 'thumbnail.json';
+/** Links to the paper elsewhere (code, project page, video), shown under its title (`lib/paper-links.ts`). */
+export const LINKS_PATH = 'links.json';
+const CARD_PATHS = new Set([THUMBNAIL_PATH, LINKS_PATH]);
 
 export const MAX_FILE_BYTES = 256 * 1024;
 export const MAX_CHANGES = 50;
@@ -65,8 +69,10 @@ export interface Roles {
   admin: boolean;
   /** Has a confirmed institutional address, or is a bot an operator minted. */
   verified: boolean;
-  /** A confirmed author of this paper. Nobody is until claims exist (Milestone 5). */
+  /** A confirmed author of this paper (`author_claims`). */
   confirmedAuthor: boolean;
+  /** The paper has a confirmed author, who then owns its picture and links. */
+  claimed: boolean;
 }
 
 /** Why these roles cannot write this path, or `null`. Checked for each path of a commit. */
@@ -76,6 +82,13 @@ export function pathDenied(path: string, roles: Roles): string | null {
   }
   if (path === PDF_PATH) {
     return roles.system || roles.admin ? null : 'only the system and admins can change the PDF';
+  }
+  if (CARD_PATHS.has(path)) {
+    if (roles.system) return 'the system only writes the metadata';
+    if (roles.admin) return null;
+    if (roles.claimed)
+      return roles.confirmedAuthor ? null : "only this paper's confirmed authors can change its picture and links";
+    return roles.verified ? null : 'confirm an institutional email address first';
   }
   if (path.startsWith('author/')) {
     return roles.confirmedAuthor || roles.admin
@@ -88,7 +101,7 @@ export function pathDenied(path: string, roles: Roles): string | null {
   }
   // Data owned by one extension (DESIGN.md §10). Nobody can act as one until extensions exist.
   if (path.startsWith('extensions/')) return 'this path is reserved for extensions';
-  return 'pages only have metadata.json, pdf.json, author/, community/ and extensions/';
+  return 'pages only have metadata.json, pdf.json, thumbnail.json, links.json, author/, community/ and extensions/';
 }
 
 function jsonValueProblem(value: unknown, depth = 0): string | null {
@@ -228,7 +241,7 @@ export function contentProblem(path: string, content: string): string | null {
   if (Buffer.byteLength(content) > MAX_FILE_BYTES) return `is larger than ${MAX_FILE_BYTES} bytes`;
   if (path === PDF_PATH) return parsePdfPointer(content) ? null : 'is not a valid PDF pointer';
   if (path === THUMBNAIL_PATH) return parseThumbnailPointer(content) ? null : 'is not a valid thumbnail pointer';
-  if (path === DEMOS_PATH) return parseDemosFile(content) ? null : 'has a line that is not a valid demo';
+  if (path === LINKS_PATH) return parseLinksFile(content) ? null : 'is not a valid list of links';
   if (path.endsWith('.jsonl')) {
     for (const line of content.split('\n')) {
       if (line === '') continue;

@@ -1,11 +1,24 @@
 import katex from 'katex';
 import MarkdownIt, { type StateBlock, type StateInline } from 'markdown-it';
+import {
+  DEMO_ALLOW,
+  DEMO_SANDBOX,
+  demoBlockId,
+  demoBlockText,
+  demoUrl,
+  sourceAt,
+  sourceLabel,
+  type DemoSource,
+} from '@/lib/demos';
 
 /**
  * A page's Markdown, as HTML and as sections. Rendered once, at commit (`writeCurrent`), so readers are
  * served stored HTML. Raw HTML is off, so the only tags are markdown-it's own and KaTeX's, and
  * markdown-it's `validateLink` refuses `javascript:`, `vbscript:`, `file:` and non-image `data:` links.
  * The CSP is the second lock (`next.config.ts`).
+ *
+ * A ```` ```demo <snapshot> ```` block is a demo (`lib/demos.ts`), shown as a figure with its frame. Where its
+ * files came from is looked up when rendering, and a block naming no known snapshot says so.
  *
  * Sections are the `##` headings at the top level, numbered from 1 in order. The editor splits a file at
  * them and the rendered page marks them, both from the same parse, so the two can't disagree.
@@ -77,6 +90,28 @@ function blockMath(state: StateBlock, startLine: number, endLine: number, silent
   return true;
 }
 
+type RenderEnv = { demos?: ReadonlyMap<string, DemoSource> } & Record<string, unknown>;
+
+/**
+ * A demo's figure. The frame has no `src` until it nears the screen: `DemoFrames` gives it one, fits its
+ * height to what the demo reports, and runs the full-screen button.
+ */
+function renderDemo(id: string, body: string, demo: DemoSource | undefined, escape: (s: string) => string): string {
+  const { title, description } = demoBlockText(body);
+  const name = escape(title || 'Untitled demo');
+  if (!demo) return `<p class="demo-missing">A demo, “${name}”, that isn't on this site.</p>\n`;
+  const url = escape(demoUrl(id));
+  return [
+    `<figure class="demo" data-demo="${id}">`,
+    `<iframe class="demo-frame" data-src="${url}" title="${name}" sandbox="${DEMO_SANDBOX}" allow="${DEMO_ALLOW}" allowfullscreen></iframe>`,
+    `<figcaption><b>Demo:</b> ${name}${description ? `. ${escape(description)}` : ''}`,
+    `<span class="demo-tools"><button type="button" data-demo-fullscreen>full screen</button>`,
+    `<a href="${url}" target="_blank" rel="noopener">new tab</a>`,
+    `<a href="${escape(sourceAt(demo))}" rel="nofollow ugc noopener" class="demo-source">${escape(sourceLabel(demo))}</a></span>`,
+    `</figcaption></figure>\n`,
+  ].join('');
+}
+
 function newRenderer() {
   const md = new MarkdownIt({ html: false, linkify: true, typographer: false });
   md.inline.ruler.after('escape', 'math_inline', inlineMath);
@@ -86,6 +121,13 @@ function newRenderer() {
   md.renderer.rules.math_inline = (tokens, idx) => renderMath(tokens[idx].content, false);
   md.renderer.rules.math_block = (tokens, idx) =>
     `<div class="math-display">${renderMath(tokens[idx].content, true)}</div>\n`;
+
+  const fence = md.renderer.rules.fence!;
+  md.renderer.rules.fence = (tokens, idx, options, env: RenderEnv | undefined, self) => {
+    const id = demoBlockId(tokens[idx].info);
+    if (!id) return fence(tokens, idx, options, env, self);
+    return renderDemo(id, tokens[idx].content, env?.demos?.get(id), md.utils.escapeHtml);
+  };
 
   const renderToken = md.renderer.renderToken.bind(md.renderer);
   md.renderer.rules.link_open = (tokens, idx, options) => {
@@ -161,17 +203,24 @@ export function replaceSection(markdown: string, index: number, content: string)
   return parts.join('');
 }
 
-/** What an empty community section starts as, in the editor. */
+/** What an empty section starts as, in the editor. */
 export const STARTER_HEADINGS = ['Summary', 'Why it matters', 'Critique', 'Errata', 'Reproductions', 'Follow-ups'];
 export const COMMUNITY_STARTER = STARTER_HEADINGS.map((title) => `## ${title}\n`).join('\n');
+export const AUTHOR_STARTER_HEADINGS = ['TL;DR', 'Overview', 'Results', 'Demos', 'Code and data', 'Talks'];
+export const AUTHOR_STARTER = AUTHOR_STARTER_HEADINGS.map((title) => `## ${title}\n`).join('\n');
 
 /**
  * HTML for a page's Markdown. Headings move down a level, since the page's own section heading is the
  * `<h2>`, and each section's heading carries `data-section`, so a page can give it an edit link. The ids
  * start with `idPrefix`, so the author and community sections can't collide.
  */
-export function renderMarkdown(markdown: string, idPrefix = 'md'): string {
-  const tokens = md.parse(markdown, {});
+export function renderMarkdown(
+  markdown: string,
+  idPrefix = 'md',
+  demos: ReadonlyMap<string, DemoSource> = new Map(),
+): string {
+  const env: RenderEnv = { demos };
+  const tokens = md.parse(markdown, env);
   let section = 0;
   for (const token of tokens) {
     if (token.type !== 'heading_open' && token.type !== 'heading_close') continue;
@@ -184,10 +233,25 @@ export function renderMarkdown(markdown: string, idPrefix = 'md'): string {
       token.attrSet('data-section', String(section));
     }
   }
-  return md.renderer.render(tokens, md.options, {});
+  return md.renderer.render(tokens, md.options, env);
 }
 
 /** The same, for HTML stored beside Markdown that may be absent. */
-export function renderOrNull(markdown: string | null, idPrefix: string): string | null {
-  return markdown === null || markdown.trim() === '' ? null : renderMarkdown(markdown, idPrefix);
+export function renderOrNull(
+  markdown: string | null,
+  idPrefix: string,
+  demos?: ReadonlyMap<string, DemoSource>,
+): string | null {
+  return markdown === null || markdown.trim() === '' ? null : renderMarkdown(markdown, idPrefix, demos);
+}
+
+/** The snapshots the Markdown's demo blocks name, in order, each once. */
+export function demoIds(markdown: string | null): string[] {
+  if (!markdown) return [];
+  const ids = md
+    .parse(markdown, {})
+    .filter((token) => token.type === 'fence')
+    .map((token) => demoBlockId(token.info))
+    .filter((id): id is string => id !== null);
+  return [...new Set(ids)];
 }

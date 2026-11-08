@@ -10,6 +10,7 @@ import {
 } from '@/components/paper/page-tools';
 import { RevertButton } from '@/components/paper/RevertButton';
 import { ui } from '@/components/ui';
+import { claimNames } from '@/server/claims';
 import { handlesOf } from '@/server/pages/edit';
 import type { FileDiff } from '@/server/pages/merge';
 import { diffCommits, findCommit } from '@/server/pages/repo';
@@ -62,18 +63,29 @@ export default async function DiffPage({ params, searchParams }: Props) {
   const found = await toolPaper('diff', params, `oid=${encodeURIComponent(oid)}`);
   const commit = await findCommit(getDb(), found.paper.id, oid);
   if (!commit) notFound();
-  const [diffs, handles] = await Promise.all([
+  const [diffs, handles, names] = await Promise.all([
     diffCommits(found.paper.id, commit.parent, oid),
     handlesOf([commit.authorId]),
+    claimNames([commit.authorId]),
   ]);
   if (!diffs) notFound();
   const handle = handles.get(commit.authorId);
+  const authorName = names.get(commit.authorId);
   return (
     <main className={ui.page}>
       <ToolHeader paper={found} tool="diff" title={commit.summary} />
       <p className="mt-3 font-sans text-sm">
-        {handle ? `@${handle}` : <i className="text-muted">PotentialPaper</i>} ·{' '}
-        <span className={ui.mono}>{commit.at.toISOString().slice(0, 16).replace('T', ' ')} UTC</span> ·{' '}
+        {authorName ? (
+          <>
+            {authorName}
+            <span className={ui.badge}>author</span>
+          </>
+        ) : handle ? (
+          `@${handle}`
+        ) : (
+          <i className="text-muted">PotentialPaper</i>
+        )}{' '}
+        · <span className={ui.mono}>{commit.at.toISOString().slice(0, 16).replace('T', ' ')} UTC</span> ·{' '}
         <span className={ui.mono}>{oid.slice(0, 12)}</span>
         {commit.kind !== 'edit' && <span className={ui.badge}>{commit.kind}</span>}
         {commit.reverts && (

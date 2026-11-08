@@ -3,17 +3,16 @@ import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { describe, expect, it } from 'vitest';
-import { encodeDemosFile, parseDemosFile, type DemoPointer } from '@/lib/demos';
+import { demoBlockId, demoBlockMarkdown, demoBlockText, sourceLabel, type DemoSource } from '@/lib/demos';
 import { parseRefAdvertisement, parseSourceUrl, resolveRest } from '@/server/demos/github';
 import { findFile, HEIGHT_REPORTER, splitDemoPath, withHeightReporter } from '@/server/demos/serve';
 import { chooseRoot, contentType, selectFiles, snapshotId } from '@/server/demos/snapshot';
 import { readTar } from '@/server/demos/tar';
-import { contentProblem, DEMOS_PATH } from '@/server/pages/rules';
+import { demoIds, renderMarkdown } from '@/server/pages/markdown';
 
 const COMMIT = 'a'.repeat(40);
-const DEMO: DemoPointer = {
+const DEMO: DemoSource = {
   id: 'f'.repeat(32),
-  title: 'Attention, in 3D',
   source: 'https://github.com/someone/attention-3d',
   commit: COMMIT,
   root: 'dist',
@@ -168,21 +167,30 @@ describe('a snapshot', () => {
   });
 });
 
-describe('demos.jsonl', () => {
-  it('round-trips, and refuses a line that is not a demo', () => {
-    const text = encodeDemosFile([DEMO, { ...DEMO, id: 'e'.repeat(32), description: 'Rotate it.' }]);
-    expect(parseDemosFile(text)).toHaveLength(2);
-    expect(contentProblem(DEMOS_PATH, text)).toBeNull();
-    for (const bad of [
-      { ...DEMO, id: 'x' },
-      { ...DEMO, title: '' },
-      { ...DEMO, source: 'https://evil.org/a/b' },
-      { ...DEMO, commit: 'main' },
-      { ...DEMO, root: '../up' },
-      { ...DEMO, root: '/abs' },
-    ]) {
-      expect(contentProblem(DEMOS_PATH, JSON.stringify(bad) + '\n')).toBe('has a line that is not a valid demo');
-    }
+describe('a demo block', () => {
+  it('round-trips its id, title and description', () => {
+    const block = demoBlockMarkdown({ id: DEMO.id, title: ' Attention,\n in 3D ', description: 'Rotate `it`.' });
+    expect(block).toBe(`\`\`\`demo ${DEMO.id}\nAttention, in 3D\nRotate 'it'.\n\`\`\`\n`);
+    expect(demoBlockId(`demo ${DEMO.id}`)).toBe(DEMO.id);
+    expect(demoBlockId('demo nope')).toBeNull();
+    expect(demoBlockId('js')).toBeNull();
+    expect(demoBlockText('Attention, in 3D\nRotate it.\nAnd zoom.\n')).toEqual({
+      title: 'Attention, in 3D',
+      description: 'Rotate it. And zoom.',
+    });
+  });
+
+  it('is found in Markdown, once each, and renders as a sandboxed frame with no src until shown', () => {
+    const md = `## Demos\n\n${demoBlockMarkdown({ id: DEMO.id, title: 'A <b>' })}\n${demoBlockMarkdown({ id: DEMO.id, title: 'Again' })}\n\`\`\`js\nx\n\`\`\`\n`;
+    expect(demoIds(md)).toEqual([DEMO.id]);
+    const html = renderMarkdown(md, 'community', new Map([[DEMO.id, DEMO]]));
+    expect(html).toContain(`<iframe class="demo-frame" data-src="http://127.0.0.1:3000/d/${DEMO.id}/"`);
+    expect(html).not.toMatch(/<iframe[^>]* src=/);
+    expect(html).toContain('sandbox="allow-scripts');
+    expect(html).toContain('<b>Demo:</b> A &lt;b&gt;');
+    expect(html).toContain(sourceLabel(DEMO));
+    expect(html).toContain('<code class="language-js">');
+    expect(renderMarkdown(md, 'community')).toContain('class="demo-missing"');
   });
 });
 

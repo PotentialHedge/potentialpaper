@@ -11,14 +11,14 @@ import {
 import { findPaper, type FoundPaper } from '@/server/papers';
 
 /**
- * What the edit, history and diff pages share. Each lives at its own prefix in front of the paper's
+ * What the edit, history, diff and claim pages share. Each lives at its own prefix in front of the paper's
  * address (`/history/abs/1706.03762`), since the paper routes are catch-alls that end anywhere. They are
  * dynamic, never cached, and kept out of indexes.
  */
 
 export type ToolParams = Promise<{ scheme: string; value: string[] }>;
 export type ToolSearchParams = Promise<Record<string, string | string[] | undefined>>;
-export type Tool = 'edit' | 'history' | 'diff';
+export type Tool = 'edit' | 'history' | 'diff' | 'claim';
 
 const SCHEME_OF_PREFIX = Object.fromEntries(
   Object.entries(PATH_PREFIX).map(([scheme, prefix]) => [prefix.slice(1), scheme as PaperScheme]),

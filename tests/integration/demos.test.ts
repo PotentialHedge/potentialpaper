@@ -7,7 +7,7 @@ import { eq } from 'drizzle-orm';
 import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it, vi } from 'vitest';
 import { getDb } from '@/db';
 import { demoSnapshots, pageCurrent } from '@/db/schema';
-import { DEMO_ORIGIN } from '@/lib/demos';
+import { DEMO_ORIGIN, demoBlockMarkdown } from '@/lib/demos';
 import { serveDemo } from '@/server/demos/serve';
 import { rebuildAllPages } from '@/server/pages/projections';
 import { pageHistory } from '@/server/pages/repo';
@@ -102,28 +102,17 @@ async function paper(): Promise<string> {
   });
 }
 
-describe('attaching a demo', () => {
-  it('copies the built folder at a pinned commit, commits a pointer, and serves the files', async () => {
+describe('a demo', () => {
+  it('copies the built folder at a pinned commit, without committing, and serves the files', async () => {
     const paperId = await paper();
     const cookie = await signUp('ada@ethz.ch');
     vi.stubGlobal('fetch', fakeGitHub());
 
-    const res = await api('POST', '/demos', {
-      cookie,
-      body: { paper: PAPER, url: `https://github.com/${OWNER}/${REPO}`, title: 'Attention, in 3D' },
-    });
+    const res = await api('POST', '/demos', { cookie, body: { url: `https://github.com/${OWNER}/${REPO}` } });
     expect(res.status).toBe(201);
-    expect(res.body.demo).toMatchObject({ title: 'Attention, in 3D', commit: MAIN, root: 'dist' });
-    expect(res.body.files).toBe(3);
-    const id: string = res.body.demo.id;
-
-    const [current] = await getDb().select().from(pageCurrent).where(eq(pageCurrent.paperId, paperId));
-    expect(current.demos).toEqual([res.body.demo]);
-    const [history] = await pageHistory(paperId, { limit: 1 });
-    expect(history).toMatchObject({
-      summary: 'Add demo "Attention, in 3D"',
-      paths: ['community/demos.jsonl', 'metadata.json'],
-    });
+    expect(res.body).toMatchObject({ commit: MAIN, root: 'dist', files: 3 });
+    const id: string = res.body.id;
+    expect(await pageHistory(paperId, { limit: 1 })).toEqual([]);
 
     const index = await serveDemo(demoRequest(`/d/${id}/`));
     expect(index.status).toBe(200);
@@ -151,45 +140,49 @@ describe('attaching a demo', () => {
     expect((await serveDemo(demoRequest('/assets/index.js'))).status).toBe(404);
   });
 
-  it('stores the same files once, refuses them twice on one page, and survives a rebuild', async () => {
+  it('goes into a section as a block, renders as a frame, and survives a rebuild', async () => {
     const paperId = await paper();
     const cookie = await signUp('ada@ethz.ch');
     vi.stubGlobal('fetch', fakeGitHub());
-    const body = { paper: PAPER, url: `https://github.com/${OWNER}/${REPO}/tree/main/dist`, title: 'Again' };
-    expect((await api('POST', '/demos', { cookie, body })).status).toBe(201);
-    const again = await api('POST', '/demos', { cookie, body });
-    expect(again.status).toBe(422);
-    expect(again.body.error.message).toMatch(/already on the page/);
+    const body = { url: `https://github.com/${OWNER}/${REPO}/tree/main/dist` };
+    const first = await api('POST', '/demos', { cookie, body });
+    expect((await api('POST', '/demos', { cookie, body })).body.id).toBe(first.body.id);
     expect(await getDb().select().from(demoSnapshots)).toHaveLength(1);
 
+    const content = `## Reproductions\n\n${demoBlockMarkdown({ id: first.body.id, title: 'Attention, in 3D', description: 'Rotate it.' })}`;
+    const edit = await api('POST', '/pages/edit', {
+      cookie,
+      body: { paper: PAPER, baseOid: null, section: 0, content, summary: '' },
+    });
+    expect(edit.status).toBe(200);
     const [before] = await getDb().select().from(pageCurrent).where(eq(pageCurrent.paperId, paperId));
+    expect(before.communityHtml).toContain(`<figure class="demo" data-demo="${first.body.id}">`);
+    expect(before.communityHtml).toContain(`data-src="${DEMO_ORIGIN}/d/${first.body.id}/"`);
+    expect(before.communityHtml).toContain(`${OWNER}/${REPO}/dist@${MAIN.slice(0, 7)}`);
+    expect(before.communityHtml).toContain('<b>Demo:</b> Attention, in 3D. Rotate it.');
+
     await rebuildAllPages();
     const [after] = await getDb().select().from(pageCurrent).where(eq(pageCurrent.paperId, paperId));
-    expect(after.demos).toEqual(before.demos);
+    expect(after.communityHtml).toBe(before.communityHtml);
   });
 
-  it('removes one, as a commit', async () => {
-    const paperId = await paper();
+  it('refuses a block naming a demo this site does not have', async () => {
+    await paper();
     const cookie = await signUp('ada@ethz.ch');
-    vi.stubGlobal('fetch', fakeGitHub());
-    const added = await api('POST', '/demos', {
+    const content = demoBlockMarkdown({ id: 'e'.repeat(32), title: 'Made up' });
+    const edit = await api('POST', '/pages/edit', {
       cookie,
-      body: { paper: PAPER, url: `https://github.com/${OWNER}/${REPO}`, title: 'Gone soon' },
+      body: { paper: PAPER, baseOid: null, section: 0, content, summary: '' },
     });
-    const query = new URLSearchParams({ ...PAPER, id: added.body.demo.id });
-    const removed = await api('DELETE', `/demos?${query}`, { cookie });
-    expect(removed.status).toBe(200);
-    const [current] = await getDb().select().from(pageCurrent).where(eq(pageCurrent.paperId, paperId));
-    expect(current.demos).toBeNull();
-    const [last] = await pageHistory(paperId, { limit: 1 });
-    expect(last.summary).toBe('Remove demo "Gone soon"');
+    expect(edit.status).toBe(422);
+    expect(edit.body.error.details.missing).toEqual(['e'.repeat(32)]);
   });
 
   it('explains what is wrong with a repo it cannot use', async () => {
     await paper();
     const cookie = await signUp('ada@ethz.ch');
     vi.stubGlobal('fetch', fakeGitHub({ 'src/index.ts': 'x' }));
-    const post = (url: string) => api('POST', '/demos', { cookie, body: { paper: PAPER, url, title: 'T' } });
+    const post = (url: string) => api('POST', '/demos', { cookie, body: { url } });
 
     const noIndex = await post(`https://github.com/${OWNER}/${REPO}`);
     expect(noIndex.status).toBe(422);
@@ -201,9 +194,7 @@ describe('attaching a demo', () => {
 
   it('needs a verified account', async () => {
     await paper();
-    const res = await api('POST', '/demos', {
-      body: { paper: PAPER, url: `https://github.com/${OWNER}/${REPO}`, title: 'T' },
-    });
+    const res = await api('POST', '/demos', { body: { url: `https://github.com/${OWNER}/${REPO}` } });
     expect(res.status).toBe(401);
   });
 });

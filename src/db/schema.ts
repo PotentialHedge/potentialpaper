@@ -17,7 +17,7 @@ import {
   uuid,
 } from 'drizzle-orm/pg-core';
 import { NOTE_KINDS, SUBMISSION_STATUSES, type FieldValue, type VenueForms } from '../lib/submissions';
-import type { DemoPointer } from '../lib/demos';
+import type { TitleLink } from '../lib/paper-links';
 import type { PdfPointer, ThumbnailPointer } from '@/server/pages/rules';
 import { PAPER_ORIGINS } from '../server/paper-sources/types';
 import { user } from './auth-schema';
@@ -282,10 +282,10 @@ export const pageCurrent = pgTable('page_current', {
   resources: jsonb('resources').$type<Record<string, unknown>>(),
   /** The page's `pdf.json`. */
   pdf: jsonb('pdf').$type<PdfPointer>(),
-  /** The page's `author/thumbnail.json`. */
+  /** The page's `thumbnail.json`. */
   thumbnail: jsonb('thumbnail').$type<ThumbnailPointer>(),
-  /** The page's `community/demos.jsonl`, in order. */
-  demos: jsonb('demos').$type<DemoPointer[]>(),
+  /** The page's `links.json`: links to the paper elsewhere, beside the ones its identifiers give. */
+  links: jsonb('links').$type<TitleLink[]>(),
   updatedAt: timestamp('updated_at', { withTimezone: true, mode: 'date' }).notNull(),
 });
 
@@ -325,7 +325,7 @@ export interface DemoFile {
 /**
  * The files of a demo, copied from a repo at one commit (`server/demos/snapshot.ts`). The id is a hash of
  * the file list, so a snapshot never changes, and the same files are stored once whoever attaches them.
- * Not a projection: pages point at snapshots by id from `demos.jsonl`.
+ * Not a projection: a page's Markdown embeds snapshots by id, in a ```` ```demo ```` block.
  */
 export const demoSnapshots = pgTable('demo_snapshots', {
   id: text('id').primaryKey(),
@@ -426,3 +426,47 @@ export const submissionNotes = pgTable(
     check('submission_notes_kind_check', sql.raw(`kind in (${NOTE_KINDS.map((kind) => `'${kind}'`).join(', ')})`)),
   ],
 );
+
+export const CLAIM_STATUSES = ['pending', 'confirmed', 'rejected'] as const;
+export type ClaimStatus = (typeof CLAIM_STATUSES)[number];
+
+/**
+ * An account's claim to be one of a paper's authors (DESIGN.md §6). A paper with a confirmed claim is
+ * claimed, and its confirmed authors own its author section, picture and links. **Private:** `identity_id`
+ * is the `a_` id the author's commits on this paper carry, and nothing public may tie it to `account_id`.
+ * How a claim gets confirmed is still open: for now an admin decides (`scripts/decide-claim.ts`).
+ */
+export const authorClaims = pgTable(
+  'author_claims',
+  {
+    id: uuid('id').primaryKey().defaultRandom(),
+    paperId: uuid('paper_id')
+      .notNull()
+      .references(() => papers.id, { onDelete: 'cascade' }),
+    accountId: uuid('account_id')
+      .notNull()
+      .references(() => accounts.id, { onDelete: 'cascade' }),
+    /** Which of `papers.authors` they say they are, from 0. */
+    authorIndex: integer('author_index').notNull(),
+    /** The name as printed, kept in case the paper's author list changes. */
+    authorName: text('author_name').notNull(),
+    /** Their own words: why they are this author. */
+    evidence: text('evidence').notNull().default(''),
+    status: text('status', { enum: CLAIM_STATUSES }).notNull().default('pending'),
+    identityId: text('identity_id').notNull(),
+    decidedBy: uuid('decided_by').references(() => accounts.id, { onDelete: 'set null' }),
+    decidedAt: timestamp('decided_at', { withTimezone: true, mode: 'date' }),
+    createdAt: createdAt(),
+  },
+  (t) => [
+    uniqueIndex('author_claims_account_key').on(t.paperId, t.accountId),
+    uniqueIndex('author_claims_identity_key').on(t.identityId),
+    uniqueIndex('author_claims_confirmed_author_key')
+      .on(t.paperId, t.authorIndex)
+      .where(sql`${t.status} = 'confirmed'`),
+    index('author_claims_status_idx').on(t.status),
+    check('author_claims_status_check', sql.raw(`status in (${CLAIM_STATUSES.map((s) => `'${s}'`).join(', ')})`)),
+  ],
+);
+
+export type AuthorClaim = typeof authorClaims.$inferSelect;

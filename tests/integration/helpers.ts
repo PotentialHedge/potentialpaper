@@ -11,6 +11,9 @@ import * as demos from '@/app/api/v1/demos/route';
 import * as pageEdit from '@/app/api/v1/pages/edit/route';
 import * as pageRender from '@/app/api/v1/pages/render/route';
 import * as pageRevert from '@/app/api/v1/pages/revert/route';
+import * as pageLinks from '@/app/api/v1/pages/links/route';
+import * as pageThumbnail from '@/app/api/v1/pages/thumbnail/route';
+import * as claims from '@/app/api/v1/claims/route';
 import { getDb, getPool } from '@/db';
 import { clearDevOutbox, devOutbox } from '@/server/mail';
 
@@ -18,7 +21,7 @@ export const ORIGIN = 'http://test.local';
 
 export async function resetDatabase(): Promise<void> {
   await getDb().execute(sql`
-    truncate table demo_snapshots, submission_notes, submissions, venues, pdf_covers, page_events, page_current, page_revisions, page_refs, page_objects, commit_identities, paper_lookup_misses, paper_identifiers, papers, institution_domains, affiliations, accounts, rate_limit_buckets,
+    truncate table author_claims, demo_snapshots, submission_notes, submissions, venues, pdf_covers, page_events, page_current, page_revisions, page_refs, page_objects, commit_identities, paper_lookup_misses, paper_identifiers, papers, institution_domains, affiliations, accounts, rate_limit_buckets,
       session, account, verification, "user"
     restart identity cascade
   `);
@@ -38,6 +41,9 @@ const ROUTES: [RegExp, any][] = [
   [/^\/pages\/edit$/, pageEdit],
   [/^\/pages\/render$/, pageRender],
   [/^\/pages\/revert$/, pageRevert],
+  [/^\/pages\/links$/, pageLinks],
+  [/^\/pages\/thumbnail(\?.*)?$/, pageThumbnail],
+  [/^\/claims(\?.*)?$/, claims],
   [/^\/me\/password$/, password],
   [/^\/me\/affiliations$/, affiliations],
   [/^\/me\/affiliations\/(?<id>[^/]+)$/, affiliation],

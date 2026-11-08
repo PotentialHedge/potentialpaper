@@ -142,4 +142,30 @@
   .md .section-edit {
     @apply ml-3 font-sans text-xs text-faint [font-variant-caps:normal];
   }
+  /* A demo (`server/pages/markdown.ts`): part of the page, as a paper's figure is, with no box around it.
+     16:9 until its page reports a height (`DemoFrames`). */
+  .md figure.demo {
+    @apply my-5;
+  }
+  .md .demo-frame {
+    @apply block aspect-video w-full border-0 bg-transparent;
+  }
+  .md .demo-frame.demo-sized {
+    aspect-ratio: auto;
+  }
+  .md figure.demo figcaption {
+    @apply mt-1 text-[13px] text-subtle;
+  }
+  .md .demo-tools {
+    @apply ml-2 inline-flex flex-wrap gap-x-2.5 font-sans text-xs text-faint;
+  }
+  .md .demo-tools button {
+    @apply cursor-pointer text-accent hover:underline;
+  }
+  .md .demo-source {
+    @apply font-mono;
+  }
+  .md .demo-missing {
+    @apply text-muted italic;
+  }
 }

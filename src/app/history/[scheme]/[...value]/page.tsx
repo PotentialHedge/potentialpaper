@@ -64,7 +64,16 @@ export default async function HistoryPage({ params, searchParams }: Props) {
                   <td className={`${ui.td} ${ui.mono}`}>{row.seq}</td>
                   <td className={`${ui.td} ${ui.mono} whitespace-nowrap`}>{when(row.at)}</td>
                   <td className={ui.td}>
-                    {row.handle ? `@${row.handle}` : <i className="text-muted">PotentialPaper</i>}
+                    {row.authorName ? (
+                      <>
+                        {row.authorName}
+                        <span className={ui.badge}>author</span>
+                      </>
+                    ) : row.handle ? (
+                      `@${row.handle}`
+                    ) : (
+                      <i className="text-muted">PotentialPaper</i>
+                    )}
                   </td>
                   <td className={ui.td}>
                     <a href={toolPath('diff', found.id, `oid=${row.oid}`)}>{row.summary}</a>
