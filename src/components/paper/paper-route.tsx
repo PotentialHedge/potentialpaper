@@ -111,8 +111,7 @@ export async function PaperRoute({ scheme, segments }: { scheme: PaperScheme; se
           editPath="#edit-community"
           historyPath={toolPath('history', panel.canonical)}
         />
-        {/* Wider beside the text while the picture is edited there, so its editor has room. */}
-        <div className="mt-5 grid grid-cols-[minmax(0,1fr)_230px] items-start gap-8 narrow:grid-cols-1 min-[721px]:has-[[data-picture-editor]]:grid-cols-[minmax(0,1fr)_360px]">
+        <div className="mt-5 grid grid-cols-[minmax(0,1fr)_300px] items-start gap-8 narrow:grid-cols-1">
           <div>
             <Slot name="paper.main" {...panel} />
           </div>

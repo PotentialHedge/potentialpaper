@@ -172,7 +172,7 @@ export function parsePdfPointer(text: string): PdfPointer | null {
 
 export const THUMBNAIL_TYPES = ['image/jpeg', 'image/png', 'image/gif', 'image/webp', 'image/avif'] as const;
 export type ThumbnailType = (typeof THUMBNAIL_TYPES)[number];
-/** It shows in a 230px box: an animated GIF larger than this is a mistake, and slows every reader. */
+/** It shows in a 300px box: an animated GIF larger than this is a mistake, and slows every reader. */
 export const MAX_THUMBNAIL_BYTES = 8 * 1024 * 1024;
 /** Of the alt text and of the caption. */
 const MAX_ALT_LENGTH = 500;
