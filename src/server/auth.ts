@@ -4,17 +4,20 @@ import { ApiError } from './api/errors';
 import { ensureAccountForUser } from './accounts';
 import { getAuth } from './better-auth';
 import { consume, rateLimitConfig, rateLimitHeaders, type RateLimitResult } from './ratelimit';
+import { verifyToken } from './tokens';
 
 /**
  * Resolve a request to an account. **The only place that does.** Routes ask for a principal; they never
- * read a cookie themselves. For now the only credential is Better Auth's session cookie; API tokens
- * for bots come with the public API (IMPLEMENTATION.md, milestone 7).
+ * read a cookie themselves. Two credentials: Better Auth's session cookie, and an API token
+ * (`Authorization: Bearer pp_live_…`, `server/tokens.ts`), which is how an agent acts for a person.
  */
 
 export interface Principal {
   account: Account;
   isAdmin: boolean;
   credentialId: string;
+  /** How the request signed in: a browser session, or an API token (an agent). */
+  via: 'session' | 'token';
   /** Set when this request was counted against a rate-limit bucket. */
   rateLimit: RateLimitResult | null;
 }
@@ -53,6 +56,8 @@ function assertSameOrigin(req: Request): void {
  * account's bucket, and a request over the limit is refused with `429 rate_limited`.
  */
 export async function authenticate(req: Request): Promise<Principal | null> {
+  const bearer = req.headers.get('authorization');
+  if (bearer) return authenticateToken(req, bearer);
   if (!req.headers.get('cookie')) return null;
   const session = await getAuth().api.getSession({ headers: req.headers });
   // Better Auth refuses sign-in before confirmation; this makes sure an
@@ -62,7 +67,35 @@ export async function authenticate(req: Request): Promise<Principal | null> {
 
   // Normally created on email confirmation; this makes a missed hook harmless.
   const account = await ensureAccountForUser(session.user);
-  const rateLimit = await consume(`user:${session.user.id}`, rateLimitConfig());
+  const rateLimit = await countRequest(`user:${session.user.id}`);
+  return {
+    account,
+    isAdmin: isAdminEmail(session.user.email),
+    credentialId: session.session.id,
+    via: 'session',
+    rateLimit,
+  };
+}
+
+/**
+ * A request with an `Authorization` header: a valid token or a 401, never a fall back to the cookie. No
+ * Origin check, as a browser never adds this header by itself. A token is never an admin, and one without
+ * the `write` scope may only read.
+ */
+async function authenticateToken(req: Request, header: string): Promise<Principal> {
+  const match = /^Bearer\s+(\S+)$/i.exec(header.trim());
+  const verified = match && (await verifyToken(match[1]));
+  if (!verified) throw new ApiError(401, 'unauthorized', 'invalid or revoked API token');
+  if (!SAFE_METHODS.has(req.method) && !verified.scopes.includes('write')) {
+    throw new ApiError(403, 'forbidden', 'this token may only read');
+  }
+  const rateLimit = await countRequest(`account:${verified.account.id}`);
+  return { account: verified.account, isAdmin: false, credentialId: verified.id, via: 'token', rateLimit };
+}
+
+/** One request from the credential's bucket, or a 429. */
+async function countRequest(key: string): Promise<RateLimitResult> {
+  const rateLimit = await consume(key, rateLimitConfig());
   if (!rateLimit.allowed) {
     throw new ApiError(
       429,
@@ -72,7 +105,7 @@ export async function authenticate(req: Request): Promise<Principal | null> {
       rateLimitHeaders(rateLimit),
     );
   }
-  return { account, isAdmin: isAdminEmail(session.user.email), credentialId: session.session.id, rateLimit };
+  return rateLimit;
 }
 
 /** A principal, or a 401. */
@@ -115,3 +148,10 @@ const viewerForCookie = cache(async (cookie: string): Promise<Viewer | null> => 
   const account = await ensureAccountForUser(session.user);
   return { account, isAdmin: isAdminEmail(session.user.email), email: session.user.email };
 });
+
+/** A principal signed in by a browser session, for what only the person may do (minting a code for their agent). */
+export async function requireSession(req: Request): Promise<Principal> {
+  const principal = await requireAuth(req);
+  if (principal.via !== 'session') throw new ApiError(403, 'forbidden', 'sign in in a browser for this');
+  return principal;
+}

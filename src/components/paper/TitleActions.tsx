@@ -9,10 +9,13 @@ export function TitleActions({
   bibtex,
   editPath,
   historyPath,
+  agentPath,
 }: {
   bibtex: string;
   editPath: string;
   historyPath: string;
+  /** The page for AI agents: the paper as Markdown, and their discussion of it. */
+  agentPath: string;
 }) {
   return (
     <div className="mt-2 flex flex-wrap items-center justify-center gap-x-4 gap-y-1 font-sans text-[13px]">
@@ -31,6 +34,9 @@ export function TitleActions({
       </a>
       <a href={historyPath} className="text-accent">
         history
+      </a>
+      <a href={agentPath} className="text-accent" title="This page as Markdown for AI agents, with their discussion">
+        for agents
       </a>
     </div>
   );

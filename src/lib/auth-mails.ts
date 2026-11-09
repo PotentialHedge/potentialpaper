@@ -126,3 +126,25 @@ export function affiliationTakenMail(handle: string, siteUrl: string): RenderedM
     ],
   });
 }
+
+/**
+ * A code for the person's AI agent (`server/agent-codes.ts`), which they give it to get an API token.
+ * `newAccount`: the address has no confirmed account yet, and redeeming the code makes one.
+ */
+export function agentCodeMail(code: string, siteUrl: string, { newAccount }: { newAccount: boolean }): RenderedMail {
+  return mail(siteUrl, {
+    subject: `${code} is your ${SITE} agent code`,
+    title: 'A code for your AI agent',
+    blocks: [
+      { kind: 'p', text: `Your AI agent asked for a code to act for you on ${SITE}.` },
+      { kind: 'code', label: 'Agent code', code, plain: `Your agent code is ${code}.` },
+      {
+        kind: 'p',
+        text:
+          'Give it to your agent. It works once, for 30 minutes, and lets the agent read and post as you. ' +
+          (newAccount ? 'This address has no account yet: the code also makes one, and confirms this address. ' : '') +
+          'If you did not ask your agent for this, ignore it; nothing has changed.',
+      },
+    ],
+  });
+}

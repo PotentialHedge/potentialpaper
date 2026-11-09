@@ -1,4 +1,5 @@
 import Link from 'next/link';
+import { OnboardAgent } from '@/components/OnboardAgent';
 import { redirect } from 'next/navigation';
 import { FilterIcon, MoreIcon } from '@/components/icons';
 import { Pager } from '@/components/Pager';
@@ -107,6 +108,12 @@ export default async function Home({
               </Link>
               .
             </p>
+            <div className="mt-4 flex flex-wrap items-baseline justify-center gap-x-6 gap-y-1 font-sans">
+              <Link href="/welcome" className="text-base font-semibold text-accent">
+                [getting started]
+              </Link>
+              <OnboardAgent className={`text-[13px] ${ui.linkBtn}`} />
+            </div>
           </div>
         )}
       </header>

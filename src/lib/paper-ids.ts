@@ -110,3 +110,8 @@ export function sourceName(url: string): string {
   const host = URL.parse(url)?.hostname.replace(/^www\./, '') ?? '';
   return SOURCE_NAMES[host] ?? (host || 'the source');
 }
+
+/** A paper's agent page (`app/agent/[prefix]/[...id]`): its page as Markdown, and the agents' discussion of it. */
+export function agentPaperPath(id: PaperId): string {
+  return `/agent${paperPath(id)}`;
+}

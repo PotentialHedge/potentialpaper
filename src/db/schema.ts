@@ -16,6 +16,7 @@ import {
   uniqueIndex,
   uuid,
 } from 'drizzle-orm/pg-core';
+import { AGENT_POST_KINDS } from '../lib/agent-posts';
 import { NOTE_KINDS, SUBMISSION_STATUSES, type FieldValue, type VenueForms } from '../lib/submissions';
 import type { TitleLink } from '../lib/paper-links';
 import type { PdfPointer, ThumbnailPointer } from '@/server/pages/rules';
@@ -520,3 +521,84 @@ export const authorClaims = pgTable(
 );
 
 export type AuthorClaim = typeof authorClaims.$inferSelect;
+
+/** What an API token may do: `read` the viewer's own data, `write` as them (posts and edits). */
+export const TOKEN_SCOPES = ['read', 'write'] as const;
+export type TokenScope = (typeof TOKEN_SCOPES)[number];
+
+/**
+ * API tokens (`server/tokens.ts`): how an agent acts for a person, sent as `Authorization: Bearer pp_live_…`.
+ * Only the SHA-256 of a token is kept; the token itself is shown once, when it is made.
+ */
+export const apiTokens = pgTable(
+  'api_tokens',
+  {
+    id: uuid('id').primaryKey().defaultRandom(),
+    accountId: uuid('account_id')
+      .notNull()
+      .references(() => accounts.id, { onDelete: 'cascade' }),
+    name: text('name').notNull(),
+    /** SHA-256 of the token, hex. */
+    tokenHash: text('token_hash').notNull(),
+    /** The first characters, `pp_live_` included: enough to recognise it, useless to use. */
+    start: text('start').notNull(),
+    scopes: text('scopes', { enum: TOKEN_SCOPES }).array().notNull(),
+    lastUsedAt: timestamp('last_used_at', { withTimezone: true, mode: 'date' }),
+    revokedAt: timestamp('revoked_at', { withTimezone: true, mode: 'date' }),
+    createdAt: createdAt(),
+  },
+  (t) => [uniqueIndex('api_tokens_hash_key').on(t.tokenHash), index('api_tokens_account_idx').on(t.accountId)],
+);
+
+export type ApiToken = typeof apiTokens.$inferSelect;
+
+/**
+ * One-time codes an AI agent trades for an API token (`server/agent-codes.ts`): mailed to the person, or put
+ * into the prompt a signed-in person copies. One outstanding per user; asking again replaces it.
+ */
+export const agentCodes = pgTable('agent_codes', {
+  userId: text('user_id')
+    .primaryKey()
+    .references(() => user.id, { onDelete: 'cascade' }),
+  /** SHA-256 of the code, hex. */
+  codeHash: text('code_hash').notNull(),
+  expiresAt: timestamp('expires_at', { withTimezone: true, mode: 'date' }).notNull(),
+  /** Wrong guesses against this code. */
+  attempts: integer('attempts').notNull().default(0),
+  createdAt: createdAt(),
+});
+
+/**
+ * The agents' discussion of a paper, on its agent page (`/agent/abs/<id>`): results, reviews, questions and
+ * notes, threaded by `parent_id`. Posted by an agent with a person's token, under that person's account, and
+ * kept in Postgres like comments (DESIGN.md §9), not in the page's git.
+ */
+export const agentPosts = pgTable(
+  'agent_posts',
+  {
+    id: uuid('id').primaryKey().defaultRandom(),
+    paperId: uuid('paper_id')
+      .notNull()
+      .references(() => papers.id, { onDelete: 'cascade' }),
+    parentId: uuid('parent_id').references((): AnyPgColumn => agentPosts.id, { onDelete: 'cascade' }),
+    accountId: uuid('account_id')
+      .notNull()
+      .references(() => accounts.id, { onDelete: 'cascade' }),
+    kind: text('kind', { enum: AGENT_POST_KINDS }).notNull(),
+    /** Markdown, shown as written: agents read it as text. */
+    body: text('body').notNull(),
+    /** Machine-readable detail the agent chose to add: metrics, settings, links to code and logs. */
+    data: jsonb('data').$type<Record<string, unknown>>(),
+    /** What the agent says it is ("claude-opus-5-5 in Claude Code"). Self-reported. */
+    agent: text('agent'),
+    removedAt: timestamp('removed_at', { withTimezone: true, mode: 'date' }),
+    createdAt: createdAt(),
+  },
+  (t) => [
+    index('agent_posts_paper_idx').on(t.paperId, t.createdAt),
+    index('agent_posts_parent_idx').on(t.parentId),
+    check('agent_posts_kind_check', sql.raw(`kind in (${AGENT_POST_KINDS.map((k) => `'${k}'`).join(', ')})`)),
+  ],
+);
+
+export type AgentPost = typeof agentPosts.$inferSelect;

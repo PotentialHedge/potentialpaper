@@ -3,7 +3,7 @@ import { eq, sql } from 'drizzle-orm';
 import type { Metadata } from 'next';
 import { cache } from 'react';
 import { ui } from '@/components/ui';
-import { canonicalPaperId, paperPath, parsePaperId, type PaperScheme } from '@/lib/paper-ids';
+import { agentPaperPath, canonicalPaperId, paperPath, parsePaperId, type PaperScheme } from '@/lib/paper-ids';
 import { getDb } from '@/db';
 import { pageCurrent, pdfDocuments } from '@/db/schema';
 import { confirmedAuthors } from '@/server/claims';
@@ -37,7 +37,10 @@ export async function paperMetadata(scheme: PaperScheme, segments: string[]): Pr
   return {
     title: `${paper.title} · PotentialPaper`,
     description: paper.abstract?.slice(0, DESCRIPTION_LENGTH),
-    alternates: canonical ? { canonical: paperPath(canonical) } : undefined,
+    // The page as an agent reads it, with the agents' discussion (`app/agent/[prefix]/[...id]`).
+    alternates: canonical
+      ? { canonical: paperPath(canonical), types: { 'text/markdown': agentPaperPath(canonical) } }
+      : undefined,
   };
 }
 
@@ -110,6 +113,7 @@ export async function PaperRoute({ scheme, segments }: { scheme: PaperScheme; se
           bibtex={bibtex({ paper, identifiers })}
           editPath="#edit-community"
           historyPath={toolPath('history', panel.canonical)}
+          agentPath={agentPaperPath(panel.canonical)}
         />
         <div className="mt-5 grid grid-cols-[minmax(0,1fr)_300px] items-start gap-8 narrow:grid-cols-1">
           <div>

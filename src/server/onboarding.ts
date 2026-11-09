@@ -56,8 +56,8 @@ export async function startOnboarding(
   else await getAuth().api.sendVerificationEmail({ body: { email, callbackURL } });
 }
 
-/** The user for `email`, made if there is none: no credential, unconfirmed. Two sign-ups at once: the other one won. */
-async function userForEmail(email: string, database: Database): Promise<{ id: string; emailVerified: boolean }> {
+/** The user for `email`, made if there is none: no credential, unconfirmed. Two sign-ups at once: the other one won. Also how an agent code makes a user (`agent-codes.ts`). */
+export async function userForEmail(email: string, database: Database): Promise<{ id: string; emailVerified: boolean }> {
   const find = async () => {
     const [row] = await database
       .select({ id: user.id, emailVerified: user.emailVerified })

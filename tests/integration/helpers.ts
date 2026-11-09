@@ -15,6 +15,13 @@ import * as pageRevert from '@/app/api/v1/pages/revert/route';
 import * as pageLinks from '@/app/api/v1/pages/links/route';
 import * as pageThumbnail from '@/app/api/v1/pages/thumbnail/route';
 import * as claims from '@/app/api/v1/claims/route';
+import * as agentCode from '@/app/api/v1/agent/code/route';
+import * as agentToken from '@/app/api/v1/agent/token/route';
+import * as myAgentCode from '@/app/api/v1/me/agent-code/route';
+import * as myTokens from '@/app/api/v1/me/tokens/route';
+import * as myToken from '@/app/api/v1/me/tokens/[id]/route';
+import * as agentPosts from '@/app/api/v1/agent-posts/route';
+import * as agentPost from '@/app/api/v1/agent-posts/[id]/route';
 import { getDb, getPool } from '@/db';
 import { clearDevOutbox, devOutbox } from '@/server/mail';
 
@@ -22,7 +29,7 @@ export const ORIGIN = 'http://test.local';
 
 export async function resetDatabase(): Promise<void> {
   await getDb().execute(sql`
-    truncate table author_claims, demo_snapshots, submission_notes, submissions, venues, pdf_documents, page_events, page_current, page_revisions, page_refs, page_objects, commit_identities, paper_lookup_misses, paper_identifiers, papers, institution_domains, affiliations, accounts, rate_limit_buckets,
+    truncate table agent_posts, api_tokens, agent_codes, author_claims, demo_snapshots, submission_notes, submissions, venues, pdf_documents, page_events, page_current, page_revisions, page_refs, page_objects, commit_identities, paper_lookup_misses, paper_identifiers, papers, institution_domains, affiliations, accounts, rate_limit_buckets,
       session, account, verification, "user"
     restart identity cascade
   `);
@@ -46,6 +53,13 @@ const ROUTES: [RegExp, any][] = [
   [/^\/pages\/links$/, pageLinks],
   [/^\/pages\/thumbnail(\?.*)?$/, pageThumbnail],
   [/^\/claims(\?.*)?$/, claims],
+  [/^\/agent\/code$/, agentCode],
+  [/^\/agent\/token$/, agentToken],
+  [/^\/me\/agent-code$/, myAgentCode],
+  [/^\/me\/tokens$/, myTokens],
+  [/^\/me\/tokens\/(?<id>[^/]+)$/, myToken],
+  [/^\/agent-posts(\?.*)?$/, agentPosts],
+  [/^\/agent-posts\/(?<id>[^/?]+)$/, agentPost],
   [/^\/me\/password$/, password],
   [/^\/me\/affiliations$/, affiliations],
   [/^\/me\/affiliations\/(?<id>[^/]+)$/, affiliation],
@@ -61,10 +75,11 @@ export interface ApiResult {
 export async function api(
   method: string,
   path: string,
-  opts: { cookie?: string; body?: unknown; origin?: string } = {},
+  opts: { cookie?: string; token?: string; body?: unknown; origin?: string } = {},
 ): Promise<ApiResult> {
   const headers: Record<string, string> = { origin: opts.origin ?? ORIGIN };
   if (opts.cookie) headers.cookie = opts.cookie;
+  if (opts.token) headers.authorization = `Bearer ${opts.token}`;
   if (opts.body !== undefined) headers['content-type'] = 'application/json';
   const request = new Request(new URL(`/api/v1${path}`, ORIGIN), {
     method,

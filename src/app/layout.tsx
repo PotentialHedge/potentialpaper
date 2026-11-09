@@ -8,6 +8,8 @@ import './globals.css';
 export const metadata: Metadata = {
   title: 'PotentialPaper',
   description: 'A public, editable page for every research paper, with labeled links between them.',
+  // Agents find their map of the site from any page.
+  alternates: { types: { 'text/markdown': '/llms.txt' } },
 };
 
 /**

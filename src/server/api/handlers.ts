@@ -3,7 +3,10 @@ import type { z } from 'zod';
 import type { Account, Affiliation } from '@/db/schema';
 import { updateProfile } from '../accounts';
 import { addAffiliation, listAffiliations, removeAffiliation, verifyAffiliation } from '../affiliations';
-import { requireAuth, requireVerified, viewerFromHeaders, type Principal } from '../auth';
+import { requireAuth, requireSession, requireVerified, viewerFromHeaders, type Principal } from '../auth';
+import { issueAgentCode, redeemAgentCode, requestAgentCode } from '../agent-codes';
+import { agentPostsOf, createAgentPost, removeAgentPost, type PresentedAgentPost } from '../agent-posts';
+import { listTokens, revokeToken } from '../tokens';
 import { demoSources } from '../demos/attach';
 import { snapshotDemo } from '../demos/snapshot';
 import { demoUrl } from '@/lib/demos';
@@ -345,4 +348,75 @@ export const deleteClaim = route(async (req) => {
   const { paper } = await knownPaper(scheme, value);
   await withdrawClaim(paper.id, principal.account.id);
   return respond(S.OwnClaim, { claim: null }, { principal });
+});
+
+/** Mails the person a code for their agent. Anonymous, and the same answer whether or not they have an account. */
+export const postAgentCode = route(async (req) => {
+  const { email } = await parseBody(req, S.AgentCodeBody);
+  await requestAgentCode(email);
+  return respond(S.Accepted, { status: 'accepted' }, { status: 202 });
+});
+
+/** Trades an address and its code for an API token, shown this once. */
+export const postAgentToken = route(async (req) => {
+  const minted = await redeemAgentCode(await parseBody(req, S.AgentTokenBody));
+  return respond(
+    S.AgentToken,
+    { token: minted.token, id: minted.id, name: minted.name, scopes: minted.scopes },
+    { status: 201 },
+  );
+});
+
+/** A code for the signed-in person's own agent prompt. A browser session only: a token cannot make tokens. */
+export const postMyAgentCode = route(async (req) => {
+  const principal = await requireSession(req);
+  const { email, code, expiresAt } = await issueAgentCode(principal.account);
+  return respond(S.MyAgentCode, { email, code, expiresAt: toIso(expiresAt) }, { status: 201, principal });
+});
+
+export const getMyTokens = route(async (req) => {
+  const principal = await requireSession(req);
+  const rows = await listTokens(principal.account.id);
+  return respond(
+    S.TokenList,
+    {
+      tokens: rows.map((t) => ({ ...t, createdAt: toIso(t.createdAt), lastUsedAt: toIsoOrNull(t.lastUsedAt) })),
+    },
+    { principal },
+  );
+});
+
+export const deleteMyToken = route(async (req, params) => {
+  const principal = await requireSession(req);
+  const id = parseParam(params.id, S.IdParam, 'id');
+  if (!(await revokeToken(principal.account.id, id))) throw new ApiError(404, 'not_found', 'no such token');
+  return respond(S.Ok, { status: 'ok' }, { principal });
+});
+
+function presentAgentPost(post: PresentedAgentPost) {
+  return { ...post, createdAt: toIso(post.createdAt) };
+}
+
+/** The agents' discussion of a paper, oldest first. Public. */
+export const getAgentPosts = route(async (req) => {
+  const { scheme, value, since } = parseQuery(req, S.AgentPostsQuery);
+  const { paper } = await knownPaper(scheme, value);
+  const posts = await agentPostsOf(paper.id, { since: since ? new Date(since) : undefined });
+  return respond(S.AgentPostList, { posts: posts.map(presentAgentPost) });
+});
+
+/** A post on a paper's agent page, by an agent with a verified person's token. */
+export const postAgentPost = route(async (req) => {
+  const principal = await requireVerified(req);
+  const { paper: id, ...input } = await parseBody(req, S.AgentPostBody);
+  const { paper } = await knownPaper(id.scheme, id.value);
+  const post = await createAgentPost(paper.id, principal, input);
+  return respond(S.AgentPost, presentAgentPost(post), { status: 201, principal });
+});
+
+export const deleteAgentPost = route(async (req, params) => {
+  const principal = await requireAuth(req);
+  const id = parseParam(params.id, S.IdParam, 'id');
+  await removeAgentPost(principal.account.id, id);
+  return respond(S.Ok, { status: 'ok' }, { principal });
 });

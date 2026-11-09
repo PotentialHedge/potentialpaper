@@ -1,4 +1,5 @@
 import { z } from 'zod';
+import { AGENT_POST_BODY_MAX, AGENT_POST_DATA_MAX, AGENT_POST_KINDS } from '@/lib/agent-posts';
 import { REAL_NAME_MAX } from '@/lib/profile';
 import { SEARCH_SORTS } from '@/lib/search';
 
@@ -194,3 +195,65 @@ export const OwnClaim = z.object({
     })
     .nullable(),
 });
+
+/** Asks for a code mailed to the person, for their agent to trade for a token (`server/agent-codes.ts`). */
+export const AgentCodeBody = z.object({ email: Email });
+export const AgentTokenBody = z.object({ email: Email, code: z.string().trim().min(1).max(16) });
+export const AgentToken = z.object({
+  /** The secret, shown this once. Send it as `Authorization: Bearer <token>`. */
+  token: z.string(),
+  id: z.uuid(),
+  name: z.string(),
+  scopes: z.array(z.enum(['read', 'write'])),
+});
+/** A code for the signed-in person's own agent prompt. */
+export const MyAgentCode = z.object({ email: z.string(), code: z.string(), expiresAt: z.string() });
+
+export const TokenList = z.object({
+  tokens: z.array(
+    z.object({
+      id: z.uuid(),
+      name: z.string(),
+      start: z.string(),
+      scopes: z.array(z.enum(['read', 'write'])),
+      createdAt: z.string(),
+      lastUsedAt: z.string().nullable(),
+    }),
+  ),
+});
+
+export const AgentPostsQuery = PaperQuery.extend({
+  /** Only posts after this instant (ISO 8601): what is new since the agent last looked. */
+  since: z.iso.datetime({ offset: true }).optional(),
+});
+
+export const AgentPostBody = z.object({
+  paper: PaperIdentifier,
+  kind: z.enum(AGENT_POST_KINDS),
+  body: z.string().trim().min(1).max(AGENT_POST_BODY_MAX),
+  parentId: z.uuid().nullable().optional(),
+  data: z
+    .record(z.string(), z.unknown())
+    .nullable()
+    .optional()
+    .refine((d) => d == null || JSON.stringify(d).length <= AGENT_POST_DATA_MAX, {
+      message: `data must be at most ${AGENT_POST_DATA_MAX} characters as JSON`,
+    }),
+  agent: z.string().trim().max(200).nullable().optional(),
+});
+
+export const AgentPost = z.object({
+  id: z.uuid(),
+  parentId: z.uuid().nullable(),
+  kind: z.enum(AGENT_POST_KINDS),
+  body: z.string().nullable(),
+  data: z.record(z.string(), z.unknown()).nullable(),
+  agent: z.string().nullable(),
+  by: z.discriminatedUnion('kind', [
+    z.object({ kind: z.literal('author'), name: z.string() }),
+    z.object({ kind: z.literal('account'), handle: z.string() }),
+  ]),
+  createdAt: z.string(),
+  removed: z.boolean(),
+});
+export const AgentPostList = z.object({ posts: z.array(AgentPost) });
