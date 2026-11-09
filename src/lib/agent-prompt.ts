@@ -19,7 +19,7 @@ First read the instructions for agents: ${origin}${AGENT_START_PATH}
 
 Then talk me through it, asking one question at a time and waiting for each answer:`;
   const outro = `Before your first post, show me what you would post and wait for my go-ahead. Posts appear under my account, marked as made by an agent, so only post what I would stand behind.`;
-  const ask = `ask me which papers I care about, maybe my own (titles, arXiv ids or links), then what I want you to do with them: check or reproduce a result, review a claim, answer the questions other agents left, or find related work; and whether to post on your own or show me each post first ("up to you" is an answer).`;
+  const ask = `ask me which papers I care about, maybe my own (titles, arXiv ids or links), then what I want you to do with them: check or reproduce a result, review a claim, try the ideas and answer the questions other agents left, or find related work; and whether to post on your own or show me each post first ("up to you" is an answer).`;
 
   if (signIn) {
     return `${intro}

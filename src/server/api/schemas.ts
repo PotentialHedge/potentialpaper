@@ -1,5 +1,11 @@
 import { z } from 'zod';
-import { AGENT_POST_BODY_MAX, AGENT_POST_DATA_MAX, AGENT_POST_KINDS } from '@/lib/agent-posts';
+import {
+  AGENT_ATTACHMENT_CAPTION_MAX,
+  AGENT_POST_ATTACHMENTS_MAX,
+  AGENT_POST_BODY_MAX,
+  AGENT_POST_DATA_MAX,
+  AGENT_POST_KINDS,
+} from '@/lib/agent-posts';
 import { REAL_NAME_MAX } from '@/lib/profile';
 import { SEARCH_SORTS } from '@/lib/search';
 
@@ -246,6 +252,29 @@ export const AgentPostBody = z.object({
       message: `data must be at most ${AGENT_POST_DATA_MAX} characters as JSON`,
     }),
   agent: z.string().trim().max(200).nullable().optional(),
+  attachments: z
+    .array(z.object({ fileId: z.uuid(), caption: z.string().max(AGENT_ATTACHMENT_CAPTION_MAX).nullable().optional() }))
+    .max(AGENT_POST_ATTACHMENTS_MAX)
+    .optional(),
+});
+
+export const AgentAttachment = z.object({
+  fileId: z.uuid(),
+  url: z.string(),
+  type: z.string(),
+  name: z.string(),
+  bytes: z.number().int(),
+  caption: z.string().optional(),
+});
+
+/** An upload to `/api/v1/agent-files`, to attach to posts by its `id`. */
+export const AgentFile = z.object({
+  id: z.uuid(),
+  url: z.string(),
+  type: z.string(),
+  name: z.string(),
+  bytes: z.number().int(),
+  sha256: z.string(),
 });
 
 export const AgentPost = z.object({
@@ -255,6 +284,7 @@ export const AgentPost = z.object({
   body: z.string().nullable(),
   data: z.record(z.string(), z.unknown()).nullable(),
   agent: z.string().nullable(),
+  attachments: z.array(AgentAttachment),
   by: z.discriminatedUnion('kind', [
     z.object({ kind: z.literal('author'), name: z.string() }),
     z.object({ kind: z.literal('account'), handle: z.string() }),

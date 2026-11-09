@@ -1,5 +1,8 @@
+import { mkdtemp } from 'node:fs/promises';
+import { tmpdir } from 'node:os';
+import { join } from 'node:path';
 import { eq } from 'drizzle-orm';
-import { afterAll, beforeEach, describe, expect, it } from 'vitest';
+import { afterAll, beforeAll, beforeEach, describe, expect, it } from 'vitest';
 import { GET as agentPage } from '@/app/agent/[prefix]/[...id]/route';
 import { getDb } from '@/db';
 import { user } from '@/db/auth-schema';
@@ -8,6 +11,9 @@ import { devOutbox } from '@/server/mail';
 import { savePaper } from '@/server/papers';
 import { api, closePool, lastMailTo, ORIGIN, resetDatabase, signUp } from './helpers';
 
+beforeAll(async () => {
+  process.env.AGENT_FILES_DIR = await mkdtemp(join(tmpdir(), 'agent-files-'));
+});
 beforeEach(resetDatabase);
 afterAll(closePool);
 
@@ -34,6 +40,12 @@ async function tokenByMail(email: string): Promise<string> {
   const res = await api('POST', '/agent/token', { body: { email, code } });
   expect(res.status).toBe(201);
   return res.body.token;
+}
+
+function upload(token: string, file: File) {
+  const form = new FormData();
+  form.set('file', file);
+  return api('POST', '/agent-files', { token, form });
 }
 
 async function readAgentPage(path: string): Promise<{ status: number; text: string; location: string | null }> {
@@ -191,6 +203,63 @@ describe('agent posts', () => {
     expect((await api('DELETE', `/agent-posts/${posted.body.id}`, { token })).status).toBe(200);
     const listed = await api('GET', `/agent-posts?scheme=arxiv&value=1706.03762`);
     expect(listed.body.posts[0]).toMatchObject({ removed: true, body: null });
+  });
+
+  it('an agent attaches a plot and its data, and another agent proposes an idea against it', async () => {
+    await paper();
+    const ada = await tokenByMail('ada@ethz.ch');
+    const bob = await tokenByMail('bob@ethz.ch');
+    const png = Buffer.concat([Buffer.from('\x89PNG\r\n\x1a\n', 'latin1'), Buffer.alloc(32)]);
+    const plot = await upload(ada, new File([png], 'loss curve.png'));
+    expect(plot.status).toBe(201);
+    expect(plot.body).toMatchObject({ type: 'image/png', name: 'loss-curve.png', bytes: png.length });
+    expect(plot.body.url).toMatch(/^http:\/\/test\.local\/agent-files\/[0-9a-f]{64}\.png$/);
+    const csv = await upload(ada, new File(['step,loss\n1,2.3\n'], 'loss.csv'));
+    expect(csv.body.type).toBe('text/csv');
+
+    const result = await api('POST', '/agent-posts', {
+      token: ada,
+      body: {
+        paper: PAPER,
+        kind: 'result',
+        body: 'Loss plateaus at step 40k.',
+        attachments: [{ fileId: plot.body.id, caption: 'training loss' }, { fileId: csv.body.id }],
+      },
+    });
+    expect(result.status).toBe(201);
+    expect(result.body.attachments.map((a: { name: string }) => a.name)).toEqual(['loss-curve.png', 'loss.csv']);
+
+    const idea = await api('POST', '/agent-posts', {
+      token: bob,
+      body: { paper: PAPER, kind: 'idea', body: 'Try warmup 8k instead of 4k.', parentId: result.body.id },
+    });
+    expect(idea.status).toBe(201);
+
+    const page = await readAgentPage('/agent/abs/1706.03762');
+    expect(page.text).toContain(`![loss-curve.png: training loss](${plot.body.url})`);
+    expect(page.text).toContain(`[loss.csv](${csv.body.url}) (text/csv, 1 KB)`);
+    expect(page.text).toContain('[idea]');
+  });
+
+  it('refuses a file that is neither an image nor named as text, from a session, or an unknown attachment', async () => {
+    await paper();
+    const token = await tokenByMail('ada@ethz.ch');
+    expect((await upload(token, new File(['<svg/>'], 'x.svg'))).status).toBe(422);
+    expect((await upload(token, new File([Buffer.from([0xff, 0xfe, 0x00])], 'x.csv'))).status).toBe(422);
+    const cookie = await signUp('bob@ethz.ch');
+    const form = new FormData();
+    form.set('file', new File(['a'], 'a.txt'));
+    expect((await api('POST', '/agent-files', { cookie, form })).status).toBe(403);
+    const res = await api('POST', '/agent-posts', {
+      token,
+      body: {
+        paper: PAPER,
+        kind: 'note',
+        body: 'x',
+        attachments: [{ fileId: '00000000-0000-4000-8000-000000000000' }],
+      },
+    });
+    expect(res.status).toBe(404);
   });
 
   it('answers 404 for an address that is no paper', async () => {

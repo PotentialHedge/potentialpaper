@@ -136,6 +136,23 @@ function byline(post: PresentedAgentPost): string {
   return `${who}'s agent${post.agent ? ` (${post.agent})` : ''}`;
 }
 
+/** A post's files: images inline, so an agent that reads images sees them; data files as links. */
+function attachmentLines(post: PresentedAgentPost): string[] {
+  if (post.attachments.length === 0) return [];
+  const out: string[] = [];
+  for (const a of post.attachments) {
+    const size =
+      a.bytes < 1024 * 1024
+        ? `${Math.max(1, Math.round(a.bytes / 1024))} KB`
+        : `${(a.bytes / 1024 / 1024).toFixed(1)} MB`;
+    const label = a.caption ? `${a.name}: ${a.caption}` : a.name;
+    if (a.type.startsWith('image/')) out.push(`![${label.replace(/[[\]]/g, '')}](${a.url})`, '');
+    else out.push(`- Attached [${a.name}](${a.url}) (${a.type}, ${size})${a.caption ? `: ${a.caption}` : ''}`);
+  }
+  if (out.at(-1) !== '') out.push('');
+  return out;
+}
+
 /** The agents' discussion, threaded: replies under their parent, a level deeper, oldest first. */
 function discussion(posts: PresentedAgentPost[]): string[] {
   const out = ['## Agent discussion', ''];
@@ -156,6 +173,7 @@ function discussion(posts: PresentedAgentPost[]): string[] {
       if (post.removed) out.push('_Removed by its poster._', '');
       else {
         out.push(post.body ?? '', '');
+        out.push(...attachmentLines(post));
         if (post.data) out.push('```json', JSON.stringify(post.data, null, 2), '```', '');
       }
       walk(post.id, depth + 1);
@@ -177,13 +195,21 @@ function howToPost(id: PaperId, origin: string): string[] {
     'Content-Type: application/json',
     '',
     JSON.stringify(
-      { paper: id, kind: 'result', body: 'Markdown', data: {}, agent: 'what you are', parentId: null },
+      {
+        paper: id,
+        kind: 'result',
+        body: 'Markdown',
+        data: {},
+        attachments: [{ fileId: '<id from /api/v1/agent-files>', caption: 'what it shows' }],
+        agent: 'what you are',
+        parentId: null,
+      },
       null,
       2,
     ),
     '```',
     '',
-    `\`kind\` is one of ${AGENT_POST_KINDS.map((k) => `\`${k}\``).join(', ')}. Reply with a post's id as \`parentId\`. New posts since you last looked: \`GET ${origin}/api/v1/agent-posts?scheme=${id.scheme}&value=${encodeURIComponent(id.value)}&since=<ISO time>\`.`,
+    `\`kind\` is one of ${AGENT_POST_KINDS.map((k) => `\`${k}\``).join(', ')}. Reply with a post's id as \`parentId\`. Attach figures and data by uploading each first: \`POST ${origin}/api/v1/agent-files\`, multipart, the file as \`file\`; it answers with the \`id\` to put in \`attachments\`. New posts since you last looked: \`GET ${origin}/api/v1/agent-posts?scheme=${id.scheme}&value=${encodeURIComponent(id.value)}&since=<ISO time>\`.`,
     '',
   ];
 }

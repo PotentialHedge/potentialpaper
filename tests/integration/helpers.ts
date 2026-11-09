@@ -22,6 +22,7 @@ import * as myTokens from '@/app/api/v1/me/tokens/route';
 import * as myToken from '@/app/api/v1/me/tokens/[id]/route';
 import * as agentPosts from '@/app/api/v1/agent-posts/route';
 import * as agentPost from '@/app/api/v1/agent-posts/[id]/route';
+import * as agentFiles from '@/app/api/v1/agent-files/route';
 import { getDb, getPool } from '@/db';
 import { clearDevOutbox, devOutbox } from '@/server/mail';
 
@@ -29,7 +30,7 @@ export const ORIGIN = 'http://test.local';
 
 export async function resetDatabase(): Promise<void> {
   await getDb().execute(sql`
-    truncate table agent_posts, api_tokens, agent_codes, author_claims, demo_snapshots, submission_notes, submissions, venues, pdf_documents, page_events, page_current, page_revisions, page_refs, page_objects, commit_identities, paper_lookup_misses, paper_identifiers, papers, institution_domains, affiliations, accounts, rate_limit_buckets,
+    truncate table agent_posts, agent_files, api_tokens, agent_codes, author_claims, demo_snapshots, submission_notes, submissions, venues, pdf_documents, page_events, page_current, page_revisions, page_refs, page_objects, commit_identities, paper_lookup_misses, paper_identifiers, papers, institution_domains, affiliations, accounts, rate_limit_buckets,
       session, account, verification, "user"
     restart identity cascade
   `);
@@ -60,6 +61,7 @@ const ROUTES: [RegExp, any][] = [
   [/^\/me\/tokens\/(?<id>[^/]+)$/, myToken],
   [/^\/agent-posts(\?.*)?$/, agentPosts],
   [/^\/agent-posts\/(?<id>[^/?]+)$/, agentPost],
+  [/^\/agent-files$/, agentFiles],
   [/^\/me\/password$/, password],
   [/^\/me\/affiliations$/, affiliations],
   [/^\/me\/affiliations\/(?<id>[^/]+)$/, affiliation],
@@ -75,7 +77,7 @@ export interface ApiResult {
 export async function api(
   method: string,
   path: string,
-  opts: { cookie?: string; token?: string; body?: unknown; origin?: string } = {},
+  opts: { cookie?: string; token?: string; body?: unknown; form?: FormData; origin?: string } = {},
 ): Promise<ApiResult> {
   const headers: Record<string, string> = { origin: opts.origin ?? ORIGIN };
   if (opts.cookie) headers.cookie = opts.cookie;
@@ -84,7 +86,7 @@ export async function api(
   const request = new Request(new URL(`/api/v1${path}`, ORIGIN), {
     method,
     headers,
-    body: opts.body === undefined ? undefined : JSON.stringify(opts.body),
+    body: opts.form ?? (opts.body === undefined ? undefined : JSON.stringify(opts.body)),
   });
   for (const [pattern, module] of ROUTES) {
     const match = pattern.exec(path);

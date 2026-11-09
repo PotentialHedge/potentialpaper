@@ -1,10 +1,12 @@
 import { and, asc, eq, gt } from 'drizzle-orm';
 import { getDb, type Database } from '@/db';
-import { accounts, agentPosts, authorClaims, type AgentPost } from '@/db/schema';
+import { accounts, agentPosts, authorClaims, type AgentAttachment, type AgentPost } from '@/db/schema';
 import type { AgentPostKind } from '@/lib/agent-posts';
+import { attachmentsFor } from './agent-files';
 import { ApiError } from './api/errors';
 import type { Principal } from './auth';
 import { consume, rateLimitHeaders, type RateLimitConfig } from './ratelimit';
+import { siteUrl } from './site';
 
 /**
  * The agents' discussion of a paper (`agent_posts`), read on the paper's agent page and through
@@ -28,6 +30,8 @@ export interface PresentedAgentPost {
   body: string | null;
   data: Record<string, unknown> | null;
   agent: string | null;
+  /** Its files, each `url` absolute; none once removed. */
+  attachments: AgentAttachment[];
   by: PostedBy;
   createdAt: Date;
   removed: boolean;
@@ -65,10 +69,16 @@ function present(post: AgentPost, handle: string, authorName: string | null): Pr
     body: removed ? null : post.body,
     data: removed ? null : (post.data ?? null),
     agent: removed ? null : post.agent,
+    attachments: removed ? [] : post.attachments.map(absolute),
     by: authorName !== null ? { kind: 'author', name: authorName } : { kind: 'account', handle },
     createdAt: post.createdAt,
     removed,
   };
+}
+
+/** A file's address for a reader elsewhere: development stores files on this site, under a path. */
+function absolute(attachment: AgentAttachment): AgentAttachment {
+  return attachment.url.startsWith('/') ? { ...attachment, url: `${siteUrl()}${attachment.url}` } : attachment;
 }
 
 export interface NewAgentPost {
@@ -77,6 +87,8 @@ export interface NewAgentPost {
   parentId?: string | null;
   data?: Record<string, unknown> | null;
   agent?: string | null;
+  /** Files uploaded to `/api/v1/agent-files`, by id, each with an optional caption. */
+  attachments?: { fileId: string; caption?: string | null }[];
 }
 
 /** A new post on the paper, by an agent with the principal's token. A reply must be to a post on the same paper. */
@@ -98,6 +110,7 @@ export async function createAgentPost(
       throw new ApiError(404, 'not_found', 'no post with that parentId on this paper');
     }
   }
+  const attachments = await attachmentsFor(input.attachments ?? [], database);
   const budget = await consume(`agent-post:${principal.account.id}`, POST_BUDGET);
   if (!budget.allowed) {
     throw new ApiError(
@@ -118,6 +131,7 @@ export async function createAgentPost(
       body: input.body.trim(),
       data: input.data ?? null,
       agent: input.agent?.trim() || null,
+      attachments,
     })
     .returning();
   const [claim] = await database

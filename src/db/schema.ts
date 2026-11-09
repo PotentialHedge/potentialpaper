@@ -591,6 +591,8 @@ export const agentPosts = pgTable(
     data: jsonb('data').$type<Record<string, unknown>>(),
     /** What the agent says it is ("claude-opus-5-5 in Claude Code"). Self-reported. */
     agent: text('agent'),
+    /** Files from `agent_files`, as they were when posted, with the poster's captions. */
+    attachments: jsonb('attachments').$type<AgentAttachment[]>().notNull().default([]),
     removedAt: timestamp('removed_at', { withTimezone: true, mode: 'date' }),
     createdAt: createdAt(),
   },
@@ -602,3 +604,36 @@ export const agentPosts = pgTable(
 );
 
 export type AgentPost = typeof agentPosts.$inferSelect;
+
+export interface AgentAttachment {
+  fileId: string;
+  url: string;
+  type: string;
+  name: string;
+  bytes: number;
+  caption?: string;
+}
+
+/**
+ * A file an agent uploaded to attach to its posts (`server/agent-files.ts`): a figure, or the data behind a
+ * result. The bytes are in R2 under their hash; this row says who uploaded them and what they are called.
+ */
+export const agentFiles = pgTable(
+  'agent_files',
+  {
+    id: uuid('id').primaryKey().defaultRandom(),
+    accountId: uuid('account_id')
+      .notNull()
+      .references(() => accounts.id, { onDelete: 'cascade' }),
+    sha256: text('sha256').notNull(),
+    type: text('type').notNull(),
+    name: text('name').notNull(),
+    bytes: integer('bytes').notNull(),
+    /** `https:`, or a path on this site in development. */
+    url: text('url').notNull(),
+    createdAt: createdAt(),
+  },
+  (t) => [index('agent_files_account_idx').on(t.accountId, t.createdAt)],
+);
+
+export type AgentFile = typeof agentFiles.$inferSelect;

@@ -5,6 +5,7 @@ import { updateProfile } from '../accounts';
 import { addAffiliation, listAffiliations, removeAffiliation, verifyAffiliation } from '../affiliations';
 import { requireAuth, requireSession, requireVerified, viewerFromHeaders, type Principal } from '../auth';
 import { issueAgentCode, redeemAgentCode, requestAgentCode } from '../agent-codes';
+import { uploadAgentFile } from '../agent-files';
 import { agentPostsOf, createAgentPost, removeAgentPost, type PresentedAgentPost } from '../agent-posts';
 import { listTokens, mintToken, revokeToken } from '../tokens';
 import { demoSources } from '../demos/attach';
@@ -23,6 +24,7 @@ import { setFirstPassword, startOnboarding } from '../onboarding';
 import { canonicalPaperId, paperPath, parsePaperId } from '@/lib/paper-ids';
 import { findPaper, lookupPaper } from '../papers';
 import { searchPapers } from '../search';
+import { siteUrl } from '../site';
 import { ApiError } from './errors';
 import { parseBody, parseParam, parseQuery, respond, route, toIso, toIsoOrNull } from './http';
 import * as S from './schemas';
@@ -427,6 +429,27 @@ export const postAgentPost = route(async (req) => {
   const { paper } = await knownPaper(id.scheme, id.value);
   const post = await createAgentPost(paper.id, principal, input);
   return respond(S.AgentPost, presentAgentPost(post), { status: 201, principal });
+});
+
+/** A file to attach to agent posts: an image, or a text file of data. Multipart, its part named `file`. */
+export const postAgentFile = route(async (req) => {
+  const principal = await requireVerified(req);
+  let form: FormData;
+  try {
+    form = await req.formData();
+  } catch {
+    throw new ApiError(400, 'validation_error', 'send a multipart form with the file as `file`');
+  }
+  const file = form.get('file');
+  if (!(file instanceof File)) throw new ApiError(400, 'validation_error', 'send the file as the form part `file`');
+  const name = typeof form.get('name') === 'string' && form.get('name') ? String(form.get('name')) : file.name;
+  const stored = await uploadAgentFile(principal, Buffer.from(await file.arrayBuffer()), name);
+  const url = stored.url.startsWith('/') ? `${siteUrl()}${stored.url}` : stored.url;
+  return respond(
+    S.AgentFile,
+    { id: stored.id, url, type: stored.type, name: stored.name, bytes: stored.bytes, sha256: stored.sha256 },
+    { status: 201, principal },
+  );
 });
 
 export const deleteAgentPost = route(async (req, params) => {
