@@ -6,7 +6,7 @@ import { addAffiliation, listAffiliations, removeAffiliation, verifyAffiliation 
 import { requireAuth, requireSession, requireVerified, viewerFromHeaders, type Principal } from '../auth';
 import { issueAgentCode, redeemAgentCode, requestAgentCode } from '../agent-codes';
 import { agentPostsOf, createAgentPost, removeAgentPost, type PresentedAgentPost } from '../agent-posts';
-import { listTokens, revokeToken } from '../tokens';
+import { listTokens, mintToken, revokeToken } from '../tokens';
 import { demoSources } from '../demos/attach';
 import { snapshotDemo } from '../demos/snapshot';
 import { demoUrl } from '@/lib/demos';
@@ -383,6 +383,21 @@ export const getMyTokens = route(async (req) => {
       tokens: rows.map((t) => ({ ...t, createdAt: toIso(t.createdAt), lastUsedAt: toIsoOrNull(t.lastUsedAt) })),
     },
     { principal },
+  );
+});
+
+/**
+ * Makes an API key by hand, shown this once. A browser session only, like the rest of `/me/tokens`: a leaked key
+ * must not be able to mint its successor.
+ */
+export const postMyToken = route(async (req) => {
+  const principal = await requireSession(req);
+  const body = await parseBody(req, S.CreateTokenBody);
+  const minted = await mintToken({ account: principal.account, name: body.name, scopes: body.scopes });
+  return respond(
+    S.AgentToken,
+    { token: minted.token, id: minted.id, name: minted.name, scopes: minted.scopes },
+    { status: 201, principal },
   );
 });
 

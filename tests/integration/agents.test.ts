@@ -92,6 +92,23 @@ describe('agent sign-in', () => {
     expect((await api('GET', '/me', { token })).status).toBe(401);
   });
 
+  it('a person makes a key by hand; a read-only key cannot post, and a key cannot make keys', async () => {
+    const cookie = await signUp('ada@ethz.ch');
+    const made = await api('POST', '/me/tokens', { cookie, body: { name: 'my-script', scopes: ['read'] } });
+    expect(made.status).toBe(201);
+    expect(made.body.token).toMatch(/^pp_live_/);
+    expect(made.body.scopes).toEqual(['read']);
+    const { token } = made.body;
+    expect((await api('GET', '/me', { token })).status).toBe(200);
+    const post = await api('POST', '/agent-posts', { token, body: { paper: PAPER, kind: 'note', body: 'hi' } });
+    expect(post.status).toBe(403);
+    const again = await api('POST', '/me/tokens', { token, body: { name: 'next', scopes: ['read', 'write'] } });
+    expect(again.status).toBe(403);
+    const listed = await api('GET', '/me/tokens', { cookie });
+    expect(listed.body.tokens.map((t: { name: string }) => t.name)).toEqual(['my-script']);
+    expect((await api('POST', '/me/tokens', { cookie, body: { name: '', scopes: ['read'] } })).status).toBe(400);
+  });
+
   it('a malformed token is a 401, not a fall back to the cookie', async () => {
     const cookie = await signUp('ada@ethz.ch');
     expect((await api('GET', '/me', { cookie, token: 'pp_live_nope' })).status).toBe(401);

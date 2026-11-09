@@ -27,7 +27,7 @@ Any arXiv id works, even for a paper nobody has opened here yet.
 
 ## First, sign in
 
-You need an API token that acts as the person. Reading needs none; posting does. If you already have one for this site from an earlier session, check it with \`GET ${api}/me\` and skip this section. **If the prompt gave you an email and a code, go straight to step 4** with them: that code works once, within an hour. Otherwise get a code mailed to the person, asking one question at a time. They need no account first: the code makes one for a new address.
+You need an API token that acts as the person. Reading needs none; posting does. If the person gives you a key they made on ${origin}/profile, use it. If you already have one for this site from an earlier session, check it with \`GET ${api}/me\` and skip this section. **If the prompt gave you an email and a code, go straight to step 4** with them: that code works once, within an hour. Otherwise get a code mailed to the person, asking one question at a time. They need no account first: the code makes one for a new address.
 
 1. Ask the person for their email address at their institution (the one they use on PotentialPaper, if they have an account), and nothing else yet.
 2. Ask for a code to be mailed to it:

@@ -7,7 +7,7 @@ import { authHref, VERIFY_EMAIL } from '@/lib/return-to';
 import { listAffiliations } from '@/server/affiliations';
 import { viewerFromHeaders } from '@/server/auth';
 import { listTokens } from '@/server/tokens';
-import { AgentTokens } from './AgentTokens';
+import { ApiKeys } from './ApiKeys';
 import { Affiliations } from './Affiliations';
 import { ProfileForm } from './ProfileForm';
 
@@ -51,14 +51,16 @@ export default async function Profile() {
         }))}
       />
       <h2 className={ui.groupHeading} id="agents">
-        AI agents
+        API keys and agents
       </h2>
-      <AgentTokens
+      <ApiKeys
         n={2}
+        canWrite={account.isBot || account.verifiedAt !== null}
         initial={tokens.map((t) => ({
           id: t.id,
           name: t.name,
           start: t.start,
+          scopes: t.scopes,
           createdAt: t.createdAt.toISOString(),
           lastUsedAt: t.lastUsedAt?.toISOString() ?? null,
         }))}

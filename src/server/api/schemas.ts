@@ -209,6 +209,12 @@ export const AgentToken = z.object({
 /** A code for the signed-in person's own agent prompt. */
 export const MyAgentCode = z.object({ email: z.string(), code: z.string(), expiresAt: z.string() });
 
+/** A key the signed-in person makes by hand on their profile, for a script or an agent of their own. */
+export const CreateTokenBody = z.object({
+  name: z.string().trim().min(1).max(100),
+  scopes: z.array(z.enum(['read', 'write'])).min(1),
+});
+
 export const TokenList = z.object({
   tokens: z.array(
     z.object({
