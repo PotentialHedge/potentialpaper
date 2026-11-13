@@ -133,3 +133,80 @@ extensions/<id>/…               reserved, refused
 - Checks still done before `commitPage`: `checkedDemoSources` (unknown snapshot), `setLinks` (label rules,
   also enforced in commit now), version `resolve` (PDF lookup), `setThumbnail` (image bytes). Content and
   layout of every file are already checked inside `commitPage`.
+
+### Phase 2: Demos (done, branch `repo-files`)
+
+**Block syntax** (`lib/demos.ts` `parseDemoInfo`, DESIGN.md §4.3): ` ```demo <name> `, title on the first line,
+description after. `<name>` is one of
+
+- a GitHub address as GitHub prints it: `https://github.com/<owner>/<repo>[/tree/<ref>/<folder>]`, `/blob/…/index.html`,
+  or a gist (resolution is the existing `snapshot.ts`: longest matching branch/tag, or a 40-hex commit; with no folder,
+  the first of `''`, `dist`, `build`, `docs`, … with an `index.html`);
+- `demos/<name>` (optional trailing slash), a folder of the page's own repo;
+- a 32-hex snapshot id (what the editor's "Insert a demo" still writes).
+
+A fence starting `demo` that names none of these is refused in a written section (`demoBlockProblems`), and renders as
+code if it is already there.
+
+**URL demos.** The file keeps the address as written; nothing rewrites a committed file. `commitPage` calls
+`snapshotNewDemoUrls` (`server/demos/attach.ts`) **before** its transaction (it's a download): addresses in the written
+Markdown sections that aren't anywhere in the head's Markdown are copied with `snapshotDemo` (≤5 per commit). A failure
+refuses the commit as `the demo at <url>: <GitHub's reason>` (422, or 502 if GitHub is down). Inside the transaction,
+`checkDemos` recomputes the addresses new to the page from the final tree and returns them; after `moveHead`,
+`pinDemos` upserts `demo_pins (paper_id, url) → snapshot_id, commit` (migration `0021_demo_pins`; not a projection,
+`pages:rebuild` reads it). A pin holds while the address is on the page, so later edits never move a branch's demo;
+removing the block and adding it in a later commit copies it again (also what a revert of a removal does). An address
+new to the page with no copy (the head changed between copy and lock) is `503 page_busy`, retry.
+
+**Repo demos.** `demos/<name>/<path>`: name a lower-case slug (as section slugs), files text only with an allowlisted
+extension (`.html .htm .js .mjs .css .json .map .webmanifest .svg .txt .md .csv .tsv .xml .glsl .wgsl .vert .frag .obj
+.gltf`), valid UTF-8 without NUL (same as every page file), ≤1 MB each, ≤300 files and ≤5 MB across all of a page's
+demos, every folder needs `index.html`. `MAX_CHANGES` (50) no longer counts demo paths; a commit may change ≤300 demo
+files. Not sanitized: it's the demo's own code, run only in the sandboxed frame. **Binary assets: not now** — the commit
+path is string-only, binary blobs would grow Postgres history, and a demo with images/models/wasm can come from GitHub
+(whose copies go to R2). Pictures in a repo demo go in as SVG.
+Serving: `writeCurrent` → `pageDemoSources` → `pageDemoSnapshot` (`server/demos/repo.ts`) turns each folder a block
+names into an ordinary `demo_snapshots` row (`source = 'page:<paperId>'`, `commit` = the page commit that first had
+those exact files, `root = 'demos/<name>'`), its files copied from `page_objects` to the blob store. The id is a hash of
+page, folder and git blob ids, so it is known without reading bytes and only a changed folder is copied (in the
+transaction, under the page lock; ≤5 MB). Served by the unchanged `serve.ts` at `/d/<id>/`, same headers and sandbox;
+the caption says "demos/<name> in this page's repo" with no link. The demo-host TODO stands.
+
+**Who writes `demos/`:** `pathDenied` treats it like `community/` (any verified account and admins, not the system).
+`checkDemos` adds: a folder named by a block in the author section (at the head or in the new tree) may only be changed
+by confirmed authors and admins (403). Also: a block may only name a folder that exists with `index.html`, so a commit
+can't delete a folder a block still names; a written section's snapshot ids must exist (moved down from `editSection`,
+same 422 and `details.missing`).
+
+**Other:** `/pages/edit` has `maxDuration = 120`. The preview (`/pages/render`) resolves snapshot ids only and shows an
+address or folder as a "copied when saved"/"from this page's demos/x" placeholder. Editor help text mentions both
+forms. Tests: `tests/unit/demos.test.ts` (parsing, rendering), `tests/unit/page-layout.test.ts` (paths),
+`tests/integration/demos.test.ts` (copy at commit, pin survives a GitHub outage and a rebuild, failed copy refused,
+repo demo served and re-snapshotted on change, refusals, author-only folders).
+
+**Left undone**
+
+- No way to write `demos/` from the web; it needs push (phase 5) or a future "edit this file" view. Today only
+  `commitPage` callers (tests, scripts) can.
+- The editor's "Insert a demo" still inserts a snapshot id (it already copied the files; inserting the address would
+  copy twice and might see a moved branch). Could switch to inserting the address later.
+- `merge-papers.ts` `foldPages` doesn't carry a duplicate's `demos/` folders; a merged section naming one would be
+  refused. No page has one yet.
+- Snapshotting happens before the permission check (it's outside the transaction), so a commit that will be refused
+  for permissions may still download its demos. Cheap to fix in phase 3 by checking roles first.
+- Old blob-store files of replaced repo-demo versions are never deleted (as for GitHub copies).
+
+**Phase 3 must know**
+
+- Demo checks are already in the commit path (`checkDemos`, called after `checkTreeShape` and `checkLinkLabels`);
+  `editSection` no longer checks demos. `checkDemos` needs `roles`, the head and final trees, a text reader, the
+  pre-transaction `snapshots` map and the sizes of new blobs.
+- The only demo step outside the transaction is `snapshotNewDemoUrls`; a tree validator for push must keep it before
+  the lock, then let `checkDemos` match.
+
+**Phase 5 must know**
+
+- Pushed Markdown with GitHub addresses gets copied at receive time like a web edit; a multi-commit push should copy
+  per commit (pins record the commit that added the address) or at least once per new address.
+- Pushed demo files arrive as bytes: refuse non-UTF-8 / NUL (binary) blobs under `demos/` with a clear `remote:` line
+  saying binary demo assets must come from GitHub.
