@@ -33,7 +33,7 @@ Milestones 0, 1 and 2 are built, merged into `main` and deployed, and Milestone 
   checks the head with a compare-and-swap. `/git/...` serves read-only clones over dumb HTTP, with its own rate
   limit.
 - **ICLR:** 42,425 ICLR 2027 and 19,804 ICLR 2026 papers are imported. ICLR 2027 also has its submissions,
-  reviews and decisions from OpenReview, and the forms for importing ICLR 2026's are ready. ICLR 2027 PDFs are hosted in R2 through a `pdf.json` in each page repo. Each paper shows a picture
+  reviews and decisions from OpenReview, and the forms for importing ICLR 2026's are ready. ICLR 2027 PDFs are hosted in R2 through a `.potentialpaper/pdf.json` in each page repo. Each paper shows a picture
   of its first page, or a thumbnail set with `pages:set-thumbnail`.
 - **Licenses:** each paper records its source and the licenses of its metadata and abstract.
 - **Demos:** a demo is a ` ```demo <snapshot> ` block (title on the first line, description after) in
@@ -46,7 +46,7 @@ Milestones 0, 1 and 2 are built, merged into `main` and deployed, and Milestone 
   demo host (`lib/demos.ts`, `papers-content.potentialhedge.com` in production, `127.0.0.1:3000` in dev) at
   `/d/<snapshot>/<path>`. That host shares a site with the app, so it is not a real sandbox yet: see `TODO.md`.
 - **The card:** `thumbnail.json` (the picture, uploaded from the page's `#edit-picture` editor through
-  `POST /api/v1/pages/thumbnail`, multipart) and `links.json` (extra links under the title; one named like a
+  `POST /api/v1/pages/thumbnail`, multipart) and `links/NN-slug.json` (extra links under the title, a file each; one named like a
   built-in link replaces it, `POST /api/v1/pages/links`). Any verified account may change them while the paper
   is unclaimed, and only its confirmed authors (and admins) once it is claimed.
 - **Claims:** `author_claims`. A paper is claimed once it has a confirmed claim. **An account with a confirmed
@@ -82,7 +82,7 @@ Milestones 0, 1 and 2 are built, merged into `main` and deployed, and Milestone 
   links, and KaTeX 0.19 for `$…$` and `$$…$$` through our own small rule, since `@vscode/markdown-it-katex`
   pins KaTeX 0.16, which has an open advisory. KaTeX runs with `trust: false`, so `\href` stays text.
   `writeCurrent` fills `page_current.community_html` and `author_html`, and `pages:rebuild` regenerates them.
-  `##` headings are a page's sections: the same parse splits the file for the editor and marks
+  Each section is its own file (`community/10-summary.md`; see `handoffs/git-push.md`), titled by its leading `#`; the same parse splits the whole-part text for the editor and marks
   `data-section` in the HTML, where `slots.tsx` adds the edit links.
 - **API:** `POST /api/v1/pages/edit` `{ paper, baseOid, section, content, summary }` (section 0 is the whole
   community section) puts the section back into the file _as it was at `baseOid`_, then calls `commitPage`,
@@ -113,7 +113,7 @@ Also revisit the CSP now that user-written content ships: scripts currently allo
 
 ## Paper versions and evidence (2026-11-13, branch `paper-versions`)
 
-- **Versions:** `versions.jsonl` in the page repo (`lib/versions.ts`, one line per version, sorted by date), projected to
+- **Versions:** `versions/<id>.json` in the page repo (`lib/versions.ts`, one file per version, sorted by date), projected to
   `page_current.versions`. Writable by any verified account, admins and the system. Saved as a whole list
   (`POST /api/v1/pages/versions`, `server/versions.ts`), merged **by version id** against `baseOid` (git's line merge
   conflicts on neighbouring lines). Editor `#edit-versions` (`EditableVersions.tsx`); section and aside box in
