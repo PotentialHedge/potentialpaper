@@ -1096,29 +1096,36 @@ describe('git clone', () => {
     expect(stub).toBeTruthy();
   });
 
-  it('is read-only', async () => {
+  it('takes no other methods, and pushes only from someone signed in', async () => {
     for (const method of ['PUT', 'PATCH', 'DELETE'] as const) {
       const res = await gitRoute[method](
         new Request(new URL('/git/arxiv/1706.03762.git/git-upload-pack', base), { method }),
       );
       expect(res.status).toBe(405);
     }
-    const post = (path: string) => gitRoute.POST(new Request(new URL(path, base), { method: 'POST', body: '0000' }));
+    const post = (path: string, type?: string) =>
+      gitRoute.POST(
+        new Request(new URL(path, base), {
+          method: 'POST',
+          body: '0000',
+          headers: type ? { 'content-type': type } : {},
+        }),
+      );
     expect((await post('/git/arxiv/1706.03762.git/info/refs')).status).toBe(405);
     expect((await post('/git/arxiv/1706.03762.git/git-upload-pack')).status).toBe(415);
-    expect((await post('/git/arxiv/1706.03762.git/git-receive-pack')).status).toBe(403);
-    expect((await request('/git/arxiv/1706.03762.git/info/refs?service=git-receive-pack')).status).toBe(403);
+    expect((await post('/git/arxiv/1706.03762.git/git-receive-pack')).status).toBe(415);
     expect((await request('/git/arxiv/1706.03762.git/info/refs?service=git-frobnicate')).status).toBe(403);
+    // No page yet: nothing to push to.
+    expect((await request('/git/arxiv/1706.03762.git/info/refs?service=git-receive-pack')).status).toBe(404);
 
-    // What a person trying to push sees.
     const paperId = await newPaper(ARXIV);
     await commitPage(paperId, null, SYSTEM_ACTOR, [], 'Start');
-    const clone = join(workDir(), 'page');
-    await gitOverHttp(['clone', '-q', `${base}${clonePath(ARXIV)}`, clone]);
-    git(['-c', 'user.name=x', '-c', 'user.email=x@example.org', 'commit', '-q', '--allow-empty', '-m', 'x'], clone);
-    await expect(gitOverHttp(['push', '-q', 'origin', 'main'], clone)).rejects.toThrow(
-      /Pushing to a page over HTTPS is not available yet/,
-    );
+    const refs = await request('/git/arxiv/1706.03762.git/info/refs?service=git-receive-pack');
+    expect(refs.status).toBe(401);
+    expect(refs.headers.get('www-authenticate')).toMatch(/^Basic realm="PotentialPaper"/);
+    const push = await post('/git/arxiv/1706.03762.git/git-receive-pack', 'application/x-git-receive-pack-request');
+    expect(push.status).toBe(401);
+    expect(await readHead(getDb(), paperId)).not.toBeNull();
   });
 
   async function longHistory(commits: number): Promise<{ paperId: string; head: string; person: Actor }> {

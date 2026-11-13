@@ -40,4 +40,10 @@ export async function proxy(req: NextRequest) {
   }
 }
 
-// Every path, since any path on the demo host can be a demo's file. The app's own paths return at once.
+// Every path, since any path on the demo host can be a demo's file, and the app's own paths return at once; but not a
+// push (`POST /git/…/git-receive-pack`). Next buffers a request body for the proxy, and past
+// `proxyClientMaxBodySize` (10 MB) cuts it off, which would break a large pack. `server/git/http.ts` refuses a
+// push on the demo host itself.
+export const config = {
+  matcher: ['/((?!git/.+/git-receive-pack$).*)'],
+};

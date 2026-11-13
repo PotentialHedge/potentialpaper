@@ -142,6 +142,11 @@ class Objects {
     return this.incoming.get(oid) ?? (await readObject(this.db, this.paperId, oid));
   }
 
+  /** Whether the page itself has the object, wherever else it is. */
+  async stored(oid: string): Promise<boolean> {
+    return (await readObject(this.db, this.paperId, oid)) !== null;
+  }
+
   async must(oid: string, type: GitObjectType): Promise<Buffer> {
     const found = await this.get(oid);
     if (!found) throw refuse(`the push is missing the object ${oid}`);
@@ -241,11 +246,18 @@ async function checkCommitText(body: Buffer, raw: CommitObject, check: MessageCh
     if (signature.name !== id || signature.email !== identityEmail(id)) {
       const { commands } = identityOf(id);
       throw refuse(
-        `its ${role} is “${signature.name} <${signature.email}>”, but your commits to this page are made as ` +
-          `${id}, so that no name or address of yours goes into its public history. In this clone run ` +
-          `${commands.map((c) => `\`${c}\``).join(' and ')}, then remake the commit with ` +
-          '`git commit --amend --reset-author --no-edit` (for several: ' +
-          "`git rebase --exec 'git commit --amend --reset-author --no-edit' origin/main`)",
+        // Lines, so a `remote:` line each, with the commands on their own to copy.
+        [
+          `its ${role} is “${signature.name} <${signature.email}>”, but your commits to this page are made as ${id},`,
+          'so that no name or address of yours goes into its public history. In this clone, run',
+          '',
+          ...commands.map((c) => `    ${c}`),
+          '',
+          'then remake the commit with',
+          '    git commit --amend --reset-author --no-edit',
+          'or, for several commits,',
+          "    git rebase --exec 'git commit --amend --reset-author --no-edit' origin/main",
+        ].join('\n'),
         { identity: { name: id, email: identityEmail(id) } },
         422,
         'wrong_identity',
@@ -318,8 +330,9 @@ async function pushedChain(objects: Objects, head: string, tip: string): Promise
   for (let oid = tip; oid !== head;) {
     if (chain.length >= MAX_PUSH_COMMITS) throw refuse(`a push can add at most ${MAX_PUSH_COMMITS} commits`);
     const found = objects.incoming.get(oid);
-    if (!found) {
-      if (await objects.get(oid)) {
+    // A commit the page has, the pack's copy too: a client that doesn't know the head sends all it has.
+    if (!found || (await objects.stored(oid))) {
+      if (found || (await objects.get(oid))) {
         throw refuse(
           `the page has commits after ${short(oid)} that this push doesn't build on; git pull --rebase, then push again`,
           { commit: oid },

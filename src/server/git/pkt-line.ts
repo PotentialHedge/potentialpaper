@@ -108,6 +108,26 @@ export class PktReader {
   }
 
   /**
+   * The input after the last packet read, unframed: a push's packfile follows its commands as raw bytes.
+   * Pulls from the source only as it is asked to, so it never reads past what its consumer needs.
+   */
+  async *rest(): AsyncGenerator<Buffer> {
+    if (this.buffered.length) {
+      const buffered = this.buffered;
+      this.buffered = Buffer.alloc(0);
+      yield buffered;
+    }
+    while (!this.ended) {
+      const next = await this.source.next();
+      if (next.done) {
+        this.ended = true;
+        return;
+      }
+      yield Buffer.from(next.value);
+    }
+  }
+
+  /**
    * Text lines up to the next flush or delim (which it consumes and returns as `end`). `null` if the input
    * ended before anything was read, the usual way a client says it is done.
    */

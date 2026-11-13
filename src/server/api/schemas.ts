@@ -7,6 +7,7 @@ import {
   AGENT_POST_KINDS,
 } from '@/lib/agent-posts';
 import { MAX_EVIDENCE, MAX_EVIDENCE_URL } from '@/lib/evidence';
+import { TOKEN_SCOPES } from '@/db/schema';
 import { REAL_NAME_MAX } from '@/lib/profile';
 import { MAX_VERSIONS, VERSION_KINDS, VERSION_STATUSES } from '@/lib/versions';
 import { SEARCH_SORTS } from '@/lib/search';
@@ -325,7 +326,7 @@ export const AgentToken = z.object({
   token: z.string(),
   id: z.uuid(),
   name: z.string(),
-  scopes: z.array(z.enum(['read', 'write'])),
+  scopes: z.array(z.enum(TOKEN_SCOPES)),
 });
 /** A code for the signed-in person's own agent prompt. */
 export const MyAgentCode = z.object({ email: z.string(), code: z.string(), expiresAt: z.string() });
@@ -333,7 +334,7 @@ export const MyAgentCode = z.object({ email: z.string(), code: z.string(), expir
 /** A key the signed-in person makes by hand on their profile, for a script or an agent of their own. */
 export const CreateTokenBody = z.object({
   name: z.string().trim().min(1).max(100),
-  scopes: z.array(z.enum(['read', 'write'])).min(1),
+  scopes: z.array(z.enum(TOKEN_SCOPES)).min(1),
 });
 
 export const TokenList = z.object({
@@ -342,7 +343,7 @@ export const TokenList = z.object({
       id: z.uuid(),
       name: z.string(),
       start: z.string(),
-      scopes: z.array(z.enum(['read', 'write'])),
+      scopes: z.array(z.enum(TOKEN_SCOPES)),
       createdAt: z.string(),
       lastUsedAt: z.string().nullable(),
     }),

@@ -93,6 +93,38 @@ async function authenticateToken(req: Request, header: string): Promise<Principa
   return { account: verified.account, isAdmin: false, credentialId: verified.id, via: 'token', rateLimit };
 }
 
+export const GIT_REALM = 'PotentialPaper';
+
+/**
+ * Who is pushing to a page over HTTPS (`server/git/http.ts`). Git sends HTTP Basic: any user name (it is
+ * ignored, so a credential helper's one entry for the host serves every page), and an API token as the
+ * password; `Authorization: Bearer` works too (`git -c http.extraHeader=…`). The token needs the `push` or
+ * the `write` scope, and its account a confirmed address, as for every write. A 401 (no credentials, or a
+ * token that isn't one) is what makes git ask for them, so the caller adds `WWW-Authenticate`.
+ */
+export async function authenticateGitPush(req: Request): Promise<Principal> {
+  const header = req.headers.get('authorization')?.trim() ?? '';
+  let token: string | null = null;
+  const basic = /^Basic\s+(\S+)$/i.exec(header);
+  if (basic) {
+    const decoded = Buffer.from(basic[1], 'base64').toString('utf8');
+    token = decoded.slice(decoded.indexOf(':') + 1);
+  } else {
+    token = /^Bearer\s+(\S+)$/i.exec(header)?.[1] ?? null;
+  }
+  if (!token) throw new ApiError(401, 'unauthorized', 'Push with an API key as the password.');
+  const verified = await verifyToken(token);
+  if (!verified) throw new ApiError(401, 'unauthorized', 'That API key is not valid, or was revoked.');
+  if (!verified.scopes.includes('push') && !verified.scopes.includes('write')) {
+    throw new ApiError(403, 'forbidden', 'This API key may not push; make one that may, on your profile page.');
+  }
+  if (!verified.account.isBot && !verified.account.verifiedAt) {
+    throw new ApiError(403, 'not_verified', 'Confirm an institutional email address before you push.');
+  }
+  const rateLimit = await countRequest(`account:${verified.account.id}`);
+  return { account: verified.account, isAdmin: false, credentialId: verified.id, via: 'token', rateLimit };
+}
+
 /** One request from the credential's bucket, or a 429. */
 async function countRequest(key: string): Promise<RateLimitResult> {
   const rateLimit = await consume(key, rateLimitConfig());

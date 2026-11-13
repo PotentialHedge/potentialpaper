@@ -62,7 +62,11 @@ export function clonePath({ scheme, value }: PaperId, file = ''): string {
 export async function findRepo(
   { id, scheme, raw, file }: GitAddress,
   database: Database = getDb(),
-): Promise<{ kind: 'repo'; paperId: string; head: string } | { kind: 'redirect'; to: string } | { kind: 'missing' }> {
+): Promise<
+  | { kind: 'repo'; paperId: string; head: string; identifiers: PaperId[] }
+  | { kind: 'redirect'; to: string }
+  | { kind: 'missing' }
+> {
   const found = await findPaper(id, database);
   if (!found) return { kind: 'missing' };
   const head = await readHead(database, found.paper.id);
@@ -71,7 +75,7 @@ export async function findRepo(
   if (canonical.scheme !== scheme || canonical.value !== raw) {
     return { kind: 'redirect', to: clonePath(canonical, `/${file}`) };
   }
-  return { kind: 'repo', paperId: found.paper.id, head };
+  return { kind: 'repo', paperId: found.paper.id, head, identifiers: found.identifiers };
 }
 
 /** The dumb protocol's answers: `info/refs`, `HEAD` and loose objects. */

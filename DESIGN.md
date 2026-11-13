@@ -36,7 +36,7 @@ in the spirit of VS Code extensions.
 
 - Hosting PDFs. We link out, which avoids a large copyright problem.
 - Formal review scores or reputation systems. An extension can experiment with these first.
-- `git push` to a page.
+- `git push` over SSH (HTTPS works, §4.6).
 - Real-time co-editing.
 
 ## 2. Stack
@@ -159,8 +159,8 @@ without a CDN. Every clone passed `git fsck --full --strict`. The first two clon
 smart and dumb rows are the app's own route (`server/git/`, §4.6) in one process with the dev Postgres, a
 page whose summary file is 9 KB and changes every commit, best of three runs (2026-11-13).
 
-**What this costs.** We own a small piece of git-format code, there are no hooks or native push, and
-tools that expect files on disk need a clone first. Nothing is locked in: `git clone` of any page
+**What this costs.** We own a small piece of git-format code (objects, packs both ways, the smart protocol),
+there are no hooks, and tools that expect files on disk need a clone first. Nothing is locked in: `git clone` of any page
 gives a normal repo.
 
 **Scale check.** At the measured 23 KB per page, one million actively edited pages come to about
@@ -307,10 +307,10 @@ Markdown is rendered and sanitized **at commit time** and stored as HTML. Raw HT
 never allowed. History pages read `page_revisions`, and diffs are computed in-process from blobs
 and cached by oid pair.
 
-### 4.6 Clone access
+### 4.6 Clone and push access
 
-Clones and fetches use git's **smart HTTP protocol**, read-only, implemented in TypeScript over
-`page_objects` (no repos on disk, no `git` process on the server), with the **dumb protocol** kept beside it:
+Clones, fetches and pushes use git's **smart HTTP protocol**, implemented in TypeScript over `page_objects`
+(no repos on disk, no `git` process on the server), with the read-only **dumb protocol** kept beside it:
 
 ```
 GET  /git/arxiv/1706.03762.git/info/refs?service=git-upload-pack   smart: capabilities (v2) or refs (v0, v1)
@@ -318,14 +318,16 @@ POST /git/arxiv/1706.03762.git/git-upload-pack                     smart: ls-ref
 GET  /git/arxiv/1706.03762.git/info/refs                           dumb: refs
 GET  /git/arxiv/1706.03762.git/HEAD                                dumb
 GET  /git/arxiv/1706.03762.git/objects/ab/cdef...                  dumb: one loose object
-     .../info/refs?service=git-receive-pack, POST .../git-receive-pack   403 "not available yet" (push comes next)
+GET  /git/arxiv/1706.03762.git/info/refs?service=git-receive-pack  push: refs and capabilities (API key)
+POST /git/arxiv/1706.03762.git/git-receive-pack                    push: commands and a pack → status report
 ```
 
 `src/server/git/` holds it, the transport kept apart from the protocol so SSH can reuse it: `pkt-line.ts`
-(framing, side-band), `pack.ts` (packfile writer: whole objects, no deltas, zlib, SHA-1 trailer), `repo.ts`
-(`GitRepo`: head, commits, objects by id; `pageRepo` reads Postgres), `walk.ts` (what to send),
-`upload-pack.ts` (the protocol: `advertisement`, `uploadPackRequest` for one stateless HTTP request,
-`uploadPackSession` for a byte stream) and `http.ts` (the route's adapter).
+(framing, side-band), `pack.ts` (packfile writer: whole objects, no deltas, zlib, SHA-1 trailer),
+`pack-reader.ts` (packfile reader: deltas by offset and by id, thin packs, capped), `repo.ts` (`GitRepo`: head,
+commits, objects by id; `pageRepo` reads Postgres), `walk.ts` (what to send), `upload-pack.ts` and
+`receive-pack.ts` (the protocols, each as one stateless HTTP request or a session on a byte stream),
+`page-push.ts` (a page as the target of a push) and `http.ts` (the route's adapter).
 
 - **Versions.** Protocol v2 (git's default since 2.29: `ls-refs`, `fetch`), and v0/v1 with
   `multi_ack_detailed` and `side-band-64k`, for older clients and libraries. Shallow clones (`--depth`) are
@@ -342,8 +344,30 @@ GET  /git/arxiv/1706.03762.git/objects/ab/cdef...                  dumb: one loo
 - **Rate limits.** As before: Traefik's own `/git/` router (200/s, burst 1500 per client IP), sized for dumb
   clones. A smart clone is three requests.
 
-Push will add `git-receive-pack` at the same base, with every incoming commit run through `receiveCommits`
-(§4.4) and the same path rules as a web edit.
+**Push.** `git push` to the clone address, with an API key as the password (`server/auth.ts`
+`authenticateGitPush`): HTTP Basic with any user name, so one credential-helper entry per host serves every page,
+or `Authorization: Bearer`. The key needs the `push` scope (a key that can do nothing else, the one to keep in a
+credential helper) or `write`, and its account a confirmed address. Without credentials, or with a key that
+isn't one, the answer is `401` with `WWW-Authenticate: Basic`, which is what makes git ask for them; a key that
+may not push or an unconfirmed account gets `403` and a sentence git prints. The flow:
+
+- `info/refs?service=git-receive-pack` advertises `refs/heads/main` with `report-status`, `side-band-64k`,
+  `quiet`, `atomic`, `ofs-delta`, `object-format=sha1` and `agent`. Not `delete-refs` (git then refuses a delete
+  itself), `push-options` or `push-cert`. Protocol v2 has no push, so a client asking for it gets v0.
+- The POST carries the commands, then the pack. A command for any ref but `main`, a tag or a delete is refused
+  per ref (`ng`, with a `remote:` line saying why). The pack is read whole (≤ 32 MB as sent, ≤ 50,000 objects,
+  ≤ 4 MB an object inflated, ≤ 128 MB held in all, so no delta bomb gets far), its trailer checked, its deltas
+  resolved, a thin pack's bases read from `page_objects`.
+- `main`'s update goes to `receiveCommits` (§4.4) with the pack's objects, so every pushed commit meets the
+  same rules as a web edit, and is stored verbatim. A refusal's message goes back on side-band 2, so git prints
+  each line as `remote: …` (the wrong-identity one lists the two `git config` commands on lines of their own),
+  and the status report says `ng refs/heads/main <short reason>`. After a push the paper's pages are refreshed
+  as after a web edit (`refreshPaperPages`).
+- `proxy.ts` skips `POST …/git-receive-pack` (its `matcher`), since Next buffers a body for the proxy and cuts
+  it off past 10 MB; the route refuses the demo host itself. Cloudflare's own limit on a request (100 MB) is
+  above the pack cap.
+
+How to clone, set the identity and push is written up for people in `docs/git.md`.
 
 ### 4.7 Redaction
 

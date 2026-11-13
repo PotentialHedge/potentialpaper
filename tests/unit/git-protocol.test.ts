@@ -18,8 +18,11 @@ import {
   readAllPkts,
   sideband,
 } from '@/server/git/pkt-line';
+import type { PackObject } from '@/server/git/pack-reader';
+import { type ReceiveTarget, receivePackSession } from '@/server/git/receive-pack';
 import { type GitRepo, memoryRepo } from '@/server/git/repo';
 import { advertisement, protocolVersion, uploadPackRequest, uploadPackSession } from '@/server/git/upload-pack';
+import { ApiError } from '@/server/api/errors';
 import { buildTrees, encodeCommit, type GitObject, gitObject, type GitObjectType } from '@/server/pages/git-objects';
 
 function git(args: string[], cwd?: string, input?: Buffer): string {
@@ -285,6 +288,7 @@ describe('real git against the session', () => {
   let server: Server;
   let port: number;
   let current: GitRepo;
+  let receiver: ReceiveTarget;
 
   beforeAll(async () => {
     server = createServer((socket: Socket) => {
@@ -294,7 +298,10 @@ describe('real git against the session', () => {
         if (!request || request.kind !== 'data') return socket.destroy();
         // `git-upload-pack /path\0host=…\0` and, for v2, `\0version=2\0`.
         const extra = request.data.toString('latin1').split('\0').slice(2).filter(Boolean).join(':');
-        for await (const chunk of uploadPackSession(current, reader, protocolVersion(extra))) {
+        const session = request.data.toString('latin1').startsWith('git-receive-pack ')
+          ? receivePackSession(receiver, reader, protocolVersion(extra))
+          : uploadPackSession(current, reader, protocolVersion(extra));
+        for await (const chunk of session) {
           if (!socket.write(chunk)) await new Promise((resolve) => socket.once('drain', resolve));
         }
         socket.end();
@@ -334,4 +341,48 @@ describe('real git against the session', () => {
       ).rejects.toThrow(/shallow|depth/i);
     });
   }
+
+  it('takes a push over the stream, and shows a refusal as git prints it', async () => {
+    const long = history(5);
+    const objects = new Map<string, PackObject>(long.objects);
+    let head = long.commits[4].oid;
+    const updates: { old: string | null; new: string; objects: ReadonlyMap<string, PackObject> }[] = [];
+    let refuse: string | null = null;
+    current = memoryRepo(head, objects);
+    receiver = {
+      repo: { ...memoryRepo(null, objects), head: async () => head },
+      async update(update, sent) {
+        updates.push({ ...update, objects: sent });
+        if (refuse) throw new ApiError(422, 'wrong_identity', refuse);
+        for (const [oid, object] of sent) objects.set(oid, object);
+        head = update.new;
+        return ['Thanks.'];
+      },
+    };
+    const clone = join(workDir(), 'page');
+    await gitAsync(['clone', '-q', `git://127.0.0.1:${port}/page.git`, clone]);
+    writeFileSync(join(clone, 'community/10-summary.md'), 'Pushed.\n');
+    git(['-c', 'user.name=u_x', '-c', 'user.email=u_x@users.invalid', 'commit', '-qam', 'Push it'], clone);
+    const tip = git(['rev-parse', 'HEAD'], clone).trim();
+    const pushed = await gitAsync(['push', '--progress', 'origin', 'main'], clone);
+    expect(pushed).toBe('');
+    expect(updates).toHaveLength(1);
+    expect(updates[0]).toMatchObject({ old: long.commits[4].oid, new: tip });
+    // The new commit, its two trees and its blob; nothing the server had.
+    expect(updates[0].objects.size).toBe(4);
+    expect(head).toBe(tip);
+
+    refuse = 'first line\n    git config user.name u_x';
+    git(
+      ['-c', 'user.name=u_x', '-c', 'user.email=u_x@users.invalid', 'commit', '-q', '--allow-empty', '-m', 'Again'],
+      clone,
+    );
+    const refused = await gitAsync(['push', 'origin', 'main'], clone).then(
+      () => '',
+      (err: Error) => err.message.replace(/[ \t]+$/gm, ''),
+    );
+    expect(refused).toContain('remote: first line\nremote:     git config user.name u_x\n');
+    expect(refused).toContain('[remote rejected] main -> main (wrong author identity)');
+    expect(head).toBe(tip);
+  });
 });

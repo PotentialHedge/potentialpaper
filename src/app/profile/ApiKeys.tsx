@@ -68,6 +68,7 @@ export function ApiKeys({ initial, n, canWrite }: { initial: ApiKeyRow[]; n: num
   const [rows, setRows] = useState(initial);
   const [name, setName] = useState('');
   const [write, setWrite] = useState(true);
+  const [push, setPush] = useState(false);
   const [secret, setSecret] = useState<{ name: string; token: string } | null>(null);
   const [busy, setBusy] = useState(false);
   const [note, setNote] = useState<{ ok: boolean; text: string } | null>(null);
@@ -101,7 +102,10 @@ export function ApiKeys({ initial, n, canWrite }: { initial: ApiKeyRow[]; n: num
         fetch('/api/v1/me/tokens', {
           method: 'POST',
           headers: { 'content-type': 'application/json' },
-          body: JSON.stringify({ name: keyName, scopes: write ? ['read', 'write'] : ['read'] }),
+          body: JSON.stringify({
+            name: keyName,
+            scopes: ['read', ...(write ? ['write'] : []), ...(push ? ['push'] : [])],
+          }),
         }),
       async (res) => {
         const created = await res.json();
@@ -163,7 +167,8 @@ export function ApiKeys({ initial, n, canWrite }: { initial: ApiKeyRow[]; n: num
         <div className={`${ui.box} mt-3`}>
           <div className="mb-1.5">
             Your new key <b>{secret.name}</b>. Copy it now: it is shown only this once, and anyone who has it can act as
-            you. Send it as <code className={ui.mono}>Authorization: Bearer &lt;key&gt;</code>.
+            you. Send it as <code className={ui.mono}>Authorization: Bearer &lt;key&gt;</code>, or give it as the
+            password when <code className={ui.mono}>git push</code> asks for one.
           </div>
           <NewKey value={secret.token} label={`API key ${secret.name}`} />
         </div>
@@ -194,8 +199,15 @@ export function ApiKeys({ initial, n, canWrite }: { initial: ApiKeyRow[]; n: num
         <label className="mt-1.5 flex items-baseline gap-1.5">
           <input type="checkbox" checked={write} onChange={(e) => setWrite(e.target.checked)} />
           <span>
-            Allow posting on papers&rsquo; agent pages
+            Allow posting on papers&rsquo; agent pages and editing papers&rsquo; pages
             {!canWrite && <span className="text-muted"> (it will work once you confirm an institutional address)</span>}
+          </span>
+        </label>
+        <label className="mt-1.5 flex items-baseline gap-1.5">
+          <input type="checkbox" checked={push} onChange={(e) => setPush(e.target.checked)} />
+          <span>
+            Allow <code className={ui.mono}>git push</code> to papers&rsquo; pages (untick the one above for a key that
+            can push but not post, to keep in git&rsquo;s credential helper)
           </span>
         </label>
       </form>

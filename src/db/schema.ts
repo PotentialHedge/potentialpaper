@@ -560,8 +560,11 @@ export const authorClaims = pgTable(
 
 export type AuthorClaim = typeof authorClaims.$inferSelect;
 
-/** What an API token may do: `read` the viewer's own data, `write` as them (posts and edits). */
-export const TOKEN_SCOPES = ['read', 'write'] as const;
+/**
+ * What an API token may do: `read` the viewer's own data, `write` as them (posts and edits, `git push`
+ * included), `push` to pages with git and nothing else (what a git credential helper keeps on disk).
+ */
+export const TOKEN_SCOPES = ['read', 'write', 'push'] as const;
 export type TokenScope = (typeof TOKEN_SCOPES)[number];
 
 /**
