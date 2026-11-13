@@ -19,11 +19,12 @@ at other venues with the same title and an abstract that says the same, and comm
 versions.jsonl as the system, next to the paper's own forum.
 
   npm run papers:import-venue-versions -- data/openreview-venues.sqlite [--scrape iclr2026.sqlite]...
-                                          [--paper <uuid>] [--limit N] [--dry-run]
+                                          [--paper <uuid>] [--limit N] [--relabel] [--dry-run]
 
 --scrape adds a venue scrape's submissions (\`submissions.raw\`, as \`papers:import-iclr\` reads), for venues
 too big for the dump's search. Run again whenever the dump is refreshed: versions are matched by address,
-so a decision that came out updates its version and keeps what people wrote. Purge the edge cache after.`;
+so a decision that came out updates its version and keeps what people wrote (--relabel
+replaces the labels of the versions it finds, after a change to how they are named). Purge the edge cache after.`;
 
 interface Forum {
   id: string;
@@ -69,6 +70,7 @@ async function main() {
       paper: { type: 'string' },
       limit: { type: 'string' },
       'dry-run': { type: 'boolean' },
+      relabel: { type: 'boolean' },
       help: { type: 'boolean' },
     },
   });
@@ -133,6 +135,7 @@ async function main() {
         delete kept.license;
         return kept as Omit<FoundVersion, 'pdfSource' | 'license'> & { pdf?: VersionPdf };
       }),
+      { relabel: values.relabel },
     );
     if (values['dry-run']) {
       if (stats.matched <= 20) {

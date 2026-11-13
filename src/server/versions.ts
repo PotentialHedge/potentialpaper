@@ -264,6 +264,7 @@ function sameUrl(url: string | undefined): string {
 export function mergeFoundVersions(
   existing: readonly PaperVersion[],
   found: readonly (Omit<PaperVersion, 'id'> & { url: string })[],
+  { relabel = false }: { relabel?: boolean } = {},
 ): (VersionInput & { pdf?: VersionPdf })[] {
   const out: (VersionInput & { pdf?: VersionPdf })[] = existing.map((v) => ({ ...v }));
   for (const version of found) {
@@ -277,7 +278,8 @@ export function mergeFoundVersions(
       ...was,
       ...version,
       id: was.id,
-      label: was.label || version.label,
+      // A label someone wrote is kept, unless an import's naming is being corrected.
+      label: (relabel ? version.label : was.label) || version.label,
       note: was.note,
       pdf: was.pdf ?? version.pdf,
       evidence: [...new Set([...(was.evidence ?? []), ...(version.evidence ?? [])])],
