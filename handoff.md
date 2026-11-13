@@ -111,6 +111,27 @@ redaction. Before the alpha, these need decisions from the user (all are in `TOD
 
 Also revisit the CSP now that user-written content ships: scripts currently allow `'unsafe-inline'`.
 
+## Paper versions and evidence (2026-11-13, branch `paper-versions`)
+
+- **Versions:** `versions.jsonl` in the page repo (`lib/versions.ts`, one line per version, sorted by date), projected to
+  `page_current.versions`. Writable by any verified account, admins and the system. Saved as a whole list
+  (`POST /api/v1/pages/versions`, `server/versions.ts`), merged **by version id** against `baseOid` (git's line merge
+  conflicts on neighbouring lines). Editor `#edit-versions` (`EditableVersions.tsx`); section and aside box in
+  `Versions.tsx`; compare page `/versions/<paper>?a=&b=` (`lib/text-diff.ts`: sentences, then words).
+- **Look-up:** `server/version-sources.ts` finds every OpenReview forum with the exact title (`notes/search`, which
+  still works from ben-docker-1; `notes?id=` and PDFs get a 403 challenge there) and arXiv's submission history (abs
+  page). PDFs copied only under a CC license. `POST /api/v1/pages/versions/lookup` (editor button, nothing saved) and
+  `npm run papers:import-versions -- openreview:<id> [--arxiv <id>] [--dry-run]` (commits as the system).
+- **Files:** `POST /api/v1/files` (multipart `file`, or JSON `{url}` for allowlisted archive hosts) → `evidence_files`
+  row; a PDF goes to `pdf/<sha>.pdf` and gets a `pdf_documents` row. Dev without R2: `public/files`.
+- **Evidence:** every commit takes `evidence` (≤10 https or site paths), stored as `Evidence:` trailers, projected to
+  `page_revisions.evidence`, in the event payload, shown on history and diff. Section, links, revert and versions
+  editors send it.
+- **Ingest:** new `fulltext` stage (`pdf_documents.full_text`, private like page 1; emails hidden when shown), **only
+  for PDFs a version points at** (`versionsOnly`), so production doesn't re-download every ICLR PDF.
+- Example: Recursive Scaling in Masked Diffusion Models (openreview:dskf2Ppd9o) = 3 ICML 2026 workshops, BeNTo
+  @ NeurIPS 2026, ICLR 2027, arXiv 2606.18022 v1/v2. Imported into the dev DB only.
+
 ## Decisions already made (don't reopen)
 
 - **No admin UI.** Admins act through scripts or SQL on the server. The institution request form and its
@@ -181,3 +202,22 @@ redoing it. They still describe a strict CSP, `node-diff3`, and `page_current` h
 - In production, mail goes through Resend. To test without sending real mail, point `RESEND_BASE_URL` at a
   local catcher.
 - The R2 bucket keeps the old name, because R2 can't rename a bucket.
+
+## Versions for every paper (2026-11-13, branch `venue-versions`, not merged or deployed)
+
+- `npm run papers:dump-openreview -- data/openreview-venues.sqlite`: every 2025–27 venue's forums (3,098 venues from
+  OpenReview's `venues` and `active_venues` groups) through `notes/search?group=<venue>&term=<venue id>`, the only
+  listing OpenReview serves scripts from ben-docker-1 (20 req/min; `notes?…` and PDFs get a browser check). Resumable;
+  venues past search's 10k cap (ICLR) are split by decision word and marked incomplete, so ICLR comes from the scrapes.
+- `npm run papers:import-venue-versions -- <dump> --scrape iclr2026.sqlite --scrape iclr2027.sqlite [--dry-run]`:
+  matches by normalized title, confirmed by `sameWork` (abstract overlap; ≥6-word titles need 0.03, 3–5 words 0.1,
+  shorter 0.25 — calibrated on the ICLR 2026↔2027 pairs, where resubmissions often rewrite the abstract), commits as the
+  system via `mergeFoundVersions`. Labels come from the venue id (`venueName`), not the venue string.
+- Ran for the ICLR 2026↔2027 resubmissions: 508 pages committed. The full dump runs detached on ben-docker-1
+  (`data/openreview-dump.log`); `data/run-venue-import.sh` waits for it, imports and purges (`data/venue-import.log`).
+- **Merged** (`server/merge-papers.ts`, `npm run papers:merge -- <dup> <survivor>` or `--iclr-resubmissions`): 242
+  ICLR 2026 papers into their ICLR 2027 resubmissions, as the system, each with a commit on the survivor naming the
+  duplicate (empty when nothing folds: `CommitOptions.recordEmpty`). LygvJQPPJ2 and uuKARZrXNO are one paper submitted
+  twice to ICLR 2026 (the second desk-rejected), not yet merged. `--relabel` on the import corrects labels it wrote. The system may not write sections or a claimed card, so such merges need an admin.
+- Next: the scrapes' `external` table has match-checked arXiv ids for ~10.5k ICLR 2026 and ~9.5k ICLR 2027 papers (add
+  them as identifiers, then arXiv versions).
