@@ -291,3 +291,105 @@ version PDF check, revert of a pre-layout commit. Existing thumbnail fixture now
   date (any). Page protection and new-account limits still don't exist anywhere.
 - `merge-papers.ts` and scripts still call `commitPage` and so get all checks; `migration: true` still skips
   permissions and counts only.
+
+### Phase 4: Fetch over smart HTTP (done, branch `repo-files`)
+
+**Built.** `git clone`/`git fetch` over git's smart HTTP protocol, in TypeScript over `page_objects` (no repos on disk,
+no `git` on the server). Protocol **v2** (`ls-refs`, `fetch`; git's default, and what 2.34 sends) and **v0/v1**
+(`multi_ack_detailed`, `side-band-64k`, `no-progress`, `symref=HEAD:refs/heads/main`). The dumb protocol is kept
+unchanged (a GET of `info/refs` without `?service=`, `HEAD`, loose objects; `GIT_SMART_HTTP=0` still clones, and the
+edge still caches objects). `?service=git-receive-pack` and `POST …/git-receive-pack` answer **403** text/plain
+"Pushing to a page over HTTPS is not available yet." (git prints it as `remote:`); other services 403.
+DESIGN.md §4.6 rewritten, measurements added to the §4.1 table.
+
+**Refused cleanly / not built:** shallow (`--depth`, `deepen*`; not advertised, so git itself stops with "Server does
+not support shallow requests"; a hand-sent `deepen` gets `ERR … shallow clones are not supported`), `--filter` (not
+advertised, git warns and clones whole; a hand-sent one gets `ERR`), tags/`include-tag` (there are none), deltas
+(packs carry whole objects), progress messages, `wait-for-done`, `packfile-uris`, `sideband-all`, `no-done`, SHA-256.
+
+**Modules** (`src/server/git/`):
+
+```
+pkt-line.ts     pkt(), pktLines(), FLUSH/DELIM/RESPONSE_END, sideband(band, bytes), PktReader (any byte stream), PktError
+pack.ts         packHeader, packObjectHeader, packEntry, writePack(count, objects) → AsyncGenerator<Buffer>, packBuffer
+repo.ts         GitRepo { head(), commits(), read(oids) }; pageRepo(db, paperId) (Postgres), memoryRepo(head, map)
+walk.ts         loadCommitGraph, ancestors, commonCommits, checkWants, objectsToSend, readObjects, FetchError, caps
+upload-pack.ts  protocolVersion, advertisement, uploadPackRequest (stateless), uploadPackSession (stream)
+http.ts         gitGet / gitPost: the route's adapter (smart + dumb, headers, gzip bodies, streaming)
+```
+
+`server/pages/clone.ts` keeps the dumb answers and now exports `parseGitAddress(pathname)` (also matches
+`git-upload-pack`/`git-receive-pack`) and `findRepo(address)` → `{ repo, paperId, head } | redirect | missing`
+(canonical address, merged papers, no repo yet), which receive-pack should reuse. The route
+(`app/git/[...path]/route.ts`) is two lines (`GET` → `gitGet`, `POST` → `gitPost`), `maxDuration = 120`.
+
+**The transport-independent API (phases 5 and 6 reuse this):**
+
+```ts
+// Input is any byte stream (an SSH channel, a request body) or one buffer; output is pulled chunk by chunk.
+new PktReader(input: AsyncIterable<Uint8Array> | Uint8Array)   // .read(): Pkt | null, .readSection()
+protocolVersion(gitProtocol: string | null): 0 | 1 | 2        // Git-Protocol header or GIT_PROTOCOL env
+advertisement(repo: GitRepo, version): Promise<Buffer>        // HTTP adds `# service=…` + flush for v0/v1
+uploadPackRequest(repo, reader, version): AsyncGenerator<Buffer>  // one stateless request (an HTTP POST)
+uploadPackSession(repo, reader, version): AsyncGenerator<Buffer>  // advertisement, then the whole session
+pageRepo(database, paperId): GitRepo
+```
+
+SSH (phase 6): on `exec git-upload-pack '<path>'`, `parseGitAddress`-style lookup of the path → `findRepo` →
+`for await (chunk of uploadPackSession(pageRepo(db, paperId), new PktReader(channel), protocolVersion(env
+GIT_PROTOCOL))) channel.write(chunk)` with backpressure, then end the channel (exit status 0). This exact loop is
+tested with real git over `git://` in `tests/unit/git-protocol.test.ts` (v2 and v0, clone + fetch + `fsck --strict`),
+since `git://` carries the same stateful session SSH will. The generator writes `ERR …` (or band 3 during a pack) on
+refusals; it rethrows internal faults after telling the client, so log them.
+
+Push (phase 5): put `pack-reader.ts` beside `pack.ts` (reuse `PACK_TYPE_CODES`; inverse of `packObjectHeader`), and
+`receive-pack.ts` beside `upload-pack.ts` with the same shape (`receivePackAdvertisement(repo)`,
+`receivePackRequest(repo, reader, actor)` / a session), using `pkt`/`sideband` for `report-status` and `remote:`
+lines (band 2). `http.ts` has the 403 placeholders to replace (`PUSH_REFUSED` in `gitGet` and `gitPost`), and its
+`readBody` (4 MB cap, gzip) must get a larger cap or stream into the pack reader for push.
+
+**Fetch logic.** `objectsToSend`: all commit rows of the page are read in keyset pages of 2,000 (bodies parsed only
+for `tree`/`parent` lines; ≤100,000 commits), the walk runs in memory; uninteresting = ancestors of the common haves;
+trees are compared only at the edge (common parents of sent commits), read breadth-first in batches of 500; blobs are
+named by their trees and never read until the pack is written, 64 per query, deflated and streamed (≤200,000 objects,
+else `ERR`). Wants must be reachable from the head (an older head is fine: the head can move between ls-refs and
+fetch). v2: no `done` and nothing in common → `NAK` + flush (client sends more haves); anything common → `ACK`s,
+`ready`, the pack. v0 mirrors `upload-pack.c`'s `get_common_commits` for `multi_ack_detailed` and plain clients,
+stateless (HTTP) or not (stream).
+
+**Caching / edge.** Checked: the Cloudflare cache rule matches only `/git/…` paths containing `.git/objects/`;
+`info/refs?service=` and `git-upload-pack` answers are `Cache-Control: no-store, no-transform` (also stops Next's
+gzip from recompressing packs; Cloudflare never caches POSTs). `proxy.ts` needed no change (`/git/` isn't a paper
+path). Rate limits unchanged: Traefik's `/git/` router (200/s, burst 1500).
+
+**Measured** (in-process route, dev Postgres, git 2.34.1, summary file 9 KB changed every commit, best of 3):
+
+| page        | smart v2 clone     | smart v0 clone     | dumb clone            | fetch 1 new commit (smart / dumb) |
+| ----------- | ------------------ | ------------------ | --------------------- | --------------------------------- |
+| 20 commits  | 91 ms, 3 requests  | 133 ms, 2 requests | 202 ms, 94 requests   | 62 ms, 3 req / 123 ms, 6 req      |
+| 500 commits | 585 ms, 3 requests | 475 ms, 2 requests | 1.94 s, 2062 requests | 149 ms, 3 req / 55 ms, 6 req      |
+
+A smart fetch reads all commit rows and walks the edge tree, so for one new commit it is slower than dumb's six
+cached-object requests; still one round trip and well under the edge timeout.
+
+**Tests.** `tests/unit/git-protocol.test.ts`: pkt-line round trips cut at random (fast-check), malformed input,
+side-band cutting; pack headers; packs checked by `git index-pack --strict` + `cat-file` (sizes 0…300 KB, binary,
+empty pack); v2 ls-refs (symrefs, prefixes), clone pack = every object, fetch pack = only new objects (count
+checked), NAK round, `not our ref`, deepen/filter refused; real `git clone`/`git fetch`/`--depth` over `git://`
+against `uploadPackSession` (v2, v0). `tests/integration/page-store.test.ts` (`git clone`): the existing clones now
+go smart; new: smart clone + fetch after a new commit for v2, v1 and v0 (no object GETs, `fsck --full --strict`,
+`--depth` refused), dumb clone with `GIT_SMART_HTTP=0`, headers of the smart answers, ls-refs by POST, 405/415/403s,
+and `git push` showing the not-yet message.
+
+**Left**
+
+- Push (phase 5) and SSH (phase 6), as above.
+- Phase 5 must know: `proxy.ts` runs on every path (no matcher, because of the demo host), and Next buffers a
+  request body for the proxy up to `experimental.proxyClientMaxBodySize` (default 10 MB, larger bodies are cut off
+  with a warning). A push pack can exceed that: raise it, or give `proxy.ts` a matcher that skips `/git/` on the app
+  host. Cloudflare's request body limit (100 MB on Free) also applies.
+- No per-page cost limit on smart fetches beyond Traefik's request rate; a smart request costs far more than a dumb
+  one (all commit rows + tree walk). Fine at current sizes; a DB-backed bucket per IP (like `takeCommit`) if needed.
+- Progress messages (band 2) aren't sent; a big clone is silent until done.
+- Packs have no deltas; a long-lived page's clone is roughly the sum of its file versions, deflated.
+- The compose comment about the git router's limit still describes dumb clones (still true for the fallback).
