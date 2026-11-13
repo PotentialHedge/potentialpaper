@@ -24,6 +24,7 @@
     "papers:import-venue-versions": "tsx scripts/import-venue-versions.ts",
     "papers:merge": "tsx scripts/merge-papers.ts",
     "pdfs:ingest": "tsx scripts/ingest-pdfs.ts",
+    "git:ssh": "tsx scripts/git-ssh.ts",
     "pages:edit": "tsx scripts/edit-page.ts",
     "pages:set-thumbnail": "tsx scripts/set-thumbnail.ts",
     "pages:rebuild": "tsx scripts/rebuild-page-projections.ts",
@@ -49,6 +50,7 @@
     "react-dom": "19.3.0",
     "resend": "^6.31.0",
     "sanitize-html": "^2.18.1",
+    "ssh2": "^1.17.0",
     "zod": "^4.6.5"
   },
   "devDependencies": {
@@ -58,6 +60,7 @@
     "@types/react": "^19",
     "@types/react-dom": "^19",
     "@types/sanitize-html": "^2.16.2",
+    "@types/ssh2": "^1.15.6",
     "dotenv": "^18.0.4",
     "drizzle-kit": "^0.31.11",
     "eslint": "^9.39.5",

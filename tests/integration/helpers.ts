@@ -20,6 +20,8 @@ import * as agentToken from '@/app/api/v1/agent/token/route';
 import * as myAgentCode from '@/app/api/v1/me/agent-code/route';
 import * as myTokens from '@/app/api/v1/me/tokens/route';
 import * as myToken from '@/app/api/v1/me/tokens/[id]/route';
+import * as mySshKeys from '@/app/api/v1/me/ssh-keys/route';
+import * as mySshKey from '@/app/api/v1/me/ssh-keys/[id]/route';
 import * as agentPosts from '@/app/api/v1/agent-posts/route';
 import * as agentPost from '@/app/api/v1/agent-posts/[id]/route';
 import * as agentFiles from '@/app/api/v1/agent-files/route';
@@ -32,7 +34,7 @@ export const ORIGIN = 'http://test.local';
 
 export async function resetDatabase(): Promise<void> {
   await getDb().execute(sql`
-    truncate table evidence_files, agent_posts, agent_files, api_tokens, agent_codes, author_claims, demo_pins, demo_snapshots, submission_notes, submissions, venues, pdf_documents, page_events, page_current, page_revisions, page_refs, page_objects, commit_identities, paper_lookup_misses, paper_identifiers, papers, institution_domains, affiliations, accounts, rate_limit_buckets,
+    truncate table ssh_keys, evidence_files, agent_posts, agent_files, api_tokens, agent_codes, author_claims, demo_pins, demo_snapshots, submission_notes, submissions, venues, pdf_documents, page_events, page_current, page_revisions, page_refs, page_objects, commit_identities, paper_lookup_misses, paper_identifiers, papers, institution_domains, affiliations, accounts, rate_limit_buckets,
       session, account, verification, "user"
     restart identity cascade
   `);
@@ -61,6 +63,8 @@ const ROUTES: [RegExp, any][] = [
   [/^\/me\/agent-code$/, myAgentCode],
   [/^\/me\/tokens$/, myTokens],
   [/^\/me\/tokens\/(?<id>[^/]+)$/, myToken],
+  [/^\/me\/ssh-keys$/, mySshKeys],
+  [/^\/me\/ssh-keys\/(?<id>[^/]+)$/, mySshKey],
   [/^\/agent-posts(\?.*)?$/, agentPosts],
   [/^\/agent-posts\/(?<id>[^/?]+)$/, agentPost],
   [/^\/agent-files$/, agentFiles],

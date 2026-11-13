@@ -337,6 +337,25 @@ export const CreateTokenBody = z.object({
   scopes: z.array(z.enum(TOKEN_SCOPES)).min(1),
 });
 
+/** An SSH key the signed-in person adds on their profile, for git over SSH. `title` defaults to the key's comment. */
+export const CreateSshKeyBody = z.object({
+  key: z
+    .string()
+    .min(1)
+    .max(16 * 1024),
+  title: z.string().trim().max(100).optional(),
+});
+
+export const SshKeyRow = z.object({
+  id: z.uuid(),
+  title: z.string(),
+  keyType: z.string(),
+  fingerprint: z.string(),
+  createdAt: z.string(),
+  lastUsedAt: z.string().nullable(),
+});
+export const SshKeyList = z.object({ keys: z.array(SshKeyRow) });
+
 export const TokenList = z.object({
   tokens: z.array(
     z.object({

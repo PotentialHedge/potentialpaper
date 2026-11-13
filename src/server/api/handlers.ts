@@ -8,6 +8,7 @@ import { issueAgentCode, redeemAgentCode, requestAgentCode } from '../agent-code
 import { uploadAgentFile } from '../agent-files';
 import { agentPostsOf, createAgentPost, removeAgentPost, type PresentedAgentPost } from '../agent-posts';
 import { listTokens, mintToken, revokeToken } from '../tokens';
+import { addSshKey, listSshKeys, removeSshKey } from '../ssh-keys';
 import { previewDemoSources } from '../demos/attach';
 import { snapshotDemo } from '../demos/snapshot';
 import { demoUrl } from '@/lib/demos';
@@ -514,6 +515,42 @@ export const deleteMyToken = route(async (req, params) => {
   const principal = await requireSession(req);
   const id = parseParam(params.id, S.IdParam, 'id');
   if (!(await revokeToken(principal.account.id, id))) throw new ApiError(404, 'not_found', 'no such token');
+  return respond(S.Ok, { status: 'ok' }, { principal });
+});
+
+function presentSshKey(k: Awaited<ReturnType<typeof listSshKeys>>[number]) {
+  return {
+    id: k.id,
+    title: k.title,
+    keyType: k.keyType,
+    fingerprint: k.fingerprint,
+    createdAt: toIso(k.createdAt),
+    lastUsedAt: toIsoOrNull(k.lastUsedAt),
+  };
+}
+
+/** The signed-in person's SSH keys, newest first. A browser session only, like `/me/tokens`. */
+export const getMySshKeys = route(async (req) => {
+  const principal = await requireSession(req);
+  const rows = await listSshKeys(principal.account.id);
+  return respond(S.SshKeyList, { keys: rows.map(presentSshKey) }, { principal });
+});
+
+/**
+ * Adds an SSH key. A session only, so a leaked API key can't add a key of its own. Any signed-in account may add
+ * one; pushing with it needs a confirmed address, checked when it is used (as for an API key with `push`).
+ */
+export const postMySshKey = route(async (req) => {
+  const principal = await requireSession(req);
+  const body = await parseBody(req, S.CreateSshKeyBody);
+  const row = await addSshKey(principal.account, body);
+  return respond(S.SshKeyRow, presentSshKey(row), { status: 201, principal });
+});
+
+export const deleteMySshKey = route(async (req, params) => {
+  const principal = await requireSession(req);
+  const id = parseParam(params.id, S.IdParam, 'id');
+  if (!(await removeSshKey(principal.account.id, id))) throw new ApiError(404, 'not_found', 'no such key');
   return respond(S.Ok, { status: 'ok' }, { principal });
 });
 

@@ -35,6 +35,10 @@ export const API_ERROR_CODES = [
   'fetch_first',
   'not_fast_forward',
   'wrong_identity',
+  // SSH keys (`server/ssh-keys.ts`).
+  'invalid_ssh_key',
+  'ssh_key_taken',
+  'too_many_ssh_keys',
 ] as const;
 
 export type ApiErrorCode = (typeof API_ERROR_CODES)[number];

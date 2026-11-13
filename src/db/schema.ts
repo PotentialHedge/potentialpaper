@@ -594,6 +594,33 @@ export const apiTokens = pgTable(
 export type ApiToken = typeof apiTokens.$inferSelect;
 
 /**
+ * Public keys for git over SSH (`server/ssh-keys.ts`, `server/git/ssh.ts`). A key signs in as its account,
+ * as an API key with the `push` scope does over HTTPS. The fingerprint is unique across all accounts, as on
+ * GitHub, so a key names one account. Deleted with the account.
+ */
+export const sshKeys = pgTable(
+  'ssh_keys',
+  {
+    id: uuid('id').primaryKey().defaultRandom(),
+    accountId: uuid('account_id')
+      .notNull()
+      .references(() => accounts.id, { onDelete: 'cascade' }),
+    title: text('title').notNull(),
+    /** `ssh-ed25519`, `ecdsa-sha2-nistp256`, … or `ssh-rsa`. */
+    keyType: text('key_type').notNull(),
+    /** The key as `authorized_keys` has it, without the comment: `<type> <base64>`. */
+    publicKey: text('public_key').notNull(),
+    /** `SHA256:` and the unpadded base64 of the key blob's SHA-256, as `ssh-keygen -l` prints it. */
+    fingerprint: text('fingerprint').notNull(),
+    lastUsedAt: timestamp('last_used_at', { withTimezone: true, mode: 'date' }),
+    createdAt: createdAt(),
+  },
+  (t) => [uniqueIndex('ssh_keys_fingerprint_key').on(t.fingerprint), index('ssh_keys_account_idx').on(t.accountId)],
+);
+
+export type SshKey = typeof sshKeys.$inferSelect;
+
+/**
  * One-time codes an AI agent trades for an API token (`server/agent-codes.ts`): mailed to the person, or put
  * into the prompt a signed-in person copies. One outstanding per user; asking again replaces it.
  */

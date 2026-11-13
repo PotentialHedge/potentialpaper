@@ -1,22 +1,27 @@
 import { revalidatePath } from 'next/cache';
 import { paperPath, type PaperId } from '@/lib/paper-ids';
+import { revalidateInApp } from '../internal';
 import { siteUrl } from '../site';
 
 /**
  * After a commit, makes the paper's pages show it: Next renders them again on their next request, and
  * Cloudflare drops its copies when production has a purge token (TODO.md). Never fails the commit, which
  * has happened by now.
+ *
+ * `revalidatePath` only works inside a Next request. Outside one (the SSH server, scripts) the app is asked to
+ * do it (`revalidateInApp`), when `APP_INTERNAL_URL` says where it is; tests have none.
  */
 export async function refreshPaperPages(identifiers: readonly PaperId[]): Promise<void> {
   const paths = identifiers.map(paperPath);
+  const outside: string[] = [];
   for (const path of paths) {
     try {
       revalidatePath(path);
-    } catch (err) {
-      // Outside a request, as in scripts and tests, there is no Next cache to clear.
-      if (process.env.NODE_ENV === 'production') console.error('revalidate', path, err);
+    } catch {
+      outside.push(path);
     }
   }
+  if (outside.length) await revalidateInApp(outside);
   const token = process.env.CLOUDFLARE_PURGE_TOKEN;
   const zone = process.env.CLOUDFLARE_ZONE_ID;
   if (!token || !zone) return;

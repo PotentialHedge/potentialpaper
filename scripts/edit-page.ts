@@ -7,6 +7,7 @@ import { accounts, user } from '@/db/schema';
 import { parsePaperId, PAPER_SCHEMES, type PaperScheme } from '@/lib/paper-ids';
 import { isAdminEmail } from '@/server/auth';
 import { type Actor, commitPage, type FileChange, revertCommit, SYSTEM_ACTOR } from '@/server/pages/commit';
+import { refreshPaperPages } from '@/server/pages/refresh';
 import { readHead } from '@/server/pages/repo';
 import { findPaper } from '@/server/papers';
 
@@ -85,6 +86,7 @@ async function main() {
         ],
         values.summary ?? 'Scripted edit',
       );
+  await refreshPaperPages(found.identifiers);
   console.log(JSON.stringify(result));
   await getPool().end();
 }

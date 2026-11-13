@@ -6,10 +6,13 @@ import { ui } from '@/components/ui';
 import { authHref, VERIFY_EMAIL } from '@/lib/return-to';
 import { listAffiliations } from '@/server/affiliations';
 import { viewerFromHeaders } from '@/server/auth';
+import { gitSshUrl } from '@/server/site';
+import { listSshKeys } from '@/server/ssh-keys';
 import { listTokens } from '@/server/tokens';
 import { ApiKeys } from './ApiKeys';
 import { Affiliations } from './Affiliations';
 import { ProfileForm } from './ProfileForm';
+import { SshKeys } from './SshKeys';
 
 export const dynamic = 'force-dynamic';
 export const metadata: Metadata = { title: 'Profile · PotentialPaper' };
@@ -19,7 +22,11 @@ export default async function Profile() {
   if (!viewer) redirect(authHref('/signin', '/profile'));
   const { account } = viewer;
   if (!account.profileCompletedAt) redirect(authHref(VERIFY_EMAIL, '/profile'));
-  const [rows, tokens] = await Promise.all([listAffiliations(account.id), listTokens(account.id)]);
+  const [rows, tokens, keys] = await Promise.all([
+    listAffiliations(account.id),
+    listTokens(account.id),
+    listSshKeys(account.id),
+  ]);
   return (
     <main className={ui.page}>
       <h1 className="mt-6 text-[26px] font-normal">@{account.handle}</h1>
@@ -63,6 +70,22 @@ export default async function Profile() {
           scopes: t.scopes,
           createdAt: t.createdAt.toISOString(),
           lastUsedAt: t.lastUsedAt?.toISOString() ?? null,
+        }))}
+      />
+      <h2 className={ui.groupHeading} id="ssh-keys">
+        SSH keys
+      </h2>
+      <SshKeys
+        n={3}
+        canPush={account.isBot || account.verifiedAt !== null}
+        sshUrl={gitSshUrl()}
+        initial={keys.map((k) => ({
+          id: k.id,
+          title: k.title,
+          keyType: k.keyType,
+          fingerprint: k.fingerprint,
+          createdAt: k.createdAt.toISOString(),
+          lastUsedAt: k.lastUsedAt?.toISOString() ?? null,
         }))}
       />
     </main>
