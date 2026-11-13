@@ -250,18 +250,30 @@ paper's PDF, copied unmodified.
 
 ### 4.4 The write path
 
-`commitPage(paperId, baseOid, actor, changes, summary)` is the **only** writer of page state, as
-`engine.trade()` is in acceptodds. Within one transaction it:
+`commitPage(paperId, baseOid, actor, changes, summary)` writes a web edit, as `engine.trade()` is in
+acceptodds, and `receiveCommits` (`pages/receive.ts`) writes commits a git client pushed. Both decide
+what may change in **one** function, `checkTree(before, after)` (`pages/check.ts`), and store through
+one, `recordCommit`, so no route checks anything a tree written by hand could get around. Within one
+transaction a commit:
 
-1. Checks path permissions, page protection and rate limits.
-2. Validates files, including link syntax, labels and targets.
-3. If `baseOid` is not the head, runs a three-way merge per file. A real conflict returns `409` with
-   both versions, and the editor shows them.
+1. Checks the actor's roles, rate limits and, per changed path, permissions and the layout.
+2. Validates files (JSON shapes, the HTML allowlist, pointers) and the tree (limits, link labels, version
+   PDFs uploaded here, the picture's address, demos). Copies of GitHub demos are made only once these
+   pass, before the lock.
+3. For a web edit, if `baseOid` is not the head, runs a three-way merge per file. A real conflict returns
+   `409` with both versions, and the editor shows them.
 4. Writes blobs, trees and the commit.
 5. Moves the head with compare-and-swap, `UPDATE ... WHERE head = $base`.
 6. Updates `page_current`, `page_links`, the search index, `page_revisions` and the event outbox.
 
-After commit it purges the Cloudflare URLs for the page and its link targets.
+After commit the route purges the Cloudflare URLs for the page and its link targets.
+
+**Pushed commits are stored verbatim**, so their ids don't change, and only if: author and committer are
+exactly the identity the site gives that account on that page (`u_…`, or the per-claim `a_…` on a paper it
+is an author of; `gitIdentity` says which `user.name`/`user.email` to set); they are a fast-forward of the
+head with no merge commits; they carry only git's own headers (no signature, which names a key) and a
+one-line summary; and their trailers are only `Evidence:`, `Edit-Kind: revert` with `Reverts:`, and
+`Bot: true` from a bot. A message line with a name and address is refused. A push is all or nothing.
 
 Details that have to be right:
 

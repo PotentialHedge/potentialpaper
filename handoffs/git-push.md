@@ -210,3 +210,84 @@ repo demo served and re-snapshotted on change, refusals, author-only folders).
   per commit (pins record the commit that added the address) or at least once per new address.
 - Pushed demo files arrive as bytes: refuse non-UTF-8 / NUL (binary) blobs under `demos/` with a clear `remote:` line
   saying binary demo assets must come from GitHub.
+
+### Phase 3: Checks in the commit path (done, branch `repo-files`)
+
+**One validator.** `checkTree(db, { paperId, roles, before, after, text, newBlobBytes, migration? })` in
+`src/server/pages/check.ts` decides whether the tree `after` may follow `before` for these roles, and returns the
+GitHub demo addresses new to the page (to copy, then pin). In order: change counts (`checkChangeCount`); per changed
+path its NFC/safe form, `pathDenied` and `layoutProblem` (`checkPath`), then content (`contentProblem`, `null` text =
+not UTF-8, with the "binary demo files come from GitHub" wording under `demos/`); then the tree: shape and limits,
+link labels, **version PDFs** (a new or changed `pdf` must match `versionPdfAt(url)`'s sha256 and size: uploaded or
+copied here), **the picture** (a changed image must sit at `imageAddresses(sha, type)`, where `storeImage` puts it,
+`src/server/media.ts`), and `checkDemos`. The system skips the PDF and picture checks. Also in `check.ts`: `Actor`,
+`rolesOf`, `authorIdOf` (system / `a_…` / `u_…`), `takeCommit` (rate limit), `checkPaper` (exists, not merged),
+`checkEvidence`, `checkMayWrite` (used by `setThumbnail` before storing an upload).
+
+**Web edits.** `commitPage` (`commit.ts`) keeps only edit-specific work: normalizing the change list, the per-file
+merge against `baseOid`, the first commit's metadata. Order now: rate limit → roles + `checkPaper` + `checkPath` (with
+content) on the requested changes → `newDemoUrls` + `copyDemos` (downloads last) → transaction: roles again, lock,
+merge, `checkTree` on the merged tree (the metadata of a first commit counts as already there, so an account's first
+edit isn't refused for `.potentialpaper/`) → `recordCommit` → `writeCurrent`. `recordCommit(tx, paperId, commitObject,
+commit, otherObjects, pins)` is shared with pushes: objects, CAS head move from `commit.parent`, pins, revision row,
+event (payload from the commit itself). `snapshotNewDemoUrls` became `newDemoUrls` + `copyDemos`; `checkDemos`
+returns addresses and `pinsFor(added, snapshots)` makes pins (503 `page_busy` if one is missing).
+
+**Pushes.** `src/server/pages/receive.ts`:
+
+```ts
+receiveCommits(paperId, actor /* { kind: 'account', accountId, isAdmin } */,
+  { old, new } /* receive-pack's old/new ids */, objects: Map<oid, { type: 'blob'|'tree'|'commit', body: Buffer }>,
+  { database?, rateLimit?, now? }): Promise<
+  | { status: 'unchanged', oid }
+  | { status: 'committed', oid, commits: { oid, seq, paths }[] }>
+gitIdentity(paperId, actor, database?): Promise<{ id, name, email, commands: string[] }>
+```
+
+Contract: `objects` are the packfile's objects, deltas already resolved, keyed by oid (re-hashed and refused if they
+don't match); objects not in the pack are read from `page_objects`. All or nothing for one ref update: walks
+`new` back to the head (≤ `MAX_PUSH_COMMITS` = 50, one parent each), `old` must equal the head (else 409
+`fetch_first`); a merge is refused ("rebase"), a commit on an older commit or a root is 409 `not_fast_forward`; a page
+with no repo yet is refused. Per commit: body is UTF-8; headers only tree/parent/author/committer/encoding(UTF-8),
+`gpgsig` refused with how to turn signing off; author **and** committer name = id, email = `<id>@users.invalid` for
+`authorIdOf` on this page (else 422 `wrong_identity`, message with both `git config` commands and the amend/rebase
+command, `details.identity`); committer date ≤ now + 10 min; summary (first paragraph) passes `cleanSummary`
+unchanged; no message line with `<x@y>`; trailers (last paragraph, git's rule, `parseMessage`) only `Evidence`
+(`cleanEvidence`, no repeats), `Edit-Kind` (+ `Reverts: <commit of this page>` together), `Bot: true` iff the account
+is a bot; tree exactly what `buildTrees` makes of its files (only modes 100644/40000; executable, symlink, submodule
+and empty folders refused by name), then `checkTree` against its parent. Roles, rate limit (one token per commit) and
+every check run before `copyDemos`; then one transaction re-reads roles, locks, checks the head again and that the
+identity is the same, re-runs the checks, and `recordCommit`s each commit in order; `writeCurrent` once at the end.
+Errors are `ApiError`s whose message is meant to be shown as is (one `remote:` line or a few), prefixed
+`commit <7 hex>:` with `details.commit` when one commit is at fault. New codes in `api/errors.ts`: `fetch_first`,
+`not_fast_forward`, `wrong_identity`. The caller purges/refreshes the paper's pages (`refreshPaperPages`) as routes do.
+
+**Parsing.** `git-objects.ts`: `parseCommitObject` (tree, parents, author/committer signatures with any time zone,
+header names, encoding, message), `parseMessage` (summary = first paragraph on one line; trailers = last paragraph only
+if every line is `Key: value`), `parseCommit` builds on them: a commit with no `Edit-Kind` is an edit, `at` is the
+committer time (same as before for the site's own commits; a rebase keeps an old author date). `identityEmail(id)`.
+
+**Revert.** `revertCommit` refuses (422, naming the path, "edit the page instead") when the commit changed any path
+with a `layoutProblem`, i.e. anything from before the file layout, or the migration commit itself. Cheaper than
+translating old layouts, and the text is still in history/diff.
+
+**Tests:** `tests/integration/receive.test.ts`: 19 bad trees pushed by hand, each refused with its message and the head
+unmoved (permissions, layout, dot files, HTML, links, labels, version PDF, picture address, demo id/folder/binary, NUL,
+NFD name, >50 files, metadata deletion), modes and an empty folder, a merged paper, `checkTree` on bare maps; verbatim
+push (oid and bytes unchanged, revision/event/projection/evidence), several commits, `a_…` identity on a claimed paper
+and the `u_…` refused there, wrong identities, merge/stale/not-fast-forward/root, message rules, bot trailer, a pushed
+revert, a commit made by stock `git` in a real clone; web path: no GitHub fetch before a 403/422 (web and push),
+version PDF check, revert of a pre-layout commit. Existing thumbnail fixture now uses `/thumbnails/<sha>.gif`.
+
+**Left / for phase 4–5**
+
+- Phase 5 only needs: pkt-line + receive-pack, packfile reader → `Map<oid, {type, body}>`, token auth → `Actor`, then
+  `receiveCommits` per updated ref (only `refs/heads/main`; refuse other refs and deletes in the transport), turning
+  `err.message` into `remote:` lines and `ng refs/heads/main <short reason>`, then `refreshPaperPages`.
+- `gitIdentity` creates the account's `u_…` on first call (a private row); show it on the clone instructions / a
+  settings page, and in every `wrong_identity` refusal (already in the message).
+- A pushed GitHub demo is copied once per address for the whole push (one map), pinned to the commit that added it.
+- Not checked for pushed commits: the message body's other text (no names policed beyond `<x@y>` lines), author
+  date (any). Page protection and new-account limits still don't exist anywhere.
+- `merge-papers.ts` and scripts still call `commitPage` and so get all checks; `migration: true` still skips
+  permissions and counts only.
