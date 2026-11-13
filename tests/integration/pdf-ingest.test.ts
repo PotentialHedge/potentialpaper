@@ -10,7 +10,7 @@ import { getPaper, search } from '@/server/api/handlers';
 import { claimByEmail, ownAddressesOnPaper } from '@/server/claims';
 import { commitPage, SYSTEM_ACTOR } from '@/server/pages/commit';
 import { readHead } from '@/server/pages/repo';
-import { PDF_PATH, VERSIONS_PATH } from '@/server/pages/rules';
+import { PDF_PATH, versionPath } from '@/server/pages/rules';
 import { savePaper } from '@/server/papers';
 import { ingest, MAX_ATTEMPTS } from '@/server/pdfs/ingest';
 import { ORIGIN, api, closePool, lastMailTo, resetDatabase, signUp } from './helpers';
@@ -135,7 +135,6 @@ describe('pdfs:ingest', () => {
 
     // Once a version points at it, its text is read for comparing versions, and nothing else runs again.
     const version = {
-      id: 'v_abcdefgh',
       label: 'arXiv v1',
       kind: 'preprint',
       pdf: { sha256: SHA, bytes: PDF.length, url: doc.url },
@@ -144,7 +143,7 @@ describe('pdfs:ingest', () => {
       paperId,
       await readHead(getDb(), paperId),
       SYSTEM_ACTOR,
-      [{ path: VERSIONS_PATH, content: `${JSON.stringify(version)}\n` }],
+      [{ path: versionPath('v_abcdefgh'), content: `${JSON.stringify(version)}\n` }],
       'Add a version',
     );
     expect((await ingest({ pdfDir })).stages).toMatchObject({ text: { done: 0 }, fulltext: { done: 1, failed: 0 } });

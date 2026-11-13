@@ -2,17 +2,17 @@ import { describe, expect, it } from 'vitest';
 import { cleanEvidence, evidenceLabel, evidenceProblem } from '@/lib/evidence';
 import { diffShort, diffTexts, sentencesOf } from '@/lib/text-diff';
 import {
-  encodeVersionsFile,
+  encodeVersionFile,
   formatVersionDate,
   newVersionId,
-  parseVersionsFile,
+  parseVersionFile,
   sortVersions,
   versionProblem,
   versionStanding,
   type PaperVersion,
 } from '@/lib/versions';
 import { encodeCommit, parseCommit, type Commit } from '@/server/pages/git-objects';
-import { contentProblem, pathDenied, VERSIONS_PATH, type Roles } from '@/server/pages/rules';
+import { contentProblem, pathDenied, versionPath, type Roles } from '@/server/pages/rules';
 import {
   abstractOverlap,
   normalizeTitle,
@@ -44,12 +44,13 @@ const conference: PaperVersion = {
   status: 'under_review',
 };
 
-describe('versions.jsonl', () => {
-  it('round-trips, oldest first, one line each', () => {
-    const text = encodeVersionsFile([conference, workshop]);
-    expect(text.split('\n')).toHaveLength(3);
-    expect(parseVersionsFile(text)).toEqual([workshop, conference]);
-    expect(contentProblem(VERSIONS_PATH, text)).toBeNull();
+describe('versions/<id>.json', () => {
+  it('round-trips, the id in the name and a field to a line', () => {
+    const text = encodeVersionFile(workshop);
+    expect(text).not.toContain(workshop.id);
+    expect(text.split('\n')[1]).toBe(`  "date": "${workshop.date}",`);
+    expect(parseVersionFile(workshop.id, text)).toEqual({ version: workshop });
+    expect(contentProblem(versionPath(workshop.id), text)).toBeNull();
   });
 
   it('refuses a bad version, a duplicate id, an unknown field', () => {
@@ -59,8 +60,8 @@ describe('versions.jsonl', () => {
     expect(versionProblem({ ...workshop, evidence: ['http://x.org'] })).toMatch(/evidence/);
     expect(versionProblem({ ...workshop, extra: 1 })).toMatch(/unknown field/);
     expect(versionProblem({ ...workshop, pdf: { ...workshop.pdf, sha256: 'x' } })).toMatch(/SHA-256/);
-    expect(parseVersionsFile(encodeVersionsFile([workshop]) + encodeVersionsFile([workshop]))).toBeNull();
-    expect(contentProblem(VERSIONS_PATH, '{"id":1}\n')).toMatch(/versions/);
+    expect(parseVersionFile(workshop.id, '[]')).toEqual({ problem: 'is not a JSON object' });
+    expect(contentProblem(versionPath('v_aaaaaaaa'), '{"id":1}\n')).toMatch(/file name/);
   });
 
   it('sorts undated versions last, keeping their order', () => {
@@ -83,9 +84,9 @@ describe('versions.jsonl', () => {
 
   it('is written by anyone verified, and the system', () => {
     const roles: Roles = { system: false, admin: false, verified: true, confirmedAuthor: false, claimed: true };
-    expect(pathDenied(VERSIONS_PATH, roles)).toBeNull();
-    expect(pathDenied(VERSIONS_PATH, { ...roles, system: true, verified: false })).toBeNull();
-    expect(pathDenied(VERSIONS_PATH, { ...roles, verified: false })).toMatch(/confirm/);
+    expect(pathDenied(versionPath('v_aaaaaaaa'), roles)).toBeNull();
+    expect(pathDenied(versionPath('v_aaaaaaaa'), { ...roles, system: true, verified: false })).toBeNull();
+    expect(pathDenied(versionPath('v_aaaaaaaa'), { ...roles, verified: false })).toMatch(/confirm/);
   });
 
   it('folds found versions into the page’s by address', () => {

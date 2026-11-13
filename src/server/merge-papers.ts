@@ -1,13 +1,15 @@
 import { eq, sql } from 'drizzle-orm';
 import { getDb, type Database } from '@/db';
 import { agentPosts, authorClaims, papers } from '@/db/schema';
-import { encodeLinksFile, MAX_LINKS, parseLinksFile } from '@/lib/paper-links';
-import { encodeVersionsFile, parseVersionsFile, type PaperVersion } from '@/lib/versions';
+import { MAX_LINKS, parseLinkFile, type TitleLink } from '@/lib/paper-links';
+import { parseVersionFile, sortVersions, type PaperVersion } from '@/lib/versions';
 import { ApiError } from './api/errors';
 import { commitPage, type Actor, type CommitResult, type FileChange } from './pages/commit';
+import { linkChanges, versionChanges } from './pages/content';
 import { lockPage } from './pages/projections';
 import { readCommit, readFiles, readHead, readText } from './pages/repo';
-import { AUTHOR_PAGE_PATH, COMMUNITY_PAGE_PATH, LINKS_PATH, METADATA_PATH, VERSIONS_PATH } from './pages/rules';
+import { isLinkPath, METADATA_PATH, PAGE_PARTS, sectionName, versionIdOf } from './pages/rules';
+import { planSections, sectionPaths, sectionTitle, type SectionFile } from './pages/sections';
 
 /**
  * Merging a duplicate page into the paper it duplicates (DESIGN.md §3): the duplicate's content is folded into
@@ -38,38 +40,79 @@ export function foldVersions(survivor: readonly PaperVersion[], duplicate: reado
   return out;
 }
 
+const byBytes = (a: string, b: string) => Buffer.compare(Buffer.from(a), Buffer.from(b));
+
+function versionsIn(files: ReadonlyMap<string, string>): PaperVersion[] {
+  const out: PaperVersion[] = [];
+  for (const [path, text] of files) {
+    const id = versionIdOf(path);
+    const parsed = id ? parseVersionFile(id, text) : null;
+    if (parsed && 'version' in parsed) out.push(parsed.version);
+  }
+  return sortVersions(out);
+}
+
+function linksIn(files: ReadonlyMap<string, string>): TitleLink[] {
+  const paths = [...files.keys()].filter(isLinkPath).sort(byBytes);
+  return paths.map((path) => parseLinkFile(files.get(path)!)).filter((link): link is TitleLink => link !== null);
+}
+
+function sectionsIn(files: ReadonlyMap<string, string>, part: (typeof PAGE_PARTS)[number]): SectionFile[] {
+  return sectionPaths(files.keys(), part).map((path) => ({
+    path,
+    name: sectionName(path, part)!,
+    text: files.get(path)!,
+  }));
+}
+
 /**
  * What the survivor's files gain from the duplicate's. Its own metadata stays. Versions and links are
- * unioned; the sections are appended under a line that says where they came from; any other file (the PDF,
- * the picture) is taken only where the survivor has none.
+ * unioned; the duplicate's sections follow the survivor's, each saying where it came from, unless the
+ * survivor has the same text already; any other file (the PDF, the picture) is taken only where the
+ * survivor has none.
  */
 export function foldPages(
   survivor: ReadonlyMap<string, string>,
   duplicate: ReadonlyMap<string, string>,
   from: string,
 ): FileChange[] {
-  const changes: FileChange[] = [];
-  for (const [path, theirs] of duplicate) {
-    if (path === METADATA_PATH) continue;
-    const ours = survivor.get(path);
-    let next: string | null = null;
-    if (ours === undefined || ours.trim() === '') next = theirs;
-    else if (path === VERSIONS_PATH) {
-      next = encodeVersionsFile(foldVersions(parseVersionsFile(ours) ?? [], parseVersionsFile(theirs) ?? []));
-    } else if (path === LINKS_PATH) {
-      const links = [...(parseLinksFile(ours) ?? [])];
-      const labels = new Set(links.map((link) => link.label.toLowerCase()));
-      for (const link of parseLinksFile(theirs) ?? []) {
-        if (links.length < MAX_LINKS && !labels.has(link.label.toLowerCase())) links.push(link);
-        labels.add(link.label.toLowerCase());
-      }
-      next = encodeLinksFile(links);
-    } else if ((path === AUTHOR_PAGE_PATH || path === COMMUNITY_PAGE_PATH) && theirs.trim() !== '') {
-      next = ours.includes(theirs.trim())
-        ? ours
-        : `${ours.trimEnd()}\n\n---\n\n*From ${from}, merged into this page:*\n\n${theirs}`;
+  const ours = versionsIn(survivor);
+  const changes: FileChange[] = versionChanges(ours, foldVersions(ours, versionsIn(duplicate)));
+
+  const links = linksIn(survivor);
+  const labels = new Set(links.map((link) => link.label.toLowerCase()));
+  for (const link of linksIn(duplicate)) {
+    if (links.length < MAX_LINKS && !labels.has(link.label.toLowerCase())) links.push(link);
+    labels.add(link.label.toLowerCase());
+  }
+  if (links.length > linksIn(survivor).length) changes.push(...linkChanges(survivor.keys(), links));
+
+  for (const part of PAGE_PARTS) {
+    const kept = sectionsIn(survivor, part);
+    const theirs = sectionsIn(duplicate, part).filter(
+      (section) => section.text.trim() !== '' && !kept.some((s) => s.text.includes(section.text.trim())),
+    );
+    if (theirs.length === 0) continue;
+    if (kept.length === 0) {
+      changes.push(...theirs.map((section) => ({ path: section.path, content: section.text })));
+      continue;
     }
-    if (next !== null && next !== ours) changes.push({ path, content: next });
+    const note = (section: SectionFile) =>
+      section.name.format === 'html'
+        ? `\n<p><em>From ${from.replace(/&/g, '&amp;').replace(/</g, '&lt;')}, merged into this page.</em></p>\n`
+        : `\n*From ${from}, merged into this page.*\n`;
+    const parts = theirs.map((section) => ({
+      title: sectionTitle(section),
+      text: `${section.text.trimEnd()}\n${note(section)}`,
+      format: section.name.format,
+    }));
+    changes.push(...planSections(kept, part, kept.length, kept.length, parts));
+  }
+
+  for (const [path, text] of duplicate) {
+    const handled = path === METADATA_PATH || versionIdOf(path) || isLinkPath(path) || path.startsWith('author/');
+    if (handled || path.startsWith('community/') || survivor.has(path)) continue;
+    changes.push({ path, content: text });
   }
   return changes;
 }

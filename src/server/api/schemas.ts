@@ -145,7 +145,11 @@ export const PageCommitted = z.object({
   changed: z.boolean(),
 });
 
-export const RenderBody = z.object({ content: z.string().max(256 * 1024) });
+export const RenderBody = z.object({
+  content: z.string().max(256 * 1024),
+  /** An HTML section's preview, through the same allowlist. */
+  format: z.enum(['markdown', 'html']).default('markdown'),
+});
 export const Rendered = z.object({ html: z.string() });
 
 export const RevertBody = z.object({
@@ -215,7 +219,7 @@ export const VersionsBody = z.object({
   versions: z
     .array(
       z.object({
-        id: z.string().max(40).optional(),
+        id: z.string().max(48).optional(),
         ...VersionFields,
         pdf: z.object({ url: z.string().max(2000), license: z.string().max(100).nullish() }).nullish(),
       }),
@@ -275,6 +279,9 @@ export const EditorOpened = z.discriminatedUnion('part', [
     baseOid: z.string().nullable(),
     section: z.number().int(),
     title: z.string().nullable(),
+    /** The section's file in the page repo, or `null` for the whole part. */
+    path: z.string().nullable(),
+    format: z.enum(['markdown', 'html']),
     text: z.string(),
     starter: z.boolean(),
   }),

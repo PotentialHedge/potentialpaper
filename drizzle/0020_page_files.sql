@@ -1,0 +1,1 @@
+ALTER TABLE "page_current" DROP COLUMN "resources";

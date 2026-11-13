@@ -164,12 +164,12 @@ function SectionForm({
       const res = await fetch('/api/v1/pages/render', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ content: text }),
+        body: JSON.stringify({ content: text, format: opened.format }),
       }).catch(() => null);
       if (res?.ok) setPreview((await res.json()).html);
     }, PREVIEW_DELAY_MS);
     return () => clearTimeout(timer);
-  }, [text, opened.text, starter]);
+  }, [text, opened.text, opened.format, starter]);
 
   /** Puts the demo's block where the cursor was, on lines of its own. */
   function insertBlock(block: string) {
@@ -255,7 +255,7 @@ function SectionForm({
             }}
             spellCheck
             autoFocus
-            aria-label="Markdown"
+            aria-label={opened.format === 'html' ? 'HTML' : 'Markdown'}
             className={`${ui.input} resize-none overflow-hidden font-mono text-[13px] leading-relaxed`}
           />
         </div>
@@ -291,11 +291,21 @@ function SectionForm({
           </button>
         </div>
       )}
-      <p className={ui.fine}>
-        Markdown, with <code>$…$</code> and <code>$$…$$</code> for math. HTML is shown as text. A demo is a{' '}
-        <code>```demo</code> block: insert one below.
-      </p>
-      <InsertDemo onInsert={insertBlock} />
+      {opened.format === 'html' ? (
+        <p className={ui.fine}>
+          HTML, saved as <code>{opened.path}</code>: text, lists, tables, links and images, without scripts, styles or
+          attributes such as <code>class</code>.
+        </p>
+      ) : (
+        <>
+          <p className={ui.fine}>
+            Markdown, with <code>$…$</code> and <code>$$…$$</code> for math. HTML is shown as text. Each{' '}
+            <code># Heading</code> starts a section of its own. A demo is a <code>```demo</code> block: insert one
+            below.
+          </p>
+          <InsertDemo onInsert={insertBlock} />
+        </>
+      )}
       <details className="mt-2" open={evidence.length > 0}>
         <summary className="cursor-pointer text-accent">Add supporting evidence</summary>
         <EvidenceInput

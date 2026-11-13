@@ -149,7 +149,7 @@ describe('a demo', () => {
     expect((await api('POST', '/demos', { cookie, body })).body.id).toBe(first.body.id);
     expect(await getDb().select().from(demoSnapshots)).toHaveLength(1);
 
-    const content = `## Reproductions\n\n${demoBlockMarkdown({ id: first.body.id, title: 'Attention, in 3D', description: 'Rotate it.' })}`;
+    const content = `# Reproductions\n\n${demoBlockMarkdown({ id: first.body.id, title: 'Attention, in 3D', description: 'Rotate it.' })}`;
     const edit = await api('POST', '/pages/edit', {
       cookie,
       body: { paper: PAPER, baseOid: null, section: 0, content, summary: '' },

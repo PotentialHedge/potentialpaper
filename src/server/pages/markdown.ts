@@ -1,5 +1,5 @@
 import katex from 'katex';
-import MarkdownIt, { type StateBlock, type StateInline } from 'markdown-it';
+import MarkdownIt, { type StateBlock, type StateInline, type Token } from 'markdown-it';
 import {
   DEMO_ALLOW,
   DEMO_SANDBOX,
@@ -20,8 +20,10 @@ import {
  * A ```` ```demo <snapshot> ```` block is a demo (`lib/demos.ts`), shown as a figure with its frame. Where its
  * files came from is looked up when rendering, and a block naming no known snapshot says so.
  *
- * Sections are the `##` headings at the top level, numbered from 1 in order. The editor splits a file at
- * them and the rendered page marks them, both from the same parse, so the two can't disagree.
+ * A page's part (author or community) is a directory of section files (`rules.ts`), and a section's
+ * title is the `#` heading its file starts with. The whole part as one text, which the editor offers, is
+ * the files joined, and it is split back at its top-level `#` headings, from the same parse that renders
+ * them, so the two can't disagree.
  */
 
 const MATH_OPTIONS: katex.KatexOptions = {
@@ -140,109 +142,96 @@ function newRenderer() {
 
 const md = newRenderer();
 
-/** The top-level `##` headings: the line each starts on, and its text. */
+/** A section heading: `#` at the top level, not a setext `===` line, which people rarely mean as one. */
+function isSectionHeading(token: Token): boolean {
+  return token.type === 'heading_open' && token.tag === 'h1' && token.markup === '#' && token.level === 0;
+}
+
+/** The top-level `#` headings: the line each starts on, and its text. */
 function headings(markdown: string): { line: number; title: string }[] {
   const tokens = md.parse(markdown, {});
   const found: { line: number; title: string }[] = [];
   for (const [index, token] of tokens.entries()) {
-    if (
-      token.type === 'heading_open' &&
-      token.tag === 'h2' &&
-      token.markup === '##' &&
-      token.level === 0 &&
-      token.map
-    ) {
+    if (isSectionHeading(token) && token.map) {
       found.push({ line: token.map[0], title: tokens[index + 1]?.content ?? '' });
     }
   }
   return found;
 }
 
-export interface Section {
-  /** From 1, in order. */
-  index: number;
-  title: string;
-  /** Its heading line and everything to the next section, ending in a newline. */
+export interface SectionText {
+  /** Its `#` heading's text, or `null` for text before the first heading. */
+  title: string | null;
+  /** Its heading line and everything to the next heading, ending in a newline. */
   text: string;
 }
 
-/** The text before the first section, and the sections. Joined back together they are the file. */
-export function splitSections(markdown: string): { preamble: string; sections: Section[] } {
-  const lines = markdown.split(/(?<=\n)/);
-  const found = headings(markdown);
-  const starts = [...found.map((heading) => heading.line), lines.length];
-  return {
-    preamble: lines.slice(0, starts[0]).join(''),
-    sections: found.map((heading, i) => ({
-      index: i + 1,
-      title: heading.title,
-      text: lines.slice(starts[i], starts[i + 1]).join(''),
-    })),
-  };
-}
-
 /** Text that ends in exactly one newline, unless it is empty, so that sections join cleanly. */
-function asBlock(text: string): string {
+export function asBlock(text: string): string {
   const trimmed = text.replace(/\s+$/, '');
   return trimmed === '' ? '' : `${trimmed}\n`;
 }
 
-/**
- * The file with one section replaced, or `null` if it has no section `index`. Section 0 is the whole
- * file. A section separated from the next by a blank line keeps it.
- */
-export function replaceSection(markdown: string, index: number, content: string): string | null {
-  if (index === 0) return asBlock(content);
-  const { preamble, sections } = splitSections(markdown);
-  const target = sections[index - 1];
-  if (!target) return null;
-  const parts = [preamble, ...sections.map((section) => section.text)];
-  const gap = /\n\s*\n$/.test(target.text) && index < sections.length ? '\n' : '';
-  const next = asBlock(content);
-  parts[index] = next === '' ? '' : `${next}${gap}`;
-  return parts.join('');
+/** The text cut at each top-level `#` heading, blank parts left out. Joined back together they are the text. */
+export function splitSections(markdown: string): SectionText[] {
+  const lines = markdown.split(/(?<=\n)/);
+  const found = headings(markdown);
+  const starts = [0, ...found.map((heading) => heading.line), lines.length];
+  const titles = [null, ...found.map((heading) => heading.title)];
+  const parts: SectionText[] = [];
+  for (let i = 0; i < starts.length - 1; i += 1) {
+    const text = lines.slice(starts[i], starts[i + 1]).join('');
+    if (text.trim() !== '' || titles[i] !== null) parts.push({ title: titles[i], text });
+  }
+  return parts;
 }
 
-/** What an empty section starts as, in the editor. */
+/** The title a section file starts with, or `null` if it doesn't start with a `#` heading. */
+export function leadingTitle(markdown: string): string | null {
+  const tokens = md.parse(markdown, {});
+  return tokens[0] && isSectionHeading(tokens[0]) ? (tokens[1]?.content ?? '') : null;
+}
+
+/** What an empty part starts as, in the editor: a heading for each section it might have. */
 export const STARTER_HEADINGS = ['Summary', 'Why it matters', 'Critique', 'Errata', 'Reproductions', 'Follow-ups'];
-export const COMMUNITY_STARTER = STARTER_HEADINGS.map((title) => `## ${title}\n`).join('\n');
+export const COMMUNITY_STARTER = STARTER_HEADINGS.map((title) => `# ${title}\n`).join('\n');
 export const AUTHOR_STARTER_HEADINGS = ['TL;DR', 'Overview', 'Results', 'Demos', 'Code and data', 'Talks'];
-export const AUTHOR_STARTER = AUTHOR_STARTER_HEADINGS.map((title) => `## ${title}\n`).join('\n');
+export const AUTHOR_STARTER = AUTHOR_STARTER_HEADINGS.map((title) => `# ${title}\n`).join('\n');
+
+export interface RenderOptions {
+  demos?: ReadonlyMap<string, DemoSource>;
+  /**
+   * Render one section file as section `section`: only its leading `#` heading is the section's, and a
+   * file without one gets `title` as its heading. Without it, every top-level `#` is a section, from 1.
+   */
+  section?: { index: number; title: string };
+}
 
 /**
- * HTML for a page's Markdown. Headings move down a level, since the page's own section heading is the
- * `<h2>`, and each section's heading carries `data-section`, so a page can give it an edit link. The ids
- * start with `idPrefix`, so the author and community sections can't collide.
+ * HTML for Markdown. Headings move down two levels, since the page's own part heading is the `<h2>` and a
+ * section's is the `<h3>`, and each section's heading carries `data-section`, so a page can give it an edit
+ * link. The ids start with `idPrefix`, so the author and community sections can't collide.
  */
-export function renderMarkdown(
-  markdown: string,
-  idPrefix = 'md',
-  demos: ReadonlyMap<string, DemoSource> = new Map(),
-): string {
-  const env: RenderEnv = { demos };
+export function renderMarkdown(markdown: string, idPrefix = 'md', options: RenderOptions = {}): string {
+  const env: RenderEnv = { demos: options.demos ?? new Map() };
   const tokens = md.parse(markdown, env);
-  let section = 0;
-  for (const token of tokens) {
+  const only = options.section;
+  let section = only ? only.index - 1 : 0;
+  let lead = '';
+  if (only && !(tokens[0] && isSectionHeading(tokens[0]))) {
+    lead = `<h3 id="${idPrefix}-${only.index}" data-section="${only.index}">${md.utils.escapeHtml(only.title)}</h3>\n`;
+  }
+  for (const [index, token] of tokens.entries()) {
     if (token.type !== 'heading_open' && token.type !== 'heading_close') continue;
-    const level = Math.min(6, Number(token.tag.slice(1)) + 1);
-    const isSection = token.tag === 'h2' && token.markup === '##' && token.level === 0;
-    token.tag = `h${level}`;
-    if (token.type === 'heading_open' && isSection) {
+    const isSection = isSectionHeading(token) && (!only || index === 0);
+    token.tag = `h${Math.min(6, Number(token.tag.slice(1)) + 2)}`;
+    if (isSection) {
       section += 1;
       token.attrSet('id', `${idPrefix}-${section}`);
       token.attrSet('data-section', String(section));
     }
   }
-  return md.renderer.render(tokens, md.options, env);
-}
-
-/** The same, for HTML stored beside Markdown that may be absent. */
-export function renderOrNull(
-  markdown: string | null,
-  idPrefix: string,
-  demos?: ReadonlyMap<string, DemoSource>,
-): string | null {
-  return markdown === null || markdown.trim() === '' ? null : renderMarkdown(markdown, idPrefix, demos);
+  return lead + md.renderer.render(tokens, md.options, env);
 }
 
 /** The snapshots the Markdown's demo blocks name, in order, each once. */
@@ -254,4 +243,20 @@ export function demoIds(markdown: string | null): string[] {
     .map((token) => demoBlockId(token.info))
     .filter((id): id is string => id !== null);
   return [...new Set(ids)];
+}
+
+/**
+ * The text with its top-level `#` headings moved by `delta` levels (`##` is `#` moved by 1), between 1 and
+ * 6. Only headings markdown-it sees as such: a `#` in code or a quote stays as it is.
+ */
+export function shiftHeadings(markdown: string, delta: number): string {
+  const lines = markdown.split(/(?<=\n)/);
+  for (const token of md.parse(markdown, {})) {
+    if (token.type !== 'heading_open' || token.level !== 0 || !token.markup.startsWith('#') || !token.map) continue;
+    const at = token.map[0];
+    lines[at] = lines[at].replace(/^( {0,3})(#{1,6})/, (_, indent: string, hashes: string) => {
+      return indent + '#'.repeat(Math.min(6, Math.max(1, hashes.length + delta)));
+    });
+  }
+  return lines.join('');
 }

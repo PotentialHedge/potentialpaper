@@ -2,9 +2,8 @@ import { eq, inArray } from 'drizzle-orm';
 import { getDb, type Database } from '@/db';
 import { pageCurrent, pdfDocuments } from '@/db/schema';
 import {
-  encodeVersionsFile,
+  encodeVersionFile,
   newVersionId,
-  parseVersionsFile,
   sortVersions,
   versionProblem,
   type PaperVersion,
@@ -14,13 +13,13 @@ import { diffShort, diffTexts, type DiffPart, type TextDiff } from '@/lib/text-d
 import { ApiError } from './api/errors';
 import { versionPdfAt } from './files';
 import { commitPage, type Actor, type CommitOptions, type CommitResult } from './pages/commit';
-import { findCommit, readCommit, readFiles, readHead, readText, type Reader } from './pages/repo';
-import { VERSIONS_PATH } from './pages/rules';
+import { readVersions, versionChanges } from './pages/content';
+import { findCommit, readCommit, readFiles, readHead, type Reader } from './pages/repo';
 
 /**
- * A paper's versions (`lib/versions.ts`), kept in its page's `versions.jsonl`. They are saved as a whole
- * list, against the commit the editor loaded, so `commitPage`'s three-way merge keeps what anyone else
- * changed meanwhile: one line per version means two people editing different versions don't conflict.
+ * A paper's versions (`lib/versions.ts`), kept in its page's `versions/`, a file each. They are saved as a
+ * whole list, against the commit the editor loaded, so `commitPage`'s three-way merge keeps what anyone
+ * else changed meanwhile: a file per version means two people editing different versions don't conflict.
  */
 
 /** The versions at a commit (the head by default), and that commit. */
@@ -34,8 +33,7 @@ export async function versionsAt(
   const commit =
     oid === undefined ? await readCommit(database, paperId, head) : await findCommit(database, paperId, head);
   if (!commit) throw new ApiError(422, 'validation_error', 'the base is not a commit of this page');
-  const text = await readText(database, paperId, (await readFiles(database, paperId, commit.tree)).get(VERSIONS_PATH));
-  return { head, versions: text === null ? [] : (parseVersionsFile(text) ?? []) };
+  return { head, versions: await readVersions(database, paperId, await readFiles(database, paperId, commit.tree)) };
 }
 
 /** A version as an editor or an agent sends it: its PDF named by the address it was uploaded to. */
@@ -105,7 +103,7 @@ export interface VersionsEdit {
   evidence?: string[];
 }
 
-/** Replaces the versions, merged with whatever changed since `baseOid`. An empty list removes the file. */
+/** Replaces the versions, merged with whatever changed since `baseOid`. An empty list removes them all. */
 export async function setVersions(
   paperId: string,
   actor: Actor,
@@ -114,63 +112,22 @@ export async function setVersions(
 ): Promise<CommitResult> {
   const database = options.database ?? getDb();
   const { versions: before } = await versionsAt(paperId, edit.baseOid, database);
-  let versions = await resolve(edit.versions, before, database);
-  // Merged a version at a time rather than a line at a time, so edits to neighbouring versions don't
-  // conflict; `commitPage` still merges by line if the head moves again before it commits.
-  let base = edit.baseOid;
-  const head = await readHead(database, paperId);
-  if (head !== base) {
-    const { versions: theirs } = await versionsAt(paperId, head, database);
-    versions = mergeVersionLists(before, versions, theirs);
-    base = head;
-  }
-  const result = await commitPage(
+  const versions = await resolve(edit.versions, before, database);
+  // Against the commit the list was loaded at: the files of versions someone else changed since are left
+  // alone, and one both changed is merged by line, a field to a line, or is a conflict.
+  return commitPage(
     paperId,
-    base,
+    edit.baseOid,
     actor,
-    [{ path: VERSIONS_PATH, content: versions.length > 0 ? encodeVersionsFile(versions) : null }],
+    versionChanges(before, versions),
     edit.summary?.trim() || summarize(before, versions),
     { ...options, database, evidence: edit.evidence ?? options.evidence },
   );
-  return result.status === 'committed' && base !== edit.baseOid ? { ...result, merged: true } : result;
 }
 
 /** Equal as the file would store them, whatever order their fields were given in. */
 const same = (a: PaperVersion | undefined, b: PaperVersion | undefined) =>
-  a === b || (a !== undefined && b !== undefined && encodeVersionsFile([a]) === encodeVersionsFile([b]));
-
-/**
- * A three-way merge of version lists by id: what one side changed since `base` is taken over the other's,
- * and a version both changed differently is `409 edit_conflict`. Order is by date, so it needs no merging.
- */
-export function mergeVersionLists(
-  base: readonly PaperVersion[],
-  ours: readonly PaperVersion[],
-  theirs: readonly PaperVersion[],
-): PaperVersion[] {
-  const byId = (list: readonly PaperVersion[]) => new Map(list.map((v) => [v.id, v]));
-  const [b, o, t] = [byId(base), byId(ours), byId(theirs)];
-  const ids = [...new Set([...theirs.map((v) => v.id), ...ours.map((v) => v.id)])];
-  const merged: PaperVersion[] = [];
-  const conflicts: string[] = [];
-  for (const id of ids) {
-    const [was, mine, other] = [b.get(id), o.get(id), t.get(id)];
-    let kept: PaperVersion | undefined;
-    if (same(mine, other) || same(mine, was)) kept = other;
-    else if (same(other, was)) kept = mine;
-    else {
-      conflicts.push((mine ?? other ?? was)!.label);
-      continue;
-    }
-    if (kept) merged.push(kept);
-  }
-  if (conflicts.length > 0) {
-    throw new ApiError(409, 'edit_conflict', `someone else changed the same version: ${conflicts.join(', ')}`, {
-      versions: conflicts,
-    });
-  }
-  return sortVersions(merged);
-}
+  a === b || (a !== undefined && b !== undefined && a.id === b.id && encodeVersionFile(a) === encodeVersionFile(b));
 
 /** "Add the version “ICLR 2027”", or what else changed, when the editor leaves the summary blank. */
 function summarize(before: readonly PaperVersion[], after: readonly PaperVersion[]): string {

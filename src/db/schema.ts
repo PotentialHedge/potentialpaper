@@ -281,19 +281,19 @@ export const pageCurrent = pgTable('page_current', {
     .primaryKey()
     .references(() => papers.id, { onDelete: 'cascade' }),
   head: bytea('head').notNull(),
+  /** Each part's section files joined, as an agent reads them (`pages/sections.ts`). */
   authorMarkdown: text('author_markdown'),
   communityMarkdown: text('community_markdown'),
-  /** The two Markdown files, rendered at commit (`pages/markdown.ts`), which is all a reader is sent. */
+  /** The two parts' sections, rendered at commit (`pages/sections.ts`), which is all a reader is sent. */
   authorHtml: text('author_html'),
   communityHtml: text('community_html'),
-  resources: jsonb('resources').$type<Record<string, unknown>>(),
-  /** The page's `pdf.json`. */
+  /** The page's `.potentialpaper/pdf.json`. */
   pdf: jsonb('pdf').$type<PdfPointer>(),
   /** The page's `thumbnail.json`. */
   thumbnail: jsonb('thumbnail').$type<ThumbnailPointer>(),
-  /** The page's `links.json`: links to the paper elsewhere, beside the ones its identifiers give. */
+  /** The page's `links/`: links to the paper elsewhere, beside the ones its identifiers give. */
   links: jsonb('links').$type<TitleLink[]>(),
-  /** The page's `versions.jsonl`, oldest first (`lib/versions.ts`). */
+  /** The page's `versions/`, oldest first (`lib/versions.ts`). */
   versions: jsonb('versions').$type<PaperVersion[]>(),
   updatedAt: timestamp('updated_at', { withTimezone: true, mode: 'date' }).notNull(),
 });

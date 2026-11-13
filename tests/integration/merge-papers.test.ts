@@ -5,6 +5,7 @@ import { accounts, pageRevisions, papers } from '@/db/schema';
 import { foldPages, mergePapers } from '@/server/merge-papers';
 import { commitPage, SYSTEM_ACTOR } from '@/server/pages/commit';
 import { readHead } from '@/server/pages/repo';
+import { PDF_PATH } from '@/server/pages/rules';
 import { findPaper, savePaper } from '@/server/papers';
 import { currentVersions, setVersions } from '@/server/versions';
 import { api, closePool, resetDatabase, signUp } from './helpers';
@@ -89,7 +90,7 @@ describe('merging papers', () => {
     );
 
     await expect(
-      commitPage(oldId, await readHead(getDb(), oldId), SYSTEM_ACTOR, [{ path: 'pdf.json', content: null }], 'x'),
+      commitPage(oldId, await readHead(getDb(), oldId), SYSTEM_ACTOR, [{ path: PDF_PATH, content: null }], 'x'),
     ).rejects.toMatchObject({ code: 'paper_merged' });
     await expect(
       mergePapers({ duplicateId: oldId, survivorId: newId, from: 'again' }, SYSTEM_ACTOR),
@@ -111,8 +112,8 @@ describe('merging papers', () => {
   it('leaves the duplicate as it was when the fold cannot be committed', async () => {
     const oldId = await paper(OLD, 2026);
     const newId = await paper(NEW, 2027);
-    const changes = foldPages(new Map(), new Map([['community/page.md', 'Notes.\n']]), 'x');
-    expect(changes).toEqual([{ path: 'community/page.md', content: 'Notes.\n' }]);
+    const changes = foldPages(new Map(), new Map([['community/10-notes.md', 'Notes.\n']]), 'x');
+    expect(changes).toEqual([{ path: 'community/10-notes.md', content: 'Notes.\n' }]);
     await commitPage(
       oldId,
       await readHead(getDb(), oldId),
@@ -124,6 +125,28 @@ describe('merging papers', () => {
     await expect(mergePapers({ duplicateId: oldId, survivorId: newId, from: 'x' }, SYSTEM_ACTOR)).rejects.toThrow();
     const [row] = await getDb().select().from(papers).where(eq(papers.id, oldId));
     expect(row?.mergedInto).toBeNull();
+  });
+});
+
+describe('folding a page', () => {
+  it("puts the duplicate's sections after the survivor's, saying where they came from, once", () => {
+    const survivor = new Map([
+      ['community/10-summary.md', '# Summary\nOurs.\n'],
+      ['links/10-code.json', '{"label":"Code","url":"https://github.com/a/b"}\n'],
+    ]);
+    const duplicate = new Map([
+      ['community/10-summary.md', '# Summary\nOurs.\n'],
+      ['community/20-errata.md', '# Errata\nTheirs.\n'],
+      ['links/10-code.json', '{"label":"Code","url":"https://github.com/c/d"}\n'],
+      ['links/20-video.json', '{"label":"Video","url":"https://youtu.be/x"}\n'],
+      ['thumbnail.json', '{}\n'],
+    ]);
+    expect(foldPages(survivor, duplicate, 'openreview:x')).toEqual([
+      { path: 'links/10-code.json', content: '{\n  "label": "Code",\n  "url": "https://github.com/a/b"\n}\n' },
+      { path: 'links/20-video.json', content: '{\n  "label": "Video",\n  "url": "https://youtu.be/x"\n}\n' },
+      { path: 'community/20-errata.md', content: '# Errata\nTheirs.\n\n*From openreview:x, merged into this page.*\n' },
+      { path: 'thumbnail.json', content: '{}\n' },
+    ]);
   });
 });
 

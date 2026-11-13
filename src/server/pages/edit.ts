@@ -6,31 +6,36 @@ import { claimNames } from '../claims';
 import { checkedDemoSources } from '../demos/attach';
 import { commitPage, type Actor, type CommitOptions, type CommitResult } from './commit';
 import { SYSTEM_AUTHOR_ID } from './git-objects';
-import { AUTHOR_STARTER, COMMUNITY_STARTER, replaceSection, splitSections } from './markdown';
-import { findCommit, pageHistory, readFiles, readHead, readText, type PublicRevision, type Reader } from './repo';
-import { AUTHOR_PAGE_PATH, COMMUNITY_PAGE_PATH } from './rules';
+import { AUTHOR_STARTER, COMMUNITY_STARTER, splitSections } from './markdown';
+import { findCommit, pageHistory, readFiles, readHead, type PublicRevision, type Reader } from './repo';
+import type { PagePart, SectionFormat } from './rules';
+import { joinSections, planSections, readSections, sectionTitle, type SectionFile } from './sections';
 
-/** The two Markdown parts of a page: the authors' and the community's. */
-export type PagePart = 'author' | 'community';
-export const PAGE_PARTS: readonly PagePart[] = ['author', 'community'];
+export { PAGE_PARTS, type PagePart } from './rules';
 
-const PART_PATH: Record<PagePart, string> = { author: AUTHOR_PAGE_PATH, community: COMMUNITY_PAGE_PATH };
 const PART_STARTER: Record<PagePart, string> = { author: AUTHOR_STARTER, community: COMMUNITY_STARTER };
 const PART_NAME: Record<PagePart, string> = { author: 'author section', community: 'community section' };
 
 /**
- * Editing the author or community section a section at a time, as a wiki does. The editor sends the section it
- * loaded and the commit it loaded it at; the server puts it back into the file *as it was at that
- * commit*, so `commitPage`'s three-way merge sees exactly what this person changed, and edits to other
- * sections since then merge in.
+ * Editing the author or community part a section at a time, as a wiki does. Each section is a file
+ * (`sections.ts`), so editing one is editing its file. The editor sends the section it loaded and the
+ * commit it loaded it at; the server makes the change against the files *as they were at that commit*,
+ * so `commitPage`'s three-way merge sees exactly what this person changed, and edits since then merge in.
  */
 
-/** The part's Markdown at a commit, or `null` if it has none. */
-async function partAt(db: Reader, paperId: string, part: PagePart, oid: string | null): Promise<string | null> {
-  if (!oid) return null;
+/** The part's sections at a commit; none if there is no commit. */
+async function sectionsAt(db: Reader, paperId: string, part: PagePart, oid: string | null): Promise<SectionFile[]> {
+  if (!oid) return [];
   const commit = await findCommit(db, paperId, oid);
   if (!commit) throw new ApiError(422, 'validation_error', 'the base is not a commit of this page');
-  return readText(db, paperId, (await readFiles(db, paperId, commit.tree)).get(PART_PATH[part]));
+  return readSections(db, paperId, await readFiles(db, paperId, commit.tree), part);
+}
+
+/** The whole part is edited as one Markdown text, which an HTML section can't be part of. */
+function wholePartProblem(sections: readonly SectionFile[]): ApiError | null {
+  return sections.some((s) => s.name.format === 'html')
+    ? new ApiError(422, 'validation_error', 'this part has HTML sections, so edit its sections one at a time')
+    : null;
 }
 
 export interface EditorState {
@@ -38,8 +43,11 @@ export interface EditorState {
   /** The commit the text was read at, which the edit is sent back with. */
   baseOid: string | null;
   section: number;
-  /** The section's heading, or `null` for the whole page. */
+  /** The section's heading, or `null` for the whole part. */
   title: string | null;
+  /** The section's file, or `null` for the whole part. */
+  path: string | null;
+  format: SectionFormat;
   text: string;
   /** The part is empty yet, and `text` is the starter. */
   starter: boolean;
@@ -53,33 +61,53 @@ export async function editorState(
   database: Database = getDb(),
 ): Promise<EditorState | null> {
   const baseOid = await readHead(database, paperId);
-  const markdown = await partAt(database, paperId, part, baseOid);
-  if (markdown === null || markdown.trim() === '') {
-    return section === 0 ? { part, baseOid, section, title: null, text: PART_STARTER[part], starter: true } : null;
+  const sections = await sectionsAt(database, paperId, part, baseOid);
+  const whole = { part, baseOid, section, title: null, path: null, format: 'markdown' as const };
+  if (sections.length === 0) {
+    return section === 0 ? { ...whole, text: PART_STARTER[part], starter: true } : null;
   }
-  if (section === 0) return { part, baseOid, section, title: null, text: markdown, starter: false };
-  const found = splitSections(markdown).sections[section - 1];
-  return found ? { part, baseOid, section, title: found.title, text: found.text, starter: false } : null;
+  if (section === 0) {
+    const problem = wholePartProblem(sections);
+    if (problem) throw problem;
+    return { ...whole, text: joinSections(sections), starter: false };
+  }
+  const found = sections[section - 1];
+  if (!found) return null;
+  return {
+    part,
+    baseOid,
+    section,
+    title: sectionTitle(found),
+    path: found.path,
+    format: found.name.format,
+    text: found.text,
+    starter: false,
+  };
 }
 
 /**
- * The section that is now where this one was: the one with its heading, or else at its place. If there is
- * none, the whole page, as section 0.
+ * The section that is now where this one was: the same file, or else the one with its title, or else at
+ * its place. If there is none, the whole part, as section 0.
  */
-function sectionNow(base: string | null, section: number, current: string | null): { section: number; text: string } {
-  if (current === null) return { section: 0, text: '' };
-  if (section === 0) return { section: 0, text: current };
-  const title = base === null ? null : splitSections(base).sections[section - 1]?.title;
-  const sections = splitSections(current).sections;
-  const found = sections.find((s) => s.title === title) ?? sections[section - 1];
-  return found ? { section: found.index, text: found.text } : { section: 0, text: current };
+function sectionNow(
+  base: readonly SectionFile[],
+  section: number,
+  current: readonly SectionFile[],
+): { section: number; text: string } {
+  const whole = { section: 0, text: joinSections(current) };
+  const was = base[section - 1];
+  if (section === 0 || !was) return whole;
+  let at = current.findIndex((s) => s.path === was.path);
+  if (at === -1) at = current.findIndex((s) => sectionTitle(s) === sectionTitle(was));
+  if (at === -1 && section <= current.length) at = section - 1;
+  return at === -1 ? whole : { section: at + 1, text: current[at].text };
 }
 
 /** What an edit is called when its summary is left blank: the section's heading, as a wiki does. */
-function defaultSummary(part: PagePart, base: string | null, section: number): string {
-  if (base === null || base.trim() === '') return `Start the ${PART_NAME[part]}`;
-  const title = section > 0 ? splitSections(base).sections[section - 1]?.title : undefined;
-  return title ? `Edit “${title}”` : `Edit the ${PART_NAME[part]}`;
+function defaultSummary(part: PagePart, base: readonly SectionFile[], section: number): string {
+  if (base.length === 0) return `Start the ${PART_NAME[part]}`;
+  const found = section > 0 ? base[section - 1] : undefined;
+  return found ? `Edit “${sectionTitle(found)}”` : `Edit the ${PART_NAME[part]}`;
 }
 
 export interface SectionEdit {
@@ -91,8 +119,9 @@ export interface SectionEdit {
 }
 
 /**
- * Commits one section's new text. A conflict is `409 edit_conflict` with, besides every version of the
- * file, `current`: the head and the section as it is there, for the editor to show beside this text.
+ * Commits one section's new text, or the whole part's. New `#` headings in Markdown make new sections,
+ * and an emptied section is removed. A conflict is `409 edit_conflict` with, besides every version of the
+ * files, `current`: the head and the section as it is there, for the editor to show beside this text.
  */
 export async function editSection(
   paperId: string,
@@ -101,24 +130,33 @@ export async function editSection(
   options: CommitOptions = {},
 ): Promise<CommitResult> {
   const database = options.database ?? getDb();
-  const path = PART_PATH[edit.part];
-  await checkedDemoSources(edit.content, database);
-  const base = await partAt(database, paperId, edit.part, edit.baseOid);
-  const whole = replaceSection(base ?? '', edit.section, edit.content);
-  if (whole === null) throw new ApiError(422, 'validation_error', 'that section is not on the page');
+  const base = await sectionsAt(database, paperId, edit.part, edit.baseOid);
+  const target = edit.section === 0 ? null : base[edit.section - 1];
+  if (edit.section > 0 && !target) throw new ApiError(422, 'validation_error', 'that section is not on the page');
+  if (!target) {
+    const problem = wholePartProblem(base);
+    if (problem) throw problem;
+  }
+  // An HTML section is one file as it was typed; Markdown is cut at its `#` headings.
+  const html = target?.name.format === 'html';
+  if (!html) await checkedDemoSources(edit.content, database);
+  const parts = html ? [{ title: null, text: edit.content }] : splitSections(edit.content);
+  const changes = target
+    ? planSections(base, edit.part, edit.section - 1, edit.section, parts)
+    : planSections(base, edit.part, 0, base.length, parts);
   try {
     return await commitPage(
       paperId,
       edit.baseOid,
       actor,
-      [{ path, content: whole.trim() === '' ? null : whole }],
+      changes,
       edit.summary.trim() || defaultSummary(edit.part, base, edit.section),
       { ...options, database },
     );
   } catch (err) {
     if (!(err instanceof ApiError) || err.code !== 'edit_conflict') throw err;
     const head = await readHead(database, paperId);
-    const current = sectionNow(base, edit.section, await partAt(database, paperId, edit.part, head));
+    const current = sectionNow(base, edit.section, await sectionsAt(database, paperId, edit.part, head));
     throw new ApiError(409, 'edit_conflict', err.message, { ...err.details, current: { head, ...current } });
   }
 }

@@ -15,6 +15,7 @@ import { claimRoles, ownClaim, requestClaim, withdrawClaim } from '../claims';
 import { removeThumbnail, setLinks, setThumbnail } from '../pages/card';
 import { revertCommit, type Actor, type CommitResult } from '../pages/commit';
 import { editorState, editSection } from '../pages/edit';
+import { renderHtml } from '../pages/html';
 import { demoIds, renderMarkdown } from '../pages/markdown';
 import { getDb } from '@/db';
 import { pageCurrent } from '@/db/schema';
@@ -277,9 +278,10 @@ export const postSectionEdit = route(async (req) => {
 /** The editor's preview, through the renderer commits use. Signed-in only, as only editors need it. */
 export const postRender = route(async (req) => {
   const principal = await requireAuth(req);
-  const { content } = await parseBody(req, S.RenderBody);
+  const { content, format } = await parseBody(req, S.RenderBody);
+  if (format === 'html') return respond(S.Rendered, { html: renderHtml(content) }, { principal });
   const demos = await demoSources(getDb(), demoIds(content));
-  return respond(S.Rendered, { html: renderMarkdown(content, 'preview', demos) }, { principal });
+  return respond(S.Rendered, { html: renderMarkdown(content, 'preview', { demos }) }, { principal });
 });
 
 /** Undoes one commit, keeping everything since, as `git revert` does. */

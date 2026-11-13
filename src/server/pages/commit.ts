@@ -14,6 +14,8 @@ import {
   papers,
 } from '@/db/schema';
 import { cleanEvidence } from '@/lib/evidence';
+import { MAX_LINKS, parseLinkFile } from '@/lib/paper-links';
+import { MAX_VERSIONS } from '@/lib/versions';
 import { ApiError } from '../api/errors';
 import { consume, rateLimitHeaders, type RateLimitConfig } from '../ratelimit';
 import {
@@ -31,12 +33,18 @@ import { changedFiles, findCommit, readCommit, readFiles, readHead, readText, to
 import {
   cleanSummary,
   contentProblem,
+  isLinkPath,
+  layoutProblem,
   MAX_CHANGES,
   MAX_FILES,
+  MAX_SECTIONS,
   METADATA_PATH,
   normalizePath,
+  PAGE_PARTS,
   pathDenied,
   type Roles,
+  sectionName,
+  versionIdOf,
 } from './rules';
 
 /**
@@ -80,6 +88,11 @@ export interface CommitOptions {
   rateLimit?: RateLimitConfig;
   /** Commit even if no file changes, to record an event in the history, as a merge of a duplicate does. System only. */
   recordEmpty?: boolean;
+  /**
+   * Moving a page to a new layout (`layout-migration.ts`): the system may then write and delete any path,
+   * however many, on a merged page too. What it writes is still checked. System only.
+   */
+  migration?: boolean;
 }
 
 /** Enough for a burst of section edits, and well short of flooding a page's history. */
@@ -117,8 +130,8 @@ async function metadataSnapshot(tx: Writer, paperId: string): Promise<string> {
   return `${JSON.stringify({ identifiers, title, authors, abstract, year, venue, source, license }, null, 2)}\n`;
 }
 
-function normalizeChanges(changes: readonly FileChange[]): FileChange[] {
-  if (changes.length > MAX_CHANGES) {
+function normalizeChanges(changes: readonly FileChange[], migration: boolean): FileChange[] {
+  if (changes.length > MAX_CHANGES && !migration) {
     throw new ApiError(422, 'validation_error', `a commit can change at most ${MAX_CHANGES} files`);
   }
   const seen = new Set<string>();
@@ -172,25 +185,58 @@ async function rolesOf(tx: Writer, actor: Actor, paperId: string): Promise<Actor
   };
 }
 
-function checkPermissions(changes: readonly FileChange[], roles: Roles): void {
-  for (const { path } of changes) {
-    const denied = pathDenied(path, roles);
+function checkPermissions(changes: readonly FileChange[], roles: Roles, migration: boolean): void {
+  for (const { path, content } of changes) {
+    const denied = migration ? null : pathDenied(path, roles);
     if (denied) throw new ApiError(403, 'forbidden', denied, { path });
+    // A file that has no place in the layout can still be deleted, so that such a page can be cleaned up.
+    const misplaced = content === null ? null : layoutProblem(path);
+    if (misplaced) throw new ApiError(422, 'validation_error', `${path}: ${misplaced}`, { path });
   }
 }
 
-/** A file can't also be a directory, which only shows once the changes meet what's in the repo. */
+/**
+ * What only shows once the changes meet what's in the repo: a file can't also be a directory, and the
+ * directories of links, versions and sections have their limits.
+ */
 function checkTreeShape(files: ReadonlyMap<string, unknown>): void {
   if (!files.has(METADATA_PATH)) {
-    throw new ApiError(422, 'validation_error', 'a page keeps its metadata.json', { path: METADATA_PATH });
+    throw new ApiError(422, 'validation_error', `a page keeps its ${METADATA_PATH}`, { path: METADATA_PATH });
   }
   if (files.size > MAX_FILES) throw new ApiError(422, 'validation_error', `a page can have at most ${MAX_FILES} files`);
+  const paths = [...files.keys()];
+  if (paths.filter(isLinkPath).length > MAX_LINKS) {
+    throw new ApiError(422, 'validation_error', `a page can have at most ${MAX_LINKS} links`);
+  }
+  if (paths.filter((path) => versionIdOf(path)).length > MAX_VERSIONS) {
+    throw new ApiError(422, 'validation_error', `a page can have at most ${MAX_VERSIONS} versions`);
+  }
+  for (const part of PAGE_PARTS) {
+    if (paths.filter((path) => sectionName(path, part)).length > MAX_SECTIONS) {
+      throw new ApiError(422, 'validation_error', `a part can have at most ${MAX_SECTIONS} sections`);
+    }
+  }
   for (const path of files.keys()) {
     for (let at = path.indexOf('/'); at !== -1; at = path.indexOf('/', at + 1)) {
       if (files.has(path.slice(0, at))) {
         throw new ApiError(422, 'validation_error', 'a path is both a file and a directory', { path });
       }
     }
+  }
+}
+
+/** Two links can't have one label, as a link with a built-in link's label replaces it (`lib/paper-links.ts`). */
+async function checkLinkLabels(
+  files: ReadonlyMap<string, string>,
+  text: (blob: string) => string | Promise<string | null>,
+): Promise<void> {
+  const labels = new Set<string>();
+  for (const [path, blob] of files) {
+    if (!isLinkPath(path)) continue;
+    const label = parseLinkFile((await text(blob)) ?? '')?.label.toLowerCase();
+    if (label === undefined) continue;
+    if (labels.has(label)) throw new ApiError(422, 'validation_error', `two links are called “${label}”`, { path });
+    labels.add(label);
   }
 }
 
@@ -238,7 +284,8 @@ export async function commitPage(
   options: CommitOptions = {},
 ): Promise<CommitResult> {
   const { kind = 'edit', reverts, database = getDb(), rateLimit = COMMIT_RATE_LIMIT } = options;
-  const wanted = normalizeChanges(changes);
+  const migration = options.migration === true && actor.kind === 'system';
+  const wanted = normalizeChanges(changes, migration);
   const cleaned = cleanEvidence(options.evidence ?? []);
   if ('problem' in cleaned) throw new ApiError(422, 'validation_error', cleaned.problem);
   const { evidence } = cleaned;
@@ -259,11 +306,11 @@ export async function commitPage(
   try {
     return await database.transaction(async (tx) => {
       const roles = await rolesOf(tx, actor, paperId);
-      checkPermissions(wanted, roles);
+      checkPermissions(wanted, roles, migration);
 
       const [paper] = await tx.select({ mergedInto: papers.mergedInto }).from(papers).where(eq(papers.id, paperId));
       if (!paper) throw new ApiError(404, 'not_found', 'no such paper');
-      if (paper.mergedInto) {
+      if (paper.mergedInto && !migration) {
         throw new ApiError(409, 'paper_merged', 'this paper was merged into another', { into: paper.mergedInto });
       }
 
@@ -278,6 +325,7 @@ export async function commitPage(
 
       const blobs: GitObject[] = [];
       const files = new Map(headFiles);
+      const written = new Map<string, string>();
       const conflicts: Conflict[] = [];
       for (const { path, content } of wanted) {
         const invalid = content === null ? null : contentProblem(path, content);
@@ -302,6 +350,7 @@ export async function commitPage(
         const blob = gitObject('blob', Buffer.from(merge.content));
         blobs.push(blob);
         files.set(path, blob.oid);
+        written.set(blob.oid, merge.content);
       }
       if (conflicts.length > 0) {
         throw new ApiError(409, 'edit_conflict', 'someone else changed the same lines', { head, conflicts });
@@ -318,6 +367,9 @@ export async function commitPage(
         files.set(METADATA_PATH, metadata.oid);
       }
       checkTreeShape(files);
+      if (wanted.some(({ path }) => isLinkPath(path))) {
+        await checkLinkLabels(files, (blob) => written.get(blob) ?? readText(tx, paperId, blob));
+      }
 
       const { root, trees } = buildTrees(files);
 

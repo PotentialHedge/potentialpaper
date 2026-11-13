@@ -12,8 +12,8 @@ import { findPaper } from '@/server/papers';
 
 const USAGE = `Commit to a page's git repo through commitPage, until the editor exists.
 
-  npm run pages:edit -- arxiv:1706.03762 --bot --write community/page.md=./note.md --summary "..."
-  npm run pages:edit -- arxiv:1706.03762 --as some-handle --delete community/old.md --summary "..."
+  npm run pages:edit -- arxiv:1706.03762 --bot --write community/10-summary.md=./note.md --summary "..."
+  npm run pages:edit -- arxiv:1706.03762 --as some-handle --delete community/20-old.md --summary "..."
   npm run pages:edit -- arxiv:1706.03762 --bot --revert <commit id>
   npm run pages:edit -- arxiv:1706.03762 --system
 

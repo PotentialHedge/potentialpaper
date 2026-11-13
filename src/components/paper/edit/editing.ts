@@ -67,6 +67,9 @@ export interface SectionOpened {
   baseOid: string | null;
   section: number;
   title: string | null;
+  /** The section's file in the page repo (`community/20-why-it-matters.md`), or `null` for the whole part. */
+  path: string | null;
+  format: 'markdown' | 'html';
   text: string;
   starter: boolean;
 }

@@ -19,6 +19,7 @@ import {
   contentProblem,
   MAX_FILE_BYTES,
   MAX_SUMMARY_LENGTH,
+  METADATA_PATH,
   normalizePath,
   pathDenied,
   type Roles,
@@ -71,7 +72,7 @@ describe('git objects', () => {
       const files = new Map<string, string>();
       for (const [path, content] of [
         ['metadata.json', '{}\n'],
-        ['community/page.md', '# Résumé\n'],
+        ['community/10-summary.md', '# Résumé\n'],
         ['community/deep/er/日本語.md', ''],
         ['community/deep.md', 'sorts before the directory'],
       ]) {
@@ -127,11 +128,11 @@ describe('git objects', () => {
 
 describe('paths', () => {
   it.each([
-    'community/page.md',
+    'community/10-summary.md',
     'community/日本語/résumé.md',
     'community/a b.md',
     'extensions/x/data.json',
-    'metadata.json',
+    '.potentialpaper/metadata.json',
   ])('accepts %s', (path) => {
     expect(normalizePath(path)).toEqual({ path });
   });
@@ -145,6 +146,10 @@ describe('paths', () => {
     'community/..',
     '../metadata.json',
     '.git/config',
+    '.potentialpaper',
+    '.Potentialpaper/metadata.json',
+    'community/.potentialpaper/x',
+    '.potentialpaper./x',
     'community/.git/hooks/x',
     'community/.GIT/x',
     'community/.gitmodules',
@@ -186,18 +191,20 @@ describe('who may write where', () => {
     unverified: nobody,
   };
   const table: [string, (keyof typeof roles)[]][] = [
-    ['metadata.json', ['system', 'admin']],
-    ['author/page.md', ['admin', 'author']],
+    ['.potentialpaper/metadata.json', ['system', 'admin']],
+    ['.potentialpaper/pdf.json', ['system', 'admin']],
+    ['author/10-overview.md', ['admin', 'author']],
     // The card: the authors' once the paper is claimed, anyone verified's until then.
     ['thumbnail.json', ['admin', 'verified', 'author']],
-    ['links.json', ['admin', 'verified', 'author']],
-    ['author/resources.json', ['admin', 'author']],
-    ['community/page.md', ['admin', 'verified', 'author', 'verifiedOnClaimed']],
-    ['community/x/y.md', ['admin', 'verified', 'author', 'verifiedOnClaimed']],
+    ['links/10-code.json', ['admin', 'verified', 'author']],
+    ['community/10-summary.md', ['admin', 'verified', 'author', 'verifiedOnClaimed']],
+    ['versions/v_k3x9q2ab.json', ['system', 'admin', 'verified', 'author', 'verifiedOnClaimed']],
     ['extensions/x/data.json', []],
     ['README.md', []],
     ['authors/page.md', []],
-    ['metadata.json/x', []],
+    // The first layout's places.
+    ['metadata.json', []],
+    ['links.json', []],
   ];
 
   it.each(table)('%s', (path, allowed) => {
@@ -209,26 +216,24 @@ describe('who may write where', () => {
 
 describe('file contents', () => {
   it('takes any text, including nothing', () => {
-    expect(contentProblem('community/page.md', '')).toBeNull();
-    expect(contentProblem('community/page.md', '# 日本語 \u{1F600}\r\n')).toBeNull();
-    expect(contentProblem('community/links.jsonl', '')).toBeNull();
+    expect(contentProblem('community/10-summary.md', '')).toBeNull();
+    expect(contentProblem('community/10-summary.md', '# 日本語 \u{1F600}\r\n')).toBeNull();
   });
 
   it('refuses what is not text, or too big', () => {
-    expect(contentProblem('community/page.md', 'a\0b')).toMatch(/text/);
-    expect(contentProblem('community/page.md', '\ud800')).toMatch(/Unicode/);
-    expect(contentProblem('community/page.md', 'a'.repeat(MAX_FILE_BYTES + 1))).toMatch(/larger/);
+    expect(contentProblem('community/10-summary.md', 'a\0b')).toMatch(/text/);
+    expect(contentProblem('community/10-summary.md', '\ud800')).toMatch(/Unicode/);
+    expect(contentProblem('community/10-summary.md', 'a'.repeat(MAX_FILE_BYTES + 1))).toMatch(/larger/);
   });
 
   it('checks JSON, and what jsonb cannot hold', () => {
-    expect(contentProblem('author/resources.json', '{"code":"https://x"}')).toBeNull();
-    expect(contentProblem('author/resources.json', '[]')).toMatch(/object/);
-    expect(contentProblem('author/resources.json', '{')).toMatch(/JSON/);
-    expect(contentProblem('author/resources.json', '{"a":"\\u0000"}')).toMatch(/Postgres/);
-    expect(contentProblem('author/resources.json', '{"\\ud800":1}')).toMatch(/Postgres/);
-    expect(contentProblem('author/resources.json', `{"a":${'['.repeat(40)}${']'.repeat(40)}}`)).toMatch(/deeply/);
-    expect(contentProblem('community/links.jsonl', '{"to":"arxiv:1"}\n{"to":"arxiv:2"}\n')).toBeNull();
-    expect(contentProblem('community/links.jsonl', '{"to":"arxiv:1"}\nnope\n')).toMatch(/line/);
+    expect(contentProblem(METADATA_PATH, '{"title":"x"}')).toBeNull();
+    expect(contentProblem(METADATA_PATH, '[]')).toMatch(/object/);
+    expect(contentProblem(METADATA_PATH, '{')).toMatch(/JSON/);
+    expect(contentProblem(METADATA_PATH, '{"a":"\\u0000"}')).toMatch(/Postgres/);
+    expect(contentProblem(METADATA_PATH, '{"\\ud800":1}')).toMatch(/Postgres/);
+    expect(contentProblem(METADATA_PATH, `{"a":${'['.repeat(40)}${']'.repeat(40)}}`)).toMatch(/deeply/);
+    expect(contentProblem('extensions/x/data.json', '[1]')).toBeNull();
   });
 });
 

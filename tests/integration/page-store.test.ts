@@ -25,7 +25,7 @@ import {
 import { ApiError } from '@/server/api/errors';
 import { answerGitRequest, clonePath } from '@/server/pages/clone';
 import { type Actor, commitPage, type FileChange, moveHead, revertCommit, SYSTEM_ACTOR } from '@/server/pages/commit';
-import { looseObject } from '@/server/pages/git-objects';
+import { buildTrees, encodeCommit, gitObject, looseObject, SYSTEM_AUTHOR_ID } from '@/server/pages/git-objects';
 import { mergeFile } from '@/server/pages/merge';
 import { rebuildAllPages } from '@/server/pages/projections';
 import { diffCommits, pageHistory, readHead } from '@/server/pages/repo';
@@ -148,9 +148,14 @@ describe('every repo passes git fsck --strict', () => {
       arbitrary: fc.constantFrom('é', 'e\u0301', '日本語', '\u{1F600}', 'A', 'a', 'a-b', 'a b', 'a.b', 'a0'),
     },
     { weight: 10, arbitrary: fc.stringMatching(/^[a-z0-9]{1,6}(\.md)?$/) },
+    // Names the layout takes, so that some commits get through.
+    { weight: 40, arbitrary: fc.stringMatching(/^\d{2}-[a-z0-9]{1,6}\.md$/) },
   );
   const path = fc
-    .array(name, { minLength: 1, maxLength: 4 })
+    .oneof(
+      { weight: 3, arbitrary: fc.tuple(name) },
+      { weight: 1, arbitrary: fc.array(name, { minLength: 1, maxLength: 4 }) },
+    )
     .chain((names) =>
       fc
         .constantFrom('community', 'community', 'community', 'community', 'author', 'extensions')
@@ -195,7 +200,7 @@ describe('every repo passes git fsck --strict', () => {
         const repo = await exportRepo(paperId);
         fsck(repo);
         const files = filesAt(repo);
-        expect(files.delete('metadata.json')).toBe(true);
+        expect(files.delete('.potentialpaper/metadata.json')).toBe(true);
         expect(new Map([...files].sort())).toEqual(new Map([...expected].sort()));
       }),
       { numRuns: 60 },
@@ -205,17 +210,34 @@ describe('every repo passes git fsck --strict', () => {
     expect(refused).toBeGreaterThan(5);
   }, 240_000);
 
-  it('for names that sort differently as directories, where a wrong tree order would show', async () => {
-    const paperId = await newPaper();
-    const admin = { ...(await newAccount()), isAdmin: true };
+  it('for names that sort differently as directories, where a wrong tree order would show', () => {
+    // The layout has no such names (`rules.ts`), but a pushed tree can, and trees are built one way for all.
+    const blob = gitObject('blob', Buffer.from(''));
     const names = ['a', 'a-b', 'a.b', 'a0', 'a b', 'é', 'Z', 'z'];
-    const changes = names.flatMap((name) => [
-      { path: `community/${name}/file`, content: '' },
-      { path: `community/${name}-file`, content: '' },
-      { path: `community/${name}.file`, content: '' },
-    ]);
-    await commitPage(paperId, null, admin, changes, 'Names', { rateLimit: NO_LIMIT });
-    fsck(await exportRepo(paperId));
+    const files = new Map(
+      names.flatMap((name) => [`x/${name}/file`, `x/${name}-file`, `x/${name}.file`].map((path) => [path, blob.oid])),
+    );
+    const { root, trees } = buildTrees(files);
+    const commit = gitObject(
+      'commit',
+      encodeCommit({
+        tree: root,
+        parent: null,
+        authorId: SYSTEM_AUTHOR_ID,
+        at: new Date(0),
+        summary: 'Names',
+        kind: 'edit',
+      }),
+    );
+    const repo = workDir();
+    git(['init', '-q', '--bare', '--initial-branch=main', repo]);
+    for (const { oid, type, body } of [blob, ...trees, commit]) {
+      const file = join(repo, 'objects', oid.slice(0, 2), oid.slice(2));
+      mkdirSync(dirname(file), { recursive: true });
+      writeFileSync(file, looseObject(type, body));
+    }
+    writeFileSync(join(repo, 'refs/heads/main'), `${commit.oid}\n`);
+    fsck(repo);
   });
 
   it('for a first commit, a merge, a revert and the system commit, read by real git', async () => {
@@ -225,19 +247,26 @@ describe('every repo passes git fsck --strict', () => {
       paperId,
       null,
       person,
-      [{ path: 'community/page.md', content: '# Über\n\nA\n\nB\n\nC\n' }],
+      [{ path: 'community/10-summary.md', content: '# Über\n\nA\n\nB\n\nC\n' }],
       'Start 日本語',
       { rateLimit: NO_LIMIT },
     );
     const c1 = first.oid!;
-    await commitPage(paperId, c1, person, [{ path: 'community/page.md', content: '# Über\n\nA2\n\nB\n\nC\n' }], 'A', {
-      rateLimit: NO_LIMIT,
-    });
+    await commitPage(
+      paperId,
+      c1,
+      person,
+      [{ path: 'community/10-summary.md', content: '# Über\n\nA2\n\nB\n\nC\n' }],
+      'A',
+      {
+        rateLimit: NO_LIMIT,
+      },
+    );
     const merged = await commitPage(
       paperId,
       c1,
       person,
-      [{ path: 'community/page.md', content: '# Über\n\nA\n\nB\n\nC2\n' }],
+      [{ path: 'community/10-summary.md', content: '# Über\n\nA\n\nB\n\nC2\n' }],
       'C',
       { rateLimit: NO_LIMIT },
     );
@@ -247,7 +276,7 @@ describe('every repo passes git fsck --strict', () => {
       paperId,
       await readHead(getDb(), paperId),
       SYSTEM_ACTOR,
-      [{ path: 'metadata.json', content: '{"title":"T"}\n' }],
+      [{ path: '.potentialpaper/metadata.json', content: '{"title":"T"}\n' }],
       'Update metadata',
     );
 
@@ -255,7 +284,7 @@ describe('every repo passes git fsck --strict', () => {
     fsck(repo);
     expect(git(['rev-list', '--count', 'main'], repo).trim()).toBe('5');
     expect(git(['rev-list', '--merges', 'main'], repo).trim()).toBe('');
-    expect(filesAt(repo).get('community/page.md')).toBe('# Über\n\nA2\n\nB\n\nC\n');
+    expect(filesAt(repo).get('community/10-summary.md')).toBe('# Über\n\nA2\n\nB\n\nC\n');
     const log = git(['log', '--format=%an|%ae|%cn|%s|%(trailers:key=Edit-Kind,valueonly)', 'main'], repo)
       .trim()
       .split('\n')
@@ -274,7 +303,7 @@ describe('concurrent commits', () => {
       paperId,
       null,
       await newAccount(),
-      [{ path: 'community/page.md', content: page(seedLines) }],
+      [{ path: 'community/10-summary.md', content: page(seedLines) }],
       'Seed',
     );
     const people = await Promise.all(Array.from({ length: 50 }, () => newAccount()));
@@ -288,10 +317,10 @@ describe('concurrent commits', () => {
           person,
           [
             {
-              path: 'community/page.md',
+              path: 'community/10-summary.md',
               content: page(seedLines.map((line, n) => (n === i ? `edited by ${i}` : line))),
             },
-            { path: `community/notes/${i}.md`, content: `note ${i}\n` },
+            { path: `community/${10 + i}-note.md`, content: `note ${i}\n` },
           ],
           `Edit ${i}`,
         ),
@@ -315,10 +344,10 @@ describe('concurrent commits', () => {
         .sort(),
     );
     const files = filesAt(repo);
-    const final = files.get('community/page.md')!;
+    const final = files.get('community/10-summary.md')!;
     for (let i = 0; i < 50; i += 1) {
       expect(final).toContain(`edited by ${i}`);
-      expect(files.get(`community/notes/${i}.md`)).toBe(`note ${i}\n`);
+      expect(files.get(`community/${10 + i}-note.md`)).toBe(`note ${i}\n`);
     }
     expect(final).not.toContain('line ');
 
@@ -327,7 +356,7 @@ describe('concurrent commits', () => {
     expect(revisions).toHaveLength(51);
     expect(await db.select().from(pageEvents).where(eq(pageEvents.paperId, paperId))).toHaveLength(51);
     const [current] = await db.select().from(pageCurrent).where(eq(pageCurrent.paperId, paperId));
-    expect(current.communityMarkdown).toBe(final);
+    expect(current.communityMarkdown).toContain(`### Summary\n\n${final}`);
     expect(current.head.toString('hex')).toBe(await readHead(db, paperId));
   }, 60_000);
 
@@ -337,13 +366,19 @@ describe('concurrent commits', () => {
       paperId,
       null,
       await newAccount(),
-      [{ path: 'community/page.md', content: 'line\n' }],
+      [{ path: 'community/10-summary.md', content: 'line\n' }],
       'Seed',
     );
     const people = await Promise.all(Array.from({ length: 50 }, () => newAccount()));
     const results = await Promise.allSettled(
       people.map((person, i) =>
-        commitPage(paperId, seed.oid, person, [{ path: 'community/page.md', content: `line ${i}\n` }], `Edit ${i}`),
+        commitPage(
+          paperId,
+          seed.oid,
+          person,
+          [{ path: 'community/10-summary.md', content: `line ${i}\n` }],
+          `Edit ${i}`,
+        ),
       ),
     );
     const won = results.filter((r) => r.status === 'fulfilled');
@@ -362,7 +397,7 @@ describe('concurrent commits', () => {
     const people = await Promise.all(Array.from({ length: 50 }, () => newAccount()));
     const results = await Promise.all(
       people.map((person, i) =>
-        commitPage(paperId, null, person, [{ path: `community/${i}.md`, content: `${i}\n` }], `Edit ${i}`),
+        commitPage(paperId, null, person, [{ path: `community/${10 + i}-n.md`, content: `${i}\n` }], `Edit ${i}`),
       ),
     );
     expect(results.every((r) => r.status === 'committed')).toBe(true);
@@ -397,7 +432,7 @@ describe('rebuilding the projections', () => {
       p1,
       null,
       person,
-      [{ path: 'community/page.md', content: '# Über\n\nA\n\nB\n' }],
+      [{ path: 'community/10-summary.md', content: '# Über\n\nA\n\nB\n' }],
       'Start 日本語',
     );
     const two = await commitPage(
@@ -405,12 +440,12 @@ describe('rebuilding the projections', () => {
       one.oid,
       admin,
       [
-        { path: 'author/page.md', content: 'Authors\n' },
-        { path: 'author/resources.json', content: '{"code":"https://example.org","nested":{"b":1,"a":[]}}' },
+        { path: 'author/10-overview.md', content: 'Authors\n' },
+        { path: 'versions/v_k3x9q2ab.json', content: '{"kind":"preprint","label":"arXiv v1"}\n' },
       ],
       'Author section',
     );
-    await commitPage(p1, two.oid, bot, [{ path: 'community/links.jsonl', content: '{"to":"arxiv:1"}\n' }], 'Bot edit');
+    await commitPage(p1, two.oid, bot, [{ path: 'community/20-bot.md', content: 'Found by a bot.\n' }], 'Bot edit');
     await revertCommit(p1, one.oid!, person);
     await commitPage(p2, null, SYSTEM_ACTOR, [], 'Metadata');
     const del = await commitPage(
@@ -418,12 +453,12 @@ describe('rebuilding the projections', () => {
       null,
       person,
       [
-        { path: 'community/x.md', content: 'x\n' },
-        { path: 'community/page.md', content: '' },
+        { path: 'community/20-x.md', content: 'x\n' },
+        { path: 'community/10-summary.md', content: '' },
       ],
       'New',
     );
-    await commitPage(p3, del.oid, person, [{ path: 'community/x.md', content: null }], 'Delete');
+    await commitPage(p3, del.oid, person, [{ path: 'community/20-x.md', content: null }], 'Delete');
 
     const before = await projections();
     expect(before.revisions).toHaveLength(7);
@@ -451,7 +486,7 @@ describe('rebuilding the projections', () => {
   it('keeps a deleted account deleted', async () => {
     const paperId = await newPaper();
     const person = await newAccount();
-    await commitPage(paperId, null, person, [{ path: 'community/page.md', content: 'x\n' }], 'Edit');
+    await commitPage(paperId, null, person, [{ path: 'community/10-summary.md', content: 'x\n' }], 'Edit');
     const before = await pageHistory(paperId);
     await getDb().delete(accounts).where(eq(accounts.id, person.accountId));
     const [row] = await getDb().select().from(pageRevisions).where(eq(pageRevisions.paperId, paperId));
@@ -467,21 +502,23 @@ describe('commitPage', () => {
   it('starts a repo with a metadata snapshot, and not for nothing', async () => {
     const paperId = await newPaper(ARXIV);
     const person = await newAccount();
-    expect(await commitPage(paperId, null, person, [{ path: 'community/gone.md', content: null }], 'Nothing')).toEqual({
+    expect(
+      await commitPage(paperId, null, person, [{ path: 'community/20-gone.md', content: null }], 'Nothing'),
+    ).toEqual({
       status: 'unchanged',
       oid: null,
     });
     expect(await readHead(getDb(), paperId)).toBeNull();
 
-    const first = await commitPage(paperId, null, person, [{ path: 'community/page.md', content: '' }], 'First');
+    const first = await commitPage(paperId, null, person, [{ path: 'community/10-summary.md', content: '' }], 'First');
     expect(first).toMatchObject({
       status: 'committed',
       seq: 1,
       merged: false,
-      paths: ['community/page.md', 'metadata.json'],
+      paths: ['.potentialpaper/metadata.json', 'community/10-summary.md'],
     });
     const repo = await exportRepo(paperId);
-    expect(JSON.parse(filesAt(repo).get('metadata.json')!)).toEqual({
+    expect(JSON.parse(filesAt(repo).get('.potentialpaper/metadata.json')!)).toEqual({
       identifiers: [ARXIV],
       title: expect.stringContaining('Über'),
       authors: ['Ada Lovelace', 'Émile Noether'],
@@ -491,7 +528,9 @@ describe('commitPage', () => {
       source: 'arxiv',
       license: { metadata: 'CC0-1.0', abstract: 'CC0-1.0' },
     });
-    expect(await commitPage(paperId, first.oid, person, [{ path: 'community/page.md', content: '' }], 'Same')).toEqual({
+    expect(
+      await commitPage(paperId, first.oid, person, [{ path: 'community/10-summary.md', content: '' }], 'Same'),
+    ).toEqual({
       status: 'unchanged',
       oid: first.oid,
     });
@@ -504,12 +543,12 @@ describe('commitPage', () => {
     const unverified = await newAccount({ verifiedAt: null });
 
     for (const [actor, path] of [
-      [person, 'metadata.json'],
-      [person, 'author/page.md'],
-      [unverified, 'community/page.md'],
+      [person, '.potentialpaper/metadata.json'],
+      [person, 'author/10-overview.md'],
+      [unverified, 'community/10-summary.md'],
       [admin, 'extensions/x/data.json'],
       [admin, 'README.md'],
-      [SYSTEM_ACTOR, 'community/page.md'],
+      [SYSTEM_ACTOR, 'community/10-summary.md'],
     ] as [Actor, string][]) {
       const err = await refusal(commitPage(paperId, null, actor, [{ path, content: '{}' }], 'Edit'));
       expect([path, err.code]).toEqual([path, 'forbidden']);
@@ -521,20 +560,20 @@ describe('commitPage', () => {
         null,
         person,
         [
-          { path: 'community/page.md', content: 'x' },
-          { path: 'author/page.md', content: 'x' },
+          { path: 'community/10-summary.md', content: 'x' },
+          { path: 'author/10-overview.md', content: 'x' },
         ],
         'Edit',
       ),
     );
     expect(await getDb().select().from(pageObjects)).toEqual([]);
 
-    await commitPage(paperId, null, admin, [{ path: 'author/page.md', content: 'x' }], 'Edit');
+    await commitPage(paperId, null, admin, [{ path: 'author/10-overview.md', content: 'x' }], 'Edit');
     await commitPage(
       paperId,
       await readHead(getDb(), paperId),
       admin,
-      [{ path: 'metadata.json', content: '{"title":"T"}' }],
+      [{ path: '.potentialpaper/metadata.json', content: '{"title":"T"}' }],
       'Edit',
     );
     const bot = await newAccount({ isBot: true, verifiedAt: null });
@@ -542,7 +581,7 @@ describe('commitPage', () => {
       paperId,
       await readHead(getDb(), paperId),
       bot,
-      [{ path: 'community/page.md', content: 'x' }],
+      [{ path: 'community/10-summary.md', content: 'x' }],
       'Edit',
     );
   });
@@ -557,8 +596,8 @@ describe('commitPage', () => {
       [
         person,
         [
-          { path: 'community/a', content },
-          { path: 'community/a', content },
+          { path: 'community/10-a.md', content },
+          { path: 'community/10-a.md', content },
         ],
       ],
       [
@@ -571,30 +610,38 @@ describe('commitPage', () => {
       [
         person,
         [
-          { path: 'community/a', content },
-          { path: 'community/a/b', content },
+          { path: 'community/10-a.md', content },
+          { path: 'community/10-a.md/b', content },
         ],
       ],
-      [person, [{ path: 'community/links.jsonl', content: 'nope' }]],
-      [person, [{ path: 'community/page.md', content: 'a\0b' }]],
+      [person, [{ path: 'links/10-code.json', content: 'nope' }]],
+      [person, [{ path: 'community/notes.md', content }]],
+      [person, [{ path: 'community/10-summary.md', content: 'a\0b' }]],
       [person, Array.from({ length: MAX_CHANGES + 1 }, (_, i) => ({ path: `community/${i}`, content }))],
-      [admin, [{ path: 'metadata.json', content: '[]' }]],
-      [admin, [{ path: 'author/resources.json', content: '{"a":"\\u0000"}' }]],
+      [admin, [{ path: '.potentialpaper/metadata.json', content: '[]' }]],
+      [admin, [{ path: '.potentialpaper/metadata.json', content: '{"a":"\\u0000"}' }]],
     ];
     for (const [actor, changes] of cases) {
       expect((await refusal(commitPage(paperId, null, actor, changes, 'Edit'))).status).toBe(422);
     }
-    const first = await commitPage(paperId, null, person, [{ path: 'community/a', content }], 'First');
-    const err = await refusal(commitPage(paperId, first.oid, person, [{ path: 'community/a/b', content }], 'Edit'));
+    const first = await commitPage(paperId, null, person, [{ path: 'community/10-a.md', content }], 'First');
+    const err = await refusal(
+      commitPage(paperId, first.oid, person, [{ path: 'community/10-a.md/b', content }], 'Edit'),
+    );
     expect(err.status).toBe(422);
     expect(
-      (await refusal(commitPage(paperId, first.oid, admin, [{ path: 'metadata.json', content: null }], 'Edit'))).status,
+      (
+        await refusal(
+          commitPage(paperId, first.oid, admin, [{ path: '.potentialpaper/metadata.json', content: null }], 'Edit'),
+        )
+      ).status,
     ).toBe(422);
     expect(
-      (await refusal(commitPage(paperId, 'nope', person, [{ path: 'community/b', content }], 'Edit'))).status,
+      (await refusal(commitPage(paperId, 'nope', person, [{ path: 'community/20-b.md', content }], 'Edit'))).status,
     ).toBe(422);
     expect(
-      (await refusal(commitPage(paperId, 'c'.repeat(40), person, [{ path: 'community/b', content }], 'Edit'))).status,
+      (await refusal(commitPage(paperId, 'c'.repeat(40), person, [{ path: 'community/20-b.md', content }], 'Edit')))
+        .status,
     ).toBe(422);
   });
 
@@ -602,18 +649,24 @@ describe('commitPage', () => {
     const paperId = await newPaper();
     const person = await newAccount();
     const base = 'A\n\nB\n\nC\n';
-    const one = await commitPage(paperId, null, person, [{ path: 'community/page.md', content: base }], 'Base');
-    await commitPage(paperId, one.oid, person, [{ path: 'community/page.md', content: 'A2\n\nB\n\nC\n' }], 'Theirs');
+    const one = await commitPage(paperId, null, person, [{ path: 'community/10-summary.md', content: base }], 'Base');
+    await commitPage(
+      paperId,
+      one.oid,
+      person,
+      [{ path: 'community/10-summary.md', content: 'A2\n\nB\n\nC\n' }],
+      'Theirs',
+    );
     const head = await readHead(getDb(), paperId);
 
     const err = await refusal(
-      commitPage(paperId, one.oid, person, [{ path: 'community/page.md', content: 'A3\n\nB\n\nC\n' }], 'Ours'),
+      commitPage(paperId, one.oid, person, [{ path: 'community/10-summary.md', content: 'A3\n\nB\n\nC\n' }], 'Ours'),
     );
     expect(err.status).toBe(409);
     expect(err.code).toBe('edit_conflict');
     expect(err.details).toEqual({
       head,
-      conflicts: [{ path: 'community/page.md', base, ours: 'A3\n\nB\n\nC\n', theirs: 'A2\n\nB\n\nC\n' }],
+      conflicts: [{ path: 'community/10-summary.md', base, ours: 'A3\n\nB\n\nC\n', theirs: 'A2\n\nB\n\nC\n' }],
     });
     expect(await readHead(getDb(), paperId)).toBe(head);
 
@@ -621,42 +674,43 @@ describe('commitPage', () => {
       paperId,
       one.oid,
       person,
-      [{ path: 'community/page.md', content: 'A\n\nB\n\nC3\n' }],
+      [{ path: 'community/10-summary.md', content: 'A\n\nB\n\nC3\n' }],
       'Ours',
     );
     expect(merged).toMatchObject({ status: 'committed', merged: true });
     const [current] = await getDb().select().from(pageCurrent).where(eq(pageCurrent.paperId, paperId));
-    expect(current.communityMarkdown).toBe('A2\n\nB\n\nC3\n');
+    // Joined for agents, under a heading from the file's name.
+    expect(current.communityMarkdown).toBe('### Summary\n\nA2\n\nB\n\nC3\n');
 
     // A commit that didn't touch the other file doesn't undo what happened to it.
     const two = await commitPage(
       paperId,
       merged.oid,
       person,
-      [{ path: 'community/other.md', content: 'v1\n' }],
+      [{ path: 'community/20-other.md', content: 'v1\n' }],
       'Other',
     );
-    await commitPage(paperId, two.oid, person, [{ path: 'community/other.md', content: 'v2\n' }], 'Other 2');
-    await commitPage(paperId, two.oid, person, [{ path: 'community/third.md', content: '3\n' }], 'Third');
-    expect(filesAt(await exportRepo(paperId)).get('community/other.md')).toBe('v2\n');
+    await commitPage(paperId, two.oid, person, [{ path: 'community/20-other.md', content: 'v2\n' }], 'Other 2');
+    await commitPage(paperId, two.oid, person, [{ path: 'community/30-third.md', content: '3\n' }], 'Third');
+    expect(filesAt(await exportRepo(paperId)).get('community/20-other.md')).toBe('v2\n');
     // A file submitted unchanged doesn't either.
     await commitPage(
       paperId,
       two.oid,
       person,
       [
-        { path: 'community/other.md', content: 'v1\n' },
-        { path: 'community/fourth.md', content: '4\n' },
+        { path: 'community/20-other.md', content: 'v1\n' },
+        { path: 'community/40-fourth.md', content: '4\n' },
       ],
       'Fourth',
     );
-    expect(filesAt(await exportRepo(paperId)).get('community/other.md')).toBe('v2\n');
+    expect(filesAt(await exportRepo(paperId)).get('community/20-other.md')).toBe('v2\n');
   });
 
   it('treats a merge that makes invalid JSON as a conflict', async () => {
     const paperId = await newPaper();
     const admin = { ...(await newAccount()), isAdmin: true };
-    const path = 'author/resources.json';
+    const path = '.potentialpaper/metadata.json';
     const base = '{"l":[\n\n\n\n\n\n]}\n';
     const object = '{"l":{\n\n\n\n\n\n}}\n';
     const item = '{"l":[\n\n\n1\n\n\n\n]}\n';
@@ -674,7 +728,7 @@ describe('commitPage', () => {
   it('never puts an account, handle or email in the repo or the outbox', async () => {
     const paperId = await newPaper();
     const person = await newAccount({ handle: 'secret-handle', realName: 'Real Name' });
-    await commitPage(paperId, null, person, [{ path: 'community/page.md', content: 'x\n' }], 'Edit');
+    await commitPage(paperId, null, person, [{ path: 'community/10-summary.md', content: 'x\n' }], 'Edit');
     const [identity] = await getDb()
       .select()
       .from(commitIdentities)
@@ -694,7 +748,7 @@ describe('commitPage', () => {
     expect(events[0].payload).toMatchObject({
       authorId: identity.id,
       kind: 'edit',
-      paths: ['community/page.md', 'metadata.json'],
+      paths: ['.potentialpaper/metadata.json', 'community/10-summary.md'],
     });
   });
 
@@ -702,13 +756,13 @@ describe('commitPage', () => {
     const person = await newAccount();
     const bot = await newAccount({ isBot: true });
     const [a, b] = [await newPaper(), await newPaper()];
-    await commitPage(a, null, person, [{ path: 'community/page.md', content: 'a' }], 'Edit');
-    await commitPage(b, null, person, [{ path: 'community/page.md', content: 'b' }], 'Edit');
+    await commitPage(a, null, person, [{ path: 'community/10-summary.md', content: 'a' }], 'Edit');
+    await commitPage(b, null, person, [{ path: 'community/10-summary.md', content: 'b' }], 'Edit');
     const [ha] = await pageHistory(a);
     const [hb] = await pageHistory(b);
     expect(ha.authorId).toBe(hb.authorId);
 
-    await commitPage(a, await readHead(getDb(), a), bot, [{ path: 'community/bot.md', content: 'x' }], 'Bot');
+    await commitPage(a, await readHead(getDb(), a), bot, [{ path: 'community/20-bot.md', content: 'x' }], 'Bot');
     const repo = await exportRepo(a);
     expect(git(['log', '-1', '--format=%(trailers:key=Bot,valueonly)', 'main'], repo).trim()).toBe('true');
     expect(git(['log', '-1', '--format=%(trailers:key=Bot,valueonly)', 'main~1'], repo).trim()).toBe('');
@@ -719,16 +773,18 @@ describe('commitPage', () => {
     const survivor = await newPaper();
     const person = await newAccount();
     await getDb().update(papers).set({ mergedInto: survivor }).where(eq(papers.id, paperId));
-    expect((await refusal(commitPage(paperId, null, person, [{ path: 'community/a', content: '' }], 'E'))).code).toBe(
-      'paper_merged',
-    );
     expect(
-      (await refusal(commitPage(crypto.randomUUID(), null, person, [{ path: 'community/a', content: '' }], 'E'))).code,
+      (await refusal(commitPage(paperId, null, person, [{ path: 'community/10-a.md', content: '' }], 'E'))).code,
+    ).toBe('paper_merged');
+    expect(
+      (await refusal(commitPage(crypto.randomUUID(), null, person, [{ path: 'community/10-a.md', content: '' }], 'E')))
+        .code,
     ).toBe('not_found');
     const limited = { rateLimit: { burst: 1, perSecond: 0.001 } };
-    await commitPage(survivor, null, person, [{ path: 'community/a', content: '' }], 'E', limited);
+    await commitPage(survivor, null, person, [{ path: 'community/10-a.md', content: '' }], 'E', limited);
     expect(
-      (await refusal(commitPage(survivor, null, person, [{ path: 'community/b', content: '' }], 'E', limited))).code,
+      (await refusal(commitPage(survivor, null, person, [{ path: 'community/20-b.md', content: '' }], 'E', limited)))
+        .code,
     ).toBe('rate_limited');
   });
 });
@@ -741,7 +797,7 @@ describe('revert', () => {
       paperId,
       null,
       person,
-      [{ path: 'community/page.md', content: 'A\n\nB\n\nC\n' }],
+      [{ path: 'community/10-summary.md', content: 'A\n\nB\n\nC\n' }],
       'One',
     );
     const two = await commitPage(
@@ -749,8 +805,8 @@ describe('revert', () => {
       one.oid,
       person,
       [
-        { path: 'community/page.md', content: 'A2\n\nB\n\nC\n' },
-        { path: 'community/new.md', content: 'new\n' },
+        { path: 'community/10-summary.md', content: 'A2\n\nB\n\nC\n' },
+        { path: 'community/20-new.md', content: 'new\n' },
       ],
       'Vandalism',
     );
@@ -758,15 +814,15 @@ describe('revert', () => {
       paperId,
       two.oid,
       person,
-      [{ path: 'community/page.md', content: 'A2\n\nB\n\nC3\n' }],
+      [{ path: 'community/10-summary.md', content: 'A2\n\nB\n\nC3\n' }],
       'Three',
     );
 
     const reverted = await revertCommit(paperId, two.oid!, person);
     expect(reverted).toMatchObject({ status: 'committed', merged: true });
     const files = filesAt(await exportRepo(paperId));
-    expect(files.get('community/page.md')).toBe('A\n\nB\n\nC3\n');
-    expect(files.has('community/new.md')).toBe(false);
+    expect(files.get('community/10-summary.md')).toBe('A\n\nB\n\nC3\n');
+    expect(files.has('community/20-new.md')).toBe(false);
     const [latest] = await pageHistory(paperId);
     expect(latest).toMatchObject({ kind: 'revert', summary: 'Revert "Vandalism"' });
     const [event] = await getDb().select().from(pageEvents).where(eq(pageEvents.seq, latest.seq));
@@ -780,9 +836,15 @@ describe('revert', () => {
   it('reports a conflict when later edits touch the same lines', async () => {
     const paperId = await newPaper();
     const person = await newAccount();
-    const one = await commitPage(paperId, null, person, [{ path: 'community/page.md', content: 'A\n' }], 'One');
-    const two = await commitPage(paperId, one.oid, person, [{ path: 'community/page.md', content: 'B\n' }], 'Two');
-    await commitPage(paperId, two.oid, person, [{ path: 'community/page.md', content: 'C\n' }], 'Three');
+    const one = await commitPage(paperId, null, person, [{ path: 'community/10-summary.md', content: 'A\n' }], 'One');
+    const two = await commitPage(
+      paperId,
+      one.oid,
+      person,
+      [{ path: 'community/10-summary.md', content: 'B\n' }],
+      'Two',
+    );
+    await commitPage(paperId, two.oid, person, [{ path: 'community/10-summary.md', content: 'C\n' }], 'Three');
     expect((await refusal(revertCommit(paperId, two.oid!, person))).code).toBe('edit_conflict');
   });
 
@@ -790,11 +852,20 @@ describe('revert', () => {
     const paperId = await newPaper();
     const person = await newAccount();
     const admin = { ...(await newAccount()), isAdmin: true };
-    const one = await commitPage(paperId, null, person, [{ path: 'community/page.md', content: 'A\n' }], 'One');
-    const author = await commitPage(paperId, one.oid, admin, [{ path: 'author/page.md', content: 'B\n' }], 'Author');
+    const one = await commitPage(paperId, null, person, [{ path: 'community/10-summary.md', content: 'A\n' }], 'One');
+    const author = await commitPage(
+      paperId,
+      one.oid,
+      admin,
+      [{ path: 'author/10-overview.md', content: 'B\n' }],
+      'Author',
+    );
     expect((await refusal(revertCommit(paperId, author.oid!, person))).code).toBe('forbidden');
     await revertCommit(paperId, one.oid!, person);
-    expect([...filesAt(await exportRepo(paperId)).keys()].sort()).toEqual(['author/page.md', 'metadata.json']);
+    expect([...filesAt(await exportRepo(paperId)).keys()].sort()).toEqual([
+      '.potentialpaper/metadata.json',
+      'author/10-overview.md',
+    ]);
     expect((await refusal(revertCommit(paperId, 'd'.repeat(40), person))).code).toBe('not_found');
   });
 });
@@ -808,8 +879,8 @@ describe('diffs between commits', () => {
       null,
       person,
       [
-        { path: 'community/page.md', content: 'one\ntwo\n' },
-        { path: 'community/日本語/old.md', content: 'gone\n' },
+        { path: 'community/10-summary.md', content: 'one\ntwo\n' },
+        { path: 'community/20-old.md', content: 'gone\n' },
       ],
       'One',
     );
@@ -818,9 +889,9 @@ describe('diffs between commits', () => {
       one.oid,
       person,
       [
-        { path: 'community/page.md', content: 'one\nTWO\n' },
-        { path: 'community/日本語/old.md', content: null },
-        { path: 'community/é.md', content: '' },
+        { path: 'community/10-summary.md', content: 'one\nTWO\n' },
+        { path: 'community/20-old.md', content: null },
+        { path: 'community/30-e.md', content: '' },
       ],
       'Two',
     );
@@ -836,7 +907,7 @@ describe('diffs between commits', () => {
     for (let i = 0; i < said.length; i += 2)
       expected.set(said[i + 1], { A: 'added', M: 'modified', D: 'deleted' }[said[i]]!);
     expect(new Map(diffs.map((d) => [d.path, d.status]))).toEqual(expected);
-    expect(diffs.find((d) => d.path === 'community/page.md')!.patch).toContain('-two\n+TWO\n');
+    expect(diffs.find((d) => d.path === 'community/10-summary.md')!.patch).toContain('-two\n+TWO\n');
     expect(await diffCommits(paperId, 'a'.repeat(40), two.oid!)).toBeNull();
     expect(await diffCommits(paperId, one.oid!, 'nope')).toBeNull();
     // From nothing, a commit's whole tree is new.
@@ -867,12 +938,12 @@ describe('git clone', () => {
     const paperId = await newPaper(ARXIV);
     const person = await newAccount();
     const edits: FileChange[][] = [
-      [{ path: 'community/page.md', content: '# Über\n' }],
+      [{ path: 'community/10-summary.md', content: '# Über\n' }],
       [
-        { path: 'community/日本語/ノート.md', content: 'テスト\n' },
-        { path: 'community/empty.md', content: '' },
+        { path: 'community/20-note.md', content: 'テスト\n' },
+        { path: 'community/30-empty.md', content: '' },
       ],
-      [{ path: 'community/page.md', content: '# Über\n\nMore.\n' }],
+      [{ path: 'community/10-summary.md', content: '# Über\n\nMore.\n' }],
     ];
     let head: string | null = null;
     for (const [i, changes] of edits.entries()) {
@@ -886,13 +957,13 @@ describe('git clone', () => {
     expect(git(['rev-parse', 'HEAD'], clone).trim()).toBe(head);
     expect(git(['rev-parse', '--abbrev-ref', 'HEAD'], clone).trim()).toBe('main');
     expect(git(['rev-list', '--count', 'HEAD'], clone).trim()).toBe('3');
-    expect(readFileSync(join(clone, 'community/日本語/ノート.md'), 'utf8')).toBe('テスト\n');
-    expect(readFileSync(join(clone, 'community/empty.md'), 'utf8')).toBe('');
+    expect(readFileSync(join(clone, 'community/20-note.md'), 'utf8')).toBe('テスト\n');
+    expect(readFileSync(join(clone, 'community/30-empty.md'), 'utf8')).toBe('');
 
     // A later edit reaches an existing clone by `git pull`.
-    await commitPage(paperId, head, person, [{ path: 'community/page.md', content: 'New\n' }], 'Later');
+    await commitPage(paperId, head, person, [{ path: 'community/10-summary.md', content: 'New\n' }], 'Later');
     await gitOverHttp(['pull', '-q', '--ff-only'], clone);
-    expect(readFileSync(join(clone, 'community/page.md'), 'utf8')).toBe('New\n');
+    expect(readFileSync(join(clone, 'community/10-summary.md'), 'utf8')).toBe('New\n');
     fsck(clone);
   });
 
@@ -1040,7 +1111,7 @@ describe('pdf.json', () => {
     const [current] = await getDb().select().from(pageCurrent).where(eq(pageCurrent.paperId, id));
     expect(current.pdf).toEqual(POINTER);
     const [revision] = await getDb().select().from(pageRevisions).where(eq(pageRevisions.paperId, id));
-    expect(revision.paths.toSorted()).toEqual(['metadata.json', PDF_PATH]);
+    expect(revision.paths.toSorted()).toEqual(['.potentialpaper/metadata.json', PDF_PATH]);
   });
 
   it('gives search results its cover once one is rendered', async () => {

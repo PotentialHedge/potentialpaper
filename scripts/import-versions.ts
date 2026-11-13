@@ -12,7 +12,7 @@ import { lookUpVersions } from '@/server/version-sources';
 import { mergeFoundVersions, setVersions, versionsAt } from '@/server/versions';
 
 const USAGE = `Find a paper's versions on OpenReview (every forum with its title) and arXiv, and commit them to its
-page's versions.jsonl, as the system. The editor's "Look them up" does the same for a person, who checks them first.
+page's versions/, as the system. The editor's "Look them up" does the same for a person, who checks them first.
 
   npm run papers:import-versions -- openreview:dskf2Ppd9o [--arxiv 2606.18022] [--dry-run]
 

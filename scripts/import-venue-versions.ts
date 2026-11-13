@@ -16,7 +16,7 @@ import { mergeFoundVersions, setVersions, versionsAt } from '@/server/versions';
 
 const USAGE = `Finds our papers' other versions in a dump of OpenReview's venues (\`papers:dump-openreview\`): forums
 at other venues with the same title and an abstract that says the same, and commits them to each paper's
-versions.jsonl as the system, next to the paper's own forum.
+versions/ as the system, next to the paper's own forum.
 
   npm run papers:import-venue-versions -- data/openreview-venues.sqlite [--scrape iclr2026.sqlite]...
                                           [--paper <uuid>] [--limit N] [--relabel] [--dry-run]

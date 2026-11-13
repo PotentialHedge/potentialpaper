@@ -3,13 +3,13 @@ import { mkdir, writeFile } from 'node:fs/promises';
 import { join } from 'node:path';
 import { AwsClient } from 'aws4fetch';
 import { getDb } from '@/db';
-import { encodeLinksFile, linkProblem, MAX_LINKS, type TitleLink } from '@/lib/paper-links';
+import { linkProblem, MAX_LINKS, type TitleLink } from '@/lib/paper-links';
 import { ApiError } from '../api/errors';
 import { commitPage, type Actor, type CommitOptions, type CommitResult } from './commit';
+import { linkChanges } from './content';
 import { readCommit, readFiles, readHead, readText } from './repo';
 import {
   imageType,
-  LINKS_PATH,
   MAX_THUMBNAIL_BYTES,
   parseThumbnailPointer,
   THUMBNAIL_PATH,
@@ -80,13 +80,14 @@ export async function storeMedia(
   return `${MEDIA_BASE}/${folder}/${name}`;
 }
 
-/** A file of the page at its head, and the head. */
+/** A file of the page at its head, the head, and every path there. */
 async function fileAtHead(paperId: string, path: string, options: CommitOptions) {
   const database = options.database ?? getDb();
   const head = await readHead(database, paperId);
-  if (!head) return { head, text: null };
+  if (!head) return { head, text: null, paths: [] };
   const commit = await readCommit(database, paperId, head);
-  return { head, text: await readText(database, paperId, (await readFiles(database, paperId, commit.tree)).get(path)) };
+  const files = await readFiles(database, paperId, commit.tree);
+  return { head, text: await readText(database, paperId, files.get(path)), paths: [...files.keys()] };
 }
 
 export interface ThumbnailChange {
@@ -145,7 +146,7 @@ export async function removeThumbnail(paperId: string, actor: Actor, options: Co
   return commitPage(paperId, head, actor, [{ path: THUMBNAIL_PATH, content: null }], 'Remove the picture', options);
 }
 
-/** Replaces the page's own links. An empty list removes the file. */
+/** Replaces the page's own links, a file each in `links/`, in order. An empty list removes them all. */
 export async function setLinks(
   paperId: string,
   actor: Actor,
@@ -164,13 +165,6 @@ export async function setLinks(
     }
     labels.add(link.label.toLowerCase());
   }
-  const { head } = await fileAtHead(paperId, LINKS_PATH, options);
-  return commitPage(
-    paperId,
-    head,
-    actor,
-    [{ path: LINKS_PATH, content: clean.length > 0 ? encodeLinksFile(clean) : null }],
-    summary?.trim() || 'Change the links',
-    options,
-  );
+  const { head, paths } = await fileAtHead(paperId, THUMBNAIL_PATH, options);
+  return commitPage(paperId, head, actor, linkChanges(paths, clean), summary?.trim() || 'Change the links', options);
 }

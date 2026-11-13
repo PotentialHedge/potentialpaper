@@ -169,31 +169,44 @@ nothing, and the first commit creates the repo with a metadata snapshot.
 
 ### 4.3 Repo layout, and permissions by path
 
+A repo is laid out so that a person with a text editor can edit it: many small files, folders over
+big files. `src/server/pages/rules.ts` is the authority.
+
 ```
-metadata.json            system: identifiers, title, authors, abstract snapshot
-author/page.md           the author section
-author/resources.json    code, data, demo, video, slides, poster, BibTeX
-author/assets.json       uploaded media as pointers: sha256, type, size
-author/thumbnail.json    the paper's picture, in place of its PDF's first page: a pointer, as pdf.json
-author/links.jsonl       links the authors assert
-community/page.md        the community section
-community/links.jsonl    links the community asserts
-extensions/<id>/...      reserved: data owned by one extension (section 10)
+.potentialpaper/metadata.json   system: identifiers, title, authors, abstract snapshot
+.potentialpaper/pdf.json        system: the paper's PDF, as a pointer
+author/10-tl-dr.md              the author section, one file per section
+author/20-results.html          … in Markdown or HTML
+community/10-summary.md         the community section, the same way
+versions/v_k3x9q2ab.json        a version of the paper; the file's name is its id
+links/10-code.json              a link under the title: { "label", "url" }
+thumbnail.json                  the paper's picture, in place of its PDF's first page: a pointer
+extensions/<id>/...             reserved: data owned by one extension (section 10)
 ```
+
+**Sections** are named `NN-slug.md` or `NN-slug.html`: two digits, then a lower-case ASCII slug.
+They show in the order of their names, which is the order `ls` lists them in. A section's title is the
+`#` heading (or `<h1>`) its file starts with, and otherwise its slug. HTML is checked against an
+allowlist at commit (no scripts, styles, event handlers, ids or classes) and refused, not cleaned, so
+what is in the repo is what is shown. Links are numbered the same way.
+
+**`.potentialpaper/`** is the one name that may start with a dot, at the top and spelled exactly so;
+every other path rule stays.
 
 **Permissions are rules on paths**, checked in one place:
 
-| Path                 | Who may commit                                   |
-| -------------------- | ------------------------------------------------ |
-| `metadata.json`      | System ingest, admins                            |
-| `pdf.json`           | System ingest, admins                            |
-| `author/**`          | Confirmed authors of this paper, admins          |
-| `community/**`       | Any verified account, subject to page protection |
-| `extensions/<id>/**` | Extension `<id>` acting for a consenting user    |
+| Path                         | Who may commit                                                      |
+| ---------------------------- | ------------------------------------------------------------------- |
+| `.potentialpaper/**`         | System ingest, admins                                               |
+| `versions/**`                | Any verified account, system ingest, admins                         |
+| `thumbnail.json`, `links/**` | Confirmed authors once claimed, any verified account before, admins |
+| `author/**`                  | Confirmed authors of this paper, admins                             |
+| `community/**`               | Any verified account, subject to page protection                    |
+| `extensions/<id>/**`         | Extension `<id>` acting for a consenting user                       |
 
 Media doesn't go in git: bytes go to R2, keyed by hash, and git records the pointer, as Git LFS
 does. `pdf.json` is such a pointer: the SHA-256, size, URL, source page and license of the
-paper's PDF, copied unmodified. Files are one record per line, so links diff cleanly.
+paper's PDF, copied unmodified.
 
 ### 4.4 The write path
 

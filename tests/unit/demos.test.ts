@@ -183,7 +183,7 @@ describe('a demo block', () => {
   it('is found in Markdown, once each, and renders as a sandboxed frame with no src until shown', () => {
     const md = `## Demos\n\n${demoBlockMarkdown({ id: DEMO.id, title: 'A <b>' })}\n${demoBlockMarkdown({ id: DEMO.id, title: 'Again' })}\n\`\`\`js\nx\n\`\`\`\n`;
     expect(demoIds(md)).toEqual([DEMO.id]);
-    const html = renderMarkdown(md, 'community', new Map([[DEMO.id, DEMO]]));
+    const html = renderMarkdown(md, 'community', { demos: new Map([[DEMO.id, DEMO]]) });
     expect(html).toContain(`<iframe class="demo-frame" data-src="http://127.0.0.1:3000/d/${DEMO.id}/"`);
     expect(html).not.toMatch(/<iframe[^>]* src=/);
     expect(html).toContain('sandbox="allow-scripts');

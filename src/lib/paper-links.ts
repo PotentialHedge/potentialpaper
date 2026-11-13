@@ -25,7 +25,7 @@ export function titleLinks({
   pdf?: string | null;
   /** Submissions' pages, kept only where they are on OpenReview. */
   forums?: readonly (string | null)[];
-  /** The page's own `links.json`: one with a built-in link's label replaces it, the rest follow. */
+  /** The page's own links (`links/`): one with a built-in link's label replaces it, the rest follow. */
   extra?: readonly TitleLink[];
 }): TitleLink[] {
   const arxiv = identifiers.find((id) => id.scheme === 'arxiv')?.value;
@@ -78,35 +78,23 @@ export function linkProblem(link: TitleLink): string | null {
   return null;
 }
 
-/** The links in a `links.json`, or `null` if it isn't a list of good, distinct links. */
-export function parseLinksFile(text: string): TitleLink[] | null {
+/** The link in a `links/10-code.json`, or `null` if it isn't a good one. */
+export function parseLinkFile(text: string): TitleLink | null {
   let value: unknown;
   try {
     value = JSON.parse(text);
   } catch {
     return null;
   }
-  if (!Array.isArray(value) || value.length > MAX_LINKS) return null;
-  const links: TitleLink[] = [];
-  const labels = new Set<string>();
-  for (const item of value) {
-    if (item === null || typeof item !== 'object' || Array.isArray(item)) return null;
-    const { label, url } = item as Record<string, unknown>;
-    if (typeof label !== 'string' || typeof url !== 'string') return null;
-    const link = { label: label.trim(), url };
-    if (linkProblem(link) || labels.has(link.label.toLowerCase())) return null;
-    labels.add(link.label.toLowerCase());
-    links.push(link);
-  }
-  return links;
+  if (value === null || typeof value !== 'object' || Array.isArray(value)) return null;
+  const { label, url, ...rest } = value as Record<string, unknown>;
+  if (typeof label !== 'string' || typeof url !== 'string' || Object.keys(rest).length > 0) return null;
+  const link = { label: label.trim(), url };
+  return linkProblem(link) ? null : link;
 }
 
-export function encodeLinksFile(links: readonly TitleLink[]): string {
-  return `${JSON.stringify(
-    links.map(({ label, url }) => ({ label, url })),
-    null,
-    2,
-  )}\n`;
+export function encodeLinkFile({ label, url }: TitleLink): string {
+  return `${JSON.stringify({ label, url }, null, 2)}\n`;
 }
 
 /** Braces protect capitals and stop a stray `{` or `}` from unbalancing the entry. */

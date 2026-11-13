@@ -1,7 +1,7 @@
 /**
  * The versions of a paper: a preprint, its workshop and conference submissions, the camera-ready, a journal
- * version. A paper is one work (DESIGN.md §3), and each version is a line of the page's `versions.jsonl`,
- * so they get history, diffs, revert and blame like the rest of the page. Each can carry its own PDF, which
+ * version. A paper is one work (DESIGN.md §3), and each version is a file of the page's repo,
+ * `versions/<id>.json`, so they get history, diffs, revert and blame like the rest of the page. Each can carry its own PDF, which
  * is how two versions are compared, and the evidence that it is what it says.
  *
  * Pure, so the server, the editor and the tests share it.
@@ -80,7 +80,11 @@ export const MAX_VERSION_ABSTRACT = 6000;
 export const MAX_VERSION_NOTE = 2000;
 const MAX_URL = 2000;
 
-const ID = /^v_[a-z0-9]{6,16}$/;
+/**
+ * A version's id, which is also its file's name. Ids made here look like `v_k3x9q2ab`; a person adding a
+ * file by hand may name it as they like within this.
+ */
+export const VERSION_ID = /^[a-z0-9][a-z0-9_-]{0,47}$/;
 const DATE = /^\d{4}(-(0[1-9]|1[0-2])(-(0[1-9]|[12]\d|3[01]))?)?$/;
 
 function httpsProblem(value: unknown): boolean {
@@ -127,7 +131,7 @@ export function versionProblem(value: unknown): string | null {
   if (value === null || typeof value !== 'object' || Array.isArray(value)) return 'is not an object';
   const v = value as Record<string, unknown>;
   for (const key of Object.keys(v)) if (!FIELDS.has(key)) return `has an unknown field “${key}”`;
-  if (typeof v.id !== 'string' || !ID.test(v.id)) return 'needs an id like v_k3x9q2';
+  if (typeof v.id !== 'string' || !VERSION_ID.test(v.id)) return 'needs an id like v_k3x9q2ab';
   if (textProblem(v.label, MAX_VERSION_LABEL)) return `needs a label of 1 to ${MAX_VERSION_LABEL} characters`;
   if (!VERSION_KINDS.includes(v.kind as VersionKind)) return `needs a kind: ${VERSION_KINDS.join(', ')}`;
   if (v.date !== undefined && (typeof v.date !== 'string' || !DATE.test(v.date))) {
@@ -157,30 +161,23 @@ export function versionProblem(value: unknown): string | null {
   return null;
 }
 
-/** The versions in a `versions.jsonl`, or `null` if any line isn't one, or two share an id. */
-export function parseVersionsFile(text: string): PaperVersion[] | null {
-  const versions: PaperVersion[] = [];
-  const ids = new Set<string>();
-  for (const line of text.split('\n')) {
-    if (line.trim() === '') continue;
-    let value: unknown;
-    try {
-      value = JSON.parse(line);
-    } catch {
-      return null;
-    }
-    if (versionProblem(value)) return null;
-    const version = value as PaperVersion;
-    if (ids.has(version.id)) return null;
-    ids.add(version.id);
-    versions.push(version);
+/** The version in `versions/<id>.json`, or why it isn't one. The id is the file's name, not a field. */
+export function parseVersionFile(id: string, text: string): { version: PaperVersion } | { problem: string } {
+  let value: unknown;
+  try {
+    value = JSON.parse(text);
+  } catch {
+    return { problem: 'is not valid JSON' };
   }
-  return versions.length > MAX_VERSIONS ? null : versions;
+  if (value === null || typeof value !== 'object' || Array.isArray(value)) return { problem: 'is not a JSON object' };
+  if ('id' in value) return { problem: 'takes its id from its file name, so leave “id” out' };
+  const version = { id, ...value } as PaperVersion;
+  const problem = versionProblem(version);
+  return problem ? { problem } : { version };
 }
 
-/** Fields in a fixed order, so that a line only changes when the version does. */
+/** Fields in a fixed order, so that a file only changes where the version does. The id is the file's name. */
 const ORDER: (keyof PaperVersion)[] = [
-  'id',
   'date',
   'kind',
   'label',
@@ -194,19 +191,11 @@ const ORDER: (keyof PaperVersion)[] = [
   'abstract',
 ];
 
-/**
- * One line per version, oldest first, so that adding one adds a line and changing one changes its line: a
- * three-way merge then lets two people edit different versions at once.
- */
-export function encodeVersionsFile(versions: readonly PaperVersion[]): string {
-  return sortVersions(versions)
-    .map((version) => {
-      const ordered: Record<string, unknown> = {};
-      for (const key of ORDER) if (version[key] !== undefined) ordered[key] = version[key];
-      return JSON.stringify(ordered);
-    })
-    .map((line) => `${line}\n`)
-    .join('');
+/** A version's file: a field to a line, so two people changing different fields of it merge. */
+export function encodeVersionFile(version: PaperVersion): string {
+  const ordered: Record<string, unknown> = {};
+  for (const key of ORDER) if (version[key] !== undefined) ordered[key] = version[key];
+  return `${JSON.stringify(ordered, null, 2)}\n`;
 }
 
 /** Oldest first; undated versions last, in the order they were given. */

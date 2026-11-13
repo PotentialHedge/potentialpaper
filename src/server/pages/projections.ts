@@ -1,23 +1,13 @@
 import { eq, notInArray, sql } from 'drizzle-orm';
 import { getDb, type Database } from '@/db';
 import { authorClaims, commitIdentities, pageCurrent, pageRefs, pageRevisions } from '@/db/schema';
-import { parseLinksFile } from '@/lib/paper-links';
-import { parseVersionsFile } from '@/lib/versions';
 import { demoSources } from '../demos/attach';
+import { readLinks, readVersions } from './content';
 import { type Commit, SYSTEM_AUTHOR_ID } from './git-objects';
-import { demoIds, renderOrNull } from './markdown';
+import { demoIds } from './markdown';
 import { changedFiles, readCommit, readFiles, readHead, readText, toBytes, type Reader } from './repo';
-import {
-  AUTHOR_PAGE_PATH,
-  COMMUNITY_PAGE_PATH,
-  LINKS_PATH,
-  parsePdfPointer,
-  parseThumbnailPointer,
-  PDF_PATH,
-  RESOURCES_PATH,
-  THUMBNAIL_PATH,
-  VERSIONS_PATH,
-} from './rules';
+import { parsePdfPointer, parseThumbnailPointer, PDF_PATH, THUMBNAIL_PATH } from './rules';
+import { partSource, readSections, renderPart } from './sections';
 
 /**
  * The rows that can be derived from the objects (DESIGN.md §4.5). A commit and a rebuild both come through
@@ -94,25 +84,24 @@ export async function writeRevision(
 /** Makes `page_current` say what the commit at the head says. */
 export async function writeCurrent(tx: Writer, paperId: string, head: string, commit: Commit): Promise<void> {
   const files = await readFiles(tx, paperId, commit.tree);
-  const resources = await readText(tx, paperId, files.get(RESOURCES_PATH));
   const pdf = await readText(tx, paperId, files.get(PDF_PATH));
   const thumbnail = await readText(tx, paperId, files.get(THUMBNAIL_PATH));
-  const links = await readText(tx, paperId, files.get(LINKS_PATH));
-  const versions = await readText(tx, paperId, files.get(VERSIONS_PATH));
-  const authorMarkdown = await readText(tx, paperId, files.get(AUTHOR_PAGE_PATH));
-  const communityMarkdown = await readText(tx, paperId, files.get(COMMUNITY_PAGE_PATH));
-  const demos = await demoSources(tx, [...demoIds(authorMarkdown), ...demoIds(communityMarkdown)]);
+  const links = await readLinks(tx, paperId, files);
+  const versions = await readVersions(tx, paperId, files);
+  const author = await readSections(tx, paperId, files, 'author');
+  const community = await readSections(tx, paperId, files, 'community');
+  const markdown = [...author, ...community].filter((s) => s.name.format === 'markdown');
+  const demos = await demoSources(tx, [...new Set(markdown.flatMap((s) => demoIds(s.text)))]);
   const row = {
     head: toBytes(head),
-    authorMarkdown,
-    communityMarkdown,
-    authorHtml: renderOrNull(authorMarkdown, 'author', demos),
-    communityHtml: renderOrNull(communityMarkdown, 'community', demos),
-    resources: resources === null ? null : (JSON.parse(resources) as Record<string, unknown>),
+    authorMarkdown: partSource(author),
+    communityMarkdown: partSource(community),
+    authorHtml: renderPart(author, 'author', demos),
+    communityHtml: renderPart(community, 'community', demos),
     pdf: pdf === null ? null : parsePdfPointer(pdf),
     thumbnail: thumbnail === null ? null : parseThumbnailPointer(thumbnail),
-    links: links === null ? null : parseLinksFile(links),
-    versions: versions === null ? null : parseVersionsFile(versions),
+    links: links.length > 0 ? links : null,
+    versions: versions.length > 0 ? versions : null,
     updatedAt: commit.at,
   };
   await tx

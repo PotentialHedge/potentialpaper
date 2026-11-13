@@ -182,7 +182,7 @@ describe('versions', () => {
         paper: PAPER,
         baseOid: null,
         section: 0,
-        content: '## Errata\nTable 2 is wrong.\n',
+        content: '# Errata\nTable 2 is wrong.\n',
         summary: 'Erratum',
         evidence: ['https://github.com/x/y/issues/1'],
       },

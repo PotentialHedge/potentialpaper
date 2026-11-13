@@ -26,7 +26,7 @@ export interface PanelProps {
   /** The PDF's first page, which the picture editor falls back to. */
   cover: string | null;
   submissions: Submission[];
-  /** The page's `versions.jsonl`, oldest first. */
+  /** The page's `versions/`, oldest first. */
   versions: PaperVersion[];
   /** Who has a confirmed claim, by the names on the paper. None: the paper is unclaimed. */
   confirmedAuthors: { authorIndex: number; authorName: string }[];

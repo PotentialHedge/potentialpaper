@@ -65,13 +65,13 @@ describe('claiming a paper', () => {
     expect(claim.body.claim).toMatchObject({ authorName: 'Ashish Vaswani', status: 'pending' });
 
     // Pending grants nothing.
-    expect((await authorEdit(ashish.cookie, '## TL;DR\nAttention.\n')).status).toBe(403);
+    expect((await authorEdit(ashish.cookie, '# TL;DR\nAttention.\n')).status).toBe(403);
 
     const [row] = await getDb().select().from(authorClaims).where(eq(authorClaims.paperId, paperId));
     expect(row.identityId).toMatch(/^a_[a-z0-9]{8}$/);
     await decideClaim(row.id, 'confirmed', null);
 
-    const written = await authorEdit(ashish.cookie, '## TL;DR\nAttention.\n');
+    const written = await authorEdit(ashish.cookie, '# TL;DR\nAttention.\n');
     expect(written.status).toBe(200);
     const [current] = await getDb().select().from(pageCurrent).where(eq(pageCurrent.paperId, paperId));
     expect(current.authorHtml).toContain('Attention.');
@@ -79,7 +79,7 @@ describe('claiming a paper', () => {
     // Everything they do on their own paper is under the per-claim id, never their handle.
     const community = await api('POST', '/pages/edit', {
       cookie: ashish.cookie,
-      body: { paper: PAPER, baseOid: written.body.head, section: 0, content: '## Errata\nNone.\n', summary: '' },
+      body: { paper: PAPER, baseOid: written.body.head, section: 0, content: '# Errata\nNone.\n', summary: '' },
     });
     expect(community.status).toBe(200);
     const history = await historyWithHandles(paperId);
