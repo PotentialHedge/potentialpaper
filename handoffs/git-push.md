@@ -393,3 +393,110 @@ and `git push` showing the not-yet message.
 - Progress messages (band 2) aren't sent; a big clone is silent until done.
 - Packs have no deltas; a long-lived page's clone is roughly the sum of its file versions, deflated.
 - The compose comment about the git router's limit still describes dumb clones (still true for the fallback).
+
+### Phase 5: Push over smart HTTP (done, branch `repo-files`)
+
+**Built.** `git push` to the clone address over smart HTTP, stock git, objects straight into `page_objects` through
+`receiveCommits` (phase 3). DESIGN.md §4.6 ("Clone and push access") rewritten, §1 and §4.1 updated; a guide for
+people in `docs/git.md` (clone, what's in a page, making a key, identity, pushing, the rules); `/llms.txt` has a line.
+
+```
+pack-reader.ts   readPack(input, { bases?, limits? }) → Map<oid, { type, body }>; applyDelta; PackError; PACK_LIMITS
+receive-pack.ts  receivePackAdvertisement, receivePackRequest, receivePackSession; ReceiveTarget
+page-push.ts     pageReceiveTarget(db, { paperId, identifiers }, actor): receiveCommits + refreshPaperPages
+http.ts          GET info/refs?service=git-receive-pack, POST git-receive-pack (auth, 33 MB body cap)
+pkt-line.ts      PktReader.rest(): the raw bytes after the last packet (the pack follows the commands unframed)
+```
+
+- **Pack reader.** Version 2/3 packs: all four object types (tags are read and dropped), OFS_DELTA and REF_DELTA, thin
+  packs (REF bases asked of `bases(oids)` in batches, a round at a time until nothing new resolves; `pageRepo.read`),
+  trailer SHA-1 checked, every object re-hashed. Resolution is git's: a queue of made objects, each releasing the
+  deltas waiting on its offset or id. Caps (`PACK_LIMITS`): 32 MB as sent, 50,000 objects, 4 MB per inflated object or
+  delta result, 128 MB held in all. It reads off a stream **no further than the trailer** (an SSH client keeps the
+  channel open for the report): an object's zlib stream is inflated from what is buffered; on "unexpected end" it waits
+  for one more chunk, then takes whatever else has already arrived (polled with `setImmediate`) up to twice what it
+  tried, and retries. Never waits for bytes an object doesn't need.
+- **receive-pack.** Advertises `refs/heads/main` (or `capabilities^{}` with no head) with `report-status
+side-band-64k quiet atomic ofs-delta object-format=sha1 agent=potentialpaper`. Not `delete-refs` (git refuses a
+  delete client-side), `push-options`, `push-cert`, `report-status-v2`. v2 requested → v0 (git has no v2 push); v1 →
+  `version 1` line. Commands: other refs → `ng <ref> only main`, tags → `pages have no tags`, delete → `cannot
+delete`, each with a `remote:` line; `shallow` lines → `ERR`. The pack is read whenever any command isn't a delete
+  (even if all are refused, so a stream stays in step); a bad pack → `unpack <reason>` and every ref `unpacker
+error`. `--atomic` with any refusal → all `atomic push failed`. `main` → `target.update`; an `ApiError` →
+  `ng refs/heads/main <reason by code>` (`fetch first`, `non-fast-forward`, `wrong author identity`, `not allowed`,
+  `too many commits, try later`, `page busy, try again`, `page merged`, else `refused`) and its message on band 2,
+  one `remote:` line per `\n`. Any other error → `internal error`, reported, then rethrown for the logs. Success
+  lines (`1 commit added: <page url>`) only when the client didn't ask for `quiet` (git asks whenever stderr isn't
+  a terminal; `--progress` shows them).
+- **Wrong identity message** (`receive.ts`) is now multi-line: the two `git config` commands and the amend/rebase
+  commands each on a line of their own, indented.
+- **Fix in `receiveCommits`:** a push whose client doesn't know the head (`git push --force` after someone else
+  pushed) sends the page's own commits in the pack; the chain walk now treats any commit the page already stores as
+  "not built on the head" (`not_fast_forward`), instead of walking into it and calling the root "a history of its
+  own".
+
+**Auth** (`server/auth.ts` `authenticateGitPush`, the only new way to resolve a request to an account).
+
+- HTTP Basic, **user name ignored** (so `credential.helper store` keeps one entry for the host and every page works;
+  the guide suggests the handle), password a `pp_live_` key; `Authorization: Bearer` also accepted. Verified with
+  `verifyToken`, counted against the account's request bucket (as `authenticate`), never admin.
+- **New scope `push`** in `TOKEN_SCOPES` (no migration: `scopes` is a plain `text[]`). A push needs `push` **or**
+  `write` (write = everything an account does, agents' keys included). The profile's API key form has a second
+  checkbox, "Allow `git push` to papers' pages"; unticking the first makes a key that can push but not post, which is
+  what to keep in a credential helper. `CreateTokenBody`/`TokenList` take `TOKEN_SCOPES`.
+- No/invalid credentials → **401** `WWW-Authenticate: Basic realm="PotentialPaper", charset="UTF-8"` (git asks, or
+  says "Authentication failed"); key without the scope → 403 "This API key may not push…"; unconfirmed account →
+  403 `not_verified` "Confirm an institutional email address before you push." Both GET (advertisement) and POST
+  check, so git asks for credentials before it builds a pack. `findRepo` (404/308) runs first.
+- `findRepo` now also returns the paper's `identifiers` (for the refresh).
+
+**Body limits.** `proxy.ts` now has a `matcher`, `'/((?!git/.+/git-receive-pack$).*)'`: every path as before except
+the receive-pack POST, so Next never buffers (and cuts off at 10 MB) a pack for the proxy. Checked on `next dev`: a
+12 MB POST to `git-upload-pack` logs Next's "Request body exceeded 10MB" warning, the same to `git-receive-pack`
+doesn't, and the proxy's other work (trailing-slash redirects) is unchanged. Since the proxy no longer sees those
+requests on the demo host, `http.ts` answers 404 there itself (compares `Host` with `DEMO_ORIGIN`'s host:port; in dev
+that's `127.0.0.1:3000`, so push to `localhost` in dev). `readBody(req, max)`: 4 MB for fetches, `MAX_PUSH_BYTES` (pack
+cap + 1 MB) for pushes, gzip handled for both. Cloudflare's 100 MB request limit is above it.
+
+**Tests.** `tests/unit/pack-reader.test.ts`: packs from real `git pack-objects` with offset deltas (cut into 1-, 7-
+and 4096-byte chunks), id deltas, a thin pack (bases from git; refused with no base reader), a push-style pack and an
+empty one, a stream that never ends after the trailer, corrupt/truncated/over-cap packs, delta instructions by hand.
+`tests/unit/git-protocol.test.ts`: real `git push` over `git://` against `receivePackSession` with an in-memory
+target (the SSH shape): objects handed over, head moved, a multi-line refusal printed as `remote:` lines with the `ng`
+reason. `tests/integration/push.test.ts`, stock `git push` over HTTP against the route: success with oids unchanged,
+projection updated, `fsck --strict` of a fresh clone, a later one-line change sent as a thin delta (POST < ¼ of the
+first); wrong identity (both `git config` lines shown; amending as told then works); fetch first, `--force`
+non-fast-forward, a merge refused, rebase accepted; author path refused for a non-author, other branch, tag,
+`--atomic`, delete; no key, bad key, read-only key, unconfirmed account, a `write` key works; the `a_` identity on a
+claimed paper writing the author section, and the `u_` refused there. `page-store.test.ts`'s old "not available yet"
+test now checks 415/404/401 + `WWW-Authenticate`.
+
+**For phase 6 (SSH): the API to drive**
+
+```ts
+// After authenticating the key to an account and finding the page (parseGitAddress-style path → findRepo):
+const target = pageReceiveTarget(db, { paperId, identifiers }, { kind: 'account', accountId, isAdmin: false });
+for await (const chunk of receivePackSession(target, new PktReader(channel), protocolVersion(env.GIT_PROTOCOL))) {
+  if (!channel.write(chunk)) await once(channel, 'drain');
+}
+channel.exit(0);
+channel.end();
+```
+
+- On `exec git-receive-pack '<path>'`. `receivePackSession` = `receivePackAdvertisement` then `receivePackRequest`;
+  exactly this loop is tested over `git://`. It rethrows internal faults after reporting them: log them.
+- Check the account is verified (or a bot) yourself, as `authenticateGitPush` does, and refuse on the channel's
+  stderr with exit status 1 (git prints it as `remote:`/fatal); there's no `WWW-Authenticate` equivalent.
+- `refreshPaperPages` calls `revalidatePath`, which only works inside a Next request: in a separate SSH process it
+  throws, is caught, and logs in production (`console.error('revalidate', …)`). The Cloudflare purge still runs. Either
+  run the SSH server inside the Next process, or give `pageReceiveTarget` a quieter refresh for SSH.
+- Rate limits: `receiveCommits` takes one commit token per pushed commit; there's no per-request bucket for SSH yet.
+
+**Left**
+
+- No `report-status-v2`, `push-options`, push certificates or progress messages during the pack read.
+- The pack is fully buffered in memory over HTTP (≤ 33 MB) and its objects held until stored; fine at page sizes.
+- `docs/git.md` is a Markdown file in the repo; the site has no help page to link it from (the profile's key form only
+  says the key works as git's password). Worth a page or a link once there is one.
+- Showing each account its `u_…` id somewhere (profile, clone instructions) is still not done; the first refused push
+  tells it, and `gitIdentity` is the call to use.
