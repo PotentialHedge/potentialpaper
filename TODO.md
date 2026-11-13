@@ -31,6 +31,10 @@ Things only you can do or decide, most urgent first. Milestones 1 and 2 and the 
       an ICLR paper with its PDF link and reviews, and
       `git clone https://papers.potentialhedge.com/git/openreview/jJbc2wpXoo.git`.
 
+- [ ] **Git over SSH: the name and the port** (DEPLOY.md, "Git over SSH"). A DNS-only `git.papers` A record, and
+      port 2222 to start (my recommendation) or 22 with the host's sshd moved. Then make the host key on the server
+      and put its fingerprint in `docs/git.md`.
+
 ## Content and licensing
 
 - [ ] **Decide about the ICLR 2026 PDFs.** They aren't local, and downloading them needs an OpenReview login, so those

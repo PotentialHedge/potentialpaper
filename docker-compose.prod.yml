@@ -10,7 +10,7 @@
 #   docker compose -f docker-compose.prod.yml --env-file .env.production up -d postgres
 #   docker compose -f docker-compose.prod.yml --env-file .env.production run --rm tools
 #   docker compose -f docker-compose.prod.yml --env-file .env.production up -d app
-#   docker compose -f docker-compose.prod.yml --env-file .env.production --profile tools up -d ingest
+#   docker compose -f docker-compose.prod.yml --env-file .env.production --profile tools up -d ingest ssh
 #   scripts/purge-edge-cache.sh
 #
 # The purge is required: cached pages name the old build's scripts, which the new container no longer has.
@@ -111,6 +111,9 @@ services:
     image: potentialpaper-tools
     profiles: [tools]
     env_file: .env.production
+    environment:
+      # Scripts that commit ask the app to refresh the page's cached HTML (server/internal.ts).
+      APP_INTERNAL_URL: http://app:3000
     depends_on:
       postgres:
         condition: service_healthy
@@ -125,6 +128,31 @@ services:
     logging: *logging
     env_file: .env.production
     command: ['npm', 'run', 'pdfs:ingest', '--', '--watch']
+    depends_on:
+      postgres:
+        condition: service_healthy
+
+  # Git over SSH (src/server/git/ssh.ts): `git clone ssh://git@<GIT_SSH_URL's host>:2222/abs/<id>.git`. Its own
+  # process from the tools image, published straight on the host (Cloudflare doesn't proxy SSH, Traefik isn't
+  # in the way): DEPLOY.md, "Git over SSH", for the DNS name, the port and the host key. A push asks the app to
+  # refresh the paper's pages (APP_INTERNAL_URL), since only the Next process can.
+  ssh:
+    image: potentialpaper-tools
+    profiles: [tools]
+    restart: unless-stopped
+    logging: *logging
+    env_file: .env.production
+    environment:
+      GIT_SSH_HOST: 0.0.0.0
+      GIT_SSH_PORT: 2222
+      GIT_SSH_HOST_KEY_FILE: /run/secrets/ssh_host_key
+      APP_INTERNAL_URL: http://app:3000
+    command: ['npm', 'run', 'git:ssh']
+    ports:
+      - '${GIT_SSH_PUBLISH:-2222}:2222'
+    volumes:
+      # The host key, made once on the host and kept: clients remember it and warn if it ever changes.
+      - ./secrets/ssh_host_ed25519_key:/run/secrets/ssh_host_key:ro
     depends_on:
       postgres:
         condition: service_healthy

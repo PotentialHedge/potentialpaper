@@ -17,6 +17,12 @@ git clone https://papers.potentialhedge.com/git/openreview/dskf2Ppd9o.git
 A page only has a repository once someone has edited it. Until then the address answers "not found". Make a
 first edit on the site to start one.
 
+Or over SSH, with a key on your profile ([below](#over-ssh)):
+
+```sh
+git clone ssh://git@git.papers.potentialhedge.com:2222/abs/1706.03762.git
+```
+
 ## What's in a page
 
 | Path                         | What it is                                            | Who may change it                                                   |
@@ -93,3 +99,36 @@ fails. Git prints why, on lines starting with `remote:`.
 
 When the push goes through, the page shows the new text at once, and its history lists your commits with the
 same ids as in your clone.
+
+## Over SSH
+
+Instead of an API key, you can push (and clone) with an SSH key, as on GitHub.
+
+1. If you have no key yet, make one: `ssh-keygen -t ed25519`. Ed25519, ECDSA and RSA keys of at least 3072 bits
+   work; DSA and shorter RSA keys don't.
+2. On your [profile page](https://papers.potentialhedge.com/profile), under SSH keys, paste the public half
+   (`~/.ssh/id_ed25519.pub`, one line starting `ssh-ed25519`). A key can be on one account only.
+3. Check it: `ssh -T -p 2222 git@git.papers.potentialhedge.com` answers "Hi <your handle>! You've authenticated,
+   but PotentialPaper does not provide shell access."
+
+The first time, ssh shows the server's key and asks whether to trust it. Say yes only if the fingerprint is this
+one:
+
+```
+ED25519 key fingerprint is SHA256:<to be filled in when the server's key is made>
+```
+
+The user is always `git`; your key says who you are. A page's SSH address is the page's own path (`abs/…`,
+`doi/…`, `openreview/…`), with or without `.git`; the `arxiv/…` form of the HTTPS address works too. To use the
+short form `git@git.papers.potentialhedge.com:abs/1706.03762.git`, which has no room for a port, tell ssh the port
+once, in `~/.ssh/config`:
+
+```
+Host git.papers.potentialhedge.com
+  Port 2222
+```
+
+To push over SSH from a clone made over HTTPS, change its push address:
+`git remote set-url --push origin ssh://git@git.papers.potentialhedge.com:2222/abs/1706.03762.git`. Everything
+else is as over HTTPS: the same identity, the same rules, and a confirmed institutional address to push. Removing a
+key on your profile stops it working at once.

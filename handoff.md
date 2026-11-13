@@ -31,7 +31,9 @@ Milestones 0, 1 and 2 are built, merged into `main` and deployed, and Milestone 
 - **Milestone 2:** each page's git store is in `page_objects`, `page_refs`, `page_revisions` and
   `page_current`. Every write goes through `commitPage`, which holds a per-page lock, merges per file and
   checks the head with a compare-and-swap. `/git/...` serves clones over smart HTTP (and dumb), with its own rate
-  limit, and takes `git push` with an API key as the password (`docs/git.md`, `handoffs/git-push.md`).
+  limit, and takes `git push` with an API key as the password (`docs/git.md`, `handoffs/git-push.md`). Git over
+  SSH (`npm run git:ssh`, `server/git/ssh.ts`, keys in `ssh_keys` from the profile page) is built and tested on
+  branch `repo-files`, but not deployed: its DNS name, port and host key wait for Benedict (DEPLOY.md, TODO.md).
 - **ICLR:** 42,425 ICLR 2027 and 19,804 ICLR 2026 papers are imported. ICLR 2027 also has its submissions,
   reviews and decisions from OpenReview, and the forms for importing ICLR 2026's are ready. ICLR 2027 PDFs are hosted in R2 through a `.potentialpaper/pdf.json` in each page repo. Each paper shows a picture
   of its first page, or a thumbnail set with `pages:set-thumbnail`.

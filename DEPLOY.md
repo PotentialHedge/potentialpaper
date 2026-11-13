@@ -18,7 +18,7 @@ dc --profile tools build          # app and tools images; without --profile tool
 dc up -d postgres
 dc run --rm tools                 # migrations (npm run db:migrate)
 dc up -d app
-dc --profile tools up -d ingest   # the PDF ingest pipeline, restarted on the new image
+dc --profile tools up -d ingest ssh  # the PDF ingest pipeline and git over SSH, on the new image
 scripts/purge-edge-cache.sh       # required, see below
 ```
 
@@ -39,6 +39,55 @@ minute it runs each stage that is missing or out of date (text and emails of pag
 points at, recording results in `pdf_documents`. `dc logs -f ingest` shows its progress. For a one-off rerun,
 `dc run --rm tools npm run pdfs:ingest -- --stage emails --force` or `-- --sha <sha256>`; `-- --help` lists the
 rest. It needs the `R2_*` keys for covers.
+
+## Git over SSH
+
+**Not set up in production yet: Benedict decides the name and the port (below).** Until then leave `ssh` out of
+`up -d ingest ssh`; it refuses to start without its host key anyway.
+
+The `ssh` service runs `npm run git:ssh` (`scripts/git-ssh.ts`, `src/server/git/ssh.ts`) from the tools image, as
+its own process: user `git`, public keys from `ssh_keys` only, nothing runs but `git-upload-pack` and
+`git-receive-pack`. It listens on 2222 in its container and is published on the host as `GIT_SSH_PUBLISH` (default
+2222). After a push it asks the app to refresh the paper's pages (`APP_INTERNAL_URL=http://app:3000`, a request to
+`/api/internal/revalidate` signed with a key derived from `BETTER_AUTH_SECRET`), and purges the edge as the app does.
+Limits (in `SSH_LIMITS`): 100 connections at once, 10 per address, 30 new ones per address then one every 2 s, 10
+key attempts a connection, 20 s to sign in, 10 minutes a connection, 4 git commands at once per account, and every
+command counts against the account's API bucket.
+
+**DNS.** Cloudflare doesn't proxy SSH on our plan, so git needs a DNS-only (grey-cloud) name pointing at this host,
+e.g. an A record `git.papers` → `77.244.248.196` in `potentialhedge.com`. It shows the origin's address, which
+the proxied names hide; Traefik admits only Cloudflare's addresses on 80/443, so the web stays behind the edge.
+
+**Port.** The host's own sshd holds 22. The options:
+
+1. **2222 (recommended to start).** `GIT_SSH_PUBLISH=2222`,
+   `GIT_SSH_URL=ssh://git@git.papers.potentialhedge.com:2222`. Nothing on the host changes. Addresses need the
+   `ssh://` form with the port, or a `Host` entry with `Port 2222` in `~/.ssh/config` for the short form. Some
+   networks block ports other than 22 and 443.
+2. **22 for git, the host's sshd moved** (to another port, or to Tailscale only, since we deploy over Tailscale
+   anyway). `GIT_SSH_PUBLISH=22`, `GIT_SSH_URL=ssh://git@git.papers.potentialhedge.com`, and the short form
+   `git@git.papers.potentialhedge.com:abs/1706.03762.git` works, as on GitHub. Risk: locking ourselves out while
+   moving sshd; do it from a Tailscale session with the new port tested before the old one closes.
+3. **22 on a second IPv4 address** for the git name only, if the provider sells one: GitHub's shape with no change to
+   the host's sshd, at a monthly cost.
+
+Starting on 2222 and moving to 22 later only changes `GIT_SSH_PUBLISH` and `GIT_SSH_URL`; the host key stays (a
+client sees `[host]:2222` and `host` as different entries, and is asked once more, with the same fingerprint).
+Whatever port: open it in the provider's firewall (Docker's published ports go around `ufw`). Docker keeps the
+client's address on published ports (iptables, not the userland proxy), which the per-address limits rely on.
+
+**Host key.** Made once, on the host, and kept: clients remember it, and a changed key makes every one of them
+refuse to connect with a warning about an attack. Back the file up with `.env.production`.
+
+```sh
+mkdir -p secrets && ssh-keygen -t ed25519 -N '' -C git.papers.potentialhedge.com -f secrets/ssh_host_ed25519_key
+ssh-keygen -lf secrets/ssh_host_ed25519_key.pub   # the fingerprint: put it in docs/git.md
+```
+
+The compose file mounts `secrets/ssh_host_ed25519_key` read-only at `/run/secrets/ssh_host_key`
+(`GIT_SSH_HOST_KEY_FILE`); `GIT_SSH_HOST_KEY` with the key's text also works. The service logs the fingerprint it
+serves at start (`dc logs ssh`). Check it from outside: `ssh -T -p 2222 git@git.papers.potentialhedge.com` prints
+"Hi <handle>! You've authenticated, …" once a key is on your profile.
 
 ## Demos
 

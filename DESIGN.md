@@ -36,7 +36,6 @@ in the spirit of VS Code extensions.
 
 - Hosting PDFs. We link out, which avoids a large copyright problem.
 - Formal review scores or reputation systems. An extension can experiment with these first.
-- `git push` over SSH (HTTPS works, §4.6).
 - Real-time co-editing.
 
 ## 2. Stack
@@ -309,8 +308,9 @@ and cached by oid pair.
 
 ### 4.6 Clone and push access
 
-Clones, fetches and pushes use git's **smart HTTP protocol**, implemented in TypeScript over `page_objects`
-(no repos on disk, no `git` process on the server), with the read-only **dumb protocol** kept beside it:
+Clones, fetches and pushes use git's **smart protocol** over HTTPS and over SSH, implemented in TypeScript over
+`page_objects` (no repos on disk, no `git` process on the server), with HTTP's read-only **dumb protocol** kept
+beside it:
 
 ```
 GET  /git/arxiv/1706.03762.git/info/refs?service=git-upload-pack   smart: capabilities (v2) or refs (v0, v1)
@@ -322,12 +322,13 @@ GET  /git/arxiv/1706.03762.git/info/refs?service=git-receive-pack  push: refs an
 POST /git/arxiv/1706.03762.git/git-receive-pack                    push: commands and a pack → status report
 ```
 
-`src/server/git/` holds it, the transport kept apart from the protocol so SSH can reuse it: `pkt-line.ts`
+`src/server/git/` holds it, the transport kept apart from the protocol, so HTTP and SSH share it: `pkt-line.ts`
 (framing, side-band), `pack.ts` (packfile writer: whole objects, no deltas, zlib, SHA-1 trailer),
 `pack-reader.ts` (packfile reader: deltas by offset and by id, thin packs, capped), `repo.ts` (`GitRepo`: head,
 commits, objects by id; `pageRepo` reads Postgres), `walk.ts` (what to send), `upload-pack.ts` and
 `receive-pack.ts` (the protocols, each as one stateless HTTP request or a session on a byte stream),
-`page-push.ts` (a page as the target of a push) and `http.ts` (the route's adapter).
+`page-push.ts` (a page as the target of a push), `http.ts` (the route's adapter) and `ssh.ts` with
+`ssh-command.ts` (the SSH server, below).
 
 - **Versions.** Protocol v2 (git's default since 2.29: `ls-refs`, `fetch`), and v0/v1 with
   `multi_ack_detailed` and `side-band-64k`, for older clients and libraries. Shallow clones (`--depth`) are
@@ -367,7 +368,27 @@ may not push or an unconfirmed account gets `403` and a sentence git prints. The
   it off past 10 MB; the route refuses the demo host itself. Cloudflare's own limit on a request (100 MB) is
   above the pack cap.
 
-How to clone, set the identity and push is written up for people in `docs/git.md`.
+**SSH.** The same sessions on an SSH channel, as GitHub serves them (`server/git/ssh.ts`, `ssh2`): user `git`,
+public-key auth only, and the key names the account (`ssh_keys`: Ed25519, ECDSA, RSA ≥ 3072 bits; the SHA256
+fingerprint unique across accounts; added and removed on the profile page through `/api/v1/me/ssh-keys`, by a browser
+session only). The only commands are `git-upload-pack '<path>'` and `git-receive-pack '<path>'`, the path quoted as
+git quotes it and parsed strictly (`ssh-command.ts`): the page's own path (`abs/1706.03762`, `doi/…`, `openreview/…`)
+or the HTTPS address's (`arxiv/…`, `git/arxiv/…`), with or without the leading slash and `.git`, then `findRepo`, its
+redirects followed. `GIT_PROTOCOL` (sent with `SendEnv`) chooses v2 for fetches. No shell, pty, forwarding, agent or
+subsystems: a bare `ssh git@host` gets "Hi <handle>! You've authenticated, but PotentialPaper does not provide shell
+access." and exit 1, another command `Invalid command` and 128. Any key may clone; pushing needs what HTTPS needs (a
+confirmed address, or a bot account), refused on stderr, which git prints. Every command counts against the account's
+API bucket, and the server caps connections (in all, per address, a per-address bucket of new ones), key attempts,
+the time to sign in, a connection's life and the commands one account runs at once (`SSH_LIMITS`).
+
+It is its own process (`npm run git:ssh`, the `ssh` compose service from the tools image), published on the host
+directly, since Cloudflare doesn't proxy SSH: a DNS-only name and a port to choose (DEPLOY.md). `revalidatePath` only
+works inside a Next request, so after a push it asks the app (`APP_INTERNAL_URL`) to revalidate the paper's paths
+through `POST /api/internal/revalidate`, authorized by a key derived from `BETTER_AUTH_SECRET`; scripts that commit
+get the same through `refreshPaperPages`. The host key comes from a file or the environment and must never change in
+production; dev makes one in `data/` on first start.
+
+How to clone, set the identity and push, over HTTPS or SSH, is written up for people in `docs/git.md`.
 
 ### 4.7 Redaction
 

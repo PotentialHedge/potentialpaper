@@ -23,3 +23,4 @@ next-env.d.ts
 /.demos/
 /public/agent-files/
 /public/files/
+/secrets/
