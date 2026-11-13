@@ -22,6 +22,7 @@
     "papers:import-versions": "tsx scripts/import-versions.ts",
     "papers:dump-openreview": "tsx scripts/dump-openreview-venues.ts",
     "papers:import-venue-versions": "tsx scripts/import-venue-versions.ts",
+    "papers:merge": "tsx scripts/merge-papers.ts",
     "pdfs:ingest": "tsx scripts/ingest-pdfs.ts",
     "pages:edit": "tsx scripts/edit-page.ts",
     "pages:set-thumbnail": "tsx scripts/set-thumbnail.ts",

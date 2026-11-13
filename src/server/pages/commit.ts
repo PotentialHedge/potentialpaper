@@ -78,6 +78,8 @@ export interface CommitOptions {
   reverts?: string;
   database?: Database;
   rateLimit?: RateLimitConfig;
+  /** Commit even if no file changes, to record an event in the history, as a merge of a duplicate does. System only. */
+  recordEmpty?: boolean;
 }
 
 /** Enough for a burst of section edits, and well short of flooding a page's history. */
@@ -308,7 +310,8 @@ export async function commitPage(
       // Nothing to say is not a reason to start a repo, unless saying the metadata is the point.
       const isFirstCommit = head === null;
       const changedAny = changedFiles(headFiles, files).length > 0;
-      if (!changedAny && !(isFirstCommit && actor.kind === 'system')) return { status: 'unchanged', oid: head };
+      const recordAnyway = (isFirstCommit || options.recordEmpty) && actor.kind === 'system';
+      if (!changedAny && !recordAnyway) return { status: 'unchanged', oid: head };
       if (isFirstCommit && !files.has(METADATA_PATH)) {
         const metadata = gitObject('blob', Buffer.from(await metadataSnapshot(tx, paperId)));
         blobs.push(metadata);
