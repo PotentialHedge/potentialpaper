@@ -235,9 +235,7 @@ async function discover(database: Database): Promise<number> {
 /** Whether `stage` should run for a row: missing or out of date, and not failing too often to retry yet. */
 function stageDue(stage: Stage, force: boolean): SQL {
   const state = sql`(d.stages -> ${stage.name})`;
-  const eligible = stage.versionsOnly
-    ? sql`exists (select from ${VERSION_PDFS} v where v.sha256 = d.sha256)`
-    : sql`true`;
+  const eligible = stage.versionsOnly ? sql`d.sha256 in (select v.sha256 from ${VERSION_PDFS} v)` : sql`true`;
   if (force) return eligible;
   return sql`${eligible} and (
     coalesce((${state} ->> 'version')::int, 0) < ${stage.version}
@@ -281,10 +279,10 @@ async function due(database: Database, stages: Stage[], options: IngestOptions):
     versioned: boolean;
   }>(sql`
     select d.sha256, d.url, d.first_page_raw, d.first_page_layout, d.emails,
-           exists (select from ${VERSION_PDFS} v where v.sha256 = d.sha256) as versioned
+           d.sha256 in (select v.sha256 from ${VERSION_PDFS} v) as versioned
     from pdf_documents d
     where (${anyDue})
-      and ${named ? sql`d.sha256 = ${options.sha256}` : sql`exists (select from ${POINTED_AT} p where p.sha256 = d.sha256)`}
+      and ${named ? sql`d.sha256 = ${options.sha256}` : sql`d.sha256 in (select p.sha256 from ${POINTED_AT} p)`}
     order by d.created_at, d.sha256
   `);
   return rows.map((r) => ({
