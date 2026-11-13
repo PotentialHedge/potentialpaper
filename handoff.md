@@ -32,8 +32,9 @@ Milestones 0, 1 and 2 are built, merged into `main` and deployed, and Milestone 
   `page_current`. Every write goes through `commitPage`, which holds a per-page lock, merges per file and
   checks the head with a compare-and-swap. `/git/...` serves clones over smart HTTP (and dumb), with its own rate
   limit, and takes `git push` with an API key as the password (`docs/git.md`, `handoffs/git-push.md`). Git over
-  SSH (`npm run git:ssh`, `server/git/ssh.ts`, keys in `ssh_keys` from the profile page) is built and tested on
-  branch `repo-files`, but not deployed: its DNS name, port and host key wait for Benedict (DEPLOY.md, TODO.md).
+  SSH (`npm run git:ssh`, `server/git/ssh.ts`, keys in `ssh_keys` from the profile page) is built, tested and
+  merged, but the `ssh` service is not started in production: its DNS name, port and host key wait for Benedict
+  (DEPLOY.md, TODO.md).
 - **ICLR:** 42,425 ICLR 2027 and 19,804 ICLR 2026 papers are imported. ICLR 2027 also has its submissions,
   reviews and decisions from OpenReview, and the forms for importing ICLR 2026's are ready. ICLR 2027 PDFs are hosted in R2 through a `.potentialpaper/pdf.json` in each page repo. Each paper shows a picture
   of its first page, or a thumbnail set with `pages:set-thumbnail`.
@@ -208,7 +209,7 @@ redoing it. They still describe a strict CSP, `node-diff3`, and `page_current` h
   local catcher.
 - The R2 bucket keeps the old name, because R2 can't rename a bucket.
 
-## Versions for every paper (2026-11-13, branch `venue-versions`, not merged or deployed)
+## Versions for every paper (2026-11-13, merged and deployed with `repo-files` at 4775139)
 
 - `npm run papers:dump-openreview -- data/openreview-venues.sqlite`: every 2025–27 venue's forums (3,098 venues from
   OpenReview's `venues` and `active_venues` groups) through `notes/search?group=<venue>&term=<venue id>`, the only
@@ -218,8 +219,10 @@ redoing it. They still describe a strict CSP, `node-diff3`, and `page_current` h
   matches by normalized title, confirmed by `sameWork` (abstract overlap; ≥6-word titles need 0.03, 3–5 words 0.1,
   shorter 0.25 — calibrated on the ICLR 2026↔2027 pairs, where resubmissions often rewrite the abstract), commits as the
   system via `mergeFoundVersions`. Labels come from the venue id (`venueName`), not the venue string.
-- Ran for the ICLR 2026↔2027 resubmissions: 508 pages committed. The full dump runs detached on ben-docker-1
-  (`data/openreview-dump.log`); `data/run-venue-import.sh` waits for it, imports and purges (`data/venue-import.log`).
+- Ran for the ICLR 2026↔2027 resubmissions: 508 pages committed. **The full dump died at venue 882 of 3,098**
+  (`data/openreview-dump.log`, last line 2026-11-13 19:40 UTC), and the waiting `data/run-venue-import.sh` died with it, so
+  the full import never ran. The dump is resumable: rerun it detached, then `data/run-venue-import.sh`. The import now
+  writes the new layout (`versions/<id>.json`), since it runs from `main`.
 - **Merged** (`server/merge-papers.ts`, `npm run papers:merge -- <dup> <survivor>` or `--iclr-resubmissions`): 242
   ICLR 2026 papers into their ICLR 2027 resubmissions, as the system, each with a commit on the survivor naming the
   duplicate (empty when nothing folds: `CommitOptions.recordEmpty`). LygvJQPPJ2 and uuKARZrXNO are one paper submitted

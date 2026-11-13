@@ -628,7 +628,10 @@ lists, remove only own, 401 without session); deleting the account deletes its k
 - The compose comment on the `/git/` Traefik router still sizes for dumb clones.
 - Old blob-store files of replaced repo demos are never deleted.
 
-**Production, in order** (nothing of `repo-files` is deployed; `venue-versions` sits under it, also unmerged)
+**Production** — steps 1–3 done 2026-11-13: `main` fast-forwarded to `repo-files` (4775139, includes
+`venue-versions`), migrations 0020–0022 applied, `pages:migrate-layout` moved 42,641 of 42,641 pages (0 failed), app
+and ingest on the new image, edge cache purged; the site, a paper page and a smart-HTTP clone checked. Step 4 (SSH)
+waits for Benedict's DNS/port/host-key decision. The steps, for reference:
 
 1. Merge `venue-versions` and `repo-files` into `main` (ask Benedict), then the DEPLOY.md recipe:
    `dc --profile tools build`, `dc up -d postgres`, `dc run --rm tools` (applies `0020_page_files`, `0021_demo_pins`,
