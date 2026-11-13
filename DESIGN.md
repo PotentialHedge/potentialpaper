@@ -137,14 +137,17 @@ log gets slow as the repo grows, and redacting one page would rewrite everyone's
 **Measurements.** Reproduce with `spikes/git-store.mjs`. Synthetic pages with an 11 KB document, on
 this shared 16-core host under other load, with Postgres at default settings:
 
-|                             | Postgres objects           | Bare repos, `git` plumbing                                 |
-| --------------------------- | -------------------------- | ---------------------------------------------------------- |
-| Write a commit, p50 / p99   | 11 / 37 ms (8 connections) | 160 / 177 ms (serial)                                      |
-| Throughput                  | 619 commits/s              | about 6 commits/s                                          |
-| Storage, 20-revision page   | 23 KB including indexes    | 655 KB, 164 inodes; 72 KB, 17 inodes after `gc` (one page) |
-| Read current page / history | 1.2 / 1.5 ms               | not measured                                               |
-| `git clone`, 20 commits     | 334 ms, 85 requests        | not measured                                               |
-| `git clone`, 500 commits    | 3.5 s, 2005 requests       | not measured                                               |
+|                                              | Postgres objects                        | Bare repos, `git` plumbing                                 |
+| -------------------------------------------- | --------------------------------------- | ---------------------------------------------------------- |
+| Write a commit, p50 / p99                    | 11 / 37 ms (8 connections)              | 160 / 177 ms (serial)                                      |
+| Throughput                                   | 619 commits/s                           | about 6 commits/s                                          |
+| Storage, 20-revision page                    | 23 KB including indexes                 | 655 KB, 164 inodes; 72 KB, 17 inodes after `gc` (one page) |
+| Read current page / history                  | 1.2 / 1.5 ms                            | not measured                                               |
+| Spike: dumb `git clone`, 20 commits          | 334 ms, 85 requests                     | not measured                                               |
+| Spike: dumb `git clone`, 500 commits         | 3.5 s, 2005 requests                    | not measured                                               |
+| Smart HTTP clone, 20 / 500                   | 0.1 / 0.6 s, 3 requests                 | not measured                                               |
+| Dumb HTTP clone, 20 / 500                    | 0.24 / 2.0 s, 94 / 2062 requests        | not measured                                               |
+| Smart / dumb fetch of 1 new commit after 500 | 0.15 s, 3 requests / 0.06 s, 6 requests | not measured                                               |
 
 Read the write gap with care. The disk column forks 8 `git` processes per commit, and an in-process
 library or `git fast-import` would narrow it substantially, so forking explains much of that gap and
@@ -152,7 +155,9 @@ storage may explain little. **The deciding argument is atomicity and operational
 raw speed.** Expected write rates are far below either figure. The Postgres timings include the
 object insert, ref update, revision row, projection and link index, but not Markdown rendering or
 merging. Conflict handling was not exercised. Clones were tested on git 2.34.1 over loopback,
-without a CDN. Every clone passed `git fsck --full --strict`.
+without a CDN. Every clone passed `git fsck --full --strict`. The first two clone rows are the spike's; the
+smart and dumb rows are the app's own route (`server/git/`, §4.6) in one process with the dev Postgres, a
+page whose summary file is 9 KB and changes every commit, best of three runs (2026-11-13).
 
 **What this costs.** We own a small piece of git-format code, there are no hooks or native push, and
 tools that expect files on disk need a clone first. Nothing is locked in: `git clone` of any page
@@ -304,18 +309,41 @@ and cached by oid pair.
 
 ### 4.6 Clone access
 
-v1 implements git's **dumb HTTP protocol**, read-only, in one route handler:
+Clones and fetches use git's **smart HTTP protocol**, read-only, implemented in TypeScript over
+`page_objects` (no repos on disk, no `git` process on the server), with the **dumb protocol** kept beside it:
 
 ```
-GET /git/arxiv/1706.03762.git/info/refs
-GET /git/arxiv/1706.03762.git/HEAD
-GET /git/arxiv/1706.03762.git/objects/ab/cdef...
+GET  /git/arxiv/1706.03762.git/info/refs?service=git-upload-pack   smart: capabilities (v2) or refs (v0, v1)
+POST /git/arxiv/1706.03762.git/git-upload-pack                     smart: ls-refs, fetch → one packfile
+GET  /git/arxiv/1706.03762.git/info/refs                           dumb: refs
+GET  /git/arxiv/1706.03762.git/HEAD                                dumb
+GET  /git/arxiv/1706.03762.git/objects/ab/cdef...                  dumb: one loose object
+     .../info/refs?service=git-receive-pack, POST .../git-receive-pack   403 "not available yet" (push comes next)
 ```
 
-Object responses are immutable, so the CDN can cache them indefinitely. The cost is one request per
-object, which is fine for small repos but noisy for long histories. If that matters, add packfile
-generation. Push, if ever wanted, means implementing `receive-pack` and running every incoming
-commit through the same path rules.
+`src/server/git/` holds it, the transport kept apart from the protocol so SSH can reuse it: `pkt-line.ts`
+(framing, side-band), `pack.ts` (packfile writer: whole objects, no deltas, zlib, SHA-1 trailer), `repo.ts`
+(`GitRepo`: head, commits, objects by id; `pageRepo` reads Postgres), `walk.ts` (what to send),
+`upload-pack.ts` (the protocol: `advertisement`, `uploadPackRequest` for one stateless HTTP request,
+`uploadPackSession` for a byte stream) and `http.ts` (the route's adapter).
+
+- **Versions.** Protocol v2 (git's default since 2.29: `ls-refs`, `fetch`), and v0/v1 with
+  `multi_ack_detailed` and `side-band-64k`, for older clients and libraries. Shallow clones (`--depth`) are
+  refused by git itself because the server doesn't offer them; `--filter` is ignored by git for the same reason.
+  No tags, no deltas (packs are bigger than git's, but cost no search).
+- **What a fetch sends.** All of the page's commit rows are read in keyset pages of 2,000 (they are small), the
+  walk runs in memory, and trees are read a level at a time in batches. Objects reachable from the client's
+  common commits are skipped, comparing trees only at the edge as git does. The pack streams out as rows are
+  read, 64 objects a query, so memory holds the object list, not the pack. Caps: 100,000 commits, 200,000
+  objects a pack, 4 MB of request. Wants must be reachable from the head.
+- **Caching.** Only loose objects are cacheable (`s-maxage`, edge only, by the `.git/objects/` cache rule); they
+  never change meaning. The smart answers are `no-store, no-transform` (so neither Next nor the edge
+  recompresses a pack), and Cloudflare never caches a POST.
+- **Rate limits.** As before: Traefik's own `/git/` router (200/s, burst 1500 per client IP), sized for dumb
+  clones. A smart clone is three requests.
+
+Push will add `git-receive-pack` at the same base, with every incoming commit run through `receiveCommits`
+(§4.4) and the same path rules as a web edit.
 
 ### 4.7 Redaction
 

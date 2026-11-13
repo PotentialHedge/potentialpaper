@@ -45,9 +45,9 @@ function git(args: string[], cwd?: string): string {
 }
 
 /** For anything talking to the server in this process, which a blocking call would stop from answering. */
-function gitOverHttp(args: string[], cwd?: string): Promise<string> {
+function gitOverHttp(args: string[], cwd?: string, env: Record<string, string> = {}): Promise<string> {
   return new Promise((resolve, reject) => {
-    execFile('git', args, { cwd, timeout: 30_000 }, (err, stdout, stderr) =>
+    execFile('git', args, { cwd, timeout: 60_000, env: { ...process.env, ...env } }, (err, stdout, stderr) =>
       err ? reject(new Error(`${err.message}\n${stderr}`)) : resolve(stdout),
     );
   });
@@ -919,11 +919,25 @@ describe('git clone', () => {
   let server: Server;
   let base: string;
 
+  /** Every request the server answered, as `METHOD path`. */
+  const seen: string[] = [];
+
   beforeAll(async () => {
     server = createServer(async (req, res) => {
-      const response = await gitRoute.GET(new Request(new URL(req.url!, base), { method: req.method }));
+      seen.push(`${req.method} ${req.url}`);
+      const chunks: Buffer[] = [];
+      for await (const chunk of req) chunks.push(chunk as Buffer);
+      const headers = new Headers();
+      for (const [name, value] of Object.entries(req.headers)) if (typeof value === 'string') headers.set(name, value);
+      const request = new Request(new URL(req.url!, base), {
+        method: req.method,
+        headers,
+        ...(req.method === 'POST' ? { body: Buffer.concat(chunks) } : {}),
+      });
+      const response = await (req.method === 'POST' ? gitRoute.POST(request) : gitRoute.GET(request));
       res.writeHead(response.status, Object.fromEntries(response.headers));
-      res.end(Buffer.from(await response.arrayBuffer()));
+      if (response.body) for await (const chunk of response.body) res.write(chunk);
+      res.end();
     });
     await new Promise<void>((resolve) => server.listen(0, '127.0.0.1', resolve));
     base = `http://127.0.0.1:${(server.address() as AddressInfo).port}`;
@@ -1004,7 +1018,20 @@ describe('git clone', () => {
   it('marks objects cacheable and everything else not', async () => {
     const paperId = await newPaper(ARXIV);
     const { oid } = await commitPage(paperId, null, SYSTEM_ACTOR, [], 'Start');
-    const refs = await request('/git/arxiv/1706.03762.git/info/refs?service=git-upload-pack');
+    const smart = await request('/git/arxiv/1706.03762.git/info/refs?service=git-upload-pack');
+    expect(smart.headers.get('content-type')).toBe('application/x-git-upload-pack-advertisement');
+    expect(smart.headers.get('cache-control')).toBe('no-store, no-transform');
+    const post = await gitRoute.POST(
+      new Request(new URL('/git/arxiv/1706.03762.git/git-upload-pack', base), {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/x-git-upload-pack-request', 'Git-Protocol': 'version=2' },
+        body: '0014command=ls-refs\n0000',
+      }),
+    );
+    expect(await post.text()).toBe(`0032${oid} HEAD\n003d${oid} refs/heads/main\n0000`);
+    expect(post.headers.get('content-type')).toBe('application/x-git-upload-pack-result');
+    expect(post.headers.get('cache-control')).toBe('no-store, no-transform');
+    const refs = await request('/git/arxiv/1706.03762.git/info/refs');
     expect(await refs.text()).toBe(`${oid}\trefs/heads/main\n`);
     expect(refs.headers.get('cache-control')).toBe('no-store');
     expect(refs.headers.get('content-type')).toMatch(/^text\/plain/);
@@ -1070,12 +1097,84 @@ describe('git clone', () => {
   });
 
   it('is read-only', async () => {
-    for (const method of ['POST', 'PUT', 'PATCH', 'DELETE'] as const) {
+    for (const method of ['PUT', 'PATCH', 'DELETE'] as const) {
       const res = await gitRoute[method](
         new Request(new URL('/git/arxiv/1706.03762.git/git-upload-pack', base), { method }),
       );
       expect(res.status).toBe(405);
     }
+    const post = (path: string) => gitRoute.POST(new Request(new URL(path, base), { method: 'POST', body: '0000' }));
+    expect((await post('/git/arxiv/1706.03762.git/info/refs')).status).toBe(405);
+    expect((await post('/git/arxiv/1706.03762.git/git-upload-pack')).status).toBe(415);
+    expect((await post('/git/arxiv/1706.03762.git/git-receive-pack')).status).toBe(403);
+    expect((await request('/git/arxiv/1706.03762.git/info/refs?service=git-receive-pack')).status).toBe(403);
+    expect((await request('/git/arxiv/1706.03762.git/info/refs?service=git-frobnicate')).status).toBe(403);
+
+    // What a person trying to push sees.
+    const paperId = await newPaper(ARXIV);
+    await commitPage(paperId, null, SYSTEM_ACTOR, [], 'Start');
+    const clone = join(workDir(), 'page');
+    await gitOverHttp(['clone', '-q', `${base}${clonePath(ARXIV)}`, clone]);
+    git(['-c', 'user.name=x', '-c', 'user.email=x@example.org', 'commit', '-q', '--allow-empty', '-m', 'x'], clone);
+    await expect(gitOverHttp(['push', '-q', 'origin', 'main'], clone)).rejects.toThrow(
+      /Pushing to a page over HTTPS is not available yet/,
+    );
+  });
+
+  async function longHistory(commits: number): Promise<{ paperId: string; head: string; person: Actor }> {
+    const paperId = await newPaper(ARXIV);
+    const person = await newAccount();
+    let head: string | null = null;
+    for (let i = 0; i < commits; i += 1) {
+      const changes: FileChange[] = [{ path: 'community/10-summary.md', content: `# Summary\n\nVersion ${i}.\n` }];
+      if (i % 10 === 0)
+        changes.push({ path: `community/${String(20 + i / 10).padStart(2, '0')}-note.md`, content: `${i}\n` });
+      head = (await commitPage(paperId, head, person, changes, `Edit ${i}`, { rateLimit: NO_LIMIT })).oid;
+    }
+    return { paperId, head: head!, person };
+  }
+
+  for (const version of [2, 1, 0]) {
+    it(`clones and fetches over the smart protocol, version ${version}`, async () => {
+      const { paperId, head, person } = await longHistory(30);
+      const config = ['-c', `protocol.version=${version}`];
+      seen.length = 0;
+      const clone = join(workDir(), 'page');
+      await gitOverHttp([...config, 'clone', '-q', `${base}${clonePath(ARXIV)}`, clone]);
+      fsck(clone);
+      expect(git(['rev-parse', 'HEAD'], clone).trim()).toBe(head);
+      expect(git(['rev-list', '--count', 'HEAD'], clone).trim()).toBe('30');
+      expect(seen.every((r) => !r.includes('/objects/'))).toBe(true);
+      expect(seen.filter((r) => r.startsWith('POST')).length).toBeGreaterThan(0);
+
+      // A new commit, fetched: the client says what it has, and gets only what's new.
+      const next = await commitPage(
+        paperId,
+        head,
+        person,
+        [{ path: 'community/10-summary.md', content: 'New\n' }],
+        'Later',
+      );
+      await gitOverHttp([...config, 'fetch', '-q', 'origin'], clone);
+      expect(git(['rev-parse', 'origin/main'], clone).trim()).toBe(next.oid);
+      await gitOverHttp([...config, 'merge', '-q', '--ff-only', 'origin/main'], clone);
+      expect(readFileSync(join(clone, 'community/10-summary.md'), 'utf8')).toBe('New\n');
+      fsck(clone);
+      await expect(
+        gitOverHttp([...config, 'clone', '-q', '--depth=1', `${base}${clonePath(ARXIV)}`, join(workDir(), 'shallow')]),
+      ).rejects.toThrow(/shallow|depth/i);
+    });
+  }
+
+  it('still clones over the dumb protocol', async () => {
+    const { head } = await longHistory(3);
+    seen.length = 0;
+    const clone = join(workDir(), 'page');
+    await gitOverHttp(['clone', '-q', `${base}${clonePath(ARXIV)}`, clone], undefined, { GIT_SMART_HTTP: '0' });
+    fsck(clone);
+    expect(git(['rev-parse', 'HEAD'], clone).trim()).toBe(head);
+    expect(seen.some((r) => r.includes('/objects/'))).toBe(true);
+    expect(seen.some((r) => r.startsWith('POST'))).toBe(false);
   });
 });
 
