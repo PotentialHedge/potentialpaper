@@ -2,6 +2,7 @@ import { eq, notInArray, sql } from 'drizzle-orm';
 import { getDb, type Database } from '@/db';
 import { authorClaims, commitIdentities, pageCurrent, pageRefs, pageRevisions } from '@/db/schema';
 import { parseLinksFile } from '@/lib/paper-links';
+import { parseVersionsFile } from '@/lib/versions';
 import { demoSources } from '../demos/attach';
 import { type Commit, SYSTEM_AUTHOR_ID } from './git-objects';
 import { demoIds, renderOrNull } from './markdown';
@@ -15,6 +16,7 @@ import {
   PDF_PATH,
   RESOURCES_PATH,
   THUMBNAIL_PATH,
+  VERSIONS_PATH,
 } from './rules';
 
 /**
@@ -83,6 +85,7 @@ export async function writeRevision(
     summary: commit.summary,
     paths,
     bytesDelta,
+    evidence: commit.evidence ?? [],
     at: commit.at,
   });
   return { paths, bytesDelta };
@@ -95,6 +98,7 @@ export async function writeCurrent(tx: Writer, paperId: string, head: string, co
   const pdf = await readText(tx, paperId, files.get(PDF_PATH));
   const thumbnail = await readText(tx, paperId, files.get(THUMBNAIL_PATH));
   const links = await readText(tx, paperId, files.get(LINKS_PATH));
+  const versions = await readText(tx, paperId, files.get(VERSIONS_PATH));
   const authorMarkdown = await readText(tx, paperId, files.get(AUTHOR_PAGE_PATH));
   const communityMarkdown = await readText(tx, paperId, files.get(COMMUNITY_PAGE_PATH));
   const demos = await demoSources(tx, [...demoIds(authorMarkdown), ...demoIds(communityMarkdown)]);
@@ -108,6 +112,7 @@ export async function writeCurrent(tx: Writer, paperId: string, head: string, co
     pdf: pdf === null ? null : parsePdfPointer(pdf),
     thumbnail: thumbnail === null ? null : parseThumbnailPointer(thumbnail),
     links: links === null ? null : parseLinksFile(links),
+    versions: versions === null ? null : parseVersionsFile(versions),
     updatedAt: commit.at,
   };
   await tx

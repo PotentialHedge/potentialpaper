@@ -11,11 +11,12 @@ import { getDb, type Database } from '@/db';
 import type { PdfStageState } from '@/db/schema';
 import { claimByEmail } from '../claims';
 import { extractEmails } from './emails';
-import { firstPageText, pageCount, renderFirstPage } from './poppler';
+import { firstPageText, pageCount, renderFirstPage, wholeText } from './poppler';
 
 /**
  * The PDF ingest pipeline: everything we derive from a hosted PDF, for every PDF a page points at
- * (`page_current.pdf`), one row per distinct PDF in `pdf_documents`.
+ * (`page_current.pdf`, and each version's in `page_current.versions`), one row per distinct PDF in
+ * `pdf_documents`.
  *
  * Each **stage** has a version. A stage's result is recorded with the version that produced it, so a run
  * does only what is missing or out of date: bump a stage's `version` and the next run redoes that stage for
@@ -39,6 +40,23 @@ export const MAX_ATTEMPTS = 4;
 const retryDelayMs = (attempts: number) => 10 * 60_000 * 4 ** (attempts - 1);
 /** The cover's longer side, in pixels: about three times what a search result shows. */
 const COVER_SIZE = 360;
+/** Far more than any paper's text; a scanned book's is cut here. */
+const MAX_FULL_TEXT = 4 * 1024 * 1024;
+
+/** The PDFs pages point at: their own, and their versions'. Rows of `(sha256, url)`, as SQL. */
+const VERSION_PDFS = sql`(
+  select v -> 'pdf' ->> 'sha256' as sha256
+    from page_current c, jsonb_array_elements(c.versions) v
+   where jsonb_typeof(c.versions) = 'array' and v ? 'pdf'
+)`;
+
+const POINTED_AT = sql`(
+  select c.pdf ->> 'sha256' as sha256, c.pdf ->> 'url' as url from page_current c where c.pdf is not null
+  union all
+  select v -> 'pdf' ->> 'sha256', v -> 'pdf' ->> 'url'
+    from page_current c, jsonb_array_elements(c.versions) v
+   where jsonb_typeof(c.versions) = 'array' and v ? 'pdf'
+)`;
 
 /** The row a stage sees: what earlier stages produced. */
 export interface PdfDocument {
@@ -47,6 +65,8 @@ export interface PdfDocument {
   firstPageRaw: string | null;
   firstPageLayout: string | null;
   emails: string[];
+  /** A version points at it, so the stages for versions run on it. */
+  versioned: boolean;
 }
 
 export interface StageContext {
@@ -65,6 +85,11 @@ export interface StageResult {
 export interface Stage {
   name: string;
   version: number;
+  /**
+   * Only for PDFs a version points at (`page_current.versions`), not every page's own: the whole text is
+   * needed only to compare versions, and every page PDF would be tens of thousands of downloads.
+   */
+  versionsOnly?: boolean;
   /** Stages whose results this one reads: it waits until they are done at their current version. */
   needs?: string[];
   run(ctx: StageContext): Promise<StageResult>;
@@ -97,6 +122,16 @@ export const STAGES: Stage[] = [
         // Accounts with these addresses may exist already, with or without a claim on the paper.
         after: emails.length > 0 ? async () => void (await claimByEmail({ sha256: doc.sha256 }, database)) : undefined,
       };
+    },
+  },
+  {
+    // The whole text, which comparing two versions of a paper diffs (`server/versions.ts`).
+    name: 'fulltext',
+    version: 1,
+    versionsOnly: true,
+    async run({ pdf }) {
+      const text = await wholeText(await pdf());
+      return { set: { full_text: text.slice(0, MAX_FULL_TEXT) } };
     },
   },
   {
@@ -189,9 +224,9 @@ export interface IngestReport {
 async function discover(database: Database): Promise<number> {
   const { rowCount } = await database.execute(sql`
     insert into pdf_documents (sha256, url)
-    select distinct on (c.pdf ->> 'sha256') c.pdf ->> 'sha256', c.pdf ->> 'url'
-    from page_current c
-    where c.pdf ->> 'sha256' ~ '^[0-9a-f]{64}$' and c.pdf ->> 'url' is not null
+    select distinct on (p.sha256) p.sha256, p.url
+    from ${POINTED_AT} p
+    where p.sha256 ~ '^[0-9a-f]{64}$' and p.url is not null
     on conflict (sha256) do nothing
   `);
   return rowCount ?? 0;
@@ -200,8 +235,11 @@ async function discover(database: Database): Promise<number> {
 /** Whether `stage` should run for a row: missing or out of date, and not failing too often to retry yet. */
 function stageDue(stage: Stage, force: boolean): SQL {
   const state = sql`(d.stages -> ${stage.name})`;
-  if (force) return sql`true`;
-  return sql`(
+  const eligible = stage.versionsOnly
+    ? sql`exists (select from ${VERSION_PDFS} v where v.sha256 = d.sha256)`
+    : sql`true`;
+  if (force) return eligible;
+  return sql`${eligible} and (
     coalesce((${state} ->> 'version')::int, 0) < ${stage.version}
     and not (
       coalesce((${state} ->> 'failedVersion')::int, 0) = ${stage.version}
@@ -240,11 +278,13 @@ async function due(database: Database, stages: Stage[], options: IngestOptions):
     first_page_raw: string | null;
     first_page_layout: string | null;
     emails: string[];
+    versioned: boolean;
   }>(sql`
-    select d.sha256, d.url, d.first_page_raw, d.first_page_layout, d.emails
+    select d.sha256, d.url, d.first_page_raw, d.first_page_layout, d.emails,
+           exists (select from ${VERSION_PDFS} v where v.sha256 = d.sha256) as versioned
     from pdf_documents d
     where (${anyDue})
-      and ${named ? sql`d.sha256 = ${options.sha256}` : sql`exists (select from page_current c where c.pdf ->> 'sha256' = d.sha256)`}
+      and ${named ? sql`d.sha256 = ${options.sha256}` : sql`exists (select from ${POINTED_AT} p where p.sha256 = d.sha256)`}
     order by d.created_at, d.sha256
   `);
   return rows.map((r) => ({
@@ -253,6 +293,7 @@ async function due(database: Database, stages: Stage[], options: IngestOptions):
     firstPageRaw: r.first_page_raw,
     firstPageLayout: r.first_page_layout,
     emails: r.emails,
+    versioned: r.versioned,
   }));
 }
 
@@ -299,6 +340,11 @@ async function ingestOne(
     if (path) return path;
     const local = options.pdfDir && join(options.pdfDir, `${doc.sha256}.pdf`);
     if (local && existsSync(local) && sha256Of(await readFile(local)) === doc.sha256) return (path = local);
+    // Stored on this disk in development, without R2 (`server/files.ts`).
+    const served =
+      doc.url.startsWith('/') &&
+      join(process.env.EVIDENCE_FILES_DIR ?? join(process.cwd(), 'public', 'files'), doc.url.replace(/^\/files\//, ''));
+    if (served && existsSync(served) && sha256Of(await readFile(served)) === doc.sha256) return (path = served);
     dir ??= await mkdtemp(join(tmpdir(), 'pdf-'));
     const target = join(dir, 'in.pdf');
     await download(doc.url, doc.sha256, target);
@@ -307,6 +353,10 @@ async function ingestOne(
   try {
     for (const stage of stages) {
       const state = states[stage.name];
+      if (stage.versionsOnly && !doc.versioned) {
+        outcome[stage.name] = 'skipped';
+        continue;
+      }
       if (!forced && (isCurrent(state, stage) || !canRetry(state, stage))) {
         outcome[stage.name] = 'skipped';
         continue;

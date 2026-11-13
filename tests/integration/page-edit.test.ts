@@ -180,7 +180,19 @@ describe('history and revert', () => {
     expect(json).not.toContain(account.id);
     expect(json).not.toMatch(/accountId|account_id/);
     expect(Object.keys(history[0]).sort()).toEqual(
-      ['at', 'authorId', 'authorName', 'bytesDelta', 'handle', 'kind', 'oid', 'paths', 'seq', 'summary'].sort(),
+      [
+        'at',
+        'authorId',
+        'authorName',
+        'bytesDelta',
+        'evidence',
+        'handle',
+        'kind',
+        'oid',
+        'paths',
+        'seq',
+        'summary',
+      ].sort(),
     );
   });
 });

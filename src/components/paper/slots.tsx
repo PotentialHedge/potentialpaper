@@ -8,6 +8,8 @@ import { EditablePicture } from './edit/EditablePicture';
 import { EditableSection } from './edit/EditableSection';
 import { toolPath } from './page-tools';
 import { SubmissionsBox, SubmissionsSection } from './Submissions';
+import { VersionsBox, VersionsSection } from './Versions';
+import type { PaperVersion } from '@/lib/versions';
 
 /**
  * A paper page is assembled from named slots, so that built-in panels can later become the first
@@ -24,6 +26,8 @@ export interface PanelProps {
   /** The PDF's first page, which the picture editor falls back to. */
   cover: string | null;
   submissions: Submission[];
+  /** The page's `versions.jsonl`, oldest first. */
+  versions: PaperVersion[];
   /** Who has a confirmed claim, by the names on the paper. None: the paper is unclaimed. */
   confirmedAuthors: { authorIndex: number; authorName: string }[];
   /** The identifier the page's API calls name the paper by. */
@@ -222,10 +226,25 @@ function SubmissionsAside({ submissions }: PanelProps) {
   return <SubmissionsBox submissions={submissions} />;
 }
 
+function Versions({ versions, canonical, paper, submissions }: PanelProps) {
+  return (
+    <VersionsSection
+      versions={versions}
+      canonical={canonical}
+      paperTitle={paper.title}
+      submissionUrls={submissions.map((s) => s.url)}
+    />
+  );
+}
+
+function VersionsAside({ versions }: PanelProps) {
+  return <VersionsBox versions={versions} />;
+}
+
 const PANELS: Record<PaperSlot, ComponentType<PanelProps>[]> = {
   'paper.main': [Abstract, AuthorSection],
-  'paper.aside': [ReadThePaper, SubmissionsAside],
-  'paper.body': [CommunitySection, Submissions],
+  'paper.aside': [ReadThePaper, VersionsAside, SubmissionsAside],
+  'paper.body': [CommunitySection, Versions, Submissions],
 };
 
 export function Slot({ name, ...props }: PanelProps & { name: PaperSlot }) {

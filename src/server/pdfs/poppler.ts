@@ -26,6 +26,15 @@ export async function firstPageText(pdf: string, mode: 'raw' | 'layout'): Promis
   return stdout.replace(/\u0000/g, '');
 }
 
+/** Every page's text in reading order, pages separated by form feeds. What comparing versions diffs. */
+export async function wholeText(pdf: string): Promise<string> {
+  const { stdout } = await run('pdftotext', ['-enc', 'UTF-8', pdf, '-'], {
+    timeout: TIMEOUT_MS,
+    maxBuffer: MAX_BUFFER,
+  });
+  return stdout.replace(/\u0000/g, '');
+}
+
 /** Page 1 as a progressive JPEG whose longer side is `size` pixels. */
 export async function renderFirstPage(pdf: string, size: number): Promise<Buffer> {
   const dir = await mkdtemp(join(tmpdir(), 'cover-'));

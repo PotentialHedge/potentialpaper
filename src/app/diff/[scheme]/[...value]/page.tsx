@@ -101,6 +101,20 @@ export default async function DiffPage({ params, searchParams }: Props) {
           </>
         )}
       </p>
+      {commit.evidence && commit.evidence.length > 0 && (
+        <div className="mt-3 font-sans text-sm">
+          <h2 className={ui.runIn}>Evidence</h2>
+          <ul className="mt-1 list-disc pl-5">
+            {commit.evidence.map((url) => (
+              <li key={url}>
+                <a href={url} rel="noopener nofollow" className={ui.hyperref}>
+                  {url}
+                </a>
+              </li>
+            ))}
+          </ul>
+        </div>
+      )}
       {diffs.length === 0 ? (
         <p className={ui.empty}>This commit changed no files.</p>
       ) : (

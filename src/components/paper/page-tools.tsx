@@ -18,7 +18,7 @@ import { findPaper, type FoundPaper } from '@/server/papers';
 
 export type ToolParams = Promise<{ scheme: string; value: string[] }>;
 export type ToolSearchParams = Promise<Record<string, string | string[] | undefined>>;
-export type Tool = 'edit' | 'history' | 'diff' | 'claim';
+export type Tool = 'edit' | 'history' | 'diff' | 'claim' | 'versions';
 
 const SCHEME_OF_PREFIX = Object.fromEntries(
   Object.entries(PATH_PREFIX).map(([scheme, prefix]) => [prefix.slice(1), scheme as PaperScheme]),
@@ -57,7 +57,8 @@ export function toolPath(tool: Tool, id: PaperId, query = ''): string {
  * What an edit link asks for: the part, or one of its sections, opens as its editor on the paper's page
  * (`components/paper/edit`).
  */
-export type EditTarget = 'community' | 'author' | 'links' | 'picture' | `${'community' | 'author'}-${number}`;
+export type EditTarget =
+  'community' | 'author' | 'links' | 'picture' | 'versions' | `${'community' | 'author'}-${number}`;
 
 export function editHref(id: PaperId, target: EditTarget = 'community'): string {
   return `${paperPath(id)}#edit-${target}`;
@@ -73,6 +74,7 @@ export function ToolHeader({ paper, tool, title }: { paper: ToolPaper; tool: Too
     { tool: 'page', label: 'Page', href: paperPath(paper.id) },
     { tool: 'edit', label: 'Edit', href: editHref(paper.id) },
     { tool: 'history', label: 'History', href: toolPath('history', paper.id) },
+    { tool: 'versions', label: 'Versions', href: toolPath('versions', paper.id) },
   ];
   return (
     <header className="mt-6">

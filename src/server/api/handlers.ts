@@ -20,6 +20,11 @@ import { getDb } from '@/db';
 import { pageCurrent } from '@/db/schema';
 import { eq } from 'drizzle-orm';
 import { refreshPaperPages } from '../pages/refresh';
+import { fetchPdf, storeFile } from '../files';
+import { mergeFoundVersions, setVersions, versionsAt } from '../versions';
+import { lookUpVersions } from '../version-sources';
+import { consume, type RateLimitConfig } from '../ratelimit';
+import { sortVersions, type VersionPdf } from '@/lib/versions';
 import { setFirstPassword, startOnboarding } from '../onboarding';
 import { canonicalPaperId, paperPath, parsePaperId } from '@/lib/paper-ids';
 import { findPaper, lookupPaper } from '../papers';
@@ -250,6 +255,10 @@ export const getEditor = route(async (req) => {
       { principal },
     );
   }
+  if (part === 'versions') {
+    const { head, versions } = await versionsAt(paper.id);
+    return respond(S.EditorOpened, { part, baseOid: head, versions: sortVersions(versions) }, { principal });
+  }
   const state = await editorState(paper.id, part, section);
   if (!state) throw new ApiError(404, 'not_found', `the page has no section ${section} any more`);
   return respond(S.EditorOpened, state, { principal });
@@ -258,9 +267,9 @@ export const getEditor = route(async (req) => {
 /** One section of the author or community page, put back into the file as it was when the editor loaded it. */
 export const postSectionEdit = route(async (req) => {
   const principal = await requireVerified(req);
-  const { paper: id, ...edit } = await parseBody(req, S.SectionEditBody);
+  const { paper: id, evidence, ...edit } = await parseBody(req, S.SectionEditBody);
   const { paper, identifiers } = await knownPaper(id.scheme, id.value);
-  const result = await editSection(paper.id, actorOf(principal), edit);
+  const result = await editSection(paper.id, actorOf(principal), edit, { evidence });
   if (result.status === 'committed') await refreshPaperPages(identifiers);
   return respond(S.PageCommitted, committed(result), { principal });
 });
@@ -276,9 +285,9 @@ export const postRender = route(async (req) => {
 /** Undoes one commit, keeping everything since, as `git revert` does. */
 export const postRevert = route(async (req) => {
   const principal = await requireVerified(req);
-  const { paper: id, oid, summary } = await parseBody(req, S.RevertBody);
+  const { paper: id, oid, summary, evidence } = await parseBody(req, S.RevertBody);
   const { paper, identifiers } = await knownPaper(id.scheme, id.value);
-  const result = await revertCommit(paper.id, oid, actorOf(principal), summary?.trim() || undefined);
+  const result = await revertCommit(paper.id, oid, actorOf(principal), summary?.trim() || undefined, { evidence });
   if (result.status === 'committed') await refreshPaperPages(identifiers);
   return respond(S.PageCommitted, committed(result), { principal });
 });
@@ -286,11 +295,107 @@ export const postRevert = route(async (req) => {
 /** The page's own links under its title, replaced as a whole. */
 export const postLinks = route(async (req) => {
   const principal = await requireVerified(req);
-  const { paper: id, links } = await parseBody(req, S.LinksBody);
+  const { paper: id, links, summary, evidence } = await parseBody(req, S.LinksBody);
   const { paper, identifiers } = await knownPaper(id.scheme, id.value);
-  const result = await setLinks(paper.id, actorOf(principal), links);
+  const result = await setLinks(paper.id, actorOf(principal), links, { evidence }, summary);
   if (result.status === 'committed') await refreshPaperPages(identifiers);
   return respond(S.PageCommitted, committed(result), { principal });
+});
+
+/** The paper's versions and the commit they were read at, which a change is sent back with. Public. */
+export const getVersions = route(async (req) => {
+  const { scheme, value } = parseQuery(req, S.PaperQuery);
+  const { paper } = await knownPaper(scheme, value);
+  const { head, versions } = await versionsAt(paper.id);
+  return respond(S.VersionsResponse, { head, versions: sortVersions(versions) });
+});
+
+/** Replaces the paper's versions, merged with whatever changed since `baseOid`. */
+export const postVersions = route(async (req) => {
+  const principal = await requireVerified(req);
+  const { paper: id, ...edit } = await parseBody(req, S.VersionsBody);
+  const { paper, identifiers } = await knownPaper(id.scheme, id.value);
+  const result = await setVersions(paper.id, actorOf(principal), {
+    ...edit,
+    versions: edit.versions.map((v) => ({
+      ...v,
+      date: v.date ?? undefined,
+      status: v.status ?? undefined,
+      decision: v.decision ?? undefined,
+      title: v.title ?? undefined,
+      abstract: v.abstract ?? undefined,
+      url: v.url ?? undefined,
+      note: v.note ?? undefined,
+    })),
+  });
+  if (result.status === 'committed') await refreshPaperPages(identifiers);
+  return respond(S.PageCommitted, committed(result), { principal });
+});
+
+const LOOKUP_BUDGET: RateLimitConfig = { burst: 10, perSecond: 10 / 3600 };
+
+/**
+ * Finds the paper's versions on OpenReview and arXiv, copies their PDFs where the license allows, and answers
+ * with the page's versions with them folded in. Commits nothing: the editor shows the list to be checked.
+ */
+export const postVersionsLookup = route(async (req) => {
+  const principal = await requireVerified(req);
+  const { paper: id, arxiv } = await parseBody(req, S.VersionsLookupBody);
+  const { paper, identifiers } = await knownPaper(id.scheme, id.value);
+  const budget = await consume(`version-lookup:${principal.account.id}`, LOOKUP_BUDGET);
+  if (!budget.allowed) {
+    throw new ApiError(429, 'rate_limited', 'too many look-ups; try again later', {
+      retryAfterSeconds: budget.retryAfterSeconds,
+    });
+  }
+  const [{ versions: existing }, [current]] = await Promise.all([
+    versionsAt(paper.id),
+    getDb().select({ pdf: pageCurrent.pdf }).from(pageCurrent).where(eq(pageCurrent.paperId, paper.id)),
+  ]);
+  const known = new Map<string, VersionPdf>();
+  if (current?.pdf) known.set(current.pdf.source, current.pdf);
+  const { versions: found, problems } = await lookUpVersions({
+    title: paper.title,
+    arxiv: arxiv ?? identifiers.find((i) => i.scheme === 'arxiv')?.value ?? null,
+    accountId: principal.account.id,
+    known,
+  });
+  return respond(S.VersionsLookup, { versions: mergeFoundVersions(existing, found), problems }, { principal });
+});
+
+/**
+ * Stores a file that backs up an edit, or a version's PDF: multipart with the file as `file`, or JSON
+ * `{ url }` to copy a PDF from an archive or proceedings site. Answers with the address to name it by.
+ */
+export const postFile = route(async (req) => {
+  const principal = await requireVerified(req);
+  let stored;
+  if ((req.headers.get('content-type') ?? '').includes('application/json')) {
+    const { url } = await parseBody(req, S.FileFetchBody);
+    stored = await fetchPdf(principal.account.id, url);
+  } else {
+    let form: FormData;
+    try {
+      form = await req.formData();
+    } catch {
+      throw new ApiError(400, 'validation_error', 'send a multipart form with the file as `file`, or JSON { url }');
+    }
+    const file = form.get('file');
+    if (!(file instanceof File)) throw new ApiError(400, 'validation_error', 'send the file as the form part `file`');
+    stored = await storeFile(principal.account.id, Buffer.from(await file.arrayBuffer()), file.name);
+  }
+  return respond(
+    S.StoredFile,
+    {
+      id: stored.id,
+      url: stored.url,
+      type: stored.type,
+      name: stored.name,
+      bytes: stored.bytes,
+      sha256: stored.sha256,
+    },
+    { status: 201, principal },
+  );
 });
 
 /** A new picture (multipart `image`), or new words for the current one. */

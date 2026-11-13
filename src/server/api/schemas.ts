@@ -6,7 +6,9 @@ import {
   AGENT_POST_DATA_MAX,
   AGENT_POST_KINDS,
 } from '@/lib/agent-posts';
+import { MAX_EVIDENCE, MAX_EVIDENCE_URL } from '@/lib/evidence';
 import { REAL_NAME_MAX } from '@/lib/profile';
+import { MAX_VERSIONS, VERSION_KINDS, VERSION_STATUSES } from '@/lib/versions';
 import { SEARCH_SORTS } from '@/lib/search';
 
 /** The `/api/v1` contract: requests are validated on the way in, responses on the way out. */
@@ -115,6 +117,12 @@ export const DemoSnapshotted = z.object({
 
 const Oid = z.string().regex(/^[0-9a-f]{40}$/);
 
+/**
+ * Addresses that back an edit up: links, or files uploaded to `POST /api/v1/files`. Each becomes an
+ * `Evidence:` trailer on the commit, and shows in the page's history.
+ */
+const Evidence = z.array(z.string().max(MAX_EVIDENCE_URL)).max(MAX_EVIDENCE).default([]);
+
 export const PagePartParam = z.enum(['author', 'community']);
 
 export const SectionEditBody = z.object({
@@ -126,6 +134,7 @@ export const SectionEditBody = z.object({
   section: z.number().int().min(0).max(1000),
   content: z.string().max(256 * 1024),
   summary: z.string().max(1000).default(''),
+  evidence: Evidence,
 });
 
 export const PageCommitted = z.object({
@@ -143,11 +152,105 @@ export const RevertBody = z.object({
   paper: PaperIdentifier,
   oid: Oid,
   summary: z.string().max(1000).optional(),
+  evidence: Evidence,
 });
 
 export const LinksBody = z.object({
   paper: PaperIdentifier,
   links: z.array(z.object({ label: z.string().max(100), url: z.string().max(2000) })).max(50),
+  summary: z.string().max(1000).optional(),
+  evidence: Evidence,
+});
+
+const VersionPdf = z.object({
+  sha256: z.string(),
+  bytes: z.number().int(),
+  url: z.string(),
+  source: z.string().optional(),
+  license: z.string().optional(),
+});
+
+const VersionFields = {
+  label: z.string().max(1000),
+  kind: z.enum(VERSION_KINDS),
+  date: z.string().max(20).nullish(),
+  status: z.enum(VERSION_STATUSES).nullish(),
+  decision: z.string().max(1000).nullish(),
+  title: z.string().max(2000).nullish(),
+  abstract: z.string().max(20_000).nullish(),
+  url: z.string().max(2000).nullish(),
+  note: z.string().max(10_000).nullish(),
+  evidence: z.array(z.string().max(MAX_EVIDENCE_URL)).max(MAX_EVIDENCE).optional(),
+};
+
+export const PaperVersionSchema = z.object({
+  id: z.string(),
+  label: z.string(),
+  kind: z.enum(VERSION_KINDS),
+  date: z.string().optional(),
+  status: z.enum(VERSION_STATUSES).optional(),
+  decision: z.string().optional(),
+  title: z.string().optional(),
+  abstract: z.string().optional(),
+  url: z.string().optional(),
+  note: z.string().optional(),
+  evidence: z.array(z.string()).optional(),
+  pdf: VersionPdf.optional(),
+});
+
+export const VersionsResponse = z.object({
+  /** The commit to send back as `baseOid`. */
+  head: z.string().nullable(),
+  versions: z.array(PaperVersionSchema),
+});
+
+/**
+ * The paper's versions as a whole list, oldest first or in any order (they are sorted by date). Keep a
+ * version's `id` to change it; leave it out for a new one. A PDF is named by the `url` that
+ * `POST /api/v1/files` answered with.
+ */
+export const VersionsBody = z.object({
+  paper: PaperIdentifier,
+  baseOid: Oid.nullable(),
+  versions: z
+    .array(
+      z.object({
+        id: z.string().max(40).optional(),
+        ...VersionFields,
+        pdf: z.object({ url: z.string().max(2000), license: z.string().max(100).nullish() }).nullish(),
+      }),
+    )
+    .max(MAX_VERSIONS),
+  summary: z.string().max(1000).optional(),
+  evidence: Evidence,
+});
+
+/** Looks the paper up on OpenReview and arXiv; `arxiv` names its arXiv id when the title won't find it. */
+export const VersionsLookupBody = z.object({
+  paper: PaperIdentifier,
+  arxiv: z
+    .string()
+    .regex(/^(\d{4}\.\d{4,5}|[a-z-]+(\.[A-Z]{2})?\/\d{7})(v\d+)?$/)
+    .optional(),
+});
+
+/** The page's versions with what was found folded in, for the editor to check and save. Nothing is saved. */
+export const VersionsLookup = z.object({
+  versions: z.array(PaperVersionSchema.extend({ id: z.string().optional() })),
+  problems: z.array(z.string()),
+});
+
+/** A file to back up an edit, or a version's PDF, copied from an archive by the server. */
+export const FileFetchBody = z.object({ url: z.url().max(2000) });
+
+export const StoredFile = z.object({
+  id: z.uuid(),
+  /** The address to name it by, as evidence or as a version's PDF. */
+  url: z.string(),
+  type: z.string(),
+  name: z.string(),
+  bytes: z.number().int(),
+  sha256: z.string(),
 });
 
 /** The picture's words, sent beside the image in a multipart form. */
@@ -162,7 +265,7 @@ export const PaperQuery = z.object({ scheme: PaperSchemeParam, value: z.string()
 
 /** What the page's editor opens with: one section's Markdown, or the picture and links. */
 export const EditorQuery = PaperQuery.extend({
-  part: z.enum(['author', 'community', 'card']).default('community'),
+  part: z.enum(['author', 'community', 'card', 'versions']).default('community'),
   section: z.coerce.number().int().min(0).max(1000).default(0),
 });
 
@@ -180,6 +283,11 @@ export const EditorOpened = z.discriminatedUnion('part', [
     thumbnail: z.object({ url: z.string(), alt: z.string().nullable(), caption: z.string().nullable() }).nullable(),
     links: z.array(z.object({ label: z.string(), url: z.string() })),
     claimed: z.boolean(),
+  }),
+  z.object({
+    part: z.literal('versions'),
+    baseOid: z.string().nullable(),
+    versions: z.array(PaperVersionSchema),
   }),
 ]);
 

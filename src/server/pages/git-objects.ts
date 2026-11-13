@@ -81,6 +81,8 @@ export interface Commit {
   kind: EditKind;
   reverts?: string;
   bot?: boolean;
+  /** Addresses that back the change up (`lib/evidence.ts`), one `Evidence:` trailer each. */
+  evidence?: string[];
 }
 
 export const SYSTEM_AUTHOR_ID = 'potentialpaper';
@@ -105,6 +107,7 @@ export function encodeCommit(commit: Commit): Buffer {
     `Edit-Kind: ${commit.kind}`,
     ...(commit.reverts ? [`Reverts: ${commit.reverts}`] : []),
     ...(commit.bot ? ['Bot: true'] : []),
+    ...(commit.evidence ?? []).map((url) => `Evidence: ${url}`),
   ];
   return Buffer.from(`${lines.join('\n')}\n`);
 }
@@ -120,16 +123,16 @@ export function parseCommit(body: Buffer): Commit {
 
   const message = text.slice(split + 2);
   const end = message.indexOf('\n\n');
-  const trailers = new Map(
-    message
-      .slice(end + 2)
-      .trim()
-      .split('\n')
-      .map((line) => {
-        const colon = line.indexOf(': ');
-        return [line.slice(0, colon), line.slice(colon + 2)] as const;
-      }),
-  );
+  const pairs = message
+    .slice(end + 2)
+    .trim()
+    .split('\n')
+    .map((line) => {
+      const colon = line.indexOf(': ');
+      return [line.slice(0, colon), line.slice(colon + 2)] as const;
+    });
+  const trailers = new Map(pairs);
+  const evidence = pairs.filter(([key]) => key === 'Evidence').map(([, value]) => value);
   const kind = trailers.get('Edit-Kind') as EditKind | undefined;
   if (!kind || !EDIT_KINDS.includes(kind)) throw new Error('commit has no Edit-Kind');
   return {
@@ -141,6 +144,7 @@ export function parseCommit(body: Buffer): Commit {
     kind,
     reverts: trailers.get('Reverts'),
     bot: trailers.get('Bot') === 'true',
+    ...(evidence.length > 0 ? { evidence } : {}),
   };
 }
 

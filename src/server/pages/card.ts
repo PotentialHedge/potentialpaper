@@ -151,6 +151,7 @@ export async function setLinks(
   actor: Actor,
   links: readonly TitleLink[],
   options: CommitOptions = {},
+  summary?: string,
 ): Promise<CommitResult> {
   if (links.length > MAX_LINKS) throw new ApiError(422, 'validation_error', `at most ${MAX_LINKS} links`);
   const clean = links.map((link) => ({ label: link.label.trim(), url: link.url.trim() }));
@@ -169,7 +170,7 @@ export async function setLinks(
     head,
     actor,
     [{ path: LINKS_PATH, content: clean.length > 0 ? encodeLinksFile(clean) : null }],
-    'Change the links',
+    summary?.trim() || 'Change the links',
     options,
   );
 }

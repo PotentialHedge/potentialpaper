@@ -1,4 +1,5 @@
 import { parseLinksFile } from '@/lib/paper-links';
+import { parseVersionsFile } from '@/lib/versions';
 
 /**
  * What may be written to a page repo, and by whom (DESIGN.md §4.3). Pure, and the only place these rules
@@ -20,6 +21,11 @@ export const THUMBNAIL_PATH = 'thumbnail.json';
 /** Links to the paper elsewhere (code, project page, video), shown under its title (`lib/paper-links.ts`). */
 export const LINKS_PATH = 'links.json';
 const CARD_PATHS = new Set([THUMBNAIL_PATH, LINKS_PATH]);
+/**
+ * The paper's versions (`lib/versions.ts`): its preprint, submissions, camera-ready. Facts about the paper
+ * that anyone verified can add to with evidence, as the community section; the system writes them on import.
+ */
+export const VERSIONS_PATH = 'versions.jsonl';
 
 export const MAX_FILE_BYTES = 256 * 1024;
 export const MAX_CHANGES = 50;
@@ -83,6 +89,9 @@ export function pathDenied(path: string, roles: Roles): string | null {
   if (path === PDF_PATH) {
     return roles.system || roles.admin ? null : 'only the system and admins can change the PDF';
   }
+  if (path === VERSIONS_PATH) {
+    return roles.system || roles.admin || roles.verified ? null : 'confirm an institutional email address first';
+  }
   if (CARD_PATHS.has(path)) {
     if (roles.system) return 'the system only writes the metadata';
     if (roles.admin) return null;
@@ -101,7 +110,7 @@ export function pathDenied(path: string, roles: Roles): string | null {
   }
   // Data owned by one extension (DESIGN.md §10). Nobody can act as one until extensions exist.
   if (path.startsWith('extensions/')) return 'this path is reserved for extensions';
-  return 'pages only have metadata.json, pdf.json, thumbnail.json, links.json, author/, community/ and extensions/';
+  return 'pages only have metadata.json, pdf.json, thumbnail.json, links.json, versions.jsonl, author/, community/ and extensions/';
 }
 
 function jsonValueProblem(value: unknown, depth = 0): string | null {
@@ -242,6 +251,7 @@ export function contentProblem(path: string, content: string): string | null {
   if (path === PDF_PATH) return parsePdfPointer(content) ? null : 'is not a valid PDF pointer';
   if (path === THUMBNAIL_PATH) return parseThumbnailPointer(content) ? null : 'is not a valid thumbnail pointer';
   if (path === LINKS_PATH) return parseLinksFile(content) ? null : 'is not a valid list of links';
+  if (path === VERSIONS_PATH) return parseVersionsFile(content) ? null : 'is not a valid list of versions';
   if (path.endsWith('.jsonl')) {
     for (const line of content.split('\n')) {
       if (line === '') continue;

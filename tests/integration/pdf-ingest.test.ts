@@ -10,7 +10,7 @@ import { getPaper, search } from '@/server/api/handlers';
 import { claimByEmail, ownAddressesOnPaper } from '@/server/claims';
 import { commitPage, SYSTEM_ACTOR } from '@/server/pages/commit';
 import { readHead } from '@/server/pages/repo';
-import { PDF_PATH } from '@/server/pages/rules';
+import { PDF_PATH, VERSIONS_PATH } from '@/server/pages/rules';
 import { savePaper } from '@/server/papers';
 import { ingest, MAX_ATTEMPTS } from '@/server/pdfs/ingest';
 import { ORIGIN, api, closePool, lastMailTo, resetDatabase, signUp } from './helpers';
@@ -110,11 +110,17 @@ async function claimRow(paperId: string, authorIndex: number) {
 
 describe('pdfs:ingest', () => {
   it('runs every stage once, and a second run has nothing to do', async () => {
-    await paperWithPdf();
+    const paperId = await paperWithPdf();
     const first = await ingest({ pdfDir });
     expect(first).toEqual({
       documents: 1,
-      stages: { text: { done: 1, failed: 0 }, emails: { done: 1, failed: 0 }, cover: { done: 1, failed: 0 } },
+      stages: {
+        text: { done: 1, failed: 0 },
+        emails: { done: 1, failed: 0 },
+        // Only a version's PDF has its whole text read.
+        fulltext: { done: 0, failed: 0 },
+        cover: { done: 1, failed: 0 },
+      },
     });
     const [doc] = await getDb().select().from(pdfDocuments).where(eq(pdfDocuments.sha256, SHA));
     expect(doc.pages).toBe(1);
@@ -123,7 +129,27 @@ describe('pdfs:ingest', () => {
     expect(doc.emails.sort()).toEqual([...ON_PAPER].sort());
     expect(doc.coverUrl).toBe(`/covers/${SHA}.jpg`);
     expect(Object.keys(doc.stages).sort()).toEqual(['cover', 'emails', 'text']);
+    expect(doc.fullText).toBeNull();
 
+    expect((await ingest({ pdfDir })).documents).toBe(0);
+
+    // Once a version points at it, its text is read for comparing versions, and nothing else runs again.
+    const version = {
+      id: 'v_abcdefgh',
+      label: 'arXiv v1',
+      kind: 'preprint',
+      pdf: { sha256: SHA, bytes: PDF.length, url: doc.url },
+    };
+    await commitPage(
+      paperId,
+      await readHead(getDb(), paperId),
+      SYSTEM_ACTOR,
+      [{ path: VERSIONS_PATH, content: `${JSON.stringify(version)}\n` }],
+      'Add a version',
+    );
+    expect((await ingest({ pdfDir })).stages).toMatchObject({ text: { done: 0 }, fulltext: { done: 1, failed: 0 } });
+    const [read] = await getDb().select().from(pdfDocuments).where(eq(pdfDocuments.sha256, SHA));
+    expect(read.fullText).toContain('Attention Is All You Need');
     expect((await ingest({ pdfDir })).documents).toBe(0);
     // --stage … --force reruns only that stage; --sha reruns all of one PDF's.
     expect((await ingest({ pdfDir, stages: ['emails'], force: true })).stages).toEqual({

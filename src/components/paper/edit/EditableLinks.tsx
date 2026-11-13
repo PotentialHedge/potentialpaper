@@ -6,6 +6,7 @@ import type { PaperId } from '@/lib/paper-ids';
 import { MAX_LINK_LABEL, MAX_LINKS, mergeLinks, type TitleLink } from '@/lib/paper-links';
 import { closeEditor, messageOf, reloadAt, useEditing, useOpened, type CardOpened } from './editing';
 import { EditorFrame, NotOpened } from './EditorFrame';
+import { EvidenceInput } from './EvidenceInput';
 
 /**
  * The links under the title, which turn into their editor in place (`#edit-links`). The row above the
@@ -93,6 +94,7 @@ function LinksForm({
   const [rows, setRows] = useState<TitleLink[]>(initial.length > 0 ? initial : [{ label: '', url: '' }]);
   const [busy, setBusy] = useState(false);
   const [problem, setProblem] = useState<string | null>(null);
+  const [evidence, setEvidence] = useState<string[]>([]);
   const filled = rows.filter((row) => row.label.trim() || row.url.trim());
 
   const dirty = JSON.stringify(filled) !== JSON.stringify(initial);
@@ -111,7 +113,7 @@ function LinksForm({
       const res = await fetch('/api/v1/pages/links', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ paper, links: filled }),
+        body: JSON.stringify({ paper, links: filled, evidence }),
       });
       if (!res.ok) return setProblem(await messageOf(res));
       onDirty(false);
@@ -175,6 +177,12 @@ function LinksForm({
               </div>
             ))}
           </div>
+          <EvidenceInput
+            value={evidence}
+            onChange={setEvidence}
+            label="Evidence (optional)"
+            hint="Where these links are named as the paper's: its README, its project page, the paper itself."
+          />
           <div className="flex flex-wrap items-baseline gap-x-4">
             {rows.length < MAX_LINKS && (
               <button

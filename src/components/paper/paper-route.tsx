@@ -10,6 +10,7 @@ import { confirmedAuthors } from '@/server/claims';
 import { findPaper, type FoundPaper } from '@/server/papers';
 import { submissionsOf } from '@/server/submissions';
 import { bibtex, titleLinks } from '@/lib/paper-links';
+import { sortVersions } from '@/lib/versions';
 import { DemoFrames } from './DemoFrames';
 import { EditableLinks } from './edit/EditableLinks';
 import { toolPath } from './page-tools';
@@ -52,6 +53,7 @@ export async function PaperRoute({ scheme, segments }: { scheme: PaperScheme; se
         pdf: pageCurrent.pdf,
         thumbnail: pageCurrent.thumbnail,
         links: pageCurrent.links,
+        versions: pageCurrent.versions,
         authorHtml: pageCurrent.authorHtml,
         communityHtml: pageCurrent.communityHtml,
         cover: pdfDocuments.coverUrl,
@@ -79,6 +81,7 @@ export async function PaperRoute({ scheme, segments }: { scheme: PaperScheme; se
     picture,
     cover: current?.cover ?? null,
     submissions,
+    versions: sortVersions(current?.versions ?? []),
     confirmedAuthors: authors,
     canonical: canonicalPaperId(identifiers) ?? identifiers[0],
     authorHtml: current?.authorHtml ?? null,

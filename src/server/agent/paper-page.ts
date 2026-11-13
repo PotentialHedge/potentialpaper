@@ -5,6 +5,7 @@ import { AGENT_POST_KINDS } from '@/lib/agent-posts';
 import { AGENT_START_PATH } from '@/lib/agent-prompt';
 import { agentPaperPath, paperPath, type PaperId } from '@/lib/paper-ids';
 import { titleLinks } from '@/lib/paper-links';
+import { sortVersions, versionStanding, type PaperVersion } from '@/lib/versions';
 import type { FieldValue, Submission } from '@/lib/submissions';
 import { confirmedAuthors } from '../claims';
 import type { FoundPaper } from '../papers';
@@ -25,6 +26,7 @@ export async function agentPaperMarkdown(found: FoundPaper, canonical: PaperId, 
         links: pageCurrent.links,
         authorMarkdown: pageCurrent.authorMarkdown,
         communityMarkdown: pageCurrent.communityMarkdown,
+        versions: pageCurrent.versions,
         head: pageCurrent.head,
       })
       .from(pageCurrent)
@@ -81,11 +83,43 @@ export async function agentPaperMarkdown(found: FoundPaper, canonical: PaperId, 
     '',
   );
 
+  out.push(...versionLines(sortVersions(current?.versions ?? []), canonical, origin));
+
   if (submissions.length > 0) out.push(...venueReviews(submissions));
 
   out.push(...discussion(posts));
   out.push(...howToPost(canonical, origin));
   return out.join('\n');
+}
+
+/** The versions as a list, oldest first, with their ids for comparing and editing them. */
+function versionLines(versions: PaperVersion[], canonical: PaperId, origin: string): string[] {
+  const out = ['## Versions', ''];
+  if (versions.length === 0) {
+    out.push('_None recorded yet. See "Record a paper\'s versions" in /agent/start to add them, with evidence._', '');
+    return out;
+  }
+  for (const v of versions) {
+    const standing = versionStanding(v);
+    const parts = [
+      `\`${v.id}\``,
+      v.date ?? 'undated',
+      `**${v.label}** (${v.kind})`,
+      standing,
+      v.url,
+      v.pdf ? `PDF: ${v.pdf.url.startsWith('/') ? origin : ''}${v.pdf.url}` : null,
+    ].filter(Boolean);
+    out.push(`- ${parts.join(' · ')}`);
+    if (v.title) out.push(`  - Title then: ${v.title}`);
+    if (v.note) out.push(`  - ${v.note.replace(/\n+/g, ' ')}`);
+    if (v.evidence?.length) out.push(`  - Evidence: ${v.evidence.join(', ')}`);
+  }
+  if (versions.length >= 2) {
+    const [a, b] = [versions[0], versions[versions.length - 1]];
+    out.push('', `Compare two: ${origin}/versions${paperPath(canonical)}?a=${a.id}&b=${b.id}`);
+  }
+  out.push('');
+  return out;
 }
 
 function section(markdown: string | null | undefined, credit: string): string {

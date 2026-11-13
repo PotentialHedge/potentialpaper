@@ -9,6 +9,7 @@ import {
 } from '@/components/paper/page-tools';
 import { RevertButton } from '@/components/paper/RevertButton';
 import { ui } from '@/components/ui';
+import { evidenceLabel } from '@/lib/evidence';
 import { historyWithHandles } from '@/server/pages/edit';
 
 export const dynamic = 'force-dynamic';
@@ -79,6 +80,17 @@ export default async function HistoryPage({ params, searchParams }: Props) {
                     <a href={toolPath('diff', found.id, `oid=${row.oid}`)}>{row.summary}</a>
                     {row.kind !== 'edit' && <span className={ui.badge}>{row.kind}</span>}
                     <span className={`block ${ui.fine} font-mono`}>{row.paths.join(', ')}</span>
+                    {row.evidence.length > 0 && (
+                      <span className={`block ${ui.fine}`}>
+                        Evidence:{' '}
+                        {row.evidence.map((url, i) => (
+                          <a key={url} href={url} rel="noopener nofollow" title={url} className="mr-2">
+                            {evidenceLabel(url)}
+                            {i < row.evidence.length - 1 ? ',' : ''}
+                          </a>
+                        ))}
+                      </span>
+                    )}
                   </td>
                   <td className={`${ui.td} text-right`}>{delta(row.bytesDelta)}</td>
                   <td className={`${ui.td} whitespace-nowrap`}>

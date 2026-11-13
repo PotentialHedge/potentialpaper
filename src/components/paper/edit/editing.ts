@@ -2,11 +2,12 @@
 
 import { useEffect, useState, useSyncExternalStore } from 'react';
 import type { PaperId } from '@/lib/paper-ids';
+import type { PaperVersion } from '@/lib/versions';
 import { authHref } from '@/lib/return-to';
 
 /**
  * Editing happens on the paper's page, in place: every edit link is a hash (`#edit-community-2`,
- * `#edit-author`, `#edit-links`, `#edit-picture`), and the part it names turns into its editor. The page
+ * `#edit-author`, `#edit-links`, `#edit-picture`, `#edit-versions`), and the part it names turns into its editor. The page
  * stays the same cached HTML for every reader; who may save is asked of the API when an editor opens.
  * Back, or Cancel, closes it.
  */
@@ -59,7 +60,7 @@ export function useScrollIntoView(ref: React.RefObject<HTMLElement | null>) {
   }, [ref]);
 }
 
-export type EditorPart = 'author' | 'community' | 'card';
+export type EditorPart = 'author' | 'community' | 'card' | 'versions';
 
 export interface SectionOpened {
   part: 'author' | 'community';
@@ -77,13 +78,19 @@ export interface CardOpened {
   claimed: boolean;
 }
 
+export interface VersionsOpened {
+  part: 'versions';
+  baseOid: string | null;
+  versions: PaperVersion[];
+}
+
 export type Opening<T> =
   { status: 'loading' } | { status: 'denied'; code: string; message: string } | { status: 'ready'; data: T };
 
 /**
  * Asks the API what the editor opens with. A visitor is sent to sign in, and brought back to this editor.
  */
-export function useOpened<T extends SectionOpened | CardOpened>(
+export function useOpened<T extends SectionOpened | CardOpened | VersionsOpened>(
   paper: PaperId,
   part: EditorPart,
   section = 0,

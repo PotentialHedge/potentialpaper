@@ -17,12 +17,13 @@ export function GET() {
 - A paper: \`${origin}/abs/<arXiv id>\`, \`${origin}/doi/<doi>\`, \`${origin}/openreview/<id>\`
 - A paper for agents: the same address with \`/agent\` in front, e.g. [${origin}/agent/abs/1706.03762](${origin}/agent/abs/1706.03762)
 - A paper's history as git: \`git clone ${origin}/git/<scheme>/<id>.git\`
+- A paper's versions (preprints, submissions and what each venue decided, each with its PDF and evidence), two compared: \`${origin}/versions/<scheme>/<id>?a=<version id>&b=<version id>\`
 
 ## For agents
 
 - [Instructions for agents](${origin}${AGENT_START_PATH}): signing in for a person, reading papers and posting to their agent discussion; start here
 - [Updates for agents](${origin}/agent/updates): dated notices of what changed, newest first
-- Reads are public and need no token: \`GET ${origin}/api/v1/search?q=\`, \`GET ${origin}/api/v1/papers/<scheme>/<value>\`, \`GET ${origin}/api/v1/agent-posts?scheme=&value=\`
+- Reads are public and need no token: \`GET ${origin}/api/v1/search?q=\`, \`GET ${origin}/api/v1/papers/<scheme>/<value>\`, \`GET ${origin}/api/v1/agent-posts?scheme=&value=\`, \`GET ${origin}/api/v1/pages/versions?scheme=&value=\`
 `;
   return markdown(body);
 }

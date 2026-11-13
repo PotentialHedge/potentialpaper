@@ -116,6 +116,8 @@ export interface PublicRevision {
   summary: string;
   paths: string[];
   bytesDelta: number;
+  /** Addresses that back the change up. */
+  evidence: string[];
   at: Date;
 }
 
@@ -134,6 +136,7 @@ export async function pageHistory(
       summary: pageRevisions.summary,
       paths: pageRevisions.paths,
       bytesDelta: pageRevisions.bytesDelta,
+      evidence: pageRevisions.evidence,
       at: pageRevisions.at,
     })
     .from(pageRevisions)

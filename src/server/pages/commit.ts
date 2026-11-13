@@ -13,6 +13,7 @@ import {
   paperIdentifiers,
   papers,
 } from '@/db/schema';
+import { cleanEvidence } from '@/lib/evidence';
 import { ApiError } from '../api/errors';
 import { consume, rateLimitHeaders, type RateLimitConfig } from '../ratelimit';
 import {
@@ -72,6 +73,8 @@ export type CommitResult =
 
 export interface CommitOptions {
   kind?: EditKind;
+  /** Addresses that back the change up: links, or files uploaded to `/api/v1/files` (`lib/evidence.ts`). */
+  evidence?: readonly string[];
   reverts?: string;
   database?: Database;
   rateLimit?: RateLimitConfig;
@@ -234,6 +237,9 @@ export async function commitPage(
 ): Promise<CommitResult> {
   const { kind = 'edit', reverts, database = getDb(), rateLimit = COMMIT_RATE_LIMIT } = options;
   const wanted = normalizeChanges(changes);
+  const cleaned = cleanEvidence(options.evidence ?? []);
+  if ('problem' in cleaned) throw new ApiError(422, 'validation_error', cleaned.problem);
+  const { evidence } = cleaned;
 
   if (actor.kind === 'account') {
     const limit = await consume(`page-commit:${actor.accountId}`, rateLimit);
@@ -324,6 +330,7 @@ export async function commitPage(
         kind,
         reverts,
         bot: roles.bot,
+        ...(evidence.length > 0 ? { evidence } : {}),
       };
       const object = gitObject('commit', encodeCommit(commit));
       await writeObjects(tx, paperId, [...blobs, ...trees, object]);
@@ -353,6 +360,7 @@ export async function commitPage(
           bytesDelta,
           ...(reverts ? { reverts } : {}),
           ...(roles.bot ? { bot: true } : {}),
+          ...(evidence.length > 0 ? { evidence } : {}),
         },
       });
       return { status: 'committed', oid: object.oid, seq, paths, merged: head !== baseOid };

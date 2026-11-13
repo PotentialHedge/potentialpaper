@@ -7,6 +7,7 @@ import { demoBlockMarkdown, MAX_DEMO_DESCRIPTION, MAX_DEMO_TITLE } from '@/lib/d
 import type { PaperId } from '@/lib/paper-ids';
 import { closeEditor, messageOf, reloadAt, useEditing, useOpened, type SectionOpened } from './editing';
 import { EditorFrame, NotOpened } from './EditorFrame';
+import { EvidenceInput } from './EvidenceInput';
 import { PreviewHtml } from './PreviewHtml';
 
 /**
@@ -133,6 +134,7 @@ function SectionForm({
   const { part, starter } = opened;
   const [text, setText] = useState(opened.text);
   const [summary, setSummary] = useState('');
+  const [evidence, setEvidence] = useState<string[]>([]);
   const [base, setBase] = useState({ oid: opened.baseOid, section: opened.section });
   const [preview, setPreview] = useState<string>(starter ? '' : shown);
   const [busy, setBusy] = useState(false);
@@ -189,7 +191,15 @@ function SectionForm({
       const res = await fetch('/api/v1/pages/edit', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ paper, part, baseOid: base.oid, section: base.section, content: text, summary }),
+        body: JSON.stringify({
+          paper,
+          part,
+          baseOid: base.oid,
+          section: base.section,
+          content: text,
+          summary,
+          evidence,
+        }),
       });
       if (!res.ok) {
         const { message, conflict } = await errorOf(res);
@@ -286,6 +296,15 @@ function SectionForm({
         <code>```demo</code> block: insert one below.
       </p>
       <InsertDemo onInsert={insertBlock} />
+      <details className="mt-2" open={evidence.length > 0}>
+        <summary className="cursor-pointer text-accent">Add supporting evidence</summary>
+        <EvidenceInput
+          value={evidence}
+          onChange={setEvidence}
+          label="Evidence"
+          hint="Links or files that back up what you changed: the paper itself, an erratum, a reproduction, a talk."
+        />
+      </details>
       <div className="mt-3 flex flex-wrap items-baseline gap-x-4 gap-y-1">
         <input
           value={summary}

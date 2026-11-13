@@ -19,6 +19,7 @@ import {
 import { AGENT_POST_KINDS } from '../lib/agent-posts';
 import { NOTE_KINDS, SUBMISSION_STATUSES, type FieldValue, type VenueForms } from '../lib/submissions';
 import type { TitleLink } from '../lib/paper-links';
+import type { PaperVersion } from '../lib/versions';
 import type { PdfPointer, ThumbnailPointer } from '@/server/pages/rules';
 import { PAPER_ORIGINS } from '../server/paper-sources/types';
 import { user } from './auth-schema';
@@ -256,6 +257,11 @@ export const pageRevisions = pgTable(
     summary: text('summary').notNull(),
     paths: text('paths').array().notNull(),
     bytesDelta: integer('bytes_delta').notNull(),
+    /** The commit's `Evidence:` trailers: addresses that back the change up. */
+    evidence: text('evidence')
+      .array()
+      .notNull()
+      .default(sql`'{}'::text[]`),
     at: timestamp('at', { withTimezone: true, mode: 'date' }).notNull(),
   },
   (t) => [
@@ -287,6 +293,8 @@ export const pageCurrent = pgTable('page_current', {
   thumbnail: jsonb('thumbnail').$type<ThumbnailPointer>(),
   /** The page's `links.json`: links to the paper elsewhere, beside the ones its identifiers give. */
   links: jsonb('links').$type<TitleLink[]>(),
+  /** The page's `versions.jsonl`, oldest first (`lib/versions.ts`). */
+  versions: jsonb('versions').$type<PaperVersion[]>(),
   updatedAt: timestamp('updated_at', { withTimezone: true, mode: 'date' }).notNull(),
 });
 
@@ -372,6 +380,11 @@ export const pdfDocuments = pgTable(
       .array()
       .notNull()
       .default(sql`'{}'::text[]`),
+    /**
+     * The whole text, through `pdftotext -raw`, which comparing two versions of a paper diffs. **Private** as
+     * page 1 is, since it has the authors' addresses: shown only through `server/versions.ts`, which hides them.
+     */
+    fullText: text('full_text'),
     /** The JPEG of page 1, in R2 beside the PDF. **Public.** */
     coverUrl: text('cover_url'),
     stages: jsonb('stages').$type<Record<string, PdfStageState>>().notNull().default({}),
@@ -637,3 +650,28 @@ export const agentFiles = pgTable(
 );
 
 export type AgentFile = typeof agentFiles.$inferSelect;
+
+/**
+ * A file someone uploaded as evidence for an edit, or as the PDF of a version (`server/files.ts`). The bytes
+ * are public in R2 under their hash as soon as they are uploaded; this row says who uploaded them, for when
+ * one has to come down.
+ */
+export const evidenceFiles = pgTable(
+  'evidence_files',
+  {
+    id: uuid('id').primaryKey().defaultRandom(),
+    accountId: uuid('account_id').references(() => accounts.id, { onDelete: 'set null' }),
+    sha256: text('sha256').notNull(),
+    type: text('type').notNull(),
+    name: text('name').notNull(),
+    bytes: integer('bytes').notNull(),
+    /** `https:`, or a path on this site in development. */
+    url: text('url').notNull(),
+    /** Where it was copied from, when the server fetched it rather than it being uploaded. */
+    source: text('source'),
+    createdAt: createdAt(),
+  },
+  (t) => [index('evidence_files_account_idx').on(t.accountId, t.createdAt), index('evidence_files_url_idx').on(t.url)],
+);
+
+export type EvidenceFile = typeof evidenceFiles.$inferSelect;

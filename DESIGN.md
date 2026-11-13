@@ -74,6 +74,11 @@ caches it and each commit purges it. This is the largest single speed gain on th
 ## 3. Papers and identity
 
 A paper is a **work**, not a version: arXiv v1 to v5 and the published version share one page.
+The versions themselves are listed in the page's `versions.jsonl` (`lib/versions.ts`): each preprint,
+workshop and conference submission, with its date, what the venue decided, its own PDF and the evidence
+for it. Anyone verified edits them (with evidence), the system imports them from OpenReview and arXiv
+(`npm run papers:import-versions`), and `/versions/<paper>?a=&b=` compares two: title, abstract, and
+the PDFs' text sentence by sentence, from the ingest's `fulltext` stage.
 
 ```
 papers(id ulid pk, title, authors jsonb, abstract, year, venue, created_at, merged_into null)
