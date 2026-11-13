@@ -208,6 +208,10 @@ export async function versionPdfAt(url: string, database: Database = getDb()): P
       where url = ${url} and type = 'application/pdf' order by created_at limit 1)
     union all
     (select sha256, bytes, url, null from pdf_documents where url = ${url} and bytes is not null limit 1)
+    union all
+    -- A page's own PDF, before the ingest has read its size.
+    (select pdf->>'sha256', (pdf->>'bytes')::bigint, pdf->>'url', pdf->>'source' from page_current
+      where pdf->>'url' = ${url} and pdf->>'bytes' is not null limit 1)
     limit 1
   `);
   const row = rows[0];

@@ -45,50 +45,73 @@ const value = (note: OpenReviewSearchNote, key: string): string | null => {
 
 const isoDay = (ms: number | undefined) => (ms ? new Date(ms).toISOString().slice(0, 10) : undefined);
 
+/** Trailing parts of a venue id that file a submission by its standing, not part of the venue's name. */
+const STANDING_PART = /^(\w+_)?(Submissions?|Rejected|Withdrawn|Under_Review|Submitted|Retracted|Accepted)$/i;
+const WORKSHOP_PART = /^(Workshop|Bridge|Symposium|Tutorial)s?$/i;
+
+const spaced = (part: string) => part.replace(/_/g, ' ').trim();
+
 /**
- * "SPIGM @ ICML Poster" filed under `ICML.cc/2026/Workshop/SPIGM` → an accepted workshop version, a
- * poster. "ICLR 2027 Conference Submission" → under review; "Submitted to ICLR 2026" → not accepted.
+ * A venue's name and kind from its id, which is structured where the venue string is whatever the
+ * organisers typed ("airrworkshop OralandPoster"): `ICLR.cc/2027/Conference` → "ICLR 2027",
+ * `NeurIPS.cc/2025/Workshop/OPT` → "OPT @ NeurIPS 2025", `thecvf.com/CVPR/2026/Conference` → "CVPR 2026",
+ * `NeurIPS.cc/2025/Datasets_and_Benchmarks_Track` → "NeurIPS 2025 Datasets and Benchmarks Track", `TMLR`.
  */
-export function openReviewVersion(note: OpenReviewSearchNote): FoundVersion | null {
+export function venueName(venueId: string): { label: string; kind: VersionKind; year: number | null } {
+  const parts = venueId.split('/').filter(Boolean);
+  while (parts.length > 1 && STANDING_PART.test(parts[parts.length - 1])) parts.pop();
+  const at = parts.findIndex((part) => /^(19|20)\d\d$/.test(part));
+  const journal = /Journal|^TMLR$|^JMLR$|^DMLR$/i.test(venueId);
+  if (at === -1) return { label: spaced(parts.join(' ')), kind: journal ? 'journal' : 'conference', year: null };
+  const host = spaced((parts[at - 1] ?? parts[0]).replace(/\.(cc|org|com|net|io|ai|edu|info)$/i, ''));
+  const year = Number(parts[at]);
+  const base = `${host} ${year}`;
+  const rest = parts.slice(at + 1).filter((part) => !/^Conference$/i.test(part));
+  if (rest.length === 0) return { label: base, kind: journal ? 'journal' : 'conference', year };
+  if (WORKSHOP_PART.test(rest[0]) && rest.length > 1) {
+    return { label: `${spaced(rest.slice(1).join(' '))} @ ${base}`, kind: 'workshop', year };
+  }
+  const kind: VersionKind = journal
+    ? 'journal'
+    : rest.some((part) => WORKSHOP_PART.test(part))
+      ? 'workshop'
+      : 'conference';
+  return { label: `${base} ${spaced(rest.join(' '))}`, kind, year };
+}
+
+const DECISION = /\b(Oral|Spotlight|Poster|Notable[\w -]*|Highlight|(?:Lightning |Contributed )?Talk)\s*$/i;
+
+/**
+ * A forum as a version of its paper: "SPIGM @ ICML Poster" filed under `ICML.cc/2026/Workshop/SPIGM` → an
+ * accepted workshop version, a poster. "ICLR 2027 Conference Submission" → under review (or, once its year is
+ * past with no decision public, just submitted); "Submitted to ICLR 2026" → not accepted.
+ */
+export function openReviewVersion(note: OpenReviewSearchNote, now = new Date()): FoundVersion | null {
   const venue = value(note, 'venue');
   const venueId = value(note, 'venueid');
   if (!venue || !venueId) return null;
-  const workshop = /\/Workshop\//i.test(venueId);
-  const kind: VersionKind = workshop ? 'workshop' : /\/Journal|TMLR|JMLR/i.test(venueId) ? 'journal' : 'conference';
-  const group = venueId.split('/').pop() ?? '';
-  let status: VersionStatus | undefined;
+  const { label, kind, year } = venueName(venueId);
+  const standing = venueId.split('/').pop() ?? '';
+  let status: VersionStatus;
   let decision: string | undefined;
-  if (/Withdrawn/i.test(group) || /withdrawn/i.test(venue)) status = 'withdrawn';
-  else if (/Desk_Rejected/i.test(group) || /desk rejected/i.test(venue)) {
+  if (/Withdrawn/i.test(standing) || /\bwithdrawn\b/i.test(venue)) status = 'withdrawn';
+  else if (/Desk_Rejected/i.test(standing) || /desk.rejected/i.test(venue)) {
     status = 'rejected';
     decision = 'Desk rejected';
-  } else if (/Rejected/i.test(group) || /rejected/i.test(venue)) status = 'rejected';
-  else if (/^Submitted to /i.test(venue)) status = 'rejected';
-  else if (/Submission$/i.test(group) || /Submission$/i.test(venue)) status = 'under_review';
-  else {
+  } else if (/Rejected/i.test(standing) || /^Submitted to /i.test(venue) || /\brejected\b/i.test(venue)) {
+    status = 'rejected';
+  } else if (/(Submission|Under_Review|Submitted)$/i.test(standing) || /(Submission|under review)$/i.test(venue)) {
+    status = year !== null && year < now.getUTCFullYear() ? 'submitted' : 'under_review';
+  } else {
     status = 'accepted';
-    decision = /\b(Oral|Spotlight|Poster|Notable[\w -]*|Highlight)\s*$/i.exec(venue)?.[1];
-  }
-  // The venue as it names itself, without the decision: "SPIGM @ ICML", "ICLR 2027 Conference".
-  const label = venue
-    .replace(/^Submitted to /i, '')
-    .replace(/\s+(Conference\s+)?(Withdrawn\s+|Desk\s+Rejected\s+)?Submission$/i, '')
-    .replace(/\s+Conference$/i, '')
-    .replace(/\s+(Oral|Spotlight|Poster|Notable[\w -]*|Highlight)\s*$/i, '')
-    .trim();
-  const year = /\/(\d{4})\//.exec(venueId)?.[1];
-  let named = year && !label.includes(year) ? `${label} ${year}` : label;
-  // Some workshops call themselves only "NeurIPS 2025 Workshop": their name is in the venue id.
-  const workshopName = /\/Workshop\/([^/]+)/i.exec(venueId)?.[1];
-  if (workshop && workshopName && !named.toLowerCase().includes(workshopName.toLowerCase())) {
-    named = `${workshopName.replace(/_/g, ' ')} @ ${named.replace(/\s+Workshop$/i, '')}`;
+    decision = DECISION.exec(venue)?.[1];
   }
   const forum = note.forum ?? note.id;
   const pdf = value(note, 'pdf');
   const title = value(note, 'title');
   const abstract = value(note, 'abstract');
   return {
-    label: named,
+    label,
     kind,
     date: isoDay(note.cdate ?? note.odate ?? note.pdate),
     status,
@@ -114,7 +137,7 @@ export async function openReviewVersions(title: string): Promise<FoundVersion[]>
   const wanted = normalizeTitle(title);
   return notes
     .filter((note) => normalizeTitle(value(note, 'title') ?? '') === wanted)
-    .map(openReviewVersion)
+    .map((note) => openReviewVersion(note))
     .filter((v): v is FoundVersion => v !== null);
 }
 

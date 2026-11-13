@@ -19,6 +19,7 @@ import {
   openReviewVersion,
   parseArxivHistory,
   sameWork,
+  venueName,
 } from '@/server/version-sources';
 import { mergeFoundVersions } from '@/server/versions';
 
@@ -253,5 +254,40 @@ describe('finding versions', () => {
     expect(sameWork('Attention', 0.5)).toBe(true);
     expect(sameWork('Generative Model via Quantile Assignment', null)).toBe(false);
     expect(sameWork('Autonomous Functional Play with Correspondence-Driven Trajectory Warping', null)).toBe(true);
+  });
+});
+
+describe('venueName', () => {
+  it('names a venue from its id, whatever its organisers typed', () => {
+    expect(venueName('ICLR.cc/2027/Conference/Submission')).toEqual({
+      label: 'ICLR 2027',
+      kind: 'conference',
+      year: 2027,
+    });
+    expect(venueName('AAAI.org/2026/Workshop/DAI')).toMatchObject({ label: 'DAI @ AAAI 2026', kind: 'workshop' });
+    expect(venueName('AAAI.org/2026/Workshop/AgriAI/Rejected_Submission').label).toBe('AgriAI @ AAAI 2026');
+    expect(venueName('AAAI.org/2026/Bridge/LMReasoning')).toMatchObject({
+      label: 'LMReasoning @ AAAI 2026',
+      kind: 'workshop',
+    });
+    expect(venueName('thecvf.com/CVPR/2026/Conference').label).toBe('CVPR 2026');
+    expect(venueName('NeurIPS.cc/2025/Datasets_and_Benchmarks_Track').label).toBe(
+      'NeurIPS 2025 Datasets and Benchmarks Track',
+    );
+    expect(venueName('TMLR')).toEqual({ label: 'TMLR', kind: 'journal', year: null });
+  });
+
+  it('says a past submission with no public decision was submitted, not under review', () => {
+    const old = openReviewVersion(
+      {
+        id: 'x',
+        content: {
+          venue: { value: 'AAAI 2025 Workshop AI4WCN Submission' },
+          venueid: { value: 'AAAI.org/2025/Workshop/AI4WCN/Submission' },
+        },
+      },
+      new Date('2026-11-13'),
+    );
+    expect(old).toMatchObject({ label: 'AI4WCN @ AAAI 2025', status: 'submitted' });
   });
 });
