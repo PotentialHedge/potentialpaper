@@ -1,84 +1,20 @@
 import { createHash } from 'node:crypto';
-import { mkdir, writeFile } from 'node:fs/promises';
-import { join } from 'node:path';
-import { AwsClient } from 'aws4fetch';
 import { getDb } from '@/db';
 import { linkProblem, MAX_LINKS, type TitleLink } from '@/lib/paper-links';
 import { ApiError } from '../api/errors';
+import { storeImage } from '../media';
+import { checkMayWrite } from './check';
 import { commitPage, type Actor, type CommitOptions, type CommitResult } from './commit';
 import { linkChanges } from './content';
 import { readCommit, readFiles, readHead, readText } from './repo';
-import {
-  imageType,
-  MAX_THUMBNAIL_BYTES,
-  parseThumbnailPointer,
-  THUMBNAIL_PATH,
-  type ThumbnailPointer,
-  type ThumbnailType,
-} from './rules';
+import { imageType, MAX_THUMBNAIL_BYTES, parseThumbnailPointer, THUMBNAIL_PATH, type ThumbnailPointer } from './rules';
 
 /**
  * A paper's card: the picture beside its abstract and the links under its title. Its confirmed authors'
  * once the paper is claimed, and any verified researcher's until then (`rules.ts`).
  */
 
-const BUCKET = process.env.R2_BUCKET ?? 'papertrail-pdfs';
-const MEDIA_BASE = process.env.PDF_BASE_URL ?? 'https://pdfs.potentialhedge.com';
-const EXTENSIONS: Record<ThumbnailType, string> = {
-  'image/jpeg': 'jpg',
-  'image/png': 'png',
-  'image/gif': 'gif',
-  'image/webp': 'webp',
-  'image/avif': 'avif',
-};
 export const MAX_ALT = 500;
-
-/**
- * Stores an image under its hash and returns its address: in R2 when its keys are set, and otherwise,
- * in development, under `public/thumbnails` (or `THUMBNAILS_DIR`), served by this site.
- */
-export function storeImage(bytes: Buffer, sha256: string, type: ThumbnailType): Promise<string> {
-  return storeMedia(bytes, `${sha256}.${EXTENSIONS[type]}`, type, {
-    folder: 'thumbnail',
-    devDir: process.env.THUMBNAILS_DIR,
-    devPath: '/thumbnails',
-  });
-}
-
-/**
- * Stores bytes as `folder/name` in R2 when its keys are set, and returns their public address. Without the
- * keys, in development, writes them to `devDir` (by default `public` + `devPath`), which this site serves.
- */
-export async function storeMedia(
-  bytes: Buffer,
-  name: string,
-  contentType: string,
-  { folder, devDir, devPath }: { folder: string; devDir?: string; devPath: string },
-): Promise<string> {
-  const { R2_ACCOUNT_ID, R2_ACCESS_KEY_ID, R2_SECRET_ACCESS_KEY } = process.env;
-  if (!R2_ACCOUNT_ID || !R2_ACCESS_KEY_ID || !R2_SECRET_ACCESS_KEY) {
-    if (process.env.NODE_ENV === 'production' && !devDir) {
-      throw new Error(`${folder} storage: set the R2_* keys`);
-    }
-    const dir = devDir ?? join(process.cwd(), 'public', devPath);
-    await mkdir(dir, { recursive: true });
-    await writeFile(join(dir, name), bytes);
-    return `${devPath}/${name}`;
-  }
-  const client = new AwsClient({
-    accessKeyId: R2_ACCESS_KEY_ID,
-    secretAccessKey: R2_SECRET_ACCESS_KEY,
-    service: 's3',
-    region: 'auto',
-  });
-  const put = await client.fetch(`https://${R2_ACCOUNT_ID}.r2.cloudflarestorage.com/${BUCKET}/${folder}/${name}`, {
-    method: 'PUT',
-    body: new Uint8Array(bytes),
-    headers: { 'Content-Type': contentType, 'Cache-Control': 'public, max-age=31536000, immutable' },
-  });
-  if (!put.ok) throw new Error(`R2 upload: HTTP ${put.status}: ${(await put.text()).slice(0, 200)}`);
-  return `${MEDIA_BASE}/${folder}/${name}`;
-}
 
 /** A file of the page at its head, the head, and every path there. */
 async function fileAtHead(paperId: string, path: string, options: CommitOptions) {
@@ -108,6 +44,8 @@ export async function setThumbnail(
   const current = text === null ? null : parseThumbnailPointer(text);
   let image: Pick<ThumbnailPointer, 'sha256' | 'bytes' | 'type' | 'url'>;
   if (change.image) {
+    // Storing the picture is slow and leaves a file behind, so only for someone the commit would take it from.
+    await checkMayWrite(options.database ?? getDb(), paperId, actor, [THUMBNAIL_PATH]);
     const type = imageType(change.image);
     if (!type) throw new ApiError(422, 'validation_error', 'the picture has to be a JPEG, PNG, GIF, WebP or AVIF');
     if (change.image.length > MAX_THUMBNAIL_BYTES) {

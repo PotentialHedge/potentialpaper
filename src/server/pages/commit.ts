@@ -1,68 +1,39 @@
-import { randomBytes } from 'node:crypto';
 import { and, eq, max } from 'drizzle-orm';
 import { getDb, type Database } from '@/db';
 import { pgErrorCode } from '@/db/errors';
-import {
-  accounts,
-  authorClaims,
-  commitIdentities,
-  pageEvents,
-  pageObjects,
-  pageRefs,
-  pageRevisions,
-  paperIdentifiers,
-  papers,
-} from '@/db/schema';
-import { cleanEvidence } from '@/lib/evidence';
-import { MAX_LINKS, parseLinkFile } from '@/lib/paper-links';
-import { MAX_VERSIONS } from '@/lib/versions';
+import { pageEvents, pageObjects, pageRefs, pageRevisions, papers, paperIdentifiers } from '@/db/schema';
 import { ApiError } from '../api/errors';
-import { checkDemos, pinDemos, snapshotNewDemoUrls } from '../demos/attach';
-import { consume, rateLimitHeaders, type RateLimitConfig } from '../ratelimit';
+import { copyDemos, type DemoPin, newDemoUrls, pinDemos, pinsFor } from '../demos/attach';
+import type { RateLimitConfig } from '../ratelimit';
 import {
-  buildTrees,
-  type Commit,
-  type EditKind,
-  encodeCommit,
-  gitObject,
-  type GitObject,
-  SYSTEM_AUTHOR_ID,
-} from './git-objects';
+  type Actor,
+  authorIdOf,
+  checkChangeCount,
+  checkEvidence,
+  checkPaper,
+  checkPath,
+  checkTree,
+  rolesOf,
+  takeCommit,
+} from './check';
+import { buildTrees, type Commit, type EditKind, encodeCommit, gitObject, type GitObject } from './git-objects';
 import { mergeFile, type Version } from './merge';
 import { lockPage, writeCurrent, writeRevision, type Writer } from './projections';
 import { changedFiles, findCommit, readCommit, readFiles, readHead, readText, toBytes } from './repo';
-import {
-  cleanSummary,
-  contentProblem,
-  isDemoPath,
-  isLinkPath,
-  layoutProblem,
-  MAX_CHANGES,
-  MAX_DEMOS_FILES,
-  MAX_FILES,
-  MAX_SECTIONS,
-  METADATA_PATH,
-  normalizePath,
-  PAGE_PARTS,
-  pathDenied,
-  type Roles,
-  sectionName,
-  versionIdOf,
-} from './rules';
+import { cleanSummary, contentProblem, layoutProblem, METADATA_PATH, normalizePath } from './rules';
+
+export { type Actor, COMMIT_RATE_LIMIT, newIdentity, SYSTEM_ACTOR } from './check';
 
 /**
  * The **only** writer of page state (DESIGN.md §4.4). One transaction covers the objects, the head, the
- * projections and the event, so they can never disagree.
+ * projections and the event, so they can never disagree. What a commit may change is decided in `check.ts`,
+ * for web edits here and for pushed commits in `receive.ts`; both store through `recordCommit`.
  *
  * Still to come with the features that need them: page protection and tighter limits for new accounts
  * (Milestone 3), links (4), author identities and trailers (5). The routes that commit refresh the paper's
  * pages afterwards (`refresh.ts`), since this runs in scripts too (`info/refs` is never cached, and objects
  * never change).
  */
-
-export type Actor = { kind: 'system' } | { kind: 'account'; accountId: string; isAdmin: boolean };
-
-export const SYSTEM_ACTOR: Actor = { kind: 'system' };
 
 export interface FileChange {
   path: string;
@@ -98,28 +69,6 @@ export interface CommitOptions {
   migration?: boolean;
 }
 
-/** Enough for a burst of section edits, and well short of flooding a page's history. */
-export const COMMIT_RATE_LIMIT: RateLimitConfig = { burst: 30, perSecond: 0.2 };
-
-const IDENTITY_ALPHABET = 'abcdefghijkmnpqrstuvwxyz23456789';
-const IDENTITY_LENGTH = 8;
-
-export function newIdentity(prefix: 'u' | 'a' = 'u'): string {
-  return `${prefix}_${[...randomBytes(IDENTITY_LENGTH)].map((b) => IDENTITY_ALPHABET[b % IDENTITY_ALPHABET.length]).join('')}`;
-}
-
-/** The account's stable public id in commits, made on its first commit. */
-async function commitIdentity(tx: Writer, accountId: string): Promise<string> {
-  await tx.insert(commitIdentities).values({ id: newIdentity(), accountId }).onConflictDoNothing();
-  const [row] = await tx
-    .select({ id: commitIdentities.id })
-    .from(commitIdentities)
-    .where(eq(commitIdentities.accountId, accountId));
-  // Only if the random id collided with another account's, which a retry won't repeat.
-  if (!row) throw new ApiError(503, 'page_busy', 'could not make a commit identity; try again');
-  return row.id;
-}
-
 /** The first commit's snapshot of the paper (DESIGN.md §4.2). Stable, so that it hashes the same when unchanged. */
 async function metadataSnapshot(tx: Writer, paperId: string): Promise<string> {
   const [paper] = await tx.select().from(papers).where(eq(papers.id, paperId));
@@ -134,14 +83,7 @@ async function metadataSnapshot(tx: Writer, paperId: string): Promise<string> {
 }
 
 function normalizeChanges(changes: readonly FileChange[], migration: boolean): FileChange[] {
-  // A demo folder is many small files that go in together; its own limits cover it.
-  const demoFiles = changes.filter(({ path }) => isDemoPath(path)).length;
-  if (changes.length - demoFiles > MAX_CHANGES && !migration) {
-    throw new ApiError(422, 'validation_error', `a commit can change at most ${MAX_CHANGES} files`);
-  }
-  if (demoFiles > MAX_DEMOS_FILES) {
-    throw new ApiError(422, 'validation_error', `a commit can change at most ${MAX_DEMOS_FILES} demo files`);
-  }
+  if (!migration) checkChangeCount(changes.map(({ path }) => path));
   const seen = new Set<string>();
   return changes.map(({ path: raw, content }) => {
     const normal = normalizePath(raw);
@@ -154,102 +96,6 @@ function normalizeChanges(changes: readonly FileChange[], migration: boolean): F
     seen.add(normal.path);
     return { path: normal.path, content };
   });
-}
-
-type ActorRoles = Roles & { bot: boolean; claimIdentity: string | null };
-
-async function rolesOf(tx: Writer, actor: Actor, paperId: string): Promise<ActorRoles> {
-  const confirmed = await tx
-    .select({ accountId: authorClaims.accountId, identityId: authorClaims.identityId })
-    .from(authorClaims)
-    .where(and(eq(authorClaims.paperId, paperId), eq(authorClaims.status, 'confirmed')));
-  const claimed = confirmed.length > 0;
-  if (actor.kind === 'system') {
-    return {
-      system: true,
-      admin: false,
-      verified: false,
-      confirmedAuthor: false,
-      claimed,
-      bot: false,
-      claimIdentity: null,
-    };
-  }
-  const claim = confirmed.find((c) => c.accountId === actor.accountId);
-  const [account] = await tx
-    .select({ isBot: accounts.isBot, verifiedAt: accounts.verifiedAt })
-    .from(accounts)
-    .where(eq(accounts.id, actor.accountId));
-  if (!account) throw new ApiError(404, 'not_found', 'no such account');
-  return {
-    system: false,
-    admin: actor.isAdmin,
-    verified: account.isBot || account.verifiedAt !== null,
-    confirmedAuthor: claim !== undefined,
-    claimed,
-    bot: account.isBot,
-    // On their own paper an author is always named, never their handle (DESIGN.md §5.3).
-    claimIdentity: claim?.identityId ?? null,
-  };
-}
-
-function checkPermissions(changes: readonly FileChange[], roles: Roles, migration: boolean): void {
-  for (const { path, content } of changes) {
-    const denied = migration ? null : pathDenied(path, roles);
-    if (denied) throw new ApiError(403, 'forbidden', denied, { path });
-    // A file that has no place in the layout can still be deleted, so that such a page can be cleaned up.
-    const misplaced = content === null ? null : layoutProblem(path);
-    if (misplaced) throw new ApiError(422, 'validation_error', `${path}: ${misplaced}`, { path });
-  }
-}
-
-/**
- * What only shows once the changes meet what's in the repo: a file can't also be a directory, and the
- * directories of links, versions and sections have their limits.
- */
-function checkTreeShape(files: ReadonlyMap<string, unknown>): void {
-  if (!files.has(METADATA_PATH)) {
-    throw new ApiError(422, 'validation_error', `a page keeps its ${METADATA_PATH}`, { path: METADATA_PATH });
-  }
-  if (files.size > MAX_FILES) throw new ApiError(422, 'validation_error', `a page can have at most ${MAX_FILES} files`);
-  const paths = [...files.keys()];
-  if (paths.filter(isLinkPath).length > MAX_LINKS) {
-    throw new ApiError(422, 'validation_error', `a page can have at most ${MAX_LINKS} links`);
-  }
-  if (paths.filter((path) => versionIdOf(path)).length > MAX_VERSIONS) {
-    throw new ApiError(422, 'validation_error', `a page can have at most ${MAX_VERSIONS} versions`);
-  }
-  for (const part of PAGE_PARTS) {
-    if (paths.filter((path) => sectionName(path, part)).length > MAX_SECTIONS) {
-      throw new ApiError(422, 'validation_error', `a part can have at most ${MAX_SECTIONS} sections`);
-    }
-  }
-  for (const path of files.keys()) {
-    for (let at = path.indexOf('/'); at !== -1; at = path.indexOf('/', at + 1)) {
-      if (files.has(path.slice(0, at))) {
-        throw new ApiError(422, 'validation_error', 'a path is both a file and a directory', { path });
-      }
-    }
-  }
-}
-
-/** Two links can't have one label, as a link with a built-in link's label replaces it (`lib/paper-links.ts`). */
-async function checkLinkLabels(
-  files: ReadonlyMap<string, string>,
-  text: (blob: string) => string | Promise<string | null>,
-): Promise<void> {
-  const labels = new Set<string>();
-  for (const [path, blob] of files) {
-    if (!isLinkPath(path)) continue;
-    const label = parseLinkFile((await text(blob)) ?? '')?.label.toLowerCase();
-    if (label === undefined) continue;
-    if (labels.has(label)) throw new ApiError(422, 'validation_error', `two links are called “${label}”`, { path });
-    labels.add(label);
-  }
-}
-
-function invalidContent(path: string, problem: string): ApiError {
-  return new ApiError(422, 'validation_error', `${path} ${problem}`, { path });
 }
 
 /**
@@ -272,6 +118,7 @@ export async function moveHead(tx: Writer, paperId: string, expected: string | n
 }
 
 async function writeObjects(tx: Writer, paperId: string, objects: readonly GitObject[]): Promise<void> {
+  if (objects.length === 0) return;
   await tx
     .insert(pageObjects)
     .values(objects.map(({ oid, type, body }) => ({ paperId, oid: toBytes(oid), type, body })))
@@ -279,9 +126,63 @@ async function writeObjects(tx: Writer, paperId: string, objects: readonly GitOb
 }
 
 /**
+ * Stores a checked commit on top of the head, which has to be its parent: its objects, the head, the pins of
+ * its new demos, its revision row and its event. The caller holds the page's lock, has run `checkTree`, and
+ * writes `page_current` (`writeCurrent`) once its last commit is in. Shared by web edits and pushes, so both
+ * leave the same rows behind.
+ */
+export async function recordCommit(
+  tx: Writer,
+  paperId: string,
+  object: GitObject,
+  commit: Commit,
+  others: readonly GitObject[],
+  pins: readonly DemoPin[],
+): Promise<{ seq: number; paths: string[] }> {
+  await writeObjects(tx, paperId, [...others, object]);
+  if (!(await moveHead(tx, paperId, commit.parent, object.oid))) {
+    throw new ApiError(503, 'page_busy', 'the page changed during the edit; try again');
+  }
+  await pinDemos(tx, paperId, object.oid, pins);
+
+  const [last] = await tx
+    .select({ seq: max(pageRevisions.seq) })
+    .from(pageRevisions)
+    .where(eq(pageRevisions.paperId, paperId));
+  const seq = (last?.seq ?? 0) + 1;
+  const { paths, bytesDelta } = await writeRevision(tx, paperId, seq, object.oid, commit);
+  await tx.insert(pageEvents).values({
+    paperId,
+    seq,
+    type: 'page.committed',
+    payload: {
+      oid: object.oid,
+      parent: commit.parent,
+      authorId: commit.authorId,
+      kind: commit.kind,
+      summary: commit.summary,
+      paths,
+      bytesDelta,
+      ...(commit.reverts ? { reverts: commit.reverts } : {}),
+      ...(commit.bot ? { bot: true } : {}),
+      ...(commit.evidence ? { evidence: commit.evidence } : {}),
+    },
+  });
+  return { seq, paths };
+}
+
+/** A lock that waited too long, said as what to do about it. */
+export function busyError(err: unknown): unknown {
+  return pgErrorCode(err) === '55P03'
+    ? new ApiError(503, 'page_busy', 'this page is being edited heavily; try again', undefined, { 'Retry-After': '5' })
+    : err;
+}
+
+/**
  * Commits changes that were made starting from `baseOid`, the commit the editor loaded, or `null` if the
  * page had no repo then. If the head has moved since, each changed file is merged with what happened in
  * between, and a real conflict throws `409 edit_conflict` with every version of each conflicting file.
+ * Whatever the merge gives is then checked as a whole tree (`checkTree`).
  */
 export async function commitPage(
   paperId: string,
@@ -291,39 +192,24 @@ export async function commitPage(
   summary: string,
   options: CommitOptions = {},
 ): Promise<CommitResult> {
-  const { kind = 'edit', reverts, database = getDb(), rateLimit = COMMIT_RATE_LIMIT } = options;
+  const { kind = 'edit', reverts, database = getDb(), rateLimit } = options;
   const migration = options.migration === true && actor.kind === 'system';
   const wanted = normalizeChanges(changes, migration);
-  const cleaned = cleanEvidence(options.evidence ?? []);
-  if ('problem' in cleaned) throw new ApiError(422, 'validation_error', cleaned.problem);
-  const { evidence } = cleaned;
+  const evidence = checkEvidence(options.evidence ?? []);
+  await takeCommit(actor, rateLimit);
 
-  if (actor.kind === 'account') {
-    const limit = await consume(`page-commit:${actor.accountId}`, rateLimit);
-    if (!limit.allowed) {
-      throw new ApiError(
-        429,
-        'rate_limited',
-        'too many edits; wait a moment',
-        { retryAfterSeconds: limit.retryAfterSeconds },
-        rateLimitHeaders(limit),
-      );
-    }
-  }
-
-  // Before the lock: copying a demo from GitHub is a download.
-  const snapshots = await snapshotNewDemoUrls(database, paperId, wanted);
+  // Roles first and downloads last: what is refused for who is asking, or for what it says, never waits
+  // for GitHub. The same checks run again under the lock, on the tree the merge makes.
+  const early = await rolesOf(database, actor, paperId);
+  await checkPaper(database, paperId, migration);
+  for (const { path, content } of wanted) checkPath(path, content, early, migration);
+  const snapshots = await copyDemos(database, await newDemoUrls(database, paperId, wanted));
 
   try {
     return await database.transaction(async (tx) => {
       const roles = await rolesOf(tx, actor, paperId);
-      checkPermissions(wanted, roles, migration);
-
-      const [paper] = await tx.select({ mergedInto: papers.mergedInto }).from(papers).where(eq(papers.id, paperId));
-      if (!paper) throw new ApiError(404, 'not_found', 'no such paper');
-      if (paper.mergedInto && !migration) {
-        throw new ApiError(409, 'paper_merged', 'this paper was merged into another', { into: paper.mergedInto });
-      }
+      for (const { path, content } of wanted) checkPath(path, content === null ? null : undefined, roles, migration);
+      await checkPaper(tx, paperId, migration);
 
       await lockPage(tx, paperId);
       const head = await readHead(tx, paperId);
@@ -339,9 +225,6 @@ export async function commitPage(
       const written = new Map<string, string>();
       const conflicts: Conflict[] = [];
       for (const { path, content } of wanted) {
-        const invalid = content === null ? null : contentProblem(path, content);
-        if (invalid) throw invalidContent(path, invalid);
-
         const base = await readText(tx, paperId, baseFiles.get(path));
         const theirs = await readText(tx, paperId, headFiles.get(path));
         const merge = mergeFile(base, content, theirs);
@@ -372,35 +255,30 @@ export async function commitPage(
       const changedAny = changedFiles(headFiles, files).length > 0;
       const recordAnyway = (isFirstCommit || options.recordEmpty) && actor.kind === 'system';
       if (!changedAny && !recordAnyway) return { status: 'unchanged', oid: head };
+      // The system starts every repo with the metadata, whoever's edit starts it, so it is checked as there.
+      const before = new Map(headFiles);
       if (isFirstCommit && !files.has(METADATA_PATH)) {
         const metadata = gitObject('blob', Buffer.from(await metadataSnapshot(tx, paperId)));
         blobs.push(metadata);
         files.set(METADATA_PATH, metadata.oid);
+        before.set(METADATA_PATH, metadata.oid);
+        written.set(metadata.oid, metadata.body.toString('utf8'));
       }
-      checkTreeShape(files);
-      const text = async (blob: string) => written.get(blob) ?? readText(tx, paperId, blob);
-      if (wanted.some(({ path }) => isLinkPath(path))) await checkLinkLabels(files, text);
-      const pins = await checkDemos(tx, {
+      const added = await checkTree(tx, {
         paperId,
         roles,
-        changed: wanted.map(({ path }) => path),
-        headFiles,
-        files,
-        text,
-        snapshots,
+        before,
+        after: files,
+        text: async (blob) => written.get(blob) ?? readText(tx, paperId, blob),
         newBlobBytes: new Map(blobs.map((blob) => [blob.oid, blob.body.length])),
         migration,
       });
 
       const { root, trees } = buildTrees(files);
-
       const commit: Commit = {
         tree: root,
         parent: head,
-        authorId:
-          actor.kind === 'system'
-            ? SYSTEM_AUTHOR_ID
-            : (roles.claimIdentity ?? (await commitIdentity(tx, actor.accountId))),
+        authorId: await authorIdOf(tx, actor, roles),
         at: new Date(Math.floor(Date.now() / 1000) * 1000),
         summary: cleanSummary(summary),
         kind,
@@ -409,46 +287,19 @@ export async function commitPage(
         ...(evidence.length > 0 ? { evidence } : {}),
       };
       const object = gitObject('commit', encodeCommit(commit));
-      await writeObjects(tx, paperId, [...blobs, ...trees, object]);
-
-      if (!(await moveHead(tx, paperId, head, object.oid))) {
-        throw new ApiError(503, 'page_busy', 'the page changed during the edit; try again');
-      }
-      await pinDemos(tx, paperId, object.oid, pins);
-
-      const [last] = await tx
-        .select({ seq: max(pageRevisions.seq) })
-        .from(pageRevisions)
-        .where(eq(pageRevisions.paperId, paperId));
-      const seq = (last?.seq ?? 0) + 1;
-      const { paths, bytesDelta } = await writeRevision(tx, paperId, seq, object.oid, commit);
-      await writeCurrent(tx, paperId, object.oid, commit);
-      await tx.insert(pageEvents).values({
+      const { seq, paths } = await recordCommit(
+        tx,
         paperId,
-        seq,
-        type: 'page.committed',
-        payload: {
-          oid: object.oid,
-          parent: head,
-          authorId: commit.authorId,
-          kind,
-          summary: commit.summary,
-          paths,
-          bytesDelta,
-          ...(reverts ? { reverts } : {}),
-          ...(roles.bot ? { bot: true } : {}),
-          ...(evidence.length > 0 ? { evidence } : {}),
-        },
-      });
+        object,
+        commit,
+        [...blobs, ...trees],
+        pinsFor(added, snapshots),
+      );
+      await writeCurrent(tx, paperId, object.oid, commit);
       return { status: 'committed', oid: object.oid, seq, paths, merged: head !== baseOid };
     });
   } catch (err) {
-    if (pgErrorCode(err) === '55P03') {
-      throw new ApiError(503, 'page_busy', 'this page is being edited heavily; try again', undefined, {
-        'Retry-After': '5',
-      });
-    }
-    throw err;
+    throw busyError(err);
   }
 }
 
@@ -473,6 +324,17 @@ export async function revertCommit(
   const changed = changedFiles(before, await readFiles(database, paperId, commit.tree)).filter(
     (file) => parent || file.path !== METADATA_PATH,
   );
+  // A commit from before the page's files were laid out as they are now (`layout-migration.ts`) would put
+  // back files that have no place any more. Its text is still in the history and the diff, to copy from.
+  const misplaced = changed.find((file) => layoutProblem(file.path));
+  if (misplaced) {
+    throw new ApiError(
+      422,
+      'validation_error',
+      `this commit changed ${misplaced.path}, which pages no longer have since their files were laid out anew, so it can't be undone; edit the page instead`,
+      { path: misplaced.path },
+    );
+  }
   const changes: FileChange[] = [];
   for (const file of changed) {
     changes.push({ path: file.path, content: await readText(database, paperId, file.before) });

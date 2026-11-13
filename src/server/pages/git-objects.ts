@@ -88,7 +88,7 @@ export interface Commit {
 export const SYSTEM_AUTHOR_ID = 'potentialpaper';
 
 function signature(id: string, at: Date): string {
-  return `${id} <${id}@users.invalid> ${Math.floor(at.getTime() / 1000)} +0000`;
+  return `${id} <${identityEmail(id)}> ${Math.floor(at.getTime() / 1000)} +0000`;
 }
 
 /**
@@ -112,35 +112,99 @@ export function encodeCommit(commit: Commit): Buffer {
   return Buffer.from(`${lines.join('\n')}\n`);
 }
 
-export function parseCommit(body: Buffer): Commit {
+export interface Signature {
+  name: string;
+  email: string;
+  /** Seconds since the epoch. */
+  time: number;
+  /** As git writes it, `+0000` or `-0130`. */
+  zone: string;
+}
+
+const SIGNATURE = /^(.*) <([^<>]*)> (\d+) ([+-]\d{4})$/;
+
+export function parseSignature(line: string): Signature | null {
+  const match = SIGNATURE.exec(line);
+  return match && { name: match[1], email: match[2], time: Number(match[3]), zone: match[4] };
+}
+
+/** The email in a commit signed by a public id (`u_…`, `a_…`, the system's). */
+export function identityEmail(id: string): string {
+  return `${id}@users.invalid`;
+}
+
+/** A commit object as git has it, before any meaning is read into its message. */
+export interface CommitObject {
+  tree: string;
+  parents: string[];
+  author: Signature;
+  committer: Signature;
+  /** Every header line's name, in order, continuation lines left out (`gpgsig`'s, say). */
+  headers: string[];
+  /** The `encoding` header, if there is one. */
+  encoding: string | null;
+  message: string;
+}
+
+export function parseCommitObject(body: Buffer): CommitObject {
   const text = body.toString('utf8');
   const split = text.indexOf('\n\n');
-  const head = text.slice(0, split).split('\n');
+  const head = (split === -1 ? text : text.slice(0, split)).split('\n');
   const field = (name: string) => head.find((l) => l.startsWith(`${name} `))?.slice(name.length + 1);
-  const author = /^(\S+) <[^>]*> (\d+) \+0000$/.exec(field('author') ?? '');
   const tree = field('tree');
-  if (!tree || !author) throw new Error('malformed commit');
-
-  const message = text.slice(split + 2);
-  const end = message.indexOf('\n\n');
-  const pairs = message
-    .slice(end + 2)
-    .trim()
-    .split('\n')
-    .map((line) => {
-      const colon = line.indexOf(': ');
-      return [line.slice(0, colon), line.slice(colon + 2)] as const;
-    });
-  const trailers = new Map(pairs);
-  const evidence = pairs.filter(([key]) => key === 'Evidence').map(([, value]) => value);
-  const kind = trailers.get('Edit-Kind') as EditKind | undefined;
-  if (!kind || !EDIT_KINDS.includes(kind)) throw new Error('commit has no Edit-Kind');
+  const author = parseSignature(field('author') ?? '');
+  const committer = parseSignature(field('committer') ?? '');
+  if (!tree || !author || !committer) throw new Error('malformed commit');
   return {
     tree,
-    parent: field('parent') ?? null,
-    authorId: author[1],
-    at: new Date(Number(author[2]) * 1000),
-    summary: message.slice(0, end),
+    parents: head.filter((l) => l.startsWith('parent ')).map((l) => l.slice('parent '.length)),
+    author,
+    committer,
+    headers: head.filter((l) => !l.startsWith(' ')).map((l) => l.slice(0, l.indexOf(' '))),
+    encoding: field('encoding') ?? null,
+    message: split === -1 ? '' : text.slice(split + 2),
+  };
+}
+
+const TRAILER = /^([A-Za-z0-9][A-Za-z0-9-]*): (.*)$/;
+
+/**
+ * A message's summary (its first paragraph, as one line) and its trailers: the last paragraph, if there is
+ * more than one and every line of it is a `Key: value`, as git reads them. Lines between are the body.
+ */
+export function parseMessage(message: string): { summary: string; trailers: [string, string][] } {
+  const paragraphs = message
+    .replace(/\r\n/g, '\n')
+    .trim()
+    .split(/\n[ \t]*\n/)
+    .map((p) => p.trim())
+    .filter(Boolean);
+  const summary = (paragraphs[0] ?? '').replace(/\s*\n\s*/g, ' ');
+  const last = paragraphs.length > 1 ? paragraphs[paragraphs.length - 1].split('\n') : [];
+  const pairs = last.map((line) => TRAILER.exec(line));
+  const trailers = pairs.every((pair) => pair !== null)
+    ? pairs.map((pair) => [pair![1], pair![2]] as [string, string])
+    : [];
+  return { summary, trailers };
+}
+
+/**
+ * A commit's meaning for the site. Commits pushed from a git client have no `Edit-Kind:` trailer, and are
+ * edits; their time is the committer's (a rebase keeps an older author date).
+ */
+export function parseCommit(body: Buffer): Commit {
+  const raw = parseCommitObject(body);
+  const { summary, trailers: pairs } = parseMessage(raw.message);
+  const trailers = new Map(pairs);
+  const evidence = pairs.filter(([key]) => key === 'Evidence').map(([, value]) => value);
+  const kind = (trailers.get('Edit-Kind') ?? 'edit') as EditKind;
+  if (!EDIT_KINDS.includes(kind)) throw new Error(`commit has an unknown Edit-Kind: ${kind}`);
+  return {
+    tree: raw.tree,
+    parent: raw.parents[0] ?? null,
+    authorId: raw.author.name,
+    at: new Date(raw.committer.time * 1000),
+    summary,
     kind,
     reverts: trailers.get('Reverts'),
     bot: trailers.get('Bot') === 'true',

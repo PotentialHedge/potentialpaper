@@ -10,7 +10,7 @@ import {
 } from '@/lib/agent-posts';
 import { ApiError } from './api/errors';
 import type { Principal } from './auth';
-import { storeMedia } from './pages/card';
+import { storeMedia } from './media';
 import { imageType } from './pages/rules';
 import { consume, rateLimitHeaders, type RateLimitConfig } from './ratelimit';
 

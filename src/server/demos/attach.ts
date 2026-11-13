@@ -110,21 +110,21 @@ function githubUrls(refs: readonly DemoRef[]): string[] {
 }
 
 /**
- * Copies the demos at the GitHub addresses that these new texts put on the page, before the commit's
- * transaction, since each is a download that may take a while. Returns the snapshot of each, by address.
- * The commit then checks, under the page's lock, that every new address has one (`checkDemos`).
+ * The GitHub addresses these new texts put on the page, that the head's Markdown doesn't have. Read before
+ * the commit's lock, to copy them first (`copyDemos`); the commit then checks under the lock that every
+ * address new to the page has a copy (`checkDemos`).
  */
-export async function snapshotNewDemoUrls(
-  database: Database,
+export async function newDemoUrls(
+  database: Reader,
   paperId: string,
   changes: readonly { path: string; content: string | null }[],
-): Promise<Map<string, string>> {
+): Promise<string[]> {
   const urls = new Set(
     changes.flatMap(({ path, content }) =>
       content !== null && isMarkdownSection(path) ? githubUrls(demoRefs(content)) : [],
     ),
   );
-  if (urls.size === 0) return new Map();
+  if (urls.size === 0) return [];
   const head = await readHead(database, paperId);
   if (head) {
     const files = await readFiles(database, paperId, (await readCommit(database, paperId, head)).tree);
@@ -133,11 +133,22 @@ export async function snapshotNewDemoUrls(
       for (const url of githubUrls(demoRefs(await readText(database, paperId, blob)))) urls.delete(url);
     }
   }
-  if (urls.size > MAX_NEW_DEMO_URLS) {
-    throw new ApiError(422, 'validation_error', `a commit can add at most ${MAX_NEW_DEMO_URLS} demos from GitHub`);
-  }
+  if (urls.size > MAX_NEW_DEMO_URLS) throw tooManyDemoUrls();
+  return [...urls];
+}
+
+function tooManyDemoUrls(): ApiError {
+  return new ApiError(422, 'validation_error', `a commit can add at most ${MAX_NEW_DEMO_URLS} demos from GitHub`);
+}
+
+/**
+ * Copies the demos at these GitHub addresses, before the commit's transaction, since each is a download that
+ * may take a while. Returns the snapshot of each, by address. Called once the commit's other checks passed.
+ */
+export async function copyDemos(database: Database, urls: Iterable<string>): Promise<Map<string, string>> {
   const snapshots = new Map<string, string>();
   for (const url of urls) {
+    if (snapshots.has(url)) continue;
     try {
       snapshots.set(url, (await snapshotDemo(url, database)).id);
     } catch (err) {
@@ -173,8 +184,6 @@ export interface DemoCheck {
   files: ReadonlyMap<string, string>;
   /** A blob's text, whether it is new in this commit or already stored. */
   text: (blob: string) => Promise<string | null>;
-  /** What `snapshotNewDemoUrls` copied. */
-  snapshots: ReadonlyMap<string, string>;
   /** The size of each blob new in this commit. */
   newBlobBytes: ReadonlyMap<string, number>;
   /** A system migration, which writes what it must. */
@@ -184,10 +193,10 @@ export interface DemoCheck {
 /**
  * The demo rules that need the whole tree: every block in a written section names a demo there is, a
  * folder a block names has an `index.html`, a folder the author section shows is only its authors' to
- * change, and the folders' limits. Returns the GitHub addresses new to the page, to pin once the commit
- * has an id.
+ * change, and the folders' limits. Returns the GitHub addresses new to the page, which have to be copied
+ * (`copyDemos`) and are pinned once the commit has an id (`pinsFor`).
  */
-export async function checkDemos(tx: Reader, check: DemoCheck): Promise<DemoPin[]> {
+export async function checkDemos(tx: Reader, check: DemoCheck): Promise<string[]> {
   const { changed, headFiles, files, text } = check;
   const touchesDemos = changed.some(isDemoPath);
   if (!touchesDemos && !changed.some(isMarkdownSection)) return [];
@@ -286,14 +295,18 @@ export async function checkDemos(tx: Reader, check: DemoCheck): Promise<DemoPin[
 
   const before = new Set(githubUrls((await refsIn(headFiles)).flatMap(({ refs }) => refs)));
   const added = new Set(githubUrls(after.flatMap(({ refs }) => refs)).filter((url) => !before.has(url)));
-  const pins: DemoPin[] = [];
-  for (const url of added) {
-    const snapshotId = check.snapshots.get(url);
+  if (added.size > MAX_NEW_DEMO_URLS) throw tooManyDemoUrls();
+  return [...added];
+}
+
+/** The pins for the addresses `checkDemos` found new to the page, from what `copyDemos` copied. */
+export function pinsFor(added: readonly string[], snapshots: ReadonlyMap<string, string>): DemoPin[] {
+  return added.map((url) => {
+    const snapshotId = snapshots.get(url);
     // Only if the page changed between the copy and the lock, taking the address off and back on.
     if (!snapshotId) throw new ApiError(503, 'page_busy', 'the page changed while its demos were copied; try again');
-    pins.push({ url, snapshotId });
-  }
-  return pins;
+    return { url, snapshotId };
+  });
 }
 
 /** Pins each new address to its snapshot, for as long as it stays on the page. Added again, it is copied again. */

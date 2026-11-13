@@ -31,6 +31,10 @@ export const API_ERROR_CODES = [
   'claim_decided',
   'method_not_allowed',
   'internal_error',
+  // A push (`server/pages/receive.ts`).
+  'fetch_first',
+  'not_fast_forward',
+  'wrong_identity',
 ] as const;
 
 export type ApiErrorCode = (typeof API_ERROR_CODES)[number];

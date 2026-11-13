@@ -5,7 +5,8 @@ import { evidenceFiles, pdfDocuments, type EvidenceFile } from '@/db/schema';
 import { AGENT_FILE_TEXT_TYPES } from '@/lib/agent-posts';
 import type { VersionPdf } from '@/lib/versions';
 import { ApiError } from './api/errors';
-import { storeMedia } from './pages/card';
+import { storeMedia } from './media';
+import type { Reader } from './pages/repo';
 import { imageType } from './pages/rules';
 import { consume, rateLimitHeaders, type RateLimitConfig } from './ratelimit';
 
@@ -201,7 +202,7 @@ export async function fetchPdf(
  * A version's PDF from the address the editor sends: one of ours, which has to be a PDF uploaded or copied
  * here, so the pointer's hash is ours to vouch for.
  */
-export async function versionPdfAt(url: string, database: Database = getDb()): Promise<VersionPdf> {
+export async function versionPdfAt(url: string, database: Reader = getDb()): Promise<VersionPdf> {
   // Uploaded or copied here, or a PDF a page already points at.
   const { rows } = await database.execute<{ sha256: string; bytes: number; url: string; source: string | null }>(sql`
     (select sha256, bytes, url, source from evidence_files

@@ -1158,7 +1158,8 @@ describe('thumbnail.json', () => {
     sha256: 'b'.repeat(64),
     bytes: 300_000,
     type: 'image/gif',
-    url: `https://pdfs.example.org/thumbnail/${'b'.repeat(64)}.gif`,
+    // Where this site stores a picture with that hash, which a pointer has to name.
+    url: `/thumbnails/${'b'.repeat(64)}.gif`,
     alt: 'The method, animated',
   };
   const change = (value: unknown): FileChange[] => [{ path: THUMBNAIL_PATH, content: `${JSON.stringify(value)}\n` }];
