@@ -13,7 +13,13 @@ import {
 } from '@/lib/versions';
 import { encodeCommit, parseCommit, type Commit } from '@/server/pages/git-objects';
 import { contentProblem, pathDenied, VERSIONS_PATH, type Roles } from '@/server/pages/rules';
-import { normalizeTitle, openReviewVersion, parseArxivHistory } from '@/server/version-sources';
+import {
+  abstractOverlap,
+  normalizeTitle,
+  openReviewVersion,
+  parseArxivHistory,
+  sameWork,
+} from '@/server/version-sources';
 import { mergeFoundVersions } from '@/server/versions';
 
 const SHA = 'a'.repeat(64);
@@ -187,9 +193,25 @@ describe('finding versions', () => {
     expect(
       openReviewVersion(note('ICLR 2027 Conference Submission', 'ICLR.cc/2027/Conference/Submission')),
     ).toMatchObject({
-      label: 'ICLR 2027 Conference',
+      label: 'ICLR 2027',
       kind: 'conference',
       status: 'under_review',
+    });
+    expect(
+      openReviewVersion(
+        note('ICLR 2026 Conference Desk Rejected Submission', 'ICLR.cc/2026/Conference/Desk_Rejected_Submission'),
+      ),
+    ).toMatchObject({ label: 'ICLR 2026', status: 'rejected', decision: 'Desk rejected' });
+    expect(
+      openReviewVersion(
+        note('ICLR 2026 Conference Withdrawn Submission', 'ICLR.cc/2026/Conference/Withdrawn_Submission'),
+      ),
+    ).toMatchObject({ label: 'ICLR 2026', status: 'withdrawn' });
+    // A workshop that names itself only by its conference is named by its venue id.
+    expect(openReviewVersion(note('NeurIPS 2025 Workshop', 'NeurIPS.cc/2025/Workshop/OPT'))).toMatchObject({
+      label: 'OPT @ NeurIPS 2025',
+      kind: 'workshop',
+      status: 'accepted',
     });
     expect(
       openReviewVersion(note('Submitted to ICLR 2026', 'ICLR.cc/2026/Conference/Rejected_Submission')),
@@ -213,5 +235,23 @@ describe('finding versions', () => {
         .pdfSource,
     ).toBeNull();
     expect(normalizeTitle('Recursive  Scaling: in Masked-Diffusion')).toBe('recursive scaling in masked diffusion');
+  });
+
+  it('tells a resubmission from another paper with the same title', () => {
+    const before = 'We introduce Hopformer, a two-stage transformer for forecasting many time series with covariates.';
+    const after =
+      'Forecasting multiple time series with external covariates needs shared structure. We introduce HopFormer.';
+    const other = 'A survey of graph neural networks for molecules and proteins.';
+    expect(abstractOverlap(before, before)).toBe(1);
+    expect(abstractOverlap(before, other)).toBeLessThan(0.05);
+    // A distinctive title needs little agreement; a generic one needs a lot.
+    const distinctive = 'Hopformer: Homogeneity-Pursuit Transformer for Time Series Forecasting';
+    expect(sameWork(distinctive, abstractOverlap(before, after))).toBe(true);
+    expect(sameWork(distinctive, abstractOverlap(before, other))).toBe(false);
+    expect(sameWork('Attention', 0.2)).toBe(false);
+    expect(sameWork('Generative Model via Quantile Assignment', 0.08)).toBe(false);
+    expect(sameWork('Attention', 0.5)).toBe(true);
+    expect(sameWork('Generative Model via Quantile Assignment', null)).toBe(false);
+    expect(sameWork('Autonomous Functional Play with Correspondence-Driven Trajectory Warping', null)).toBe(true);
   });
 });

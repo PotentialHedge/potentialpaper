@@ -20,6 +20,8 @@
     "papers:upload-pdfs": "tsx scripts/upload-pdfs.ts",
     "papers:attach-pdfs": "tsx scripts/attach-pdfs.ts",
     "papers:import-versions": "tsx scripts/import-versions.ts",
+    "papers:dump-openreview": "tsx scripts/dump-openreview-venues.ts",
+    "papers:import-venue-versions": "tsx scripts/import-venue-versions.ts",
     "pdfs:ingest": "tsx scripts/ingest-pdfs.ts",
     "pages:edit": "tsx scripts/edit-page.ts",
     "pages:set-thumbnail": "tsx scripts/set-thumbnail.ts",

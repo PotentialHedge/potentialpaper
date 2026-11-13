@@ -1,5 +1,11 @@
 import type { Database } from '@/db';
-import type { PaperVersion, VersionKind, VersionPdf, VersionStatus } from '@/lib/versions';
+import {
+  normalizeTitle,
+  type PaperVersion,
+  type VersionKind,
+  type VersionPdf,
+  type VersionStatus,
+} from '@/lib/versions';
 import { fetchPdf } from './files';
 import { forumUrl, licenseId, OPENREVIEW } from './venue-sources/openreview';
 
@@ -8,6 +14,8 @@ import { forumUrl, licenseId, OPENREVIEW } from './venue-sources/openreview';
  * (a workshop, then a conference), and its arXiv versions. What comes back is a suggestion: the editor shows
  * it to be checked and saved, and `scripts/import-versions.ts` commits it. The parsers are pure, for tests.
  */
+
+export { normalizeTitle };
 
 const USER_AGENT = 'PotentialPaper (+https://papers.potentialhedge.com)';
 const TIMEOUT_MS = 20_000;
@@ -20,16 +28,7 @@ export interface FoundVersion extends Omit<PaperVersion, 'id' | 'pdf'> {
   license: string | null;
 }
 
-export function normalizeTitle(title: string): string {
-  return title
-    .normalize('NFKD')
-    .replace(/[̀-ͯ]/g, '')
-    .toLowerCase()
-    .replace(/[^a-z0-9]+/g, ' ')
-    .trim();
-}
-
-interface OpenReviewSearchNote {
+export interface OpenReviewSearchNote {
   id: string;
   forum?: string;
   cdate?: number;
@@ -60,7 +59,10 @@ export function openReviewVersion(note: OpenReviewSearchNote): FoundVersion | nu
   let status: VersionStatus | undefined;
   let decision: string | undefined;
   if (/Withdrawn/i.test(group) || /withdrawn/i.test(venue)) status = 'withdrawn';
-  else if (/Desk_Rejected|Rejected/i.test(group) || /rejected/i.test(venue)) status = 'rejected';
+  else if (/Desk_Rejected/i.test(group) || /desk rejected/i.test(venue)) {
+    status = 'rejected';
+    decision = 'Desk rejected';
+  } else if (/Rejected/i.test(group) || /rejected/i.test(venue)) status = 'rejected';
   else if (/^Submitted to /i.test(venue)) status = 'rejected';
   else if (/Submission$/i.test(group) || /Submission$/i.test(venue)) status = 'under_review';
   else {
@@ -70,13 +72,17 @@ export function openReviewVersion(note: OpenReviewSearchNote): FoundVersion | nu
   // The venue as it names itself, without the decision: "SPIGM @ ICML", "ICLR 2027 Conference".
   const label = venue
     .replace(/^Submitted to /i, '')
-    .replace(/\s+(Conference\s+)?(Withdrawn\s+|Desk\s+Rejected\s+)?Submission$/i, (_, conf) =>
-      conf ? ' Conference' : '',
-    )
+    .replace(/\s+(Conference\s+)?(Withdrawn\s+|Desk\s+Rejected\s+)?Submission$/i, '')
+    .replace(/\s+Conference$/i, '')
     .replace(/\s+(Oral|Spotlight|Poster|Notable[\w -]*|Highlight)\s*$/i, '')
     .trim();
   const year = /\/(\d{4})\//.exec(venueId)?.[1];
-  const named = year && !label.includes(year) ? `${label} ${year}` : label;
+  let named = year && !label.includes(year) ? `${label} ${year}` : label;
+  // Some workshops call themselves only "NeurIPS 2025 Workshop": their name is in the venue id.
+  const workshopName = /\/Workshop\/([^/]+)/i.exec(venueId)?.[1];
+  if (workshop && workshopName && !named.toLowerCase().includes(workshopName.toLowerCase())) {
+    named = `${workshopName.replace(/_/g, ' ')} @ ${named.replace(/\s+Workshop$/i, '')}`;
+  }
   const forum = note.forum ?? note.id;
   const pdf = value(note, 'pdf');
   const title = value(note, 'title');
@@ -227,4 +233,48 @@ export async function lookUpVersions(
     versions.push({ ...version, ...(pdf ? { pdf } : {}) });
   }
   return { versions, problems };
+}
+
+/** The words of a text that say something, for telling two abstracts of one paper from two papers. */
+const STOPWORDS = new Set(
+  (
+    'and the for with that this these those from into onto our are was were has have had not but can its their ' +
+    'which while when where than then them they such also more most both each other over under between through ' +
+    'via using based show shows shown propose proposed present new novel approach method methods model models ' +
+    'results paper work task tasks data however further well across without within existing many large'
+  ).split(' '),
+);
+
+function words(text: string): Set<string> {
+  return new Set(
+    normalizeTitle(text)
+      .split(' ')
+      .filter((word) => word.length > 2 && !STOPWORDS.has(word)),
+  );
+}
+
+/**
+ * How much two abstracts share, from 0 to 1 (Jaccard on their words). Versions of one paper are rewritten
+ * but keep most of their words; two papers that happen to share a generic title don't.
+ */
+export function abstractOverlap(a: string, b: string): number {
+  const x = words(a);
+  const y = words(b);
+  if (x.size === 0 || y.size === 0) return 0;
+  let shared = 0;
+  for (const word of x) if (y.has(word)) shared += 1;
+  return shared / (x.size + y.size - shared);
+}
+
+/**
+ * Whether a forum with a paper's exact title (normalized) is a version of it. Resubmissions often rewrite the
+ * abstract from scratch, so a distinctive title needs little agreement; a short, generic one needs a lot.
+ * `overlap` is `null` when either has no abstract.
+ */
+export function sameWork(title: string, overlap: number | null): boolean {
+  const words = normalizeTitle(title).split(' ').filter(Boolean).length;
+  if (overlap === null) return words >= 7;
+  if (words >= 6) return overlap >= 0.03;
+  if (words >= 3) return overlap >= 0.1;
+  return overlap >= 0.25;
 }

@@ -253,3 +253,13 @@ export function newVersionId(random: () => number = Math.random): string {
   for (let i = 0; i < 8; i += 1) id += ID_ALPHABET[Math.floor(random() * ID_ALPHABET.length)];
   return id;
 }
+
+/** A title as matched across venues: accents, case and punctuation dropped. */
+export function normalizeTitle(title: string): string {
+  return title
+    .normalize('NFKD')
+    .replace(/[\u0300-\u036f]/g, '')
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, ' ')
+    .trim();
+}
