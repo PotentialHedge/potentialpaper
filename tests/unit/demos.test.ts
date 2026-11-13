@@ -3,12 +3,12 @@ import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { describe, expect, it } from 'vitest';
-import { demoBlockId, demoBlockMarkdown, demoBlockText, sourceLabel, type DemoSource } from '@/lib/demos';
+import { demoBlockMarkdown, demoBlockText, parseDemoInfo, sourceAt, sourceLabel, type DemoSource } from '@/lib/demos';
 import { parseRefAdvertisement, parseSourceUrl, resolveRest } from '@/server/demos/github';
 import { findFile, HEIGHT_REPORTER, splitDemoPath, withHeightReporter } from '@/server/demos/serve';
 import { chooseRoot, contentType, selectFiles, snapshotId } from '@/server/demos/snapshot';
 import { readTar } from '@/server/demos/tar';
-import { demoIds, renderMarkdown } from '@/server/pages/markdown';
+import { demoBlockProblems, demoIds, demoRefs, renderMarkdown } from '@/server/pages/markdown';
 
 const COMMIT = 'a'.repeat(40);
 const DEMO: DemoSource = {
@@ -169,11 +169,14 @@ describe('a snapshot', () => {
 
 describe('a demo block', () => {
   it('round-trips its id, title and description', () => {
-    const block = demoBlockMarkdown({ id: DEMO.id, title: ' Attention,\n in 3D ', description: 'Rotate `it`.' });
+    const block = demoBlockMarkdown({
+      ref: { kind: 'snapshot', id: DEMO.id },
+      title: ' Attention,\n in 3D ',
+      description: 'Rotate `it`.',
+    });
     expect(block).toBe(`\`\`\`demo ${DEMO.id}\nAttention, in 3D\nRotate 'it'.\n\`\`\`\n`);
-    expect(demoBlockId(`demo ${DEMO.id}`)).toBe(DEMO.id);
-    expect(demoBlockId('demo nope')).toBeNull();
-    expect(demoBlockId('js')).toBeNull();
+    expect(parseDemoInfo(`demo ${DEMO.id}`)).toEqual({ kind: 'snapshot', id: DEMO.id });
+    expect(parseDemoInfo('js')).toBeNull();
     expect(demoBlockText('Attention, in 3D\nRotate it.\nAnd zoom.\n')).toEqual({
       title: 'Attention, in 3D',
       description: 'Rotate it. And zoom.',
@@ -181,7 +184,7 @@ describe('a demo block', () => {
   });
 
   it('is found in Markdown, once each, and renders as a sandboxed frame with no src until shown', () => {
-    const md = `## Demos\n\n${demoBlockMarkdown({ id: DEMO.id, title: 'A <b>' })}\n${demoBlockMarkdown({ id: DEMO.id, title: 'Again' })}\n\`\`\`js\nx\n\`\`\`\n`;
+    const md = `## Demos\n\n${demoBlockMarkdown({ ref: { kind: 'snapshot', id: DEMO.id }, title: 'A <b>' })}\n${demoBlockMarkdown({ ref: { kind: 'snapshot', id: DEMO.id }, title: 'Again' })}\n\`\`\`js\nx\n\`\`\`\n`;
     expect(demoIds(md)).toEqual([DEMO.id]);
     const html = renderMarkdown(md, 'community', { demos: new Map([[DEMO.id, DEMO]]) });
     expect(html).toContain(`<iframe class="demo-frame" data-src="http://127.0.0.1:3000/d/${DEMO.id}/"`);
@@ -191,6 +194,53 @@ describe('a demo block', () => {
     expect(html).toContain(sourceLabel(DEMO));
     expect(html).toContain('<code class="language-js">');
     expect(renderMarkdown(md, 'community')).toContain('class="demo-missing"');
+  });
+});
+
+describe('the demo a block names', () => {
+  it('is a GitHub address, a folder of the page, or a snapshot id', () => {
+    const url = 'https://github.com/someone/attention-3d/tree/v1.2/dist';
+    expect(parseDemoInfo(`demo ${url}`)).toEqual({ kind: 'github', url });
+    expect(parseDemoInfo('demo https://gist.github.com/a/0123456789abcdef0123')).toMatchObject({ kind: 'github' });
+    expect(parseDemoInfo('demo demos/attention-3d')).toEqual({ kind: 'repo', name: 'attention-3d' });
+    expect(parseDemoInfo('demo demos/attention-3d/')).toEqual({ kind: 'repo', name: 'attention-3d' });
+    expect(parseDemoInfo('demo demos/Big_Demo')).toHaveProperty('problem');
+    expect(parseDemoInfo('demo https://gitlab.com/a/b')).toHaveProperty('problem');
+    expect(parseDemoInfo('demo nope')).toHaveProperty('problem');
+    expect(parseDemoInfo('demo')).toHaveProperty('problem');
+    expect(parseDemoInfo(`demo ${DEMO.id} extra`)).toHaveProperty('problem');
+  });
+
+  it('is found in Markdown by its name, and a block naming nothing is a problem a commit can refuse', () => {
+    const url = 'https://github.com/someone/attention-3d';
+    const md = [
+      demoBlockMarkdown({ ref: { kind: 'github', url }, title: 'From GitHub' }),
+      demoBlockMarkdown({ ref: { kind: 'repo', name: 'local' }, title: 'From the page' }),
+      demoBlockMarkdown({ ref: { kind: 'github', url }, title: 'Again' }),
+      '```demo https://example.com/x\nNo\n```\n',
+    ].join('\n');
+    expect(md).toContain('```demo demos/local\n');
+    expect(demoRefs(md)).toEqual([
+      { kind: 'github', url },
+      { kind: 'repo', name: 'local' },
+    ]);
+    expect(demoIds(md)).toEqual([]);
+    expect(demoBlockProblems(md)).toHaveLength(1);
+    const html = renderMarkdown(md, 'community');
+    expect(html).toContain(`from ${url}, which is copied when the edit is saved`);
+    expect(html).toContain("from this page's demos/local");
+  });
+
+  it("links a copied demo to GitHub, and names a page's own folder without a link", () => {
+    const local: DemoSource = { id: 'e'.repeat(32), source: 'page:x', commit: COMMIT, root: 'demos/local' };
+    expect(sourceAt(DEMO)).toBe(`https://github.com/someone/attention-3d/tree/${COMMIT}/dist`);
+    expect(sourceAt(local)).toBeNull();
+    expect(sourceLabel(local)).toBe("demos/local in this page's repo");
+    const html = renderMarkdown('```demo demos/local\nHere\n```\n', 'community', {
+      demos: new Map([['demos/local', local]]),
+    });
+    expect(html).toContain(`data-src="http://127.0.0.1:3000/d/${local.id}/"`);
+    expect(html).toContain('<span class="demo-source">demos/local in this page\'s repo</span>');
   });
 });
 

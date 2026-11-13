@@ -1,10 +1,10 @@
 import { eq, notInArray, sql } from 'drizzle-orm';
 import { getDb, type Database } from '@/db';
 import { authorClaims, commitIdentities, pageCurrent, pageRefs, pageRevisions } from '@/db/schema';
-import { demoSources } from '../demos/attach';
+import { pageDemoSources } from '../demos/attach';
 import { readLinks, readVersions } from './content';
 import { type Commit, SYSTEM_AUTHOR_ID } from './git-objects';
-import { demoIds } from './markdown';
+import { demoRefs } from './markdown';
 import { changedFiles, readCommit, readFiles, readHead, readText, toBytes, type Reader } from './repo';
 import { parsePdfPointer, parseThumbnailPointer, PDF_PATH, THUMBNAIL_PATH } from './rules';
 import { partSource, readSections, renderPart } from './sections';
@@ -91,7 +91,13 @@ export async function writeCurrent(tx: Writer, paperId: string, head: string, co
   const author = await readSections(tx, paperId, files, 'author');
   const community = await readSections(tx, paperId, files, 'community');
   const markdown = [...author, ...community].filter((s) => s.name.format === 'markdown');
-  const demos = await demoSources(tx, [...new Set(markdown.flatMap((s) => demoIds(s.text)))]);
+  const demos = await pageDemoSources(
+    tx,
+    paperId,
+    head,
+    files,
+    markdown.flatMap((s) => demoRefs(s.text)),
+  );
   const row = {
     head: toBytes(head),
     authorMarkdown: partSource(author),

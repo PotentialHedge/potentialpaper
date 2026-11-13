@@ -300,8 +300,9 @@ function SectionForm({
         <>
           <p className={ui.fine}>
             Markdown, with <code>$…$</code> and <code>$$…$$</code> for math. HTML is shown as text. Each{' '}
-            <code># Heading</code> starts a section of its own. A demo is a <code>```demo</code> block: insert one
-            below.
+            <code># Heading</code> starts a section of its own. A demo is a <code>```demo</code> block naming a GitHub
+            address (copied when you save), a folder <code>demos/&lt;name&gt;</code> of this page&apos;s repo, or one
+            inserted below.
           </p>
           <InsertDemo onInsert={insertBlock} />
         </>
@@ -388,7 +389,7 @@ function InsertDemo({ onInsert }: { onInsert: (block: string) => void }) {
       });
       if (!res.ok) return setProblem(await messageOf(res));
       const { id } = await res.json();
-      onInsert(demoBlockMarkdown({ id, title, description }));
+      onInsert(demoBlockMarkdown({ ref: { kind: 'snapshot', id }, title, description }));
       setUrl('');
       setTitle('');
       setDescription('');

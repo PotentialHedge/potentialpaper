@@ -1,3 +1,4 @@
+import { DEMO_NAME, DEMOS_DIR, MAX_DEMO_NAME } from '@/lib/demos';
 import { parseLinkFile } from '@/lib/paper-links';
 import { parseVersionFile, VERSION_ID } from '@/lib/versions';
 import { htmlProblem } from './html';
@@ -14,6 +15,7 @@ import { htmlProblem } from './html';
  *   versions/v_k3x9q2ab.json        a version of the paper, named by its id
  *   links/10-code.json              a link under the title
  *   thumbnail.json                  the paper's picture: a pointer
+ *   demos/<name>/index.html         a demo, with its other files beside it
  *   extensions/<id>/…               reserved
  */
 
@@ -35,6 +37,33 @@ export const LINKS_DIR = 'links';
  * that anyone verified can add to with evidence, as the community section; the system writes them on import.
  */
 export const VERSIONS_DIR = 'versions';
+
+/**
+ * Demos kept in the page itself (`lib/demos.ts`): a folder each, `demos/<name>/`, with an `index.html` and
+ * the files it loads, served from the demo host as a copied demo is. **Text only for now** (UTF-8, as every
+ * file of a page is): pictures go in as SVG, and a demo with binary files (images, models, wasm) comes
+ * from GitHub instead, whose copies go to the blob store. Binary blobs in Postgres would grow every page's
+ * history, and nothing in the commit path handles bytes yet.
+ */
+/** The types a demo folder may hold, so the demo host serves each with a known type. */
+const DEMO_EXTENSIONS = new Set(
+  'html htm js mjs css json map webmanifest svg txt md csv tsv xml glsl wgsl vert frag obj gltf'.split(' '),
+);
+/** A bundled script is often past the 256 KB a page's other files may have. */
+export const MAX_DEMO_FILE_BYTES = 1024 * 1024;
+/** All of a page's demo folders together. Larger demos come from GitHub. */
+export const MAX_DEMOS_BYTES = 5 * 1024 * 1024;
+export const MAX_DEMOS_FILES = 300;
+
+/** The folder a path is in, as `demos/<name>/…`, and its path inside it; or `null`. */
+export function demoPath(path: string): { name: string; inside: string } | null {
+  const match = /^demos\/([^/]+)\/(.+)$/.exec(path);
+  return match && { name: match[1], inside: match[2] };
+}
+
+export function isDemoPath(path: string): boolean {
+  return path.startsWith(`${DEMOS_DIR}/`);
+}
 
 /** The two parts of a page written as prose, each a directory of section files. */
 export type PagePart = 'author' | 'community';
@@ -89,8 +118,8 @@ export function versionPath(id: string): string {
 /** What a page holds, said when a path isn't one of them. */
 const LAYOUT =
   'pages hold .potentialpaper/ (metadata.json, pdf.json), author/ and community/ (sections named like ' +
-  '10-summary.md or 20-results.html), versions/<id>.json, links/ (named like 10-code.json), thumbnail.json ' +
-  'and extensions/';
+  '10-summary.md or 20-results.html), versions/<id>.json, links/ (named like 10-code.json), thumbnail.json, ' +
+  'demos/<name>/ and extensions/';
 
 /** Why nothing can be written at this path, or `null`. Deleting a file needs no such check. */
 export function layoutProblem(path: string): string | null {
@@ -108,6 +137,18 @@ export function layoutProblem(path: string): string | null {
   }
   if (path.startsWith(`${VERSIONS_DIR}/`)) {
     return versionIdOf(path) ? null : 'versions/ holds one file per version, named like v_k3x9q2ab.json';
+  }
+  if (isDemoPath(path)) {
+    const demo = demoPath(path);
+    if (!demo || !DEMO_NAME.test(demo.name) || demo.name.length > MAX_DEMO_NAME) {
+      return 'demos/ holds one folder per demo, named like demos/my-demo/ (lower-case letters, digits and dashes)';
+    }
+    const dot = demo.inside.lastIndexOf('.');
+    const extension = dot === -1 ? '' : demo.inside.slice(dot + 1);
+    if (!DEMO_EXTENSIONS.has(extension)) {
+      return `a demo's files are text: ${[...DEMO_EXTENSIONS].map((e) => `.${e}`).join(' ')} (binary files come from GitHub)`;
+    }
+    return null;
   }
   return LAYOUT;
 }
@@ -188,6 +229,12 @@ export function pathDenied(path: string, roles: Roles): string | null {
       : "only this paper's confirmed authors can edit its author section";
   }
   if (path.startsWith('community/')) {
+    if (roles.system) return 'the system only writes the metadata';
+    return roles.verified || roles.admin ? null : 'confirm an institutional email address first';
+  }
+  // As the community section, since either section may show a demo. A folder the author section shows is
+  // its authors' alone, which `commit.ts` checks, as it needs the sections' text.
+  if (isDemoPath(path)) {
     if (roles.system) return 'the system only writes the metadata';
     return roles.verified || roles.admin ? null : 'confirm an institutional email address first';
   }
@@ -330,6 +377,10 @@ export function parseThumbnailPointer(text: string): ThumbnailPointer | null {
 export function contentProblem(path: string, content: string): string | null {
   if (!content.isWellFormed()) return 'is not valid Unicode';
   if (content.includes('\0')) return 'is not text';
+  // A demo's files are its own code, served as they are from the demo host: only their size is ours.
+  if (isDemoPath(path)) {
+    return Buffer.byteLength(content) > MAX_DEMO_FILE_BYTES ? `is larger than ${MAX_DEMO_FILE_BYTES} bytes` : null;
+  }
   if (Buffer.byteLength(content) > MAX_FILE_BYTES) return `is larger than ${MAX_FILE_BYTES} bytes`;
   if (path === PDF_PATH) return parsePdfPointer(content) ? null : 'is not a valid PDF pointer';
   if (path === THUMBNAIL_PATH) return parseThumbnailPointer(content) ? null : 'is not a valid thumbnail pointer';

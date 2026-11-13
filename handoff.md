@@ -36,12 +36,15 @@ Milestones 0, 1 and 2 are built, merged into `main` and deployed, and Milestone 
   reviews and decisions from OpenReview, and the forms for importing ICLR 2026's are ready. ICLR 2027 PDFs are hosted in R2 through a `.potentialpaper/pdf.json` in each page repo. Each paper shows a picture
   of its first page, or a thumbnail set with `pages:set-thumbnail`.
 - **Licenses:** each paper records its source and the licenses of its metadata and abstract.
-- **Demos:** a demo is a ` ```demo <snapshot> ` block (title on the first line, description after) in
-  either Markdown section, author or community; there is no separate demos section or `demos.jsonl` any more.
-  The editor's "Insert a demo" calls `POST /api/v1/demos { url }`, which only snapshots (resolves the ref
-  through git's ref listing, streams codeload's tarball, keeps the folder with `index.html`, stores each file
-  in R2 by SHA-256, records `demo_snapshots`) and returns the id; the block goes in with the edit, which
-  refuses a block naming an unknown snapshot. The renderer writes a sandboxed iframe with `data-src`, and
+- **Demos:** a demo is a ` ```demo <name> ` block (title on the first line, description after) in a Markdown
+  section, author or community. The name is a GitHub address (`https://github.com/o/r[/tree/<ref>/<folder>]`, or a
+  gist), copied when the commit adding it comes in and pinned in `demo_pins` while it stays on the page (the file
+  keeps the address); `demos/<name>`, a text-only folder of the page's own repo with an `index.html`; or a snapshot
+  id, as the editor's "Insert a demo" (`POST /api/v1/demos { url }`) writes it. Copying resolves the ref through
+  git's ref listing, streams codeload's tarball, keeps the folder with `index.html`, stores each file in R2 by
+  SHA-256 and records `demo_snapshots`; a page's own folder becomes a snapshot the same way when the projection is
+  written (`server/demos/repo.ts`). All the rules are checked in `commitPage` (`server/demos/attach.ts`; DESIGN.md
+  §4.3). The renderer writes a sandboxed iframe with `data-src`, and
   `DemoFrames` (client) loads it near the screen, fits its height and runs full screen. `proxy.ts` answers the
   demo host (`lib/demos.ts`, `papers-content.potentialhedge.com` in production, `127.0.0.1:3000` in dev) at
   `/d/<snapshot>/<path>`. That host shares a site with the app, so it is not a real sandbox yet: see `TODO.md`.

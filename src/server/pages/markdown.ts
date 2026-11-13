@@ -3,11 +3,14 @@ import MarkdownIt, { type StateBlock, type StateInline, type Token } from 'markd
 import {
   DEMO_ALLOW,
   DEMO_SANDBOX,
-  demoBlockId,
+  demoBlockRef,
   demoBlockText,
+  demoRefKey,
   demoUrl,
+  parseDemoInfo,
   sourceAt,
   sourceLabel,
+  type DemoRef,
   type DemoSource,
 } from '@/lib/demos';
 
@@ -17,8 +20,9 @@ import {
  * markdown-it's `validateLink` refuses `javascript:`, `vbscript:`, `file:` and non-image `data:` links.
  * The CSP is the second lock (`next.config.ts`).
  *
- * A ```` ```demo <snapshot> ```` block is a demo (`lib/demos.ts`), shown as a figure with its frame. Where its
- * files came from is looked up when rendering, and a block naming no known snapshot says so.
+ * A ```` ```demo <name> ```` block is a demo (`lib/demos.ts`), shown as a figure with its frame. The snapshot
+ * each name stands for, and where its files came from, are looked up before rendering (`demos/attach.ts`),
+ * and a block whose demo isn't found says so.
  *
  * A page's part (author or community) is a directory of section files (`rules.ts`), and a section's
  * title is the `#` heading its file starts with. The whole part as one text, which the editor offers, is
@@ -94,23 +98,38 @@ function blockMath(state: StateBlock, startLine: number, endLine: number, silent
 
 type RenderEnv = { demos?: ReadonlyMap<string, DemoSource> } & Record<string, unknown>;
 
+/** What a block says when its demo isn't on the site, as in a preview of a demo not yet copied. */
+function missingDemo(ref: DemoRef, name: string, escape: (s: string) => string): string {
+  const where =
+    ref.kind === 'github'
+      ? `from ${escape(ref.url)}, which is copied when the edit is saved`
+      : ref.kind === 'repo'
+        ? `from this page's ${escape(demoRefKey(ref))}`
+        : "that isn't on this site";
+  return `<p class="demo-missing">A demo, “${name}”, ${where}.</p>\n`;
+}
+
 /**
  * A demo's figure. The frame has no `src` until it nears the screen: `DemoFrames` gives it one, fits its
  * height to what the demo reports, and runs the full-screen button.
  */
-function renderDemo(id: string, body: string, demo: DemoSource | undefined, escape: (s: string) => string): string {
+function renderDemo(ref: DemoRef, body: string, demo: DemoSource | undefined, escape: (s: string) => string): string {
   const { title, description } = demoBlockText(body);
   const name = escape(title || 'Untitled demo');
-  if (!demo) return `<p class="demo-missing">A demo, “${name}”, that isn't on this site.</p>\n`;
-  const url = escape(demoUrl(id));
+  if (!demo) return missingDemo(ref, name, escape);
+  const url = escape(demoUrl(demo.id));
+  const at = sourceAt(demo);
+  const label = escape(sourceLabel(demo));
   return [
-    `<figure class="demo" data-demo="${id}">`,
+    `<figure class="demo" data-demo="${demo.id}">`,
     `<iframe class="demo-frame" data-src="${url}" title="${name}" sandbox="${DEMO_SANDBOX}" allow="${DEMO_ALLOW}" allowfullscreen></iframe>`,
     `<figcaption><b>Demo:</b> ${name}${description ? `. ${escape(description)}` : ''}`,
     `<span class="demo-tools"><button type="button" data-demo-fullscreen>full screen</button>`,
     `<a href="${url}" target="_blank" rel="noopener">new tab</a>`,
-    `<a href="${escape(sourceAt(demo))}" rel="nofollow ugc noopener" class="demo-source">${escape(sourceLabel(demo))}</a></span>`,
-    `</figcaption></figure>\n`,
+    at
+      ? `<a href="${escape(at)}" rel="nofollow ugc noopener" class="demo-source">${label}</a>`
+      : `<span class="demo-source">${label}</span>`,
+    `</span></figcaption></figure>\n`,
   ].join('');
 }
 
@@ -126,9 +145,9 @@ function newRenderer() {
 
   const fence = md.renderer.rules.fence!;
   md.renderer.rules.fence = (tokens, idx, options, env: RenderEnv | undefined, self) => {
-    const id = demoBlockId(tokens[idx].info);
-    if (!id) return fence(tokens, idx, options, env, self);
-    return renderDemo(id, tokens[idx].content, env?.demos?.get(id), md.utils.escapeHtml);
+    const ref = demoBlockRef(tokens[idx].info);
+    if (!ref) return fence(tokens, idx, options, env, self);
+    return renderDemo(ref, tokens[idx].content, env?.demos?.get(demoRefKey(ref)), md.utils.escapeHtml);
   };
 
   const renderToken = md.renderer.renderToken.bind(md.renderer);
@@ -234,15 +253,28 @@ export function renderMarkdown(markdown: string, idPrefix = 'md', options: Rende
   return lead + md.renderer.render(tokens, md.options, env);
 }
 
-/** The snapshots the Markdown's demo blocks name, in order, each once. */
-export function demoIds(markdown: string | null): string[] {
+/** The demos the Markdown's blocks name, in order, each once (by `demoRefKey`). */
+export function demoRefs(markdown: string | null): DemoRef[] {
   if (!markdown) return [];
-  const ids = md
-    .parse(markdown, {})
-    .filter((token) => token.type === 'fence')
-    .map((token) => demoBlockId(token.info))
-    .filter((id): id is string => id !== null);
-  return [...new Set(ids)];
+  const found = new Map<string, DemoRef>();
+  for (const token of md.parse(markdown, {})) {
+    const ref = token.type === 'fence' ? demoBlockRef(token.info) : null;
+    if (ref && !found.has(demoRefKey(ref))) found.set(demoRefKey(ref), ref);
+  }
+  return [...found.values()];
+}
+
+/** The snapshot ids the Markdown's blocks name directly. */
+export function demoIds(markdown: string | null): string[] {
+  return demoRefs(markdown).flatMap((ref) => (ref.kind === 'snapshot' ? [ref.id] : []));
+}
+
+/** Why a block that starts ```` ```demo ```` names no demo, for each such block, so a commit can refuse it. */
+export function demoBlockProblems(markdown: string): string[] {
+  return md.parse(markdown, {}).flatMap((token) => {
+    const parsed = token.type === 'fence' ? parseDemoInfo(token.info) : null;
+    return parsed && 'problem' in parsed ? [parsed.problem] : [];
+  });
 }
 
 /**

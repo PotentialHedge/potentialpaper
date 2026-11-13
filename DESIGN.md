@@ -181,6 +181,7 @@ community/10-summary.md         the community section, the same way
 versions/v_k3x9q2ab.json        a version of the paper; the file's name is its id
 links/10-code.json              a link under the title: { "label", "url" }
 thumbnail.json                  the paper's picture, in place of its PDF's first page: a pointer
+demos/<name>/index.html         a demo kept in the page, with the files it loads beside it
 extensions/<id>/...             reserved: data owned by one extension (section 10)
 ```
 
@@ -195,14 +196,53 @@ every other path rule stays.
 
 **Permissions are rules on paths**, checked in one place:
 
-| Path                         | Who may commit                                                      |
-| ---------------------------- | ------------------------------------------------------------------- |
-| `.potentialpaper/**`         | System ingest, admins                                               |
-| `versions/**`                | Any verified account, system ingest, admins                         |
-| `thumbnail.json`, `links/**` | Confirmed authors once claimed, any verified account before, admins |
-| `author/**`                  | Confirmed authors of this paper, admins                             |
-| `community/**`               | Any verified account, subject to page protection                    |
-| `extensions/<id>/**`         | Extension `<id>` acting for a consenting user                       |
+| Path                         | Who may commit                                                                              |
+| ---------------------------- | ------------------------------------------------------------------------------------------- |
+| `.potentialpaper/**`         | System ingest, admins                                                                       |
+| `versions/**`                | Any verified account, system ingest, admins                                                 |
+| `thumbnail.json`, `links/**` | Confirmed authors once claimed, any verified account before, admins                         |
+| `author/**`                  | Confirmed authors of this paper, admins                                                     |
+| `community/**`               | Any verified account, subject to page protection                                            |
+| `demos/<name>/**`            | Any verified account; a folder the author section shows, only its confirmed authors; admins |
+| `extensions/<id>/**`         | Extension `<id>` acting for a consenting user                                               |
+
+**Demos** are code that runs on the page, in a sandboxed frame from a host of their own
+(`lib/demos.ts`, served by `server/demos/serve.ts` at `/d/<snapshot>/…`). Either section embeds one
+with a fenced block whose info string names it, the title on its first line and a description after:
+
+````
+```demo https://github.com/you/demo/tree/v1.2/dist
+Attention, in 3D
+Rotate it.
+```
+````
+
+The name is one of:
+
+- **A GitHub address**, as GitHub prints it: `https://github.com/<owner>/<repo>`, optionally with
+  `/tree/<branch, tag or commit>/<folder>` (or `/blob/…/index.html`), or a gist. When the commit that
+  puts the address on the page comes in, the server copies the files (git's ref listing, then
+  codeload's tarball; the folder with `index.html`, or the first of `dist`, `build`, `docs`, … that has
+  one) and records the snapshot in `demo_pins`, keyed by page and address. The file keeps the address
+  as written: a pushed commit is stored verbatim, so the server never rewrites one. The pin holds while
+  the address stays anywhere on the page, so later edits don't move a branch's demo; taking the block
+  off and adding it again in a later commit copies it again, and naming a tag or commit pins it
+  exactly. A copy that fails refuses the commit with GitHub's reason. At most 5 new addresses a commit.
+- **`demos/<name>`**, a folder of the page's own repo with an `index.html`. Its files are text only
+  for now (`.html .js .mjs .css .json .svg .glsl …`, valid UTF-8): pictures go in as SVG, and a demo
+  with binary files comes from GitHub instead, whose copies go to the blob store, so that binary blobs
+  don't grow every page's history in Postgres. Up to 1 MB a file, 300 files and 5 MB for all of a
+  page's demos; a commit may change up to 300 demo files besides its 50 others. When a page's
+  projection is written, each folder a block names becomes a snapshot like a copied one (its id a hash
+  of the page, folder and blob ids), so both are served and sandboxed the same way. A block may only
+  name a folder that is there, and a commit can't delete a folder a block still names. Anyone verified
+  may add a folder, as they may write the community section, but once the author section shows one,
+  only the paper's confirmed authors and admins may change it, since what runs there speaks for them.
+- **A snapshot id** (32 hex digits), as the editor's "Insert a demo" writes it after copying a demo
+  through `POST /api/v1/demos`. A block naming an id the site doesn't have is refused.
+
+These rules are checked inside `commitPage` (`server/demos/attach.ts`), so they hold for any writer.
+The demo host shares a site with the app, so it is not yet a real sandbox (`TODO.md`).
 
 Media doesn't go in git: bytes go to R2, keyed by hash, and git records the pointer, as Git LFS
 does. `pdf.json` is such a pointer: the SHA-256, size, URL, source page and license of the

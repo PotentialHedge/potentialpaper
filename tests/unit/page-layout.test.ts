@@ -37,6 +37,16 @@ describe('the layout', () => {
     expect(pathDenied('links/10-code.json', { ...NOBODY, claimed: true })).toMatch(/confirmed authors/);
   });
 
+  it('lets anyone verified write a demo folder, as the community section, and takes its files as they are', () => {
+    expect(pathDenied('demos/spin/index.html', NOBODY)).toBeNull();
+    expect(pathDenied('demos/spin/index.html', { ...NOBODY, verified: false })).toMatch(/institutional/);
+    expect(pathDenied('demos/spin/index.html', { ...NOBODY, verified: false, system: true })).not.toBeNull();
+    expect(contentProblem('demos/spin/index.html', '<script>alert(1)</script>')).toBeNull();
+    expect(contentProblem('demos/spin/data.json', 'not json')).toBeNull();
+    expect(contentProblem('demos/spin/app.js', 'x'.repeat(512 * 1024))).toBeNull();
+    expect(contentProblem('demos/spin/app.js', 'x'.repeat(1024 * 1024 + 1))).toMatch(/larger/);
+  });
+
   it('knows each file a page can hold by its name', () => {
     for (const path of [
       '.potentialpaper/metadata.json',
@@ -46,6 +56,8 @@ describe('the layout', () => {
       'versions/arxiv-v2.json',
       'links/10-code.json',
       'thumbnail.json',
+      'demos/attention-3d/index.html',
+      'demos/attention-3d/assets/shader.glsl',
     ]) {
       expect(layoutProblem(path), path).toBeNull();
     }
@@ -58,6 +70,10 @@ describe('the layout', () => {
       'versions/V1.json',
       'pdf.json',
       'notes.md',
+      'demos/index.html',
+      'demos/Spin/index.html',
+      'demos/spin/logo.png',
+      'demos/spin/LICENSE',
     ]) {
       expect(layoutProblem(path), path).not.toBeNull();
     }

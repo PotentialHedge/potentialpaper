@@ -6,11 +6,13 @@ import { gzipSync } from 'node:zlib';
 import { eq } from 'drizzle-orm';
 import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it, vi } from 'vitest';
 import { getDb } from '@/db';
-import { demoSnapshots, pageCurrent } from '@/db/schema';
+import { accounts, authorClaims, demoPins, demoSnapshots, pageCurrent } from '@/db/schema';
 import { DEMO_ORIGIN, demoBlockMarkdown } from '@/lib/demos';
+import { ApiError } from '@/server/api/errors';
 import { serveDemo } from '@/server/demos/serve';
+import { type Actor, commitPage, type FileChange } from '@/server/pages/commit';
 import { rebuildAllPages } from '@/server/pages/projections';
-import { pageHistory } from '@/server/pages/repo';
+import { pageHistory, readCommit, readFiles, readHead, readText } from '@/server/pages/repo';
 import { savePaper } from '@/server/papers';
 import { api, closePool, resetDatabase, signUp } from './helpers';
 
@@ -149,7 +151,7 @@ describe('a demo', () => {
     expect((await api('POST', '/demos', { cookie, body })).body.id).toBe(first.body.id);
     expect(await getDb().select().from(demoSnapshots)).toHaveLength(1);
 
-    const content = `# Reproductions\n\n${demoBlockMarkdown({ id: first.body.id, title: 'Attention, in 3D', description: 'Rotate it.' })}`;
+    const content = `# Reproductions\n\n${demoBlockMarkdown({ ref: { kind: 'snapshot', id: first.body.id }, title: 'Attention, in 3D', description: 'Rotate it.' })}`;
     const edit = await api('POST', '/pages/edit', {
       cookie,
       body: { paper: PAPER, baseOid: null, section: 0, content, summary: '' },
@@ -169,7 +171,7 @@ describe('a demo', () => {
   it('refuses a block naming a demo this site does not have', async () => {
     await paper();
     const cookie = await signUp('ada@ethz.ch');
-    const content = demoBlockMarkdown({ id: 'e'.repeat(32), title: 'Made up' });
+    const content = demoBlockMarkdown({ ref: { kind: 'snapshot', id: 'e'.repeat(32) }, title: 'Made up' });
     const edit = await api('POST', '/pages/edit', {
       cookie,
       body: { paper: PAPER, baseOid: null, section: 0, content, summary: '' },
@@ -196,5 +198,240 @@ describe('a demo', () => {
     await paper();
     const res = await api('POST', '/demos', { body: { url: `https://github.com/${OWNER}/${REPO}` } });
     expect(res.status).toBe(401);
+  });
+});
+
+const NO_LIMIT = { burst: 100_000, perSecond: 1000 };
+
+let accountCount = 0;
+async function account(): Promise<Actor & { kind: 'account' }> {
+  accountCount += 1;
+  const [row] = await getDb()
+    .insert(accounts)
+    .values({ handle: `person-${accountCount}`, verifiedAt: new Date() })
+    .returning({ id: accounts.id });
+  return { kind: 'account', accountId: row.id, isAdmin: false };
+}
+
+async function current(paperId: string) {
+  const [row] = await getDb().select().from(pageCurrent).where(eq(pageCurrent.paperId, paperId));
+  return row;
+}
+
+async function fileAtHead(paperId: string, path: string): Promise<string | null> {
+  const db = getDb();
+  const head = await readHead(db, paperId);
+  const files = await readFiles(db, paperId, (await readCommit(db, paperId, head!)).tree);
+  return readText(db, paperId, files.get(path));
+}
+
+async function refusal(promise: Promise<unknown>): Promise<ApiError> {
+  const err = await promise.then(
+    () => null,
+    (e: unknown) => e,
+  );
+  expect(err).toBeInstanceOf(ApiError);
+  return err as ApiError;
+}
+
+function frameId(html: string | null): string {
+  const id = /data-demo="([0-9a-f]{32})"/.exec(html ?? '')?.[1];
+  expect(id).toBeDefined();
+  return id!;
+}
+
+describe('a demo block naming a GitHub address', () => {
+  const URL_BLOCK = `# Demos\n\n\`\`\`demo https://github.com/${OWNER}/${REPO}/tree/main/dist\nAttention, in 3D\n\`\`\`\n`;
+
+  it('is copied when the commit comes in, keeps the address in the file, and stays pinned', async () => {
+    const paperId = await paper();
+    const cookie = await signUp('ada@ethz.ch');
+    vi.stubGlobal('fetch', fakeGitHub());
+    const edit = await api('POST', '/pages/edit', {
+      cookie,
+      body: { paper: PAPER, baseOid: null, section: 0, content: URL_BLOCK, summary: '' },
+    });
+    expect(edit.status).toBe(200);
+    expect(await fileAtHead(paperId, 'community/10-demos.md')).toBe(URL_BLOCK);
+    const [snapshot] = await getDb().select().from(demoSnapshots);
+    expect(snapshot).toMatchObject({ commit: MAIN, root: 'dist' });
+    const [pin] = await getDb().select().from(demoPins);
+    expect(pin).toMatchObject({ paperId, url: `https://github.com/${OWNER}/${REPO}/tree/main/dist` });
+    expect(pin.commit.toString('hex')).toBe(edit.body.head);
+    const html = (await current(paperId)).communityHtml;
+    expect(frameId(html)).toBe(snapshot.id);
+    expect(html).toContain(`${OWNER}/${REPO}/dist@${MAIN.slice(0, 7)}`);
+
+    // GitHub isn't asked again while the address stays on the page, whatever its branch does.
+    vi.stubGlobal(
+      'fetch',
+      vi.fn(async () => new Response('down', { status: 500 })),
+    );
+    const again = await api('POST', '/pages/edit', {
+      cookie,
+      body: {
+        paper: PAPER,
+        baseOid: edit.body.head,
+        section: 1,
+        content: `${URL_BLOCK}\nNow with words.\n`,
+        summary: '',
+      },
+    });
+    expect(again.status).toBe(200);
+    const before = (await current(paperId)).communityHtml;
+    expect(frameId(before)).toBe(snapshot.id);
+    await rebuildAllPages();
+    expect((await current(paperId)).communityHtml).toBe(before);
+  });
+
+  it('refuses the commit when the copy fails, saying why', async () => {
+    const paperId = await paper();
+    const cookie = await signUp('ada@ethz.ch');
+    vi.stubGlobal('fetch', fakeGitHub());
+    const content = `\`\`\`demo https://github.com/${OWNER}/${REPO}/tree/nope\nBroken\n\`\`\`\n`;
+    const edit = await api('POST', '/pages/edit', {
+      cookie,
+      body: { paper: PAPER, baseOid: null, section: 0, content, summary: '' },
+    });
+    expect(edit.status).toBe(422);
+    expect(edit.body.error.message).toMatch(/^the demo at https:\/\/github\.com\/.*branch/);
+    expect(await pageHistory(paperId)).toEqual([]);
+
+    const bad = await api('POST', '/pages/edit', {
+      cookie,
+      body: {
+        paper: PAPER,
+        baseOid: null,
+        section: 0,
+        content: '```demo https://gitlab.com/a/b\nX\n```\n',
+        summary: '',
+      },
+    });
+    expect(bad.status).toBe(422);
+    expect(bad.body.error.message).toMatch(/not a demo/);
+  });
+});
+
+describe("a demo in the page's own repo", () => {
+  const SECTION = 'community/10-demos.md';
+  const SHOWN = '# Demos\n\n```demo demos/spin\nSpin it\n```\n';
+  const FOLDER: FileChange[] = [
+    {
+      path: 'demos/spin/index.html',
+      content: '<!doctype html><html><head></head><script src="app.js"></script></html>',
+    },
+    { path: 'demos/spin/app.js', content: 'document.title = "spun";\n' },
+  ];
+
+  it('is served from the demo host like a copied one, and a new version is a new snapshot', async () => {
+    const paperId = await paper();
+    const person = await account();
+    const first = await commitPage(
+      paperId,
+      null,
+      person,
+      [...FOLDER, { path: SECTION, content: SHOWN }],
+      'Add a demo',
+      {
+        rateLimit: NO_LIMIT,
+      },
+    );
+    expect(first.status).toBe('committed');
+    const html = (await current(paperId)).communityHtml;
+    const id = frameId(html);
+    expect(html).toContain("demos/spin in this page's repo");
+    const [snapshot] = await getDb().select().from(demoSnapshots);
+    expect(snapshot).toMatchObject({
+      id,
+      source: `page:${paperId}`,
+      root: 'demos/spin',
+      totalBytes: expect.any(Number),
+    });
+
+    const page = await serveDemo(demoRequest(`/d/${id}/`));
+    expect(page.status).toBe(200);
+    expect(await page.text()).toContain('<head><script data-potentialpaper>');
+    const script = await serveDemo(demoRequest(`/d/${id}/app.js`));
+    expect(script.headers.get('content-type')).toMatch(/^text\/javascript/);
+    expect(await script.text()).toBe('document.title = "spun";\n');
+
+    const head = first.status === 'committed' ? first.oid : null;
+    await commitPage(
+      paperId,
+      head,
+      person,
+      [{ path: 'demos/spin/app.js', content: 'document.title = "faster";\n' }],
+      'Faster',
+      {
+        rateLimit: NO_LIMIT,
+      },
+    );
+    const next = (await current(paperId)).communityHtml;
+    expect(frameId(next)).not.toBe(id);
+    await rebuildAllPages();
+    expect((await current(paperId)).communityHtml).toBe(next);
+  });
+
+  it('is text in a folder with an index.html, that a block may only name while it is there', async () => {
+    const paperId = await paper();
+    const person = await account();
+    const commit = (changes: FileChange[]) =>
+      commitPage(paperId, null, person, changes, 'Demo', { rateLimit: NO_LIMIT });
+
+    expect((await refusal(commit([{ path: 'demos/spin/logo.png', content: 'x' }]))).message).toMatch(/text/);
+    expect((await refusal(commit([{ path: 'demos/Spin/index.html', content: 'x' }]))).message).toMatch(
+      /demos\/my-demo/,
+    );
+    expect((await refusal(commit([{ path: 'demos/spin/app.js', content: 'a\0b' }]))).message).toMatch(/not text/);
+    expect((await refusal(commit([{ path: 'demos/spin/app.js', content: 'x' }]))).message).toMatch(/no index\.html/);
+    expect((await refusal(commit([{ path: SECTION, content: SHOWN }]))).message).toMatch(
+      /demos\/spin, which has no index/,
+    );
+
+    const made = await commit([...FOLDER, { path: SECTION, content: SHOWN }]);
+    const head = made.status === 'committed' ? made.oid : null;
+    const removal = FOLDER.map(({ path }) => ({ path, content: null }));
+    const err = await refusal(commitPage(paperId, head, person, removal, 'Remove', { rateLimit: NO_LIMIT }));
+    expect(err.message).toMatch(/shows demos\/spin/);
+  });
+
+  it("is the authors' alone once the author section shows it", async () => {
+    const paperId = await paper();
+    const author = await account();
+    const someone = await account();
+    await getDb().insert(authorClaims).values({
+      paperId,
+      accountId: author.accountId,
+      authorIndex: 1,
+      authorName: 'Ashish Vaswani',
+      status: 'confirmed',
+      identityId: 'a_test',
+    });
+    const made = await commitPage(
+      paperId,
+      null,
+      author,
+      [...FOLDER, { path: 'author/10-demos.md', content: SHOWN }],
+      'Our demo',
+      { rateLimit: NO_LIMIT },
+    );
+    const head = made.status === 'committed' ? made.oid : null;
+    const change = [{ path: 'demos/spin/app.js', content: 'alert(1)\n' }];
+    const err = await refusal(commitPage(paperId, head, someone, change, 'Mine now', { rateLimit: NO_LIMIT }));
+    expect(err.status).toBe(403);
+    expect(err.message).toMatch(/author section/);
+
+    const own = await commitPage(
+      paperId,
+      head,
+      someone,
+      [
+        { path: 'demos/other/index.html', content: '<p>Another</p>' },
+        { path: 'community/10-more.md', content: '```demo demos/other\nAnother\n```\n' },
+      ],
+      'A community demo',
+      { rateLimit: NO_LIMIT },
+    );
+    expect(own.status).toBe('committed');
   });
 });

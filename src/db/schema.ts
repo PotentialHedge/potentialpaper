@@ -327,9 +327,10 @@ export interface DemoFile {
 }
 
 /**
- * The files of a demo, copied from a repo at one commit (`server/demos/snapshot.ts`). The id is a hash of
- * the file list, so a snapshot never changes, and the same files are stored once whoever attaches them.
- * Not a projection: a page's Markdown embeds snapshots by id, in a ```` ```demo ```` block.
+ * The files of a demo, copied from a GitHub repo at one commit (`server/demos/snapshot.ts`) or from a page's
+ * own `demos/<name>/` (`server/demos/repo.ts`). The id is a hash of the file list, so a snapshot never
+ * changes, and the same files are stored once whoever attaches them. Not a projection: a page's Markdown
+ * names demos in ```` ```demo ```` blocks, and these are what the names stand for.
  */
 export const demoSnapshots = pgTable('demo_snapshots', {
   id: text('id').primaryKey(),
@@ -342,6 +343,30 @@ export const demoSnapshots = pgTable('demo_snapshots', {
   totalBytes: bigint('total_bytes', { mode: 'number' }).notNull(),
   createdAt: createdAt(),
 });
+
+/**
+ * The snapshot a GitHub address in a page's demo block stands for: taken when the commit that put the address
+ * on the page came in (`commit.ts`), and kept while it stays there. Pushed files are stored as they were
+ * written, so the pin is here rather than in the repo. Not a projection: GitHub can't be asked again for
+ * what a branch was, so a rebuild reads these.
+ */
+export const demoPins = pgTable(
+  'demo_pins',
+  {
+    paperId: uuid('paper_id')
+      .notNull()
+      .references(() => papers.id, { onDelete: 'cascade' }),
+    /** As written in the block. */
+    url: text('url').notNull(),
+    snapshotId: text('snapshot_id')
+      .notNull()
+      .references(() => demoSnapshots.id),
+    /** The page's commit that added the address. */
+    commit: bytea('commit').notNull(),
+    createdAt: createdAt(),
+  },
+  (t) => [primaryKey({ columns: [t.paperId, t.url] })],
+);
 
 /** Where one ingest stage stands for one PDF (`server/pdfs/ingest.ts`). */
 export interface PdfStageState {

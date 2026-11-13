@@ -17,6 +17,7 @@ import { cleanEvidence } from '@/lib/evidence';
 import { MAX_LINKS, parseLinkFile } from '@/lib/paper-links';
 import { MAX_VERSIONS } from '@/lib/versions';
 import { ApiError } from '../api/errors';
+import { checkDemos, pinDemos, snapshotNewDemoUrls } from '../demos/attach';
 import { consume, rateLimitHeaders, type RateLimitConfig } from '../ratelimit';
 import {
   buildTrees,
@@ -33,9 +34,11 @@ import { changedFiles, findCommit, readCommit, readFiles, readHead, readText, to
 import {
   cleanSummary,
   contentProblem,
+  isDemoPath,
   isLinkPath,
   layoutProblem,
   MAX_CHANGES,
+  MAX_DEMOS_FILES,
   MAX_FILES,
   MAX_SECTIONS,
   METADATA_PATH,
@@ -131,8 +134,13 @@ async function metadataSnapshot(tx: Writer, paperId: string): Promise<string> {
 }
 
 function normalizeChanges(changes: readonly FileChange[], migration: boolean): FileChange[] {
-  if (changes.length > MAX_CHANGES && !migration) {
+  // A demo folder is many small files that go in together; its own limits cover it.
+  const demoFiles = changes.filter(({ path }) => isDemoPath(path)).length;
+  if (changes.length - demoFiles > MAX_CHANGES && !migration) {
     throw new ApiError(422, 'validation_error', `a commit can change at most ${MAX_CHANGES} files`);
+  }
+  if (demoFiles > MAX_DEMOS_FILES) {
+    throw new ApiError(422, 'validation_error', `a commit can change at most ${MAX_DEMOS_FILES} demo files`);
   }
   const seen = new Set<string>();
   return changes.map(({ path: raw, content }) => {
@@ -303,6 +311,9 @@ export async function commitPage(
     }
   }
 
+  // Before the lock: copying a demo from GitHub is a download.
+  const snapshots = await snapshotNewDemoUrls(database, paperId, wanted);
+
   try {
     return await database.transaction(async (tx) => {
       const roles = await rolesOf(tx, actor, paperId);
@@ -367,9 +378,19 @@ export async function commitPage(
         files.set(METADATA_PATH, metadata.oid);
       }
       checkTreeShape(files);
-      if (wanted.some(({ path }) => isLinkPath(path))) {
-        await checkLinkLabels(files, (blob) => written.get(blob) ?? readText(tx, paperId, blob));
-      }
+      const text = async (blob: string) => written.get(blob) ?? readText(tx, paperId, blob);
+      if (wanted.some(({ path }) => isLinkPath(path))) await checkLinkLabels(files, text);
+      const pins = await checkDemos(tx, {
+        paperId,
+        roles,
+        changed: wanted.map(({ path }) => path),
+        headFiles,
+        files,
+        text,
+        snapshots,
+        newBlobBytes: new Map(blobs.map((blob) => [blob.oid, blob.body.length])),
+        migration,
+      });
 
       const { root, trees } = buildTrees(files);
 
@@ -393,6 +414,7 @@ export async function commitPage(
       if (!(await moveHead(tx, paperId, head, object.oid))) {
         throw new ApiError(503, 'page_busy', 'the page changed during the edit; try again');
       }
+      await pinDemos(tx, paperId, object.oid, pins);
 
       const [last] = await tx
         .select({ seq: max(pageRevisions.seq) })

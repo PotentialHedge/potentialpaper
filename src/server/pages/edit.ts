@@ -3,7 +3,6 @@ import { getDb, type Database } from '@/db';
 import { accounts, commitIdentities } from '@/db/schema';
 import { ApiError } from '../api/errors';
 import { claimNames } from '../claims';
-import { checkedDemoSources } from '../demos/attach';
 import { commitPage, type Actor, type CommitOptions, type CommitResult } from './commit';
 import { SYSTEM_AUTHOR_ID } from './git-objects';
 import { AUTHOR_STARTER, COMMUNITY_STARTER, splitSections } from './markdown';
@@ -139,7 +138,6 @@ export async function editSection(
   }
   // An HTML section is one file as it was typed; Markdown is cut at its `#` headings.
   const html = target?.name.format === 'html';
-  if (!html) await checkedDemoSources(edit.content, database);
   const parts = html ? [{ title: null, text: edit.content }] : splitSections(edit.content);
   const changes = target
     ? planSections(base, edit.part, edit.section - 1, edit.section, parts)

@@ -8,7 +8,7 @@ import { issueAgentCode, redeemAgentCode, requestAgentCode } from '../agent-code
 import { uploadAgentFile } from '../agent-files';
 import { agentPostsOf, createAgentPost, removeAgentPost, type PresentedAgentPost } from '../agent-posts';
 import { listTokens, mintToken, revokeToken } from '../tokens';
-import { demoSources } from '../demos/attach';
+import { previewDemoSources } from '../demos/attach';
 import { snapshotDemo } from '../demos/snapshot';
 import { demoUrl } from '@/lib/demos';
 import { claimRoles, ownClaim, requestClaim, withdrawClaim } from '../claims';
@@ -16,7 +16,7 @@ import { removeThumbnail, setLinks, setThumbnail } from '../pages/card';
 import { revertCommit, type Actor, type CommitResult } from '../pages/commit';
 import { editorState, editSection } from '../pages/edit';
 import { renderHtml } from '../pages/html';
-import { demoIds, renderMarkdown } from '../pages/markdown';
+import { renderMarkdown } from '../pages/markdown';
 import { getDb } from '@/db';
 import { pageCurrent } from '@/db/schema';
 import { eq } from 'drizzle-orm';
@@ -280,7 +280,7 @@ export const postRender = route(async (req) => {
   const principal = await requireAuth(req);
   const { content, format } = await parseBody(req, S.RenderBody);
   if (format === 'html') return respond(S.Rendered, { html: renderHtml(content) }, { principal });
-  const demos = await demoSources(getDb(), demoIds(content));
+  const demos = await previewDemoSources(content);
   return respond(S.Rendered, { html: renderMarkdown(content, 'preview', { demos }) }, { principal });
 });
 
