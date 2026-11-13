@@ -500,3 +500,144 @@ channel.end();
   says the key works as git's password). Worth a page or a link once there is one.
 - Showing each account its `u_…` id somewhere (profile, clone instructions) is still not done; the first refused push
   tells it, and `gitIdentity` is the call to use.
+
+### Phase 6: SSH (done, branch `repo-files`; not deployed)
+
+**Built.** Git over SSH with the `ssh2` package (1.17.0), as GitHub serves it: `git clone
+ssh://git@<host>:2222/abs/1706.03762.git`, push the same way. DESIGN.md §4.6 ("SSH") and §1 updated, `docs/git.md`
+has an "Over SSH" section (making and adding a key, `ssh -T`, the host key fingerprint as a placeholder, the
+`~/.ssh/config` `Port` entry for the short form), `/llms.txt` a sentence.
+
+```
+src/server/ssh-keys.ts         parsePublicKey (own wire-format parser), fingerprintOf, add/list/remove/findSshKey
+src/server/git/ssh-command.ts  parseSshCommand, sqDequote (git's sq_quote, strictly), parseSshPath → GitAddress
+src/server/git/ssh.ts          createSshServer({ hostKeys, database, limits?, log? }) → net.Server; SSH_LIMITS
+src/server/internal.ts         revalidateInApp(paths), isInternalRequest; POST /api/internal/revalidate
+scripts/git-ssh.ts             npm run git:ssh (host key, port, bind address from env)
+src/app/profile/SshKeys.tsx    the profile's "SSH keys" section (Table 3), /api/v1/me/ssh-keys[/id]
+drizzle/0022_ssh_keys.sql      applied to the dev and test DBs
+```
+
+- **Keys** (`ssh_keys`: account (cascade on delete), title, key type, `<type> <base64>`, `SHA256:` fingerprint
+  unique across accounts, created, last used). Ed25519, ECDSA P-256/384/521, RSA ≥ 3072 bits (≤ 16384); DSA, short
+  RSA, `sk-…` security keys (ssh2 can't verify them), private keys, PEM, several lines and malformed blobs are refused
+  with a sentence (`422 invalid_ssh_key`); a key on any account → `409 ssh_key_taken`; ≤ 50 an account
+  (`too_many_ssh_keys`). Title defaults to the key's comment. API by browser session only (`requireSession`), as
+  `/me/tokens`, so a leaked API key can't add a key.
+- **Who may add / push (decision):** any signed-in account may add keys, as any may make an API key; the check is at
+  use, the same as `authenticateGitPush`: any key may clone, pushing needs `verifiedAt` or `isBot` (refused on stderr
+  "ERROR: Confirm an institutional email address before you push.", exit 1). Keys are never admin. There's no
+  read-only key: an SSH key can always push (like GitHub's account keys); scope stays an API-key thing.
+- **Server.** User `git` only, `publickey` only (a key query answers yes only for a known key; the signature is
+  checked with `utils.parseKey(stored).verify`, then `last_used_at`). Exec of `git-upload-pack '<path>'` /
+  `git-receive-pack '<path>'` only; the path: the page path or the HTTPS one (`abs/`, `doi/`, `openreview/`,
+  `arxiv/`, optional `/`, `git/` and `.git`; no control characters, backslashes, `//` or trailing `/`), then
+  `findRepo`, following its redirect (old arXiv version, merged paper, other identifier) instead of refusing.
+  `GIT_PROTOCOL` env is taken (≤ 256 chars), nothing else; v2 for upload-pack, receive-pack v0/v1. Pty, x11, agent,
+  subsystem/sftp, tcpip/streamlocal forwarding and global requests are refused. Bare `ssh` → "Hi <handle>! You've
+  authenticated, but PotentialPaper does not provide shell access." exit 1; other commands → `Invalid command`, 128;
+  unknown page → "ERROR: No page repository at …" exit 1. Internal faults are logged, the client gets an `ERROR:` line.
+- **Limits** (`SSH_LIMITS`, overridable per server): 100 connections, 10 per address, per-address bucket of 30 new
+  connections refilled at one per 2 s (in memory: one process), checked on our own `net.Server` before any SSH work
+  (`ssh.injectSocket`); 10 auth attempts; 20 s to sign in; 10 min per connection; 4 git commands at once per account;
+  each command takes one token from the account's API bucket (`consume('account:<id>')`), and pushes take commit
+  tokens in `receiveCommits` as before. Keepalives are ssh2's defaults (15 s × 3).
+- **Where it runs (decision): its own process**, `npm run git:ssh`, the `ssh` compose service on the tools image
+  (`profiles: [tools]`, like `ingest`), published on the host as `${GIT_SSH_PUBLISH:-2222}:2222`, host key mounted
+  from `./secrets/ssh_host_ed25519_key` (gitignored, dockerignored). Not inside Next: a custom server would replace
+  `next start`'s standalone server and run SSH in every app replica.
+- **Refreshing pages from outside Next.** Scripts didn't solve this before (none refreshed Next; only the edge purge
+  and `scripts/purge-edge-cache.sh`). Now `refreshPaperPages` collects the paths whose `revalidatePath` throws (outside
+  a request) and, if `APP_INTERNAL_URL` is set, POSTs them to `/api/internal/revalidate` with a bearer key =
+  HMAC-SHA256(`BETTER_AUTH_SECRET`, fixed label) — no new secret to manage; anyone else gets 404; only paper paths,
+  ≤ 20. Compose sets `APP_INTERNAL_URL=http://app:3000` for `ssh` and `tools`, so `pages:edit` (now calls
+  `refreshPaperPages`), `claims:decide`, `pages:set-thumbnail`, `papers:import-versions` refresh too. Tests have no
+  app (unset), as before.
+- **Host key:** `GIT_SSH_HOST_KEY` (text, `\n` allowed) or `GIT_SSH_HOST_KEY_FILE` (default
+  `data/ssh_host_ed25519_key`); in dev a missing file is generated (ed25519); with `NODE_ENV=production` it refuses
+  to start without one. The fingerprint is logged at start. Checked in the built tools image: refuses without a key,
+  serves with one.
+- **Config:** `GIT_SSH_PORT` (2222), `GIT_SSH_HOST` (127.0.0.1; compose 0.0.0.0), `GIT_SSH_URL` (how the profile page
+  writes clone addresses; default `ssh://git@localhost:2222`), `GIT_SSH_PUBLISH` (compose). In `.env.example` and
+  `.env.production.example`.
+
+**Tests.** `tests/unit/ssh.test.ts`: every accepted key type from real `ssh-keygen` with its fingerprint, RSA-2048,
+DSA, sk-, unknown types, private/PEM/multi-line/junk, broken blobs (wrong inner type, short Ed25519, trailing bytes,
+wrong curve, cut short, bad base64); `sqDequote` and `parseSshCommand` (quotes, `'\''`, `'\!'`, injection attempts,
+other services, `git upload-pack`, overlong), `parseSshPath` (all accepted forms, DOI, OpenReview, arXiv version, and
+`/etc/passwd`, `..`, `~`, `//`, newline). `tests/unit/internal.test.ts`: `revalidateInApp` → the route over real HTTP
+→ `revalidatePath` (mocked), non-paper paths refused, 404 without the credential. `tests/integration/ssh.test.ts`
+(stock `ssh`/`git`, server on a random port, `GIT_SSH_COMMAND` with `-i`, `IdentitiesOnly`, `IdentityAgent=none`,
+`BatchMode`, `UserKnownHostsFile` holding the server's key and `StrictHostKeyChecking=yes`): clone + push at
+`abs/<id>.git` with `remote: 1 commit added`, clones by `arxiv/<id>`, `git/arxiv/<id>.git` (v0), the scp form and an
+arXiv version (`fsck --strict`), second push, `last_used_at`, v2 seen in `GIT_TRACE_PACKET`, nothing logged; a
+non-author's author-section push and a wrong identity printed as `remote:` lines with the `ng` reasons; unconfirmed
+account clones but can't push; unknown key and user `root` → "Permission denied (publickey)"; bare `ssh -T` greeting
+(exact text, exit 1), `ls -la` → 128, `-L` forwarding and `-s sftp` refused; missing page and `/etc/passwd`; a
+per-address bucket of 1 drops the second connection and a silent connection is closed after the sign-in timeout;
+keys API (add with comment title, 409 same and other account, RSA titled, 422 DSA, list newest first, per-account
+lists, remove only own, 401 without session); deleting the account deletes its keys. `helpers.ts` truncates
+`ssh_keys`. The 6 `pdf-ingest` failures are pre-existing (no poppler).
+
+**Decisions for Benedict** (DEPLOY.md "Git over SSH", TODO.md):
+
+1. **DNS:** a DNS-only (grey-cloud) A record, e.g. `git.papers.potentialhedge.com` → `77.244.248.196`. It exposes
+   the origin IP (Traefik only admits Cloudflare on 80/443, so the web is still behind the edge). Not created.
+2. **Port:** (1) 2222 published, nothing else changes — **my recommendation to start**; (2) 22 for git with the
+   host's sshd moved to another port or Tailscale-only, so `git@git.papers…:abs/<id>.git` works as on GitHub; (3) a
+   second IPv4 for git on 22. Moving from 2222 to 22 later only changes `GIT_SSH_PUBLISH` and `GIT_SSH_URL`. Open the
+   port in the provider's firewall (Docker bypasses ufw).
+3. **Host key:** `ssh-keygen -t ed25519 -N '' -f secrets/ssh_host_ed25519_key` on the server, once, backed up with
+   `.env.production`; its fingerprint goes into `docs/git.md` (placeholder now). `docs/git.md` and the profile also
+   assume `git.papers.potentialhedge.com:2222` until decided.
+
+**Left (SSH)**
+
+- No mail when a key is added (GitHub sends one), no admin listing of keys beyond SQL, no `sk-` (FIDO) keys until
+  ssh2 supports them, no read-only keys.
+- The per-address connection limit is in memory, so it resets on restart and only works with one `ssh` process.
+- SSH fetches have the same cost issue as smart HTTP fetches (all commit rows + tree walk per fetch); bounded per
+  account by the API bucket and 4 concurrent commands, not per page.
+- `docs/git.md` and the profile's example address assume host and port that aren't decided.
+
+### What's left overall (all phases)
+
+**Product**
+
+- The generic "edit this file" view (replaces the bespoke in-place editors); section 0 (whole part) can't contain
+  HTML sections; `demos/` is writable only by push or scripts.
+- Pictures and PDFs in repos: still pointers to R2 (`thumbnail.json`, `.potentialpaper/pdf.json`, version `pdf`);
+  binary demo assets refused (must come from GitHub). Decide later, as agreed.
+- "Insert a demo" still inserts a snapshot id, not the GitHub address.
+- Show people their git identity (`u_…`, and `a_…` per claimed paper) on the profile or the clone instructions
+  (`gitIdentity`); today the first refused push tells them.
+- Link `docs/git.md` from the site (a help page; the profile only mentions it indirectly), and clone/SSH addresses on
+  a paper's page.
+- `merge-papers.ts` `foldPages` doesn't carry a duplicate's `demos/` folders.
+- Old commits keep the pre-file layout: reverting one is refused ("edit the page instead"); non-ASCII slugs refused.
+- Page protection levels and new-account limits don't exist anywhere yet (milestone 3 list); pushed commit bodies are
+  policed only for `<x@y>` lines; author dates are free.
+
+**Git transport**
+
+- Rate limits for smart fetch (HTTP and SSH) beyond Traefik's request rate / the account bucket: a smart fetch reads
+  all commit rows and walks trees; a DB bucket per IP (HTTP) or per page if it ever matters.
+- No progress messages (band 2) on fetch or during a push's pack read; packs carry no deltas; no
+  `report-status-v2`, `push-options`, push certificates, shallow or partial clones.
+- An HTTP push is buffered whole (≤ 33 MB) and its objects held until stored.
+- The compose comment on the `/git/` Traefik router still sizes for dumb clones.
+- Old blob-store files of replaced repo demos are never deleted.
+
+**Production, in order** (nothing of `repo-files` is deployed; `venue-versions` sits under it, also unmerged)
+
+1. Merge `venue-versions` and `repo-files` into `main` (ask Benedict), then the DEPLOY.md recipe:
+   `dc --profile tools build`, `dc up -d postgres`, `dc run --rm tools` (applies `0020_page_files`, `0021_demo_pins`,
+   `0022_ssh_keys`), `dc up -d app`.
+2. Straight away: `dc run --rm tools npm run pages:migrate-layout` (until a page is migrated every edit to it fails),
+   then `scripts/purge-edge-cache.sh` (required after every deploy anyway).
+3. `dc --profile tools up -d ingest` as usual.
+4. SSH, once decided: make `secrets/ssh_host_ed25519_key`, create the DNS-only record, set `GIT_SSH_URL` (and
+   `GIT_SSH_PUBLISH` if not 2222) in `.env.production`, open the port, `dc --profile tools up -d ssh`, check
+   `dc logs ssh` for the fingerprint and `ssh -T -p <port> git@<host>`, then put the fingerprint in `docs/git.md`.
+5. Optional but wanted: `CLOUDFLARE_PURGE_TOKEN`/`CLOUDFLARE_ZONE_ID` so pushes and edits purge their page at the edge
+   (TODO.md).
