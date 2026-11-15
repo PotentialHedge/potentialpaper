@@ -91,7 +91,7 @@ Milestones 0, 1 and 2 are built, merged into `main` and deployed, and Milestone 
   `writeCurrent` fills `page_current.community_html` and `author_html`, and `pages:rebuild` regenerates them.
   Each section is its own file (`community/10-summary.md`; see `handoffs/git-push.md`), titled by its leading `#`; the same parse splits the whole-part text for the editor and marks
   `data-section` in the HTML, where `slots.tsx` adds the edit links.
-- **Editing (2026-11-15, branch `web-editor`):** the inline editors are gone. The "edit" button under a paper's
+- **Editing (2026-11-15, merged and deployed at 872a246):** the inline editors are gone. The "edit" button under a paper's
   title (and any `#edit` link) opens a dialog (`components/paper/EditDialog.tsx`): open the web editor, or
   `git clone` over HTTPS (SSH shows "not open yet" until `GIT_SSH_URL` is set). The web editor is VS Code for the
   Web built from source, framed by `/code/<paper>` beside a live preview in the page's own look. It sits behind an
