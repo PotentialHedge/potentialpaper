@@ -81,6 +81,29 @@ Milestones 0, 1 and 2 are built, merged into `main` and deployed, and Milestone 
   ICLR 2027 submissions are anonymous, so almost none have emails (0 of the dev database's 500); recent arXiv
   first pages give at least one for 69%.
 
+## Editor trims, starter files, schemas (2026-11-15, merged into `main` and deployed at d08eec6)
+
+- `/code/…` redirects someone signed out to `/signin?next=…`.
+- Every repo starts with `prek.toml` and empty section files (`server/pages/starter.ts`); blank section files aren't
+  shown (`readSections`). Older pages: `npm run pages:add-starter` (ran on the dev DB, 501 pages, and in production on
+  42,641 pages after the deploy, as the user unit `pp-prod-add-starter`, log `data/prod-add-starter.log`). Run it
+  again whenever `prek.toml` changes, e.g. the final domain.
+- Page JSON formats are zod schemas (`lib/paper-links.ts`, `lib/versions.ts`, `rules.ts`), registered in
+  `server/pages/schemas.ts`; JSON Schema at `/schemas/<name>.json` and inside the editor extension
+  (`scripts/write-page-schemas.ts`, since VS Code ignores `json.schemas` as a default).
+- VS Code trims: `editors/vscode/patch-vscode.mjs` (Dockerfile `vscode` stage; also Accounts' default, which is
+  browser storage, not a setting) plus settings in `workbench.ts`; commands remain in the palette. Source Control
+  has a Commit button (the `scmActionButton` proposal, enabled in `workbench.ts`). The editor's commit formats with
+  Prettier and refuses on errors (`precommit.ts`).
+- Rebuilding the editor (`npm run editor:build`) replaces `public/editor/` under a running `next dev`, which left
+  its watcher reloading every page in a loop; restart the dev server afterwards (`systemctl --user restart
+  papertrail-dev`, the dev server's unit now, log `data/dev-server.log`).
+- Deployed from a clean worktree (`docker compose -p potentialpaper …`), as the shared checkout held another
+  session's uncommitted work, which `COPY . .` would have shipped.
+- Another session was building comments/mentions in the same checkout at the same time (uncommitted
+  `drizzle/0024_comments.sql`, etc.); this work leaves those out. `0024` was applied to the dev database only,
+  so the dev server (which runs that uncommitted code) works.
+
 ## Milestone 3, community editing (in progress)
 
 **Built:** the web editor, history, diff and revert.
