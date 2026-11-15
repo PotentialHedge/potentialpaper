@@ -645,7 +645,7 @@ The steps, for reference:
 5. Optional but wanted: `CLOUDFLARE_PURGE_TOKEN`/`CLOUDFLARE_ZONE_ID` so pushes and edits purge their page at the edge
    (TODO.md).
 
-### Phase 7: PDFs and the picture as Git LFS (branch `git-lfs`, 2026-11-15; not merged, not deployed)
+### Phase 7: PDFs and the picture as Git LFS (2026-11-15; merged and deployed at d5f810b)
 
 Benedict wanted as much as possible editable through the repo, the picture and the versions' PDFs included, and
 chose Git LFS: pointers in the repo, bytes in R2 as before.
@@ -687,5 +687,10 @@ fetched the real PDF from R2; pushing a GIF + words showed it on the page; no lo
 reached as `localhost`, since `127.0.0.1` is the dev demo host.
 
 **Left:** LFS over SSH (`git-lfs-authenticate`; docs say set `lfs.url`), TODO.md. No `verify` action. Uploaded files
-never referenced are kept (as evidence files are). Production: merge, deploy, `pages:migrate-lfs`, purge (DEPLOY.md
-"Git LFS").
+never referenced are kept (as evidence files are).
+
+**Production, 2026-11-15:** `main` fast-forwarded to `git-lfs` (d5f810b), migration 0023 applied (42,309 PDFs
+backfilled into `lfs_objects`), app and ingest on the new image, `pages:migrate-lfs` moved 42,641 of 42,641 pages (0
+failed, about an hour), edge cache purged. `page_current` still has 42,307 page PDFs, 597 pages with versions and 267
+version PDFs, as before. A moved page cloned over HTTPS with `git lfs` had its real PDF; the site and a paper page
+load.
