@@ -68,6 +68,12 @@ const nextConfig: NextConfig = {
         ],
       },
       {
+        // The site's extension, which changes without VS Code's version (the path) changing: checked with the
+        // server on every load, which answers 304 while it is the same. After the rule above, so this replaces it.
+        source: '/editor/vscode/:version/potentialpaper/:path*',
+        headers: [{ key: 'Cache-Control', value: 'no-cache' }],
+      },
+      {
         // A webview's own pages, on the webview's origin, framed by the editor (`webviewCsp`). After the rule
         // above, so its policy replaces the editor's.
         source: `/editor/vscode/:version${WEBVIEW_PRE_PATH}:path*`,
