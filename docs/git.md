@@ -14,6 +14,11 @@ git clone https://papers.potentialhedge.com/git/doi/10.1000/xyz123.git
 git clone https://papers.potentialhedge.com/git/openreview/dskf2Ppd9o.git
 ```
 
+Install [Git LFS](https://git-lfs.com) first (`brew install git-lfs`, `apt install git-lfs`; Git for Windows and
+GitHub Desktop come with it) and run `git lfs install` once. The page's PDFs and its picture are kept with it, so a
+clone then has them as files. Without it the clone still works, and those files are small text "pointers"
+instead: everything else can be edited, but a PDF or picture can't be added ([below](#pdfs-and-the-picture)).
+
 A page only has a repository once someone has edited it. Until then the address answers "not found". Make a
 first edit on the site to start one.
 
@@ -30,13 +35,40 @@ git clone ssh://git@git.papers.potentialhedge.com:2222/abs/1706.03762.git
 | `community/NN-slug.md`       | the community section, one file per section           | any verified account                                                |
 | `author/NN-slug.md`          | the author section                                    | the paper's confirmed authors                                       |
 | `versions/<id>.json`         | the paper's versions                                  | any verified account                                                |
+| `versions/<id>.pdf`          | that version's PDF (Git LFS)                          | any verified account                                                |
 | `links/NN-slug.json`         | the links under the title: `{ "label": …, "url": … }` | its authors once the paper is claimed, else anyone                  |
+| `thumbnail.png` (or `.jpg`…) | the picture shown in place of the PDF's first page    | its authors once the paper is claimed, else anyone                  |
+| `thumbnail.json`             | the picture's words: `{ "alt": …, "caption": … }`     | as the picture                                                      |
 | `demos/<name>/index.html`, … | a demo kept in the page                               | any verified account; once the author section shows it, its authors |
-| `.potentialpaper/…`          | metadata and the PDF, written by the site             | nobody but the site                                                 |
+| `.potentialpaper/…`          | metadata and the paper's PDF, written by the site     | nobody but the site                                                 |
+| `.gitattributes`             | says which files are Git LFS; the same on every page  | nobody                                                              |
 
 Sections can also be `.html` files, from a small allowlist of tags (no scripts, styles or classes). They show
 in the order of their file names, so `10-summary.md` comes before `20-results.md`; a section's title is the
-`#` heading its file starts with. Files are plain text (UTF-8), at most 256 KB each (1 MB in `demos/`).
+`#` heading its file starts with. Files are plain text (UTF-8), at most 256 KB each (1 MB in `demos/`), except
+the PDFs and the picture.
+
+### PDFs and the picture
+
+These are kept with Git LFS: the repository holds a pointer (the file's SHA-256 and size), and the bytes are stored
+by the site. With Git LFS installed you don't see the pointers; you work with the files:
+
+```sh
+cp ~/Downloads/camera-ready.pdf versions/v_k3x9q2ab.pdf     # the PDF of the version in v_k3x9q2ab.json
+cp ~/teaser.gif thumbnail.gif                               # the picture; remove any other thumbnail.*
+git add versions/v_k3x9q2ab.pdf thumbnail.gif
+git commit -m "Add the camera-ready PDF and a teaser"
+git push
+```
+
+`git push` uploads the files first, with the same API key, then pushes the commit. A version's PDF has to sit beside
+its `.json`, and its file can say where it came from and under what license: `"pdf": { "source": "https://…",
+"license": "CC BY 4.0" }`. A PDF is at most 40 MB. The picture is a PNG, JPEG, GIF (animated too), WebP or AVIF of at
+most 8 MB, named for what it is (`thumbnail.jpg` for a JPEG), and a page has one; its alt text and caption go in
+`thumbnail.json`. To go back to the PDF's first page, remove both.
+
+A PDF or picture committed without Git LFS installed is refused with a `remote:` line saying so. Install it, then
+`git rm --cached <file>`, `git add <file>`, `git commit --amend` and push again.
 
 ## Make an API key that may push
 
@@ -95,7 +127,8 @@ fails. Git prints why, on lines starting with `remote:`.
   signature names its key: `git config commit.gpgsign false`.
 - **A one-line summary** first in the message, at most 50 commits a push. Evidence goes in trailers at the end
   of the message, one per line: `Evidence: https://…`. Lines like `Signed-off-by: Name <address>` are refused.
-- **Files the page takes**, at the paths above, and only where your account may write.
+- **Files the page takes**, at the paths above, and only where your account may write. A PDF or the picture has to
+  be a Git LFS pointer to a file uploaded to the site, which `git push` does when Git LFS is installed.
 
 When the push goes through, the page shows the new text at once, and its history lists your commits with the
 same ids as in your clone.
@@ -132,3 +165,6 @@ To push over SSH from a clone made over HTTPS, change its push address:
 `git remote set-url --push origin ssh://git@git.papers.potentialhedge.com:2222/abs/1706.03762.git`. Everything
 else is as over HTTPS: the same identity, the same rules, and a confirmed institutional address to push. Removing a
 key on your profile stops it working at once.
+
+Git LFS doesn't work over SSH yet. In a clone made over SSH, point it at the HTTPS address once, and it uses your API
+key for PDFs and pictures: `git config lfs.url https://papers.potentialhedge.com/git/arxiv/1706.03762.git/info/lfs`.

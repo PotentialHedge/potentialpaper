@@ -5,16 +5,7 @@ import { dirname, join } from 'node:path';
 import { eq } from 'drizzle-orm';
 import { afterAll, afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { getDb } from '@/db';
-import {
-  accounts,
-  authorClaims,
-  evidenceFiles,
-  pageCurrent,
-  pageEvents,
-  pageObjects,
-  pageRevisions,
-  papers,
-} from '@/db/schema';
+import { accounts, authorClaims, pageCurrent, pageEvents, pageObjects, pageRevisions, papers } from '@/db/schema';
 import { ApiError } from '@/server/api/errors';
 import { checkTree, rolesOf } from '@/server/pages/check';
 import {
@@ -37,6 +28,8 @@ import {
 import { lockPage } from '@/server/pages/projections';
 import { gitIdentity, type IncomingObject, receiveCommits } from '@/server/pages/receive';
 import { pageHistory, readCommit, readFiles, readHead, readText } from '@/server/pages/repo';
+import { recordLfsObject } from '@/server/lfs';
+import { encodeLfsPointer } from '@/server/pages/rules';
 import { savePaper } from '@/server/papers';
 import { closePool, resetDatabase } from './helpers';
 
@@ -179,7 +172,7 @@ describe('a bad tree is refused, whoever made it', () => {
   const cases: [string, Record<string, Content>, number, RegExp][] = [
     ['the system files', { '.potentialpaper/metadata.json': '{}\n' }, 403, /only the system and admins/],
     ['the author section, by someone else', { 'author/10-mine.md': '# Mine\n' }, 403, /confirmed authors/],
-    ['a path with no place', { 'page.md': 'hello\n' }, 403, /pages hold \.potentialpaper/],
+    ['a path with no place', { 'page.md': 'hello\n' }, 403, /pages hold \.gitattributes, \.potentialpaper/],
     ['a section not named NN-slug', { 'community/summary.md': 'x\n' }, 422, /one file per section/],
     ['a dot file', { 'community/.hidden': 'x\n' }, 422, /starting with a dot/],
     [
@@ -199,14 +192,20 @@ describe('a bad tree is refused, whoever made it', () => {
     [
       'a version whose PDF was never uploaded',
       {
-        'versions/v_test0001.json': `${JSON.stringify({
-          kind: 'preprint',
-          label: 'v1',
-          pdf: { sha256: SHA, bytes: 1000, url: 'https://evil.example/paper.pdf' },
-        })}\n`,
+        'versions/v_test0001.json': `${JSON.stringify({ kind: 'preprint', label: 'v1' })}\n`,
+        'versions/v_test0001.pdf': `version https://git-lfs.github.com/spec/v1\noid sha256:${SHA}\nsize 1000\n`,
       },
       422,
-      /versions\/v_test0001\.json: a version’s PDF has to be uploaded or copied here first/,
+      /versions\/v_test0001\.pdf: the file with sha256 c+ isn't stored here; push with Git LFS installed/,
+    ],
+    [
+      'a PDF that is not a Git LFS pointer',
+      {
+        'versions/v_test0001.json': `${JSON.stringify({ kind: 'preprint', label: 'v1' })}\n`,
+        'versions/v_test0001.pdf': '%PDF-1.4\n\u0000\u00ff',
+      },
+      422,
+      /versions\/v_test0001\.pdf has to be a Git LFS pointer: install Git LFS/,
     ],
     [
       'a picture from elsewhere',
@@ -214,7 +213,7 @@ describe('a bad tree is refused, whoever made it', () => {
         'thumbnail.json': `${JSON.stringify({ sha256: SHA, bytes: 10, type: 'image/png', url: 'https://tracker.example/x.png' })}\n`,
       },
       422,
-      /thumbnail\.json has to point at a picture uploaded here/,
+      /thumbnail\.json is not \{ "alt"/,
     ],
     [
       'a demo the site does not have',
@@ -620,19 +619,24 @@ describe('the commit path, for web edits too', () => {
     const paperId = await newPaper();
     const someone = await newAccount();
     const pdf = { sha256: 'f'.repeat(64), bytes: 1234, url: '/files/paper.pdf' };
-    const version = (p: object): FileChange[] => [
-      { path: 'versions/v_pdf00001.json', content: `${JSON.stringify({ kind: 'preprint', label: 'v1', pdf: p })}\n` },
+    const version = (p: { sha256: string; bytes: number }): FileChange[] => [
+      { path: 'versions/v_pdf00001.json', content: `${JSON.stringify({ kind: 'preprint', label: 'v1' })}\n` },
+      { path: 'versions/v_pdf00001.pdf', content: encodeLfsPointer(p) },
     ];
     await expect(commitPage(paperId, null, someone, version(pdf), 'V', { rateLimit: NO_LIMIT })).rejects.toMatchObject({
       status: 422,
-      message: expect.stringMatching(/uploaded or copied here first/),
+      message: expect.stringMatching(/isn't stored here/),
     });
-    await getDb()
-      .insert(evidenceFiles)
-      .values({ sha256: pdf.sha256, type: 'application/pdf', name: 'paper.pdf', bytes: pdf.bytes, url: pdf.url });
+    await recordLfsObject(getDb(), { ...pdf, type: 'application/pdf' });
     await expect(
       commitPage(paperId, null, someone, version({ ...pdf, bytes: 99 }), 'V', { rateLimit: NO_LIMIT }),
-    ).rejects.toMatchObject({ message: expect.stringMatching(/has sha256 f+ and 1234 bytes/) });
+    ).rejects.toMatchObject({ message: expect.stringMatching(/that file has 1234 bytes, not 99/) });
+    // A picture is not a PDF, whatever it is called.
+    const gif = { sha256: 'e'.repeat(64), bytes: 10, type: 'image/gif', url: '/thumbnails/e.gif' };
+    await recordLfsObject(getDb(), gif);
+    await expect(commitPage(paperId, null, someone, version(gif), 'V', { rateLimit: NO_LIMIT })).rejects.toMatchObject({
+      message: expect.stringMatching(/is not a PDF/),
+    });
     const ok = await commitPage(paperId, null, someone, version(pdf), 'V', { rateLimit: NO_LIMIT });
     expect(ok.status).toBe('committed');
   });

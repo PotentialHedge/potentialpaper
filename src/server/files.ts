@@ -5,9 +5,10 @@ import { evidenceFiles, pdfDocuments, type EvidenceFile } from '@/db/schema';
 import { AGENT_FILE_TEXT_TYPES } from '@/lib/agent-posts';
 import type { VersionPdf } from '@/lib/versions';
 import { ApiError } from './api/errors';
-import { storeMedia } from './media';
+import { recordLfsObject } from './lfs';
+import { storeImage, storeMedia } from './media';
 import type { Reader } from './pages/repo';
-import { imageType } from './pages/rules';
+import { imageType, MAX_LFS_PDF_BYTES, MAX_THUMBNAIL_BYTES } from './pages/rules';
 import { consume, rateLimitHeaders, type RateLimitConfig } from './ratelimit';
 
 /**
@@ -20,7 +21,7 @@ import { consume, rateLimitHeaders, type RateLimitConfig } from './ratelimit';
  */
 
 const UPLOAD_BUDGET: RateLimitConfig = { burst: 40, perSecond: 40 / 3600 };
-export const MAX_PDF_BYTES = 40 * 1024 * 1024;
+export const MAX_PDF_BYTES = MAX_LFS_PDF_BYTES;
 const MAX_IMAGE_BYTES = 10 * 1024 * 1024;
 const MAX_TEXT_BYTES = 2 * 1024 * 1024;
 
@@ -141,6 +142,8 @@ export async function storeFile(
   });
   if (pdf) {
     await database.insert(pdfDocuments).values({ sha256, url, bytes: bytes.length }).onConflictDoNothing();
+    // So a version can have it as its `versions/<id>.pdf` (`server/lfs.ts`).
+    await recordLfsObject(database, { sha256, bytes: bytes.length, type, url, accountId });
   }
   const [file] = await database
     .insert(evidenceFiles)
@@ -224,4 +227,31 @@ export async function versionPdfAt(url: string, database: Reader = getDb()): Pro
     );
   }
   return { sha256: row.sha256, bytes: Number(row.bytes), url: row.url, ...(row.source ? { source: row.source } : {}) };
+}
+
+/**
+ * Stores what `git lfs` uploads (`server/git/lfs.ts`): a PDF, as a version's PDF is, or a picture, where the
+ * picture editor puts one. Either is recorded in `lfs_objects`, so a pushed pointer may name it. Nothing else
+ * goes in a page's Git LFS, so nothing else is taken.
+ */
+export async function storeLfsUpload(accountId: string, bytes: Buffer, database: Database = getDb()): Promise<void> {
+  if (isPdf(bytes)) {
+    await storeFile(accountId, bytes, 'paper.pdf', { database });
+    return;
+  }
+  const type = imageType(bytes);
+  if (!type) {
+    throw new ApiError(
+      422,
+      'validation_error',
+      'a page keeps only PDFs and pictures (PNG, JPEG, GIF, WebP, AVIF) with Git LFS',
+    );
+  }
+  if (bytes.length > MAX_THUMBNAIL_BYTES) {
+    throw new ApiError(422, 'validation_error', `a picture may be at most ${MAX_THUMBNAIL_BYTES / 1024 / 1024} MB`);
+  }
+  await spend(accountId);
+  const sha256 = createHash('sha256').update(bytes).digest('hex');
+  const url = await storeImage(bytes, sha256, type);
+  await recordLfsObject(database, { sha256, bytes: bytes.length, type, url, accountId });
 }

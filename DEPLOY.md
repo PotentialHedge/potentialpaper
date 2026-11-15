@@ -32,6 +32,16 @@ https://papers.potentialhedge.com loads.
 - **The edge-cache purge is not optional.** Cloudflare caches whole pages. They name the old build's scripts,
   which the new container no longer serves, so cached pages break until the cache is purged.
 
+## Git LFS
+
+PDFs and pictures in page repos are Git LFS pointers (DESIGN.md §4.3), served by the app at each clone address's
+`info/lfs/` (`src/server/git/lfs.ts`). Nothing to run for it: downloads go straight to R2's public addresses, and
+uploads are `PUT`s of at most 40 MB through Cloudflare (whose limit is 100 MB) to the app.
+
+**Once, when deploying the move to it** (migration `0023_lfs_objects`): straight after `dc up -d app`, run
+`dc run --rm tools npm run pages:migrate-lfs` (a system commit per page; until a page is moved, edits to it are
+refused), then `scripts/purge-edge-cache.sh`. `-- --dry-run` lists what it would change. It is safe to run again.
+
 ## PDF ingest
 
 The `ingest` service runs `npm run pdfs:ingest -- --watch` from the tools image (which has poppler): every

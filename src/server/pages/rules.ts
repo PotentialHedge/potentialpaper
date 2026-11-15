@@ -8,26 +8,54 @@ import { htmlProblem } from './html';
  * are decided. Paths reach people's disks through `git clone`, so a path has to be safe on every
  * filesystem as well as valid to git. The layout is many small files a person can edit with a text editor:
  *
+ *   .gitattributes                  the system's, always the same: which files are kept with Git LFS
  *   .potentialpaper/metadata.json   the system's: identifiers, title, authors, abstract snapshot
- *   .potentialpaper/pdf.json        the system's: where the paper's PDF is
+ *   .potentialpaper/paper.pdf       the system's: the paper's PDF (Git LFS)
+ *   .potentialpaper/pdf.json        the system's: where that PDF came from, and its license
  *   author/10-overview.md           the author section, a file per section (Markdown or HTML)
  *   community/10-summary.md         the community section, the same way
  *   versions/v_k3x9q2ab.json        a version of the paper, named by its id
+ *   versions/v_k3x9q2ab.pdf         that version's PDF (Git LFS)
  *   links/10-code.json              a link under the title
- *   thumbnail.json                  the paper's picture: a pointer
+ *   thumbnail.png                   the paper's picture (Git LFS), or .jpg, .gif, .webp, .avif
+ *   thumbnail.json                  its alt text and caption
  *   demos/<name>/index.html         a demo, with its other files beside it
  *   extensions/<id>/…               reserved
+ *
+ * PDFs and pictures are Git LFS pointers (`parseLfsPointer`): the repo holds their hash and size, the bytes
+ * are in R2 (`server/lfs.ts`), and `git lfs` moves them through the batch API (`server/git/lfs.ts`).
  */
 
-/** Files only the system and admins write. The one name that may start with a dot. */
+/** Files only the system and admins write. The one directory whose name may start with a dot. */
 export const SYSTEM_DIR = '.potentialpaper';
 export const METADATA_PATH = `${SYSTEM_DIR}/metadata.json`;
-/** Where the paper's PDF is: the bytes are in R2 (DESIGN.md §4.3), and this says which ones. */
+/** The paper's PDF, a Git LFS pointer; the bytes are in R2 (DESIGN.md §4.3). */
+export const PAPER_PDF_PATH = `${SYSTEM_DIR}/paper.pdf`;
+/** Where `paper.pdf` came from and under what license, which the license requires us to say. */
 export const PDF_PATH = `${SYSTEM_DIR}/pdf.json`;
-const SYSTEM_PATHS = new Set([METADATA_PATH, PDF_PATH]);
+const SYSTEM_PATHS = new Set([METADATA_PATH, PAPER_PDF_PATH, PDF_PATH]);
+
 /**
- * A picture of the paper, in place of its PDF's first page: a pointer, as `pdf.json` is. It and the links
- * are the paper's card: its confirmed authors' once it is claimed, and anyone verified's until then.
+ * Every page has this, and only this, so that `git lfs` keeps PDFs and pictures as pointers on a clone and
+ * on `git add`. Nobody can change it: an attribute can name a filter, and filters run programs.
+ */
+export const GITATTRIBUTES_PATH = '.gitattributes';
+export const GITATTRIBUTES = `# PDFs and pictures are kept with Git LFS (https://git-lfs.com). With it installed (\`git lfs install\`),
+# a clone has the files, and \`git add\` of one stores a pointer. This file is the same on every page.
+/.potentialpaper/*.pdf filter=lfs diff=lfs merge=lfs -text
+/versions/*.pdf filter=lfs diff=lfs merge=lfs -text
+/thumbnail.png filter=lfs diff=lfs merge=lfs -text
+/thumbnail.jpg filter=lfs diff=lfs merge=lfs -text
+/thumbnail.jpeg filter=lfs diff=lfs merge=lfs -text
+/thumbnail.gif filter=lfs diff=lfs merge=lfs -text
+/thumbnail.webp filter=lfs diff=lfs merge=lfs -text
+/thumbnail.avif filter=lfs diff=lfs merge=lfs -text
+`;
+
+/**
+ * The words for the picture of the paper, which shows in place of its PDF's first page: its alt text and
+ * caption. The picture is \`thumbnail.<ext>\` beside it. They and the links are the paper's card: its
+ * confirmed authors' once it is claimed, and anyone verified's until then.
  */
 export const THUMBNAIL_PATH = 'thumbnail.json';
 /** Links to the paper elsewhere (code, project page, video), shown under its title (`lib/paper-links.ts`). */
@@ -115,15 +143,90 @@ export function versionPath(id: string): string {
   return `${VERSIONS_DIR}/${id}.json`;
 }
 
+/** The version whose PDF a path is, as `versions/<id>.pdf`, or `null`. */
+export function versionPdfIdOf(path: string): string | null {
+  const match = /^versions\/([^/]+)\.pdf$/.exec(path);
+  return match && VERSION_ID.test(match[1]) ? match[1] : null;
+}
+
+export function versionPdfPath(id: string): string {
+  return `${VERSIONS_DIR}/${id}.pdf`;
+}
+
+/** A picture's type by its file name's extension, as `thumbnail.<ext>` is named. */
+const THUMBNAIL_EXTENSIONS: Record<string, ThumbnailType> = {
+  png: 'image/png',
+  jpg: 'image/jpeg',
+  jpeg: 'image/jpeg',
+  gif: 'image/gif',
+  webp: 'image/webp',
+  avif: 'image/avif',
+};
+
+/** The type the name of the picture says, as `thumbnail.png`, or `null` if the path isn't the picture. */
+export function thumbnailImageType(path: string): ThumbnailType | null {
+  const match = /^thumbnail\.([a-z]+)$/.exec(path);
+  return (match && THUMBNAIL_EXTENSIONS[match[1]]) ?? null;
+}
+
+/** Where a picture of this type goes. */
+export function thumbnailImagePath(type: ThumbnailType): string {
+  const extension = Object.entries(THUMBNAIL_EXTENSIONS).find(([, t]) => t === type)![0];
+  return `thumbnail.${extension}`;
+}
+
+/** What a Git LFS file at this path has to be, or `null` if the path isn't one. */
+export function lfsKindOf(path: string): 'pdf' | 'image' | null {
+  if (path === PAPER_PDF_PATH || versionPdfIdOf(path)) return 'pdf';
+  if (thumbnailImageType(path)) return 'image';
+  return null;
+}
+
+export const PDF_TYPE = 'application/pdf';
+
+/** An uploaded PDF is at most this (`server/files.ts` takes the same). */
+export const MAX_LFS_PDF_BYTES = 40 * 1024 * 1024;
+/**
+ * A pointer may name a larger PDF than can be uploaded: the imports stored some (proceedings with appendices of
+ * 50 MB). Only files stored here can be named anyway (`check.ts`).
+ */
+const MAX_POINTED_PDF_BYTES = 200 * 1024 * 1024;
+
+export interface LfsPointer {
+  sha256: string;
+  bytes: number;
+}
+
+const LFS_VERSION = 'version https://git-lfs.github.com/spec/v1';
+
+/**
+ * A Git LFS pointer file (https://github.com/git-lfs/git-lfs/blob/main/docs/spec.md), or `null`. Only the
+ * three lines `git lfs` writes, in its order, so a pointer has one spelling and so one blob.
+ */
+export function parseLfsPointer(text: string): LfsPointer | null {
+  const match =
+    /^version https:\/\/git-lfs\.github\.com\/spec\/v1\noid sha256:([0-9a-f]{64})\nsize (0|[1-9]\d{0,15})\n$/.exec(
+      text,
+    );
+  if (!match) return null;
+  const bytes = Number(match[2]);
+  return Number.isSafeInteger(bytes) ? { sha256: match[1], bytes } : null;
+}
+
+export function encodeLfsPointer({ sha256, bytes }: LfsPointer): string {
+  return `${LFS_VERSION}\noid sha256:${sha256}\nsize ${bytes}\n`;
+}
+
 /** What a page holds, said when a path isn't one of them. */
 const LAYOUT =
-  'pages hold .potentialpaper/ (metadata.json, pdf.json), author/ and community/ (sections named like ' +
-  '10-summary.md or 20-results.html), versions/<id>.json, links/ (named like 10-code.json), thumbnail.json, ' +
-  'demos/<name>/ and extensions/';
+  'pages hold .gitattributes, .potentialpaper/ (metadata.json, paper.pdf, pdf.json), author/ and community/ ' +
+  '(sections named like 10-summary.md or 20-results.html), versions/<id>.json and <id>.pdf, links/ (named like ' +
+  '10-code.json), thumbnail.png (or .jpg, .gif, .webp, .avif) and thumbnail.json, demos/<name>/ and extensions/';
 
 /** Why nothing can be written at this path, or `null`. Deleting a file needs no such check. */
 export function layoutProblem(path: string): string | null {
-  if (SYSTEM_PATHS.has(path) || path === THUMBNAIL_PATH) return null;
+  if (SYSTEM_PATHS.has(path) || path === GITATTRIBUTES_PATH || path === THUMBNAIL_PATH) return null;
+  if (thumbnailImageType(path)) return null;
   if (path.startsWith('extensions/')) return null;
   for (const part of PAGE_PARTS) {
     if (path.startsWith(`${part}/`)) {
@@ -136,7 +239,9 @@ export function layoutProblem(path: string): string | null {
     return isLinkPath(path) ? null : 'links/ holds one file per link, named like 10-code.json';
   }
   if (path.startsWith(`${VERSIONS_DIR}/`)) {
-    return versionIdOf(path) ? null : 'versions/ holds one file per version, named like v_k3x9q2ab.json';
+    return versionIdOf(path) || versionPdfIdOf(path)
+      ? null
+      : 'versions/ holds a file per version, named like v_k3x9q2ab.json, and its PDF beside it as v_k3x9q2ab.pdf';
   }
   if (isDemoPath(path)) {
     const demo = demoPath(path);
@@ -171,11 +276,13 @@ const WINDOWS_DEVICE = /^(con|prn|aux|nul|com\d|lpt\d)(\..*)?$/i;
 /**
  * Why a name cannot be in a tree, or `null`. Refusing every leading dot covers `.`, `..`, `.git` in all
  * its spellings, `.gitmodules` and `.gitattributes`. The one exception is `.potentialpaper` at the top,
- * spelled exactly so, which keeps the system's files out of the way of people's.
+ * spelled exactly so, which keeps the system's files out of the way of people's, and `.gitattributes` at the
+ * top, whose content is fixed (`GITATTRIBUTES`).
  */
-function nameProblem(name: string, top: boolean): string | null {
+function nameProblem(name: string, top: boolean, alone: boolean): string | null {
   if (name === '') return 'has an empty name';
-  if (name.startsWith('.') && !(top && name === SYSTEM_DIR)) return 'has a name starting with a dot';
+  const allowed = (top && name === SYSTEM_DIR) || (alone && name === GITATTRIBUTES_PATH);
+  if (name.startsWith('.') && !allowed) return 'has a name starting with a dot';
   if (/^\s|[\s.]$/u.test(name)) return 'has a name starting with a space or ending with a space or dot';
   if (UNSAFE_CHARACTER.test(name)) return 'has a character that is not safe in a file name';
   if (SHORT_NAME.test(name) || WINDOWS_DEVICE.test(name)) return 'has a name that is reserved on Windows';
@@ -191,7 +298,7 @@ export function normalizePath(raw: string): { path: string } | { problem: string
   const names = path.split('/');
   if (names.length > MAX_DEPTH) return { problem: 'is nested too deeply' };
   for (const [index, name] of names.entries()) {
-    const problem = nameProblem(name, index === 0 && names.length > 1);
+    const problem = nameProblem(name, index === 0 && names.length > 1, names.length === 1);
     if (problem) return { problem };
   }
   return { path };
@@ -210,13 +317,13 @@ export interface Roles {
 
 /** Why these roles cannot write this path, or `null`. Checked for each path of a commit. */
 export function pathDenied(path: string, roles: Roles): string | null {
-  if (path.startsWith(`${SYSTEM_DIR}/`)) {
+  if (path.startsWith(`${SYSTEM_DIR}/`) || path === GITATTRIBUTES_PATH) {
     return roles.system || roles.admin ? null : `only the system and admins can change ${SYSTEM_DIR}/`;
   }
   if (path.startsWith(`${VERSIONS_DIR}/`)) {
     return roles.system || roles.admin || roles.verified ? null : 'confirm an institutional email address first';
   }
-  if (path === THUMBNAIL_PATH || path.startsWith(`${LINKS_DIR}/`)) {
+  if (path === THUMBNAIL_PATH || thumbnailImageType(path) || path.startsWith(`${LINKS_DIR}/`)) {
     if (roles.system) return 'the system only writes the metadata';
     if (roles.admin) return null;
     if (roles.claimed)
@@ -292,21 +399,27 @@ function isHttps(value: unknown): boolean {
   return URL.parse(value)?.protocol === 'https:';
 }
 
-/** The pointer in a `pdf.json`, or `null` if it isn't one. Pages link to `url`, so it has to be checked. */
-export function parsePdfPointer(text: string): PdfPointer | null {
-  let value: Partial<PdfPointer> | null;
+/** What `pdf.json` says about `paper.pdf`. */
+export type PdfSource = Pick<PdfPointer, 'source' | 'license' | 'fetchedAt'>;
+
+/** A `pdf.json`, or `null` if it isn't one. Pages credit `source`, so it has to be checked. */
+export function parsePdfSource(text: string): PdfSource | null {
+  let value: Partial<PdfSource> | null;
   try {
-    value = JSON.parse(text) as Partial<PdfPointer> | null;
+    value = JSON.parse(text) as Partial<PdfSource> | null;
   } catch {
     return null;
   }
-  if (value === null || typeof value !== 'object') return null;
-  const { sha256, bytes, url, source, license, fetchedAt } = value;
-  if (typeof sha256 !== 'string' || !/^[0-9a-f]{64}$/.test(sha256)) return null;
-  if (typeof bytes !== 'number' || !Number.isSafeInteger(bytes) || bytes <= 0) return null;
-  if (!isHttps(url) || !isHttps(source)) return null;
+  if (value === null || typeof value !== 'object' || Array.isArray(value)) return null;
+  if (Object.keys(value).some((key) => !['source', 'license', 'fetchedAt'].includes(key))) return null;
+  const { source, license, fetchedAt } = value;
+  if (!isHttps(source)) return null;
   if (typeof license !== 'string' || license === '' || typeof fetchedAt !== 'string') return null;
-  return { sha256, bytes, url: url as string, source: source as string, license, fetchedAt };
+  return { source: source as string, license, fetchedAt };
+}
+
+export function encodePdfSource({ source, license, fetchedAt }: PdfSource): string {
+  return `${JSON.stringify({ source, license, fetchedAt }, null, 2)}\n`;
 }
 
 export const THUMBNAIL_TYPES = ['image/jpeg', 'image/png', 'image/gif', 'image/webp', 'image/avif'] as const;
@@ -339,35 +452,33 @@ export function imageType(bytes: Uint8Array): ThumbnailType | null {
   return null;
 }
 
-/** The pointer in an `author/thumbnail.json`, or `null` if it isn't one. */
-export function parseThumbnailPointer(text: string): ThumbnailPointer | null {
-  let value: Partial<ThumbnailPointer> | null;
+export type ThumbnailWords = Pick<ThumbnailPointer, 'alt' | 'caption'>;
+
+/** The words in a `thumbnail.json`, or `null` if it isn't that. */
+export function parseThumbnailWords(text: string): ThumbnailWords | null {
+  let value: ThumbnailWords | null;
   try {
-    value = JSON.parse(text) as Partial<ThumbnailPointer> | null;
+    value = JSON.parse(text) as ThumbnailWords | null;
   } catch {
     return null;
   }
   if (value === null || typeof value !== 'object' || Array.isArray(value)) return null;
-  const { sha256, bytes, type, url, alt, caption } = value;
-  if (typeof sha256 !== 'string' || !/^[0-9a-f]{64}$/.test(sha256)) return null;
-  if (typeof bytes !== 'number' || !Number.isSafeInteger(bytes) || bytes <= 0 || bytes > MAX_THUMBNAIL_BYTES) {
-    return null;
-  }
-  if (!THUMBNAIL_TYPES.includes(type as ThumbnailType)) return null;
-  const sitePath = typeof url === 'string' && /^\/[^/\\]/.test(url);
-  if (!isHttps(url) && !sitePath) return null;
+  if (Object.keys(value).some((key) => key !== 'alt' && key !== 'caption')) return null;
+  const { alt, caption } = value;
   for (const text of [alt, caption]) {
     if (text !== undefined && (typeof text !== 'string' || text.length > MAX_ALT_LENGTH)) return null;
   }
-  return {
-    sha256,
-    bytes,
-    type: type as ThumbnailType,
-    url: url as string,
-    ...(alt ? { alt } : {}),
-    ...(caption ? { caption } : {}),
-  };
+  return { ...(alt ? { alt } : {}), ...(caption ? { caption } : {}) };
 }
+
+export function encodeThumbnailWords({ alt, caption }: ThumbnailWords): string {
+  return `${JSON.stringify({ ...(alt ? { alt } : {}), ...(caption ? { caption } : {}) }, null, 2)}\n`;
+}
+
+/** What to tell someone whose PDF or picture arrived as itself, not as a Git LFS pointer. */
+export const LFS_NEEDED =
+  'has to be a Git LFS pointer: install Git LFS (https://git-lfs.com), run `git lfs install` once, then ' +
+  '`git rm --cached <file>`, `git add <file>` and commit again';
 
 /**
  * Why this can't be the file's content, or `null`. Files are text, since media goes to R2 (DESIGN.md
@@ -375,6 +486,14 @@ export function parseThumbnailPointer(text: string): ThumbnailPointer | null {
  * span files (how many links, their labels) are `commit.ts`'s, which sees the whole tree.
  */
 export function contentProblem(path: string, content: string): string | null {
+  // A PDF or picture that arrived as itself rather than as a pointer is told how to fix that.
+  const lfs = lfsKindOf(path);
+  if (lfs) {
+    const pointer = parseLfsPointer(content);
+    if (!pointer) return LFS_NEEDED;
+    const max = lfs === 'pdf' ? MAX_POINTED_PDF_BYTES : MAX_THUMBNAIL_BYTES;
+    return pointer.bytes > max ? `is larger than ${max / 1024 / 1024} MB` : null;
+  }
   if (!content.isWellFormed()) return 'is not valid Unicode';
   if (content.includes('\0')) return 'is not text';
   // A demo's files are its own code, served as they are from the demo host: only their size is ours.
@@ -382,8 +501,13 @@ export function contentProblem(path: string, content: string): string | null {
     return Buffer.byteLength(content) > MAX_DEMO_FILE_BYTES ? `is larger than ${MAX_DEMO_FILE_BYTES} bytes` : null;
   }
   if (Buffer.byteLength(content) > MAX_FILE_BYTES) return `is larger than ${MAX_FILE_BYTES} bytes`;
-  if (path === PDF_PATH) return parsePdfPointer(content) ? null : 'is not a valid PDF pointer';
-  if (path === THUMBNAIL_PATH) return parseThumbnailPointer(content) ? null : 'is not a valid thumbnail pointer';
+  if (path === GITATTRIBUTES_PATH) return content === GITATTRIBUTES ? null : 'is the same on every page, and fixed';
+  if (path === PDF_PATH) {
+    return parsePdfSource(content) ? null : 'is not { "source": "https://…", "license": "…", "fetchedAt": "…" }';
+  }
+  if (path === THUMBNAIL_PATH) {
+    return parseThumbnailWords(content) ? null : 'is not { "alt": "…", "caption": "…" } (both optional)';
+  }
   if (isLinkPath(path)) return parseLinkFile(content) ? null : 'is not a link: { "label": "Code", "url": "https://…" }';
   const versionId = versionIdOf(path);
   if (versionId) {

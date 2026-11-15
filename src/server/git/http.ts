@@ -4,6 +4,7 @@ import { DEMO_ORIGIN } from '@/lib/demos';
 import { ApiError } from '../api/errors';
 import { authenticateGitPush, GIT_REALM } from '../auth';
 import { answerGitRequest, findRepo, type GitAddress, parseGitAddress } from '../pages/clone';
+import { lfsBatch, lfsLocks, lfsUpload } from './lfs';
 import { PACK_LIMITS } from './pack-reader';
 import { pageReceiveTarget } from './page-push';
 import { FLUSH, pkt, PktReader } from './pkt-line';
@@ -46,6 +47,9 @@ export async function gitGet(req: Request, database: Database = getDb()): Promis
   const url = new URL(req.url);
   const service = url.searchParams.get('service');
   const address = parseGitAddress(url.pathname);
+  if (address?.file.startsWith('info/lfs/')) {
+    return onDemoHost(req) ? notFound() : lfsLocks();
+  }
   if (address?.file === 'info/refs' && service !== null) {
     if (service === 'git-receive-pack') return receivePackRefs(req, address, database);
     if (service !== 'git-upload-pack') return text(403, `Unsupported service ${service}\n`);
@@ -85,6 +89,11 @@ export async function gitPost(req: Request, database: Database = getDb()): Promi
   const url = new URL(req.url);
   const address = parseGitAddress(url.pathname);
   if (address?.file === 'git-receive-pack') return receivePack(req, address, database);
+  if (address?.file.startsWith('info/lfs/')) {
+    if (onDemoHost(req)) return notFound();
+    if (address.file === 'info/lfs/objects/batch') return lfsBatch(req, address, database);
+    if (address.file.startsWith('info/lfs/locks')) return lfsLocks();
+  }
   if (address?.file !== 'git-upload-pack') {
     return text(405, 'Method not allowed\n', { ...NOT_CACHED, Allow: 'GET' });
   }
@@ -151,6 +160,7 @@ function streamOf(output: AsyncGenerator<Buffer>): ReadableStream<Uint8Array> {
 
 /** Not on the demo host, which `proxy.ts` would otherwise have answered (it skips pushes, see there). */
 const DEMO_HOST = new URL(DEMO_ORIGIN).host;
+const onDemoHost = (req: Request) => req.headers.get('host') === DEMO_HOST;
 
 /**
  * Who is pushing, or the answer that refuses them. A 401 carries `WWW-Authenticate`, which is what makes git
@@ -201,4 +211,14 @@ async function receivePack(req: Request, address: GitAddress, database: Database
   return new Response(streamOf(receivePackRequest(target, new PktReader(body))), {
     headers: { ...SMART, 'Content-Type': 'application/x-git-receive-pack-result' },
   });
+}
+
+/** `PUT`: only Git LFS uploads (`lfs.ts`). */
+export async function gitPut(req: Request, database: Database = getDb()): Promise<Response> {
+  const address = parseGitAddress(new URL(req.url).pathname);
+  if (onDemoHost(req)) return notFound();
+  if (!address || !/^info\/lfs\/objects\/[0-9a-f]{64}$/.test(address.file)) {
+    return text(405, 'Method not allowed\n', { ...NOT_CACHED, Allow: 'GET, POST' });
+  }
+  return lfsUpload(req, address, database);
 }

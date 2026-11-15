@@ -644,3 +644,48 @@ The steps, for reference:
    `dc logs ssh` for the fingerprint and `ssh -T -p <port> git@<host>`, then put the fingerprint in `docs/git.md`.
 5. Optional but wanted: `CLOUDFLARE_PURGE_TOKEN`/`CLOUDFLARE_ZONE_ID` so pushes and edits purge their page at the edge
    (TODO.md).
+
+### Phase 7: PDFs and the picture as Git LFS (branch `git-lfs`, 2026-11-15; not merged, not deployed)
+
+Benedict wanted as much as possible editable through the repo, the picture and the versions' PDFs included, and
+chose Git LFS: pointers in the repo, bytes in R2 as before.
+
+**Layout** (`rules.ts`): `.gitattributes` (fixed content, system/admins, the one top-level dot file; marks only the
+PDF and picture paths `filter=lfs`), `.potentialpaper/paper.pdf` + `pdf.json` (now only `source`, `license`,
+`fetchedAt`; both or neither), `versions/<id>.pdf` beside `<id>.json` (whose `"pdf"` now only has `source`/`license`),
+`thumbnail.<png|jpg|jpeg|gif|webp|avif>` (one a page, named for its type) + `thumbnail.json` (`alt`, `caption`; needs
+the picture). `parseLfsPointer` takes exactly the three lines `git lfs` writes. A PDF or picture that arrives as bytes
+is refused with `LFS_NEEDED` (install, `git lfs install`, re-add).
+
+**`lfs_objects`** (migration 0023, backfilled from `page_current`, `evidence_files` PDFs and `pdf_documents`): every
+file the site stored, by sha256, with bytes, sniffed type, url, uploader. `checkLfsFiles` (`check.ts`, for everyone,
+system too) wants each changed pointer to name a row of that size and kind; it replaces `checkVersionPdf` and
+`checkThumbnail`. Written by `storeFile` (PDFs), `setThumbnail`, `storeLfsUpload`, `attach-pdfs`, `migrate-page-lfs`.
+
+**Projections unchanged in shape:** `page_current.pdf`/`.thumbnail`/`versions[].pdf` are composed from the pointer, the
+JSON and the row's url (`content.ts` `readPagePdf`, `readThumbnail`, `readVersions`/`versionsIn`), so readers didn't
+change. A rebuild now reads `lfs_objects` too.
+
+**Batch API** (`server/git/lfs.ts`, routed by `http.ts` from `info/lfs/…`, `PUT` added to the route, excluded from
+`proxy.ts`'s matcher as pushes are): download for anyone (R2 address, absolute); upload needs `authenticateGitPush`,
+hands back a `PUT` to `info/lfs/objects/<oid>` with the same Authorization, which checks the hash and stores only a PDF
+(≤ 40 MB, through `storeFile`, so ingest reads it) or a picture (≤ 8 MB). Locks answer 501, which makes `git lfs`
+set `locksverify=false` silently (a 200 printed a "consider enabling" hint with the key in it). Pointers may name PDFs
+up to 200 MB, as 597 imported page PDFs are over 40 MB (largest 51 MB).
+
+**Web editors:** `setThumbnail`/`removeThumbnail` write the pointer and words; `versionChanges` writes `<id>.pdf`; the
+APIs and components are unchanged. `foldPages` moves version PDFs with their versions and a picture only to a survivor
+without one. First commits get `.gitattributes`; revert never touches it.
+
+**Migration:** `npm run pages:migrate-lfs` (`planLfs` in `layout-migration.ts`). On the dev database: 501 of 501 pages
+moved, `page_current`'s pdf/thumbnail/versions identical before and after (md5 of the rows).
+
+**Checked:** unit and integration tests (the 6 `pdf-ingest` failures are the pre-existing poppler ones);
+`tests/integration/lfs.test.ts` runs real `git lfs` (from PATH or `~/.local/bin`, skipped without it): clone has the
+files, push uploads then pushes, a raw PDF is refused with the hint. By hand through `next dev`: clone of a dev page
+fetched the real PDF from R2; pushing a GIF + words showed it on the page; no lock hint. Note `next dev` must be
+reached as `localhost`, since `127.0.0.1` is the dev demo host.
+
+**Left:** LFS over SSH (`git-lfs-authenticate`; docs say set `lfs.url`), TODO.md. No `verify` action. Uploaded files
+never referenced are kept (as evidence files are). Production: merge, deploy, `pages:migrate-lfs`, purge (DEPLOY.md
+"Git LFS").

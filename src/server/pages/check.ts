@@ -3,11 +3,10 @@ import { and, eq } from 'drizzle-orm';
 import { accounts, authorClaims, commitIdentities, papers } from '@/db/schema';
 import { cleanEvidence } from '@/lib/evidence';
 import { MAX_LINKS, parseLinkFile } from '@/lib/paper-links';
-import { MAX_VERSIONS, parseVersionFile, type VersionPdf } from '@/lib/versions';
+import { MAX_VERSIONS } from '@/lib/versions';
 import { ApiError } from '../api/errors';
 import { checkDemos } from '../demos/attach';
-import { versionPdfAt } from '../files';
-import { imageAddresses } from '../media';
+import { findLfsObjects, PDF_TYPE } from '../lfs';
 import { consume, rateLimitHeaders, type RateLimitConfig } from '../ratelimit';
 import { SYSTEM_AUTHOR_ID, type FileTree } from './git-objects';
 import type { Writer } from './projections';
@@ -17,6 +16,8 @@ import {
   isDemoPath,
   isLinkPath,
   layoutProblem,
+  LFS_NEEDED,
+  lfsKindOf,
   MAX_CHANGES,
   MAX_DEMOS_FILES,
   MAX_FILES,
@@ -24,12 +25,19 @@ import {
   METADATA_PATH,
   normalizePath,
   PAGE_PARTS,
-  parseThumbnailPointer,
+  PAPER_PDF_PATH,
+  parseLfsPointer,
   pathDenied,
+  PDF_PATH,
   type Roles,
   sectionName,
   THUMBNAIL_PATH,
+  THUMBNAIL_TYPES,
+  thumbnailImagePath,
+  thumbnailImageType,
   versionIdOf,
+  versionPath,
+  versionPdfIdOf,
 } from './rules';
 
 /**
@@ -209,6 +217,31 @@ function checkTreeShape(files: FileTree): void {
   if (paths.filter((path) => versionIdOf(path)).length > MAX_VERSIONS) {
     throw new ApiError(422, 'validation_error', `a page can have at most ${MAX_VERSIONS} versions`);
   }
+  const pictures = paths.filter((path) => thumbnailImageType(path));
+  if (pictures.length > 1) {
+    throw new ApiError(422, 'validation_error', `a page has one picture, not ${pictures.join(' and ')}`, {
+      path: pictures[1],
+    });
+  }
+  if (files.has(THUMBNAIL_PATH) && pictures.length === 0) {
+    throw new ApiError(
+      422,
+      'validation_error',
+      `${THUMBNAIL_PATH} has the words for the picture: add the picture beside it (thumbnail.png, .jpg, .gif, .webp or .avif), or remove it too`,
+      { path: THUMBNAIL_PATH },
+    );
+  }
+  for (const path of paths) {
+    const id = versionPdfIdOf(path);
+    if (id && !files.has(versionPath(id))) {
+      throw new ApiError(422, 'validation_error', `${path} is the PDF of a version, so it needs ${versionPath(id)}`, {
+        path,
+      });
+    }
+  }
+  if (files.has(PAPER_PDF_PATH) !== files.has(PDF_PATH)) {
+    throw new ApiError(422, 'validation_error', `${PAPER_PDF_PATH} and ${PDF_PATH} go together`, { path: PDF_PATH });
+  }
   for (const part of PAGE_PARTS) {
     if (paths.filter((path) => sectionName(path, part)).length > MAX_SECTIONS) {
       throw new ApiError(422, 'validation_error', `a part can have at most ${MAX_SECTIONS} sections`);
@@ -237,61 +270,57 @@ async function checkLinkLabels(files: FileTree, text: TextOf): Promise<void> {
   }
 }
 
-async function versionPdfIn(path: string, blob: string | undefined, text: TextOf): Promise<VersionPdf | undefined> {
-  const id = versionIdOf(path);
-  if (!id || !blob) return undefined;
-  const parsed = parseVersionFile(id, (await text(blob)) ?? '');
-  return 'version' in parsed ? parsed.version.pdf : undefined;
-}
-
-const samePdf = (a: VersionPdf | undefined, b: VersionPdf | undefined) =>
-  a?.sha256 === b?.sha256 && a?.bytes === b?.bytes && a?.url === b?.url;
-
 /**
- * A version's PDF is one uploaded or copied here (`server/files.ts`), with the hash and size it has, since
- * a page links to it and shows it as that version. The editor resolves an uploaded address to this; a file
- * written by hand has to say the same.
+ * A PDF or the picture is a Git LFS pointer to bytes this site stored (`server/lfs.ts`): it read them first and
+ * knows what they are, so a page never links to a PDF that isn't one, or shows a picture from anywhere.
+ * `git lfs` uploads the bytes before it pushes (`server/git/lfs.ts`); the web editors store them first.
  */
-async function checkVersionPdf(db: Reader, path: string, before: FileTree, after: FileTree, text: TextOf) {
-  const pdf = await versionPdfIn(path, after.get(path), text);
-  if (!pdf || samePdf(pdf, await versionPdfIn(path, before.get(path), text))) return;
-  let known: VersionPdf;
-  try {
-    known = await versionPdfAt(pdf.url, db);
-  } catch (err) {
-    if (err instanceof ApiError) throw new ApiError(err.status, err.code, `${path}: ${err.message}`, { path });
-    throw err;
+async function checkLfsFiles(changed: readonly string[], after: FileTree, text: TextOf, db: Reader) {
+  const pointers = new Map<string, { sha256: string; bytes: number }>();
+  for (const path of changed) {
+    const blob = after.get(path);
+    if (!blob || !lfsKindOf(path)) continue;
+    const pointer = parseLfsPointer((await text(blob)) ?? '');
+    if (pointer) pointers.set(path, pointer);
   }
-  if (known.sha256 !== pdf.sha256 || known.bytes !== pdf.bytes) {
-    throw new ApiError(
-      422,
-      'validation_error',
-      `${path}: the PDF at ${pdf.url} has sha256 ${known.sha256} and ${known.bytes} bytes`,
-      { path },
-    );
-  }
-}
-
-/**
- * The picture is one this site stored, at the address it stores that hash at: it read the bytes first and
- * knows they are an image (`card.ts`). Any other address would be a picture, or a tracker, from anywhere.
- */
-async function checkThumbnail(before: FileTree, after: FileTree, text: TextOf) {
-  const blob = after.get(THUMBNAIL_PATH);
-  if (!blob) return;
-  const pointer = parseThumbnailPointer((await text(blob)) ?? '');
-  const was = before.get(THUMBNAIL_PATH);
-  const old = was ? parseThumbnailPointer((await text(was)) ?? '') : null;
-  if (!pointer || (old && old.sha256 === pointer.sha256 && old.url === pointer.url && old.type === pointer.type)) {
-    return;
-  }
-  if (!imageAddresses(pointer.sha256, pointer.type).includes(pointer.url)) {
-    throw new ApiError(
-      422,
-      'validation_error',
-      `${THUMBNAIL_PATH} has to point at a picture uploaded here (the page's picture editor, or POST /api/v1/pages/thumbnail)`,
-      { path: THUMBNAIL_PATH },
-    );
+  if (pointers.size === 0) return;
+  const known = await findLfsObjects(
+    db,
+    [...pointers.values()].map((p) => p.sha256),
+  );
+  for (const [path, pointer] of pointers) {
+    const object = known.get(pointer.sha256);
+    if (!object) {
+      throw new ApiError(
+        422,
+        'validation_error',
+        `${path}: the file with sha256 ${pointer.sha256} isn't stored here; push with Git LFS installed, which uploads it first`,
+        { path },
+      );
+    }
+    if (object.bytes !== pointer.bytes) {
+      throw new ApiError(
+        422,
+        'validation_error',
+        `${path}: that file has ${object.bytes} bytes, not ${pointer.bytes}`,
+        {
+          path,
+        },
+      );
+    }
+    if (lfsKindOf(path) === 'pdf' && object.type !== PDF_TYPE) {
+      throw new ApiError(422, 'validation_error', `${path} is not a PDF`, { path });
+    }
+    const named = thumbnailImageType(path);
+    if (named && object.type !== named) {
+      const type = THUMBNAIL_TYPES.find((t) => t === object.type);
+      throw new ApiError(
+        422,
+        'validation_error',
+        type ? `${path} is a ${type}, so call it ${thumbnailImagePath(type)}` : `${path} is not a picture`,
+        { path },
+      );
+    }
   }
 }
 
@@ -317,7 +346,8 @@ export interface TreeCheck {
  *
  * Checks, in order: the number of changed files; for each changed path, its normal form (NFC, safe on every
  * filesystem), who may change it, its place in the layout and its content (JSON shapes, the HTML allowlist,
- * pointers); then across the tree: its limits, link labels, version PDFs, the picture, and the demos.
+ * Git LFS pointers); then across the tree: its limits, link labels, that each pointer's bytes are stored
+ * here, and the demos.
  */
 export async function checkTree(db: Reader, check: TreeCheck): Promise<string[]> {
   const { before, after, text, roles } = check;
@@ -341,9 +371,11 @@ export async function checkTree(db: Reader, check: TreeCheck): Promise<string[]>
     if (content === null) {
       throw invalidContent(
         path,
-        isDemoPath(path)
-          ? "is not UTF-8 text; a demo's binary files (pictures, models, wasm) come from GitHub"
-          : 'is not UTF-8 text',
+        lfsKindOf(path)
+          ? LFS_NEEDED
+          : isDemoPath(path)
+            ? "is not UTF-8 text; a demo's binary files (pictures, models, wasm) come from GitHub"
+            : 'is not UTF-8 text',
       );
     }
     const invalid = contentProblem(path, content);
@@ -352,12 +384,7 @@ export async function checkTree(db: Reader, check: TreeCheck): Promise<string[]>
 
   checkTreeShape(after);
   if (changed.some(isLinkPath)) await checkLinkLabels(after, text);
-  if (!roles.system) {
-    for (const path of changed) {
-      if (versionIdOf(path)) await checkVersionPdf(db, path, before, after, text);
-    }
-    if (changed.includes(THUMBNAIL_PATH)) await checkThumbnail(before, after, text);
-  }
+  await checkLfsFiles(changed, after, text, db);
   return checkDemos(db, {
     paperId: check.paperId,
     roles,

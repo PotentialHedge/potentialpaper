@@ -4,11 +4,13 @@ import { eq, sql } from 'drizzle-orm';
 import { getDb, getPool } from '@/db';
 import { pageCurrent, pageRefs, paperIdentifiers } from '@/db/schema';
 import { commitPage, SYSTEM_ACTOR } from '@/server/pages/commit';
-import { PDF_PATH, type PdfPointer } from '@/server/pages/rules';
+import { recordLfsObject } from '@/server/lfs';
+import { encodeLfsPointer, encodePdfSource, PAPER_PDF_PATH, PDF_PATH, PDF_TYPE } from '@/server/pages/rules';
 import type { ManifestRow } from './upload-pdfs';
 
 /**
- * Commits a `pdf.json` to the page of each paper in a manifest from `upload-pdfs`. Safe to run again: a
+ * Commits a `.potentialpaper/paper.pdf` (a Git LFS pointer) and its `pdf.json` to the page of each paper in a
+ * manifest from `upload-pdfs`. Safe to run again: a
  * page that already points at those bytes is skipped.
  *
  *   npm run papers:attach-pdfs -- data/iclr2027.jsonl
@@ -55,20 +57,22 @@ async function main() {
           skipped += 1;
           continue;
         }
-        const pointer: PdfPointer = {
-          sha256: row.sha256,
-          bytes: row.bytes,
-          url: `${PDF_BASE}/pdf/${row.sha256}.pdf`,
+        const source = {
           source: `https://openreview.net/forum?id=${row.id}`,
           license: row.license,
           fetchedAt: row.fetchedAt,
         };
         try {
+          const url = `${PDF_BASE}/pdf/${row.sha256}.pdf`;
+          await recordLfsObject(getDb(), { sha256: row.sha256, bytes: row.bytes, type: PDF_TYPE, url });
           await commitPage(
             page.paperId,
             page.head,
             SYSTEM_ACTOR,
-            [{ path: PDF_PATH, content: `${JSON.stringify(pointer, null, 2)}\n` }],
+            [
+              { path: PAPER_PDF_PATH, content: encodeLfsPointer(row) },
+              { path: PDF_PATH, content: encodePdfSource(source) },
+            ],
             'Add the PDF',
           );
           committed += 1;

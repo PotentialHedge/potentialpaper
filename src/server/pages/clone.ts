@@ -23,7 +23,7 @@ export type GitAnswer =
 export const CLONE_PREFIX = '/git';
 
 const REQUEST =
-  /^\/git\/([a-z]+)\/(.+)\.git\/(info\/refs|HEAD|objects\/[0-9a-f]{2}\/[0-9a-f]{38}|git-upload-pack|git-receive-pack)$/;
+  /^\/git\/([a-z]+)\/(.+)\.git\/(info\/refs|HEAD|objects\/[0-9a-f]{2}\/[0-9a-f]{38}|git-upload-pack|git-receive-pack|info\/lfs\/objects\/batch|info\/lfs\/objects\/[0-9a-f]{64}|info\/lfs\/locks(?:\/verify)?)$/;
 
 /** A clone address, taken apart: the paper as written in it, and the file asked for under `.git/`. */
 export interface GitAddress {
@@ -81,7 +81,7 @@ export async function findRepo(
 /** The dumb protocol's answers: `info/refs`, `HEAD` and loose objects. */
 export async function answerGitRequest(pathname: string, database: Database = getDb()): Promise<GitAnswer> {
   const address = parseGitAddress(pathname);
-  if (!address || address.file.startsWith('git-')) return { kind: 'missing' };
+  if (!address || address.file.startsWith('git-') || address.file.startsWith('info/lfs/')) return { kind: 'missing' };
   const { id, scheme, raw, file } = address;
 
   // Git asks for one object per request, so this is one query, and only ever one address's worth.

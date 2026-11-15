@@ -39,7 +39,11 @@ export const VERSION_STATUS_LABELS: Record<VersionStatus, string> = {
   published: 'Published',
 };
 
-/** A version's PDF, hosted here by its SHA-256 as the page's own is (`pdf.json`). */
+/**
+ * A version's PDF, hosted here by its SHA-256 as the page's own is. In the repo it is two things: the PDF
+ * itself beside the version's file, `versions/<id>.pdf` (a Git LFS pointer, which has the hash and size), and
+ * the rest in the version's file as `"pdf": { "source", "license" }` (`VersionPdfInfo`).
+ */
 export interface VersionPdf {
   sha256: string;
   bytes: number;
@@ -48,6 +52,9 @@ export interface VersionPdf {
   source?: string;
   license?: string;
 }
+
+/** What a version's file says about its PDF. */
+export type VersionPdfInfo = Pick<VersionPdf, 'source' | 'license'>;
 
 export interface PaperVersion {
   /** Stable, so the compare page's links keep working when versions are added or reordered. */
@@ -161,8 +168,27 @@ export function versionProblem(value: unknown): string | null {
   return null;
 }
 
-/** The version in `versions/<id>.json`, or why it isn't one. The id is the file's name, not a field. */
-export function parseVersionFile(id: string, text: string): { version: PaperVersion } | { problem: string } {
+function pdfInfoProblem(value: unknown): string | null {
+  if (value === null || typeof value !== 'object' || Array.isArray(value)) return 'has a “pdf” that is not an object';
+  for (const key of Object.keys(value)) {
+    if (key !== 'source' && key !== 'license') {
+      return `has “pdf.${key}”; the PDF itself is versions/<id>.pdf, and “pdf” only says its “source” and “license”`;
+    }
+  }
+  const { source, license } = value as VersionPdfInfo;
+  if (source !== undefined && httpsProblem(source)) return 'has a PDF with a bad source';
+  if (license !== undefined && textProblem(license, 100)) return 'has a PDF with a bad license';
+  return null;
+}
+
+/**
+ * The version in `versions/<id>.json`, without its PDF, and what the file says about the PDF; or why it
+ * isn't one. The id is the file's name, not a field. The PDF itself is `versions/<id>.pdf`.
+ */
+export function parseVersionFile(
+  id: string,
+  text: string,
+): { version: PaperVersion; pdfInfo: VersionPdfInfo } | { problem: string } {
   let value: unknown;
   try {
     value = JSON.parse(text);
@@ -171,9 +197,16 @@ export function parseVersionFile(id: string, text: string): { version: PaperVers
   }
   if (value === null || typeof value !== 'object' || Array.isArray(value)) return { problem: 'is not a JSON object' };
   if ('id' in value) return { problem: 'takes its id from its file name, so leave “id” out' };
-  const version = { id, ...value } as PaperVersion;
+  const { pdf, ...rest } = value as Record<string, unknown>;
+  if (pdf !== undefined) {
+    const problem = pdfInfoProblem(pdf);
+    if (problem) return { problem };
+  }
+  const version = { id, ...rest } as PaperVersion;
   const problem = versionProblem(version);
-  return problem ? { problem } : { version };
+  if (problem) return { problem };
+  const { source, license } = (pdf ?? {}) as VersionPdfInfo;
+  return { version, pdfInfo: { ...(source ? { source } : {}), ...(license ? { license } : {}) } };
 }
 
 /** Fields in a fixed order, so that a file only changes where the version does. The id is the file's name. */
@@ -191,10 +224,20 @@ const ORDER: (keyof PaperVersion)[] = [
   'abstract',
 ];
 
-/** A version's file: a field to a line, so two people changing different fields of it merge. */
+/**
+ * A version's file: a field to a line, so two people changing different fields of it merge. Of its PDF only
+ * the source and license, as the PDF is a file of its own (`versions/<id>.pdf`).
+ */
 export function encodeVersionFile(version: PaperVersion): string {
   const ordered: Record<string, unknown> = {};
-  for (const key of ORDER) if (version[key] !== undefined) ordered[key] = version[key];
+  for (const key of ORDER) {
+    if (key === 'pdf') {
+      const { source, license } = version.pdf ?? {};
+      if (source || license) ordered.pdf = { ...(source ? { source } : {}), ...(license ? { license } : {}) };
+    } else if (version[key] !== undefined) {
+      ordered[key] = version[key];
+    }
+  }
   return `${JSON.stringify(ordered, null, 2)}\n`;
 }
 

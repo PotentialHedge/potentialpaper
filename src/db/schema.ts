@@ -287,9 +287,9 @@ export const pageCurrent = pgTable('page_current', {
   /** The two parts' sections, rendered at commit (`pages/sections.ts`), which is all a reader is sent. */
   authorHtml: text('author_html'),
   communityHtml: text('community_html'),
-  /** The page's `.potentialpaper/pdf.json`. */
+  /** The page's `.potentialpaper/paper.pdf` and `pdf.json`, with where the bytes are (`lfs_objects`). */
   pdf: jsonb('pdf').$type<PdfPointer>(),
-  /** The page's `thumbnail.json`. */
+  /** The page's picture, `thumbnail.<ext>`, and its words, `thumbnail.json`. */
   thumbnail: jsonb('thumbnail').$type<ThumbnailPointer>(),
   /** The page's `links/`: links to the paper elsewhere, beside the ones its identifiers give. */
   links: jsonb('links').$type<TitleLink[]>(),
@@ -619,6 +619,27 @@ export const sshKeys = pgTable(
 );
 
 export type SshKey = typeof sshKeys.$inferSelect;
+
+/**
+ * The files page repos keep with Git LFS (`server/lfs.ts`): PDFs and pictures, whose bytes are in R2 and
+ * whose pointers (an `oid sha256:…` and a size) are in the repos. One row per distinct file, by its SHA-256,
+ * as R2 keeps them, written when this site stores the bytes, which it does only after reading them, so a row
+ * says what they are. A pointer in a commit has to name a row here (`check.ts`), and the LFS batch API
+ * hands out `url` to download it (`server/git/lfs.ts`). Rows are never changed; a takedown deletes the bytes.
+ */
+export const lfsObjects = pgTable('lfs_objects', {
+  sha256: text('sha256').primaryKey(),
+  bytes: bigint('bytes', { mode: 'number' }).notNull(),
+  /** `application/pdf`, or a picture's type (`rules.ts` `THUMBNAIL_TYPES`). */
+  type: text('type').notNull(),
+  /** Where the bytes are: `https:`, or a path on this site in development. */
+  url: text('url').notNull(),
+  /** Who stored it; `null` for the system (imports) and for files stored before this table. */
+  accountId: uuid('account_id').references(() => accounts.id, { onDelete: 'set null' }),
+  createdAt: createdAt(),
+});
+
+export type LfsObject = typeof lfsObjects.$inferSelect;
 
 /**
  * One-time codes an AI agent trades for an API token (`server/agent-codes.ts`): mailed to the person, or put

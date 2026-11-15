@@ -22,6 +22,7 @@ import {
   venueName,
 } from '@/server/version-sources';
 import { mergeFoundVersions } from '@/server/versions';
+import { versionChanges, versionsIn } from '@/server/pages/content';
 
 const SHA = 'a'.repeat(64);
 
@@ -49,8 +50,41 @@ describe('versions/<id>.json', () => {
     const text = encodeVersionFile(workshop);
     expect(text).not.toContain(workshop.id);
     expect(text.split('\n')[1]).toBe(`  "date": "${workshop.date}",`);
-    expect(parseVersionFile(workshop.id, text)).toEqual({ version: workshop });
+    const { pdf: _pdf, ...withoutPdf } = workshop;
+    void _pdf;
+    expect(parseVersionFile(workshop.id, text)).toEqual({ version: withoutPdf, pdfInfo: {} });
+    expect(text).not.toContain(SHA);
     expect(contentProblem(versionPath(workshop.id), text)).toBeNull();
+  });
+
+  it('keeps a PDF beside its file, as a Git LFS pointer, and only its source and license inside', () => {
+    const copied = {
+      ...workshop,
+      pdf: { ...workshop.pdf!, source: 'https://openreview.net/pdf?id=x', license: 'CC BY 4.0' },
+    };
+    const text = encodeVersionFile(copied);
+    expect(JSON.parse(text).pdf).toEqual({ source: 'https://openreview.net/pdf?id=x', license: 'CC BY 4.0' });
+    const changes = versionChanges([], [copied, conference]);
+    expect(changes.map((c) => c.path).sort()).toEqual([
+      'versions/v_9q2mfk3x.json',
+      'versions/v_k3x9q2mf.json',
+      'versions/v_k3x9q2mf.pdf',
+    ]);
+    const texts = new Map(changes.map((c) => [c.path, c.content!]));
+    expect(texts.get('versions/v_k3x9q2mf.pdf')).toBe(
+      `version https://git-lfs.github.com/spec/v1\noid sha256:${SHA}\nsize 1000\n`,
+    );
+    const read = versionsIn(texts, (sha) => (sha === SHA ? workshop.pdf!.url : undefined));
+    expect(read).toEqual([copied, conference]);
+    // Without the bytes known here, the version shows without its PDF.
+    expect(versionsIn(texts, () => undefined)[0].pdf).toBeUndefined();
+    expect(versionChanges([copied], [{ ...copied, pdf: undefined }])).toEqual([
+      { path: 'versions/v_k3x9q2mf.pdf', content: null },
+      { path: 'versions/v_k3x9q2mf.json', content: encodeVersionFile({ ...copied, pdf: undefined }) },
+    ]);
+    expect(contentProblem(versionPath(workshop.id), '{"label":"x","kind":"other","pdf":{"sha256":"x"}}')).toMatch(
+      /pdf\.sha256/,
+    );
   });
 
   it('refuses a bad version, a duplicate id, an unknown field', () => {

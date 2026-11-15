@@ -177,14 +177,19 @@ A repo is laid out so that a person with a text editor can edit it: many small f
 big files. `src/server/pages/rules.ts` is the authority.
 
 ```
+.gitattributes                  system, always the same: which files are Git LFS
 .potentialpaper/metadata.json   system: identifiers, title, authors, abstract snapshot
-.potentialpaper/pdf.json        system: the paper's PDF, as a pointer
+.potentialpaper/paper.pdf       system: the paper's PDF (Git LFS)
+.potentialpaper/pdf.json        system: its source page, license and when it was fetched
 author/10-tl-dr.md              the author section, one file per section
 author/20-results.html          … in Markdown or HTML
 community/10-summary.md         the community section, the same way
 versions/v_k3x9q2ab.json        a version of the paper; the file's name is its id
+versions/v_k3x9q2ab.pdf         that version's PDF (Git LFS)
 links/10-code.json              a link under the title: { "label", "url" }
-thumbnail.json                  the paper's picture, in place of its PDF's first page: a pointer
+thumbnail.gif                   the paper's picture, in place of its PDF's first page (Git LFS;
+                                .png, .jpg, .gif, .webp or .avif, named for its type, one a page)
+thumbnail.json                  the picture's words: { "alt", "caption" }
 demos/<name>/index.html         a demo kept in the page, with the files it loads beside it
 extensions/<id>/...             reserved: data owned by one extension (section 10)
 ```
@@ -195,20 +200,23 @@ They show in the order of their names, which is the order `ls` lists them in. A 
 allowlist at commit (no scripts, styles, event handlers, ids or classes) and refused, not cleaned, so
 what is in the repo is what is shown. Links are numbered the same way.
 
-**`.potentialpaper/`** is the one name that may start with a dot, at the top and spelled exactly so;
-every other path rule stays.
+**`.potentialpaper/`** is the one directory that may start with a dot, at the top and spelled exactly
+so, and `.gitattributes` at the top the one file; every other path rule stays. `.gitattributes` has fixed
+content (`GITATTRIBUTES`): it marks the PDFs and the picture `filter=lfs`, and nothing else, since an
+attribute can name a filter and filters run programs on a clone.
 
 **Permissions are rules on paths**, checked in one place:
 
-| Path                         | Who may commit                                                                              |
-| ---------------------------- | ------------------------------------------------------------------------------------------- |
-| `.potentialpaper/**`         | System ingest, admins                                                                       |
-| `versions/**`                | Any verified account, system ingest, admins                                                 |
-| `thumbnail.json`, `links/**` | Confirmed authors once claimed, any verified account before, admins                         |
-| `author/**`                  | Confirmed authors of this paper, admins                                                     |
-| `community/**`               | Any verified account, subject to page protection                                            |
-| `demos/<name>/**`            | Any verified account; a folder the author section shows, only its confirmed authors; admins |
-| `extensions/<id>/**`         | Extension `<id>` acting for a consenting user                                               |
+| Path                      | Who may commit                                                                              |
+| ------------------------- | ------------------------------------------------------------------------------------------- |
+| `.potentialpaper/**`      | System ingest, admins                                                                       |
+| `.gitattributes`          | System, admins, and only its fixed content                                                  |
+| `versions/**`             | Any verified account, system ingest, admins                                                 |
+| `thumbnail.*`, `links/**` | Confirmed authors once claimed, any verified account before, admins                         |
+| `author/**`               | Confirmed authors of this paper, admins                                                     |
+| `community/**`            | Any verified account, subject to page protection                                            |
+| `demos/<name>/**`         | Any verified account; a folder the author section shows, only its confirmed authors; admins |
+| `extensions/<id>/**`      | Extension `<id>` acting for a consenting user                                               |
 
 **Demos** are code that runs on the page, in a sandboxed frame from a host of their own
 (`lib/demos.ts`, served by `server/demos/serve.ts` at `/d/<snapshot>/…`). Either section embeds one
@@ -248,9 +256,19 @@ The name is one of:
 These rules are checked inside `commitPage` (`server/demos/attach.ts`), so they hold for any writer.
 The demo host shares a site with the app, so it is not yet a real sandbox (`TODO.md`).
 
-Media doesn't go in git: bytes go to R2, keyed by hash, and git records the pointer, as Git LFS
-does. `pdf.json` is such a pointer: the SHA-256, size, URL, source page and license of the
-paper's PDF, copied unmodified.
+**Media is Git LFS.** PDFs and the picture don't go in git: their bytes go to R2, keyed by SHA-256, and
+the repo has a Git LFS pointer (`version …`, `oid sha256:…`, `size …`), so a clone with `git lfs`
+installed has the files and `git add` of one stores a pointer. `lfs_objects` records every file this
+site stored, with its type (read from its bytes) and where it is (`server/lfs.ts`); a commit's pointer
+has to name one, of the right size and kind (a PDF at a `.pdf` path, a picture of the type its name
+says), whoever commits it (`check.ts`). The bytes come in three ways: `git lfs` through the batch API
+at the clone address's `info/lfs/` (`server/git/lfs.ts`: downloads are R2 addresses, for anyone;
+uploads are a `PUT` back to the site with the push API key, kept only if they are a PDF or a picture),
+the web editors (the picture, a version's PDF uploaded or copied from an archive), and the imports.
+Pages have no LFS locks; the locks API answers 501, which `git lfs` takes as "turn lock checks off".
+Taking a file down deletes its bytes; history keeps the pointer, which then shows nothing. What the
+page shows is projected from the pointer, the JSON beside it and `lfs_objects` (`page_current.pdf`,
+`.thumbnail`, each version's `pdf`).
 
 ### 4.4 The write path
 

@@ -1,10 +1,12 @@
 import { describe, expect, it } from 'vitest';
 import { linkChanges, versionChanges } from '@/server/pages/content';
 import { htmlProblem, renderHtmlSection } from '@/server/pages/html';
-import { planLayout } from '@/server/pages/layout-migration';
+import { planLayout, planLfs } from '@/server/pages/layout-migration';
 import {
   contentProblem,
+  GITATTRIBUTES,
   layoutProblem,
+  parseLfsPointer,
   normalizePath,
   pathDenied,
   type PagePart,
@@ -56,6 +58,11 @@ describe('the layout', () => {
       'versions/arxiv-v2.json',
       'links/10-code.json',
       'thumbnail.json',
+      'thumbnail.png',
+      'thumbnail.webp',
+      '.gitattributes',
+      '.potentialpaper/paper.pdf',
+      'versions/v_k3x9q2ab.pdf',
       'demos/attention-3d/index.html',
       'demos/attention-3d/assets/shader.glsl',
     ]) {
@@ -69,6 +76,9 @@ describe('the layout', () => {
       'links/code.json',
       'versions/V1.json',
       'pdf.json',
+      'thumbnail.svg',
+      'versions/v_k3x9q2ab.png',
+      'paper.pdf',
       'notes.md',
       'demos/index.html',
       'demos/Spin/index.html',
@@ -259,5 +269,74 @@ describe('moving a page to the layout', () => {
     const moved = new Map(Object.entries(written) as [string, string][]);
     moved.set('thumbnail.json', '{}\n');
     expect(planLayout(moved).changes).toEqual([]);
+  });
+});
+
+describe('the move to Git LFS', () => {
+  const sha = (c: string) => c.repeat(64);
+  const files = new Map([
+    ['.potentialpaper/metadata.json', '{}\n'],
+    [
+      '.potentialpaper/pdf.json',
+      JSON.stringify({
+        sha256: sha('a'),
+        bytes: 1000,
+        url: 'https://pdfs.example.org/pdf/a.pdf',
+        source: 'https://openreview.net/forum?id=x',
+        license: 'CC BY 4.0',
+        fetchedAt: '2026-10-06T17:26:50.147Z',
+      }),
+    ],
+    [
+      'thumbnail.json',
+      JSON.stringify({
+        sha256: sha('b'),
+        bytes: 20,
+        type: 'image/gif',
+        url: 'https://pdfs.example.org/thumbnail/b.gif',
+        alt: 'A cube',
+      }),
+    ],
+    [
+      'versions/v_k3x9q2ab.json',
+      JSON.stringify({
+        kind: 'workshop',
+        label: 'SPIGM',
+        pdf: { sha256: sha('c'), bytes: 30, url: 'https://pdfs.example.org/pdf/c.pdf', license: 'CC BY 4.0' },
+      }),
+    ],
+    ['versions/v_9q2mfk3x.json', JSON.stringify({ kind: 'preprint', label: 'arXiv v1' })],
+  ]);
+
+  it('turns each pointer in JSON into a pointer file, and keeps the rest of the JSON', () => {
+    const { changes, stored } = planLfs(files);
+    const after = new Map(files);
+    for (const change of changes) {
+      if (change.content === null) after.delete(change.path);
+      else after.set(change.path, change.content);
+    }
+    expect(after.get('.gitattributes')).toBe(GITATTRIBUTES);
+    expect(parseLfsPointer(after.get('.potentialpaper/paper.pdf')!)).toEqual({ sha256: sha('a'), bytes: 1000 });
+    expect(JSON.parse(after.get('.potentialpaper/pdf.json')!)).toEqual({
+      source: 'https://openreview.net/forum?id=x',
+      license: 'CC BY 4.0',
+      fetchedAt: '2026-10-06T17:26:50.147Z',
+    });
+    expect(parseLfsPointer(after.get('thumbnail.gif')!)).toEqual({ sha256: sha('b'), bytes: 20 });
+    expect(JSON.parse(after.get('thumbnail.json')!)).toEqual({ alt: 'A cube' });
+    expect(parseLfsPointer(after.get('versions/v_k3x9q2ab.pdf')!)).toEqual({ sha256: sha('c'), bytes: 30 });
+    expect(JSON.parse(after.get('versions/v_k3x9q2ab.json')!)).toEqual({
+      kind: 'workshop',
+      label: 'SPIGM',
+      pdf: { license: 'CC BY 4.0' },
+    });
+    expect(changes.some((c) => c.path === 'versions/v_9q2mfk3x.json')).toBe(false);
+    for (const [path, text] of after) expect(contentProblem(path, text), path).toBeNull();
+    expect(stored.map((f) => [f.sha256[0], f.type, f.url])).toEqual([
+      ['a', 'application/pdf', 'https://pdfs.example.org/pdf/a.pdf'],
+      ['b', 'image/gif', 'https://pdfs.example.org/thumbnail/b.gif'],
+      ['c', 'application/pdf', 'https://pdfs.example.org/pdf/c.pdf'],
+    ]);
+    expect(planLfs(after)).toEqual({ changes: [], stored: [] });
   });
 });

@@ -2,13 +2,22 @@ import { eq, sql } from 'drizzle-orm';
 import { getDb, type Database } from '@/db';
 import { agentPosts, authorClaims, papers } from '@/db/schema';
 import { MAX_LINKS, parseLinkFile, type TitleLink } from '@/lib/paper-links';
-import { parseVersionFile, sortVersions, type PaperVersion } from '@/lib/versions';
+import type { PaperVersion } from '@/lib/versions';
 import { ApiError } from './api/errors';
 import { commitPage, type Actor, type CommitResult, type FileChange } from './pages/commit';
-import { linkChanges, versionChanges } from './pages/content';
+import { linkChanges, thumbnailImagePathIn, versionChanges, versionsIn as versionsOf } from './pages/content';
 import { lockPage } from './pages/projections';
 import { readCommit, readFiles, readHead, readText } from './pages/repo';
-import { isLinkPath, METADATA_PATH, PAGE_PARTS, sectionName, versionIdOf } from './pages/rules';
+import {
+  isLinkPath,
+  METADATA_PATH,
+  PAGE_PARTS,
+  sectionName,
+  THUMBNAIL_PATH,
+  thumbnailImageType,
+  versionIdOf,
+  versionPdfIdOf,
+} from './pages/rules';
 import { planSections, sectionPaths, sectionTitle, type SectionFile } from './pages/sections';
 
 /**
@@ -42,15 +51,8 @@ export function foldVersions(survivor: readonly PaperVersion[], duplicate: reado
 
 const byBytes = (a: string, b: string) => Buffer.compare(Buffer.from(a), Buffer.from(b));
 
-function versionsIn(files: ReadonlyMap<string, string>): PaperVersion[] {
-  const out: PaperVersion[] = [];
-  for (const [path, text] of files) {
-    const id = versionIdOf(path);
-    const parsed = id ? parseVersionFile(id, text) : null;
-    if (parsed && 'version' in parsed) out.push(parsed.version);
-  }
-  return sortVersions(out);
-}
+/** The versions, with their PDFs as pointers: folding them only moves the pointers, so no address is needed. */
+const versionsIn = (files: ReadonlyMap<string, string>): PaperVersion[] => versionsOf(files, () => 'unused');
 
 function linksIn(files: ReadonlyMap<string, string>): TitleLink[] {
   const paths = [...files.keys()].filter(isLinkPath).sort(byBytes);
@@ -109,9 +111,17 @@ export function foldPages(
     changes.push(...planSections(kept, part, kept.length, kept.length, parts));
   }
 
+  // A page has one picture: the duplicate's, with its words, only if the survivor has none.
+  const survivorHasPicture = thumbnailImagePathIn(survivor.keys()) !== null;
   for (const [path, text] of duplicate) {
-    const handled = path === METADATA_PATH || versionIdOf(path) || isLinkPath(path) || path.startsWith('author/');
-    if (handled || path.startsWith('community/') || survivor.has(path)) continue;
+    const handled =
+      path === METADATA_PATH ||
+      versionIdOf(path) ||
+      versionPdfIdOf(path) ||
+      isLinkPath(path) ||
+      path.startsWith('author/');
+    const picture = path === THUMBNAIL_PATH || thumbnailImageType(path) !== null;
+    if (handled || (picture && survivorHasPicture) || path.startsWith('community/') || survivor.has(path)) continue;
     changes.push({ path, content: text });
   }
   return changes;

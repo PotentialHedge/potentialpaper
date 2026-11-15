@@ -10,7 +10,8 @@ import { getPaper, search } from '@/server/api/handlers';
 import { claimByEmail, ownAddressesOnPaper } from '@/server/claims';
 import { commitPage, SYSTEM_ACTOR } from '@/server/pages/commit';
 import { readHead } from '@/server/pages/repo';
-import { PDF_PATH, versionPath } from '@/server/pages/rules';
+import { recordLfsObject } from '@/server/lfs';
+import { encodeLfsPointer, PAPER_PDF_PATH, PDF_PATH, versionPath, versionPdfPath } from '@/server/pages/rules';
 import { savePaper } from '@/server/papers';
 import { ingest, MAX_ATTEMPTS } from '@/server/pdfs/ingest';
 import { ORIGIN, api, closePool, lastMailTo, resetDatabase, signUp } from './helpers';
@@ -82,19 +83,20 @@ async function paperWithPdf(sha256 = SHA, url = `https://pdfs.invalid/pdf/${SHA}
     metadataLicense: 'CC0-1.0',
     abstractLicense: null,
   });
-  const pointer = {
-    sha256,
-    bytes: PDF.length,
-    url,
+  const source = {
     source: 'https://arxiv.org/abs/1706.03762',
     license: 'CC BY 4.0',
     fetchedAt: '2026-11-08T00:00:00Z',
   };
+  await recordLfsObject(getDb(), { sha256, bytes: PDF.length, url, type: 'application/pdf' });
   await commitPage(
     paperId,
     await readHead(getDb(), paperId),
     SYSTEM_ACTOR,
-    [{ path: PDF_PATH, content: `${JSON.stringify(pointer, null, 2)}\n` }],
+    [
+      { path: PAPER_PDF_PATH, content: encodeLfsPointer({ sha256, bytes: PDF.length }) },
+      { path: PDF_PATH, content: `${JSON.stringify(source, null, 2)}\n` },
+    ],
     'Add the PDF',
   );
   return paperId;
@@ -134,16 +136,15 @@ describe('pdfs:ingest', () => {
     expect((await ingest({ pdfDir })).documents).toBe(0);
 
     // Once a version points at it, its text is read for comparing versions, and nothing else runs again.
-    const version = {
-      label: 'arXiv v1',
-      kind: 'preprint',
-      pdf: { sha256: SHA, bytes: PDF.length, url: doc.url },
-    };
+    const version = { label: 'arXiv v1', kind: 'preprint' };
     await commitPage(
       paperId,
       await readHead(getDb(), paperId),
       SYSTEM_ACTOR,
-      [{ path: versionPath('v_abcdefgh'), content: `${JSON.stringify(version)}\n` }],
+      [
+        { path: versionPath('v_abcdefgh'), content: `${JSON.stringify(version)}\n` },
+        { path: versionPdfPath('v_abcdefgh'), content: encodeLfsPointer({ sha256: SHA, bytes: PDF.length }) },
+      ],
       'Add a version',
     );
     expect((await ingest({ pdfDir })).stages).toMatchObject({ text: { done: 0 }, fulltext: { done: 1, failed: 0 } });

@@ -29,7 +29,8 @@ import { buildTrees, encodeCommit, gitObject, looseObject, SYSTEM_AUTHOR_ID } fr
 import { mergeFile } from '@/server/pages/merge';
 import { rebuildAllPages } from '@/server/pages/projections';
 import { diffCommits, pageHistory, readHead } from '@/server/pages/repo';
-import { MAX_CHANGES, PDF_PATH, THUMBNAIL_PATH } from '@/server/pages/rules';
+import { encodeLfsPointer, MAX_CHANGES, PAPER_PDF_PATH, PDF_PATH, THUMBNAIL_PATH } from '@/server/pages/rules';
+import { recordLfsObject } from '@/server/lfs';
 import { savePaper } from '@/server/papers';
 import { searchPapers } from '@/server/search';
 import { closePool, resetDatabase } from './helpers';
@@ -201,6 +202,7 @@ describe('every repo passes git fsck --strict', () => {
         fsck(repo);
         const files = filesAt(repo);
         expect(files.delete('.potentialpaper/metadata.json')).toBe(true);
+        expect(files.delete('.gitattributes')).toBe(true);
         expect(new Map([...files].sort())).toEqual(new Map([...expected].sort()));
       }),
       { numRuns: 60 },
@@ -404,7 +406,7 @@ describe('concurrent commits', () => {
     const repo = await exportRepo(paperId);
     fsck(repo);
     expect(git(['rev-list', '--count', 'main'], repo).trim()).toBe('50');
-    expect(filesAt(repo).size).toBe(51);
+    expect(filesAt(repo).size).toBe(52);
     expect(git(['rev-list', '--max-parents=0', 'main'], repo).trim().split('\n')).toHaveLength(1);
   }, 60_000);
 
@@ -515,7 +517,7 @@ describe('commitPage', () => {
       status: 'committed',
       seq: 1,
       merged: false,
-      paths: ['.potentialpaper/metadata.json', 'community/10-summary.md'],
+      paths: ['.gitattributes', '.potentialpaper/metadata.json', 'community/10-summary.md'],
     });
     const repo = await exportRepo(paperId);
     expect(JSON.parse(filesAt(repo).get('.potentialpaper/metadata.json')!)).toEqual({
@@ -748,7 +750,7 @@ describe('commitPage', () => {
     expect(events[0].payload).toMatchObject({
       authorId: identity.id,
       kind: 'edit',
-      paths: ['.potentialpaper/metadata.json', 'community/10-summary.md'],
+      paths: ['.gitattributes', '.potentialpaper/metadata.json', 'community/10-summary.md'],
     });
   });
 
@@ -863,6 +865,7 @@ describe('revert', () => {
     expect((await refusal(revertCommit(paperId, author.oid!, person))).code).toBe('forbidden');
     await revertCommit(paperId, one.oid!, person);
     expect([...filesAt(await exportRepo(paperId)).keys()].sort()).toEqual([
+      '.gitattributes',
       '.potentialpaper/metadata.json',
       'author/10-overview.md',
     ]);
@@ -911,7 +914,12 @@ describe('diffs between commits', () => {
     expect(await diffCommits(paperId, 'a'.repeat(40), two.oid!)).toBeNull();
     expect(await diffCommits(paperId, one.oid!, 'nope')).toBeNull();
     // From nothing, a commit's whole tree is new.
-    expect((await diffCommits(paperId, null, one.oid!))!.map((d) => d.status)).toEqual(['added', 'added', 'added']);
+    expect((await diffCommits(paperId, null, one.oid!))!.map((d) => d.status)).toEqual([
+      'added',
+      'added',
+      'added',
+      'added',
+    ]);
   });
 });
 
@@ -1185,7 +1193,7 @@ describe('git clone', () => {
   });
 });
 
-describe('pdf.json', () => {
+describe('the PDF', () => {
   const POINTER = {
     sha256: 'a'.repeat(64),
     bytes: 2_000_000,
@@ -1194,7 +1202,11 @@ describe('pdf.json', () => {
     license: 'CC BY 4.0',
     fetchedAt: '2026-10-06T14:18:10.000Z',
   };
-  const change = (value: unknown): FileChange[] => [{ path: PDF_PATH, content: `${JSON.stringify(value)}\n` }];
+  const change = ({ sha256, bytes, source, license, fetchedAt }: typeof POINTER): FileChange[] => [
+    { path: PAPER_PDF_PATH, content: encodeLfsPointer({ sha256, bytes }) },
+    { path: PDF_PATH, content: `${JSON.stringify({ source, license, fetchedAt })}\n` },
+  ];
+  beforeEach(() => recordLfsObject(getDb(), { ...POINTER, type: 'application/pdf' }));
 
   async function paper(): Promise<string> {
     return savePaper({
@@ -1217,7 +1229,12 @@ describe('pdf.json', () => {
     const [current] = await getDb().select().from(pageCurrent).where(eq(pageCurrent.paperId, id));
     expect(current.pdf).toEqual(POINTER);
     const [revision] = await getDb().select().from(pageRevisions).where(eq(pageRevisions.paperId, id));
-    expect(revision.paths.toSorted()).toEqual(['.potentialpaper/metadata.json', PDF_PATH]);
+    expect(revision.paths.toSorted()).toEqual([
+      '.gitattributes',
+      '.potentialpaper/metadata.json',
+      PAPER_PDF_PATH,
+      PDF_PATH,
+    ]);
   });
 
   it('gives search results its cover once one is rendered', async () => {
@@ -1230,11 +1247,16 @@ describe('pdf.json', () => {
     expect(await hit()).toMatchObject({ pdf: POINTER.url, cover });
   });
 
-  it('refuses a pointer that a page could not safely link to', async () => {
+  it('refuses a source a page could not safely link to, bytes not stored here, and one file without the other', async () => {
     const id = await paper();
-    await expect(
-      commitPage(id, null, SYSTEM_ACTOR, change({ ...POINTER, url: 'javascript:alert(1)' }), 'Bad'),
-    ).rejects.toMatchObject({ status: 422 });
+    for (const bad of [
+      change({ ...POINTER, source: 'javascript:alert(1)' }),
+      change({ ...POINTER, sha256: 'c'.repeat(64) }),
+      change({ ...POINTER, bytes: 3 }),
+      change(POINTER).slice(0, 1),
+    ]) {
+      await expect(commitPage(id, null, SYSTEM_ACTOR, bad, 'Bad')).rejects.toMatchObject({ status: 422 });
+    }
   });
 
   it('can only be written by the system and admins', async () => {
@@ -1251,28 +1273,43 @@ describe('pdf.json', () => {
   });
 });
 
-describe('thumbnail.json', () => {
+describe('the picture', () => {
   const PDF = {
     sha256: 'a'.repeat(64),
     bytes: 2_000_000,
     url: `https://pdfs.example.org/pdf/${'a'.repeat(64)}.pdf`,
-    source: 'https://openreview.net/forum?id=submission1',
-    license: 'CC BY 4.0',
-    fetchedAt: '2026-10-06T14:18:10.000Z',
   };
   const THUMBNAIL = {
     sha256: 'b'.repeat(64),
     bytes: 300_000,
-    type: 'image/gif',
-    // Where this site stores a picture with that hash, which a pointer has to name.
+    type: 'image/gif' as const,
     url: `/thumbnails/${'b'.repeat(64)}.gif`,
     alt: 'The method, animated',
   };
-  const change = (value: unknown): FileChange[] => [{ path: THUMBNAIL_PATH, content: `${JSON.stringify(value)}\n` }];
+  const change = ({ alt, ...picture }: Partial<typeof THUMBNAIL>, path = 'thumbnail.gif'): FileChange[] => [
+    { path, content: encodeLfsPointer({ sha256: picture.sha256!, bytes: picture.bytes! }) },
+    { path: THUMBNAIL_PATH, content: `${JSON.stringify({ alt })}\n` },
+  ];
+  beforeEach(async () => {
+    await recordLfsObject(getDb(), { ...PDF, type: 'application/pdf' });
+    await recordLfsObject(getDb(), THUMBNAIL);
+  });
 
   it("is projected, survives a rebuild, and replaces the PDF's cover in search results", async () => {
     const id = await newPaper();
-    await commitPage(id, null, SYSTEM_ACTOR, [{ path: PDF_PATH, content: JSON.stringify(PDF) }], 'Add the PDF');
+    await commitPage(
+      id,
+      null,
+      SYSTEM_ACTOR,
+      [
+        { path: PAPER_PDF_PATH, content: encodeLfsPointer(PDF) },
+        {
+          path: PDF_PATH,
+          content: JSON.stringify({ source: 'https://openreview.net/forum?id=x', license: 'CC BY 4.0', fetchedAt: '' }),
+        },
+      ],
+      'Add the PDF',
+    );
     await getDb()
       .insert(pdfDocuments)
       .values({ sha256: PDF.sha256, url: PDF.url, coverUrl: 'https://pdfs.example.org/cover/a.jpg' });
@@ -1288,16 +1325,18 @@ describe('thumbnail.json', () => {
     expect(hits.find((hit) => hit.title === paper.title)).toMatchObject({ cover: THUMBNAIL.url });
   });
 
-  it('refuses what is not an image pointer, and anyone but its authors and admins once claimed', async () => {
+  it('refuses what is not a picture stored here, and anyone but its authors and admins once claimed', async () => {
     const id = await newPaper();
     const admin = { ...(await newAccount()), isAdmin: true };
     for (const bad of [
-      { ...THUMBNAIL, type: 'text/html' },
-      { ...THUMBNAIL, url: 'javascript:alert(1)' },
-      { ...THUMBNAIL, url: '//evil.example/x.gif' },
-      { ...THUMBNAIL, bytes: 100 * 1024 * 1024 },
+      change(THUMBNAIL, 'thumbnail.png'),
+      change({ ...THUMBNAIL, sha256: 'c'.repeat(64) }),
+      change({ ...THUMBNAIL, sha256: PDF.sha256, bytes: PDF.bytes }),
+      change({ ...THUMBNAIL, bytes: 100 * 1024 * 1024 }),
+      change(THUMBNAIL).slice(1),
+      [...change(THUMBNAIL), ...change(THUMBNAIL, 'thumbnail.webp').slice(0, 1)],
     ]) {
-      await expect(commitPage(id, null, admin, change(bad), 'Bad', { rateLimit: NO_LIMIT })).rejects.toMatchObject({
+      await expect(commitPage(id, null, admin, bad, 'Bad', { rateLimit: NO_LIMIT })).rejects.toMatchObject({
         status: 422,
       });
     }

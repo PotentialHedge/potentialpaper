@@ -9,7 +9,7 @@ import { isAdminEmail } from '@/server/auth';
 import { removeThumbnail, setThumbnail } from '@/server/pages/card';
 import type { Actor } from '@/server/pages/commit';
 import { refreshPaperPages } from '@/server/pages/refresh';
-import { MAX_THUMBNAIL_BYTES, THUMBNAIL_PATH } from '@/server/pages/rules';
+import { MAX_THUMBNAIL_BYTES } from '@/server/pages/rules';
 import { findPaper } from '@/server/papers';
 
 const USAGE = `Set a paper's thumbnail, shown in place of its PDF's first page. The paper's edit page does the same.
@@ -19,7 +19,7 @@ const USAGE = `Set a paper's thumbnail, shown in place of its PDF's first page. 
 
 JPEG, PNG, GIF (animated too), WebP or AVIF, up to ${MAX_THUMBNAIL_BYTES / 1024 / 1024} MB. The bytes go to R2
 under their SHA-256 (R2_ACCOUNT_ID, R2_ACCESS_KEY_ID, R2_SECRET_ACCESS_KEY), and the page's
-${THUMBNAIL_PATH} points at them. Without R2 keys, in development, they go to public/thumbnails (or THUMBNAILS_DIR).`;
+thumbnail.<ext> (a Git LFS pointer) names them. Without R2 keys, in development, they go to public/thumbnails (or THUMBNAILS_DIR).`;
 
 async function adminActor(handle: string): Promise<Actor> {
   const [row] = await getDb()

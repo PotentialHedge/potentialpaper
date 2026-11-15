@@ -2,17 +2,16 @@ import { eq, notInArray, sql } from 'drizzle-orm';
 import { getDb, type Database } from '@/db';
 import { authorClaims, commitIdentities, pageCurrent, pageRefs, pageRevisions } from '@/db/schema';
 import { pageDemoSources } from '../demos/attach';
-import { readLinks, readVersions } from './content';
+import { readLinks, readPagePdf, readThumbnail, readVersions } from './content';
 import { type Commit, SYSTEM_AUTHOR_ID } from './git-objects';
 import { demoRefs } from './markdown';
 import { changedFiles, readCommit, readFiles, readHead, readText, toBytes, type Reader } from './repo';
-import { parsePdfPointer, parseThumbnailPointer, PDF_PATH, THUMBNAIL_PATH } from './rules';
 import { partSource, readSections, renderPart } from './sections';
 
 /**
  * The rows that can be derived from the objects (DESIGN.md §4.5). A commit and a rebuild both come through
- * the functions here, and they read only the objects and `commit_identities`, which is why a rebuild
- * gives identical rows.
+ * the functions here, and they read only the objects, `commit_identities` and `lfs_objects` (where the
+ * bytes of a PDF or picture are, which never changes), which is why a rebuild gives identical rows.
  */
 
 export type Writer = Reader & Pick<Database, 'insert' | 'update' | 'delete'>;
@@ -84,8 +83,8 @@ export async function writeRevision(
 /** Makes `page_current` say what the commit at the head says. */
 export async function writeCurrent(tx: Writer, paperId: string, head: string, commit: Commit): Promise<void> {
   const files = await readFiles(tx, paperId, commit.tree);
-  const pdf = await readText(tx, paperId, files.get(PDF_PATH));
-  const thumbnail = await readText(tx, paperId, files.get(THUMBNAIL_PATH));
+  const pdf = await readPagePdf(tx, paperId, files);
+  const thumbnail = await readThumbnail(tx, paperId, files);
   const links = await readLinks(tx, paperId, files);
   const versions = await readVersions(tx, paperId, files);
   const author = await readSections(tx, paperId, files, 'author');
@@ -104,8 +103,8 @@ export async function writeCurrent(tx: Writer, paperId: string, head: string, co
     communityMarkdown: partSource(community),
     authorHtml: renderPart(author, 'author', demos),
     communityHtml: renderPart(community, 'community', demos),
-    pdf: pdf === null ? null : parsePdfPointer(pdf),
-    thumbnail: thumbnail === null ? null : parseThumbnailPointer(thumbnail),
+    pdf,
+    thumbnail,
     links: links.length > 0 ? links : null,
     versions: versions.length > 0 ? versions : null,
     updatedAt: commit.at,

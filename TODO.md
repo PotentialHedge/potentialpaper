@@ -36,19 +36,18 @@ Things only you can do or decide, most urgent first. Milestones 1 and 2 and the 
 - [ ] **Set up git over SSH properly** (on hold, 2026-11-15). The code is merged and deployed in the image
       (`npm run git:ssh`, `src/server/git/ssh.ts`, keys from the profile page), but the `ssh` service isn't started,
       so only HTTPS clone and push work. Until then, `docs/git.md` and the profile's example assume
-      `git.papers.potentialhedge.com:2222`, and the host key fingerprint is a placeholder. To decide:
-      - **DNS:** a DNS-only (grey-cloud) A record, e.g. `git.papers.potentialhedge.com` → `77.244.248.196`. It
-        exposes the origin IP (the web stays behind Cloudflare, since Traefik only admits it on 80/443).
-      - **Port:** 2222 published (simplest), 22 with the host's sshd moved to another port or Tailscale-only (so
-        `git@host:abs/<id>.git` works as on GitHub), or a second IPv4 for git on 22. Moving later only changes
-        `GIT_SSH_PUBLISH` and `GIT_SSH_URL`.
+      `git.papers.potentialhedge.com:2222`, and the host key fingerprint is a placeholder. To decide: - **DNS:** a DNS-only (grey-cloud) A record, e.g. `git.papers.potentialhedge.com` → `77.244.248.196`. It
+      exposes the origin IP (the web stays behind Cloudflare, since Traefik only admits it on 80/443). - **Port:** 2222 published (simplest), 22 with the host's sshd moved to another port or Tailscale-only (so
+      `git@host:abs/<id>.git` works as on GitHub), or a second IPv4 for git on 22. Moving later only changes
+      `GIT_SSH_PUBLISH` and `GIT_SSH_URL`.
 
       Then the steps (DEPLOY.md, "Git over SSH"): `ssh-keygen -t ed25519 -N '' -f secrets/ssh_host_ed25519_key` on
       the server, once, backed up with `.env.production`; create the DNS record; set `GIT_SSH_URL` (and
       `GIT_SSH_PUBLISH` if not 2222) in `.env.production`; open the port in the provider's firewall (Docker bypasses
       ufw); `dc --profile tools up -d ssh`; check `dc logs ssh` for the fingerprint and `ssh -T -p <port> git@<host>`;
       put the fingerprint in `docs/git.md` and fix its address if it changed. Also worth doing then: show clone/SSH
-      addresses on a paper's page and link `docs/git.md` from the site.
+      addresses on a paper's page and link `docs/git.md` from the site, and answer `git-lfs-authenticate` over SSH
+      so Git LFS works in an SSH clone without setting `lfs.url` (docs/git.md says to set it for now).
 
 ## Content and licensing
 

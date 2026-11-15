@@ -29,6 +29,7 @@
     "pages:set-thumbnail": "tsx scripts/set-thumbnail.ts",
     "pages:rebuild": "tsx scripts/rebuild-page-projections.ts",
     "pages:migrate-layout": "tsx scripts/migrate-page-layout.ts",
+    "pages:migrate-lfs": "tsx scripts/migrate-page-lfs.ts",
     "claims:decide": "tsx scripts/decide-claim.ts",
     "institutions:build": "NODE_OPTIONS=--max-old-space-size=4096 tsx scripts/build-institution-domains.ts",
     "format": "prettier --write .",

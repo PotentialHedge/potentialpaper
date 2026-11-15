@@ -4,10 +4,18 @@ import { linkProblem, MAX_LINKS, type TitleLink } from '@/lib/paper-links';
 import { ApiError } from '../api/errors';
 import { storeImage } from '../media';
 import { checkMayWrite } from './check';
-import { commitPage, type Actor, type CommitOptions, type CommitResult } from './commit';
-import { linkChanges } from './content';
-import { readCommit, readFiles, readHead, readText } from './repo';
-import { imageType, MAX_THUMBNAIL_BYTES, parseThumbnailPointer, THUMBNAIL_PATH, type ThumbnailPointer } from './rules';
+import { recordLfsObject } from '../lfs';
+import { commitPage, type Actor, type CommitOptions, type CommitResult, type FileChange } from './commit';
+import { linkChanges, thumbnailImagePathIn } from './content';
+import { readCommit, readFiles, readHead } from './repo';
+import {
+  encodeLfsPointer,
+  encodeThumbnailWords,
+  imageType,
+  MAX_THUMBNAIL_BYTES,
+  THUMBNAIL_PATH,
+  thumbnailImagePath,
+} from './rules';
 
 /**
  * A paper's card: the picture beside its abstract and the links under its title. Its confirmed authors'
@@ -16,14 +24,13 @@ import { imageType, MAX_THUMBNAIL_BYTES, parseThumbnailPointer, THUMBNAIL_PATH, 
 
 export const MAX_ALT = 500;
 
-/** A file of the page at its head, the head, and every path there. */
-async function fileAtHead(paperId: string, path: string, options: CommitOptions) {
+/** The page's files at its head, and the head. */
+async function filesAtHead(paperId: string, options: CommitOptions) {
   const database = options.database ?? getDb();
   const head = await readHead(database, paperId);
-  if (!head) return { head, text: null, paths: [] };
+  if (!head) return { database, head, files: new Map<string, string>() };
   const commit = await readCommit(database, paperId, head);
-  const files = await readFiles(database, paperId, commit.tree);
-  return { head, text: await readText(database, paperId, files.get(path)), paths: [...files.keys()] };
+  return { database, head, files: await readFiles(database, paperId, commit.tree) };
 }
 
 export interface ThumbnailChange {
@@ -33,46 +40,50 @@ export interface ThumbnailChange {
   caption?: string;
 }
 
-/** Sets the picture, or changes its alt text and caption. */
+/**
+ * Sets the picture, or changes its alt text and caption: `thumbnail.<ext>`, a Git LFS pointer to the bytes
+ * stored here, and `thumbnail.json` beside it, as a push would.
+ */
 export async function setThumbnail(
   paperId: string,
   actor: Actor,
   change: ThumbnailChange,
   options: CommitOptions = {},
 ): Promise<CommitResult> {
-  const { head, text } = await fileAtHead(paperId, THUMBNAIL_PATH, options);
-  const current = text === null ? null : parseThumbnailPointer(text);
-  let image: Pick<ThumbnailPointer, 'sha256' | 'bytes' | 'type' | 'url'>;
+  const { database, head, files } = await filesAtHead(paperId, options);
+  const currentPath = thumbnailImagePathIn(files.keys());
+  const changes: FileChange[] = [];
   if (change.image) {
     // Storing the picture is slow and leaves a file behind, so only for someone the commit would take it from.
-    await checkMayWrite(options.database ?? getDb(), paperId, actor, [THUMBNAIL_PATH]);
+    await checkMayWrite(database, paperId, actor, [THUMBNAIL_PATH]);
     const type = imageType(change.image);
     if (!type) throw new ApiError(422, 'validation_error', 'the picture has to be a JPEG, PNG, GIF, WebP or AVIF');
     if (change.image.length > MAX_THUMBNAIL_BYTES) {
       throw new ApiError(422, 'validation_error', `the picture is larger than ${MAX_THUMBNAIL_BYTES / 1024 / 1024} MB`);
     }
     const sha256 = createHash('sha256').update(change.image).digest('hex');
-    image = { sha256, bytes: change.image.length, type, url: await storeImage(change.image, sha256, type) };
-  } else if (current) {
-    image = current;
-  } else {
+    const url = await storeImage(change.image, sha256, type);
+    await recordLfsObject(database, {
+      sha256,
+      bytes: change.image.length,
+      type,
+      url,
+      accountId: actor.kind === 'account' ? actor.accountId : null,
+    });
+    const path = thumbnailImagePath(type);
+    if (currentPath && currentPath !== path) changes.push({ path: currentPath, content: null });
+    changes.push({ path, content: encodeLfsPointer({ sha256, bytes: change.image.length }) });
+  } else if (!currentPath) {
     throw new ApiError(422, 'validation_error', 'choose a picture');
   }
   const alt = change.alt?.trim().slice(0, MAX_ALT);
   const caption = change.caption?.trim().slice(0, MAX_ALT);
-  const pointer: ThumbnailPointer = {
-    sha256: image.sha256,
-    bytes: image.bytes,
-    type: image.type,
-    url: image.url,
-    ...(alt ? { alt } : {}),
-    ...(caption ? { caption } : {}),
-  };
+  changes.push({ path: THUMBNAIL_PATH, content: alt || caption ? encodeThumbnailWords({ alt, caption }) : null });
   return commitPage(
     paperId,
     head,
     actor,
-    [{ path: THUMBNAIL_PATH, content: `${JSON.stringify(pointer, null, 2)}\n` }],
+    changes.filter((c) => c.content !== null || files.has(c.path)),
     change.image ? 'Change the picture' : "Change the picture's words",
     options,
   );
@@ -80,8 +91,16 @@ export async function setThumbnail(
 
 /** Goes back to the PDF's first page. */
 export async function removeThumbnail(paperId: string, actor: Actor, options: CommitOptions = {}) {
-  const { head } = await fileAtHead(paperId, THUMBNAIL_PATH, options);
-  return commitPage(paperId, head, actor, [{ path: THUMBNAIL_PATH, content: null }], 'Remove the picture', options);
+  const { head, files } = await filesAtHead(paperId, options);
+  const paths = [thumbnailImagePathIn(files.keys()), THUMBNAIL_PATH].filter((p) => p !== null && files.has(p));
+  return commitPage(
+    paperId,
+    head,
+    actor,
+    paths.map((path) => ({ path: path!, content: null })),
+    'Remove the picture',
+    options,
+  );
 }
 
 /** Replaces the page's own links, a file each in `links/`, in order. An empty list removes them all. */
@@ -103,6 +122,13 @@ export async function setLinks(
     }
     labels.add(link.label.toLowerCase());
   }
-  const { head, paths } = await fileAtHead(paperId, THUMBNAIL_PATH, options);
-  return commitPage(paperId, head, actor, linkChanges(paths, clean), summary?.trim() || 'Change the links', options);
+  const { head, files } = await filesAtHead(paperId, options);
+  return commitPage(
+    paperId,
+    head,
+    actor,
+    linkChanges(files.keys(), clean),
+    summary?.trim() || 'Change the links',
+    options,
+  );
 }

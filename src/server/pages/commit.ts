@@ -20,7 +20,15 @@ import { buildTrees, type Commit, type EditKind, encodeCommit, gitObject, type G
 import { mergeFile, type Version } from './merge';
 import { lockPage, writeCurrent, writeRevision, type Writer } from './projections';
 import { changedFiles, findCommit, readCommit, readFiles, readHead, readText, toBytes } from './repo';
-import { cleanSummary, contentProblem, layoutProblem, METADATA_PATH, normalizePath } from './rules';
+import {
+  cleanSummary,
+  contentProblem,
+  GITATTRIBUTES,
+  GITATTRIBUTES_PATH,
+  layoutProblem,
+  METADATA_PATH,
+  normalizePath,
+} from './rules';
 
 export { type Actor, COMMIT_RATE_LIMIT, newIdentity, SYSTEM_ACTOR } from './check';
 
@@ -255,14 +263,22 @@ export async function commitPage(
       const changedAny = changedFiles(headFiles, files).length > 0;
       const recordAnyway = (isFirstCommit || options.recordEmpty) && actor.kind === 'system';
       if (!changedAny && !recordAnyway) return { status: 'unchanged', oid: head };
-      // The system starts every repo with the metadata, whoever's edit starts it, so it is checked as there.
+      // The system starts every repo with the metadata and `.gitattributes`, whoever's edit starts it, so they
+      // are checked as there.
       const before = new Map(headFiles);
-      if (isFirstCommit && !files.has(METADATA_PATH)) {
-        const metadata = gitObject('blob', Buffer.from(await metadataSnapshot(tx, paperId)));
-        blobs.push(metadata);
-        files.set(METADATA_PATH, metadata.oid);
-        before.set(METADATA_PATH, metadata.oid);
-        written.set(metadata.oid, metadata.body.toString('utf8'));
+      if (isFirstCommit) {
+        const start: [string, () => Promise<string>][] = [
+          [METADATA_PATH, () => metadataSnapshot(tx, paperId)],
+          [GITATTRIBUTES_PATH, async () => GITATTRIBUTES],
+        ];
+        for (const [path, make] of start) {
+          if (files.has(path)) continue;
+          const blob = gitObject('blob', Buffer.from(await make()));
+          blobs.push(blob);
+          files.set(path, blob.oid);
+          before.set(path, blob.oid);
+          written.set(blob.oid, blob.body.toString('utf8'));
+        }
       }
       const added = await checkTree(tx, {
         paperId,
@@ -306,7 +322,7 @@ export async function commitPage(
 /**
  * Undoes one commit, keeping everything since: the files as they were before it, merged from it onto the
  * head, which is what `git revert` does. Goes through `commitPage`, so reverting needs the same permissions
- * as writing those paths. The first commit's metadata stays, because a page always has it.
+ * as writing those paths. The first commit's metadata and `.gitattributes` stay, because a page always has them.
  */
 export async function revertCommit(
   paperId: string,
@@ -322,7 +338,7 @@ export async function revertCommit(
   const parent = commit.parent ? await readCommit(database, paperId, commit.parent) : null;
   const before = parent ? await readFiles(database, paperId, parent.tree) : new Map<string, string>();
   const changed = changedFiles(before, await readFiles(database, paperId, commit.tree)).filter(
-    (file) => parent || file.path !== METADATA_PATH,
+    (file) => (parent || file.path !== METADATA_PATH) && file.path !== GITATTRIBUTES_PATH,
   );
   // A commit from before the page's files were laid out as they are now (`layout-migration.ts`) would put
   // back files that have no place any more. Its text is still in the history and the diff, to copy from.

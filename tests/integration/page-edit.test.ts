@@ -167,6 +167,7 @@ describe('editing the community section', () => {
     const gone = await edit(ada, { baseOid: res.body.head, section: 4, content: '' });
     expect(gone.status).toBe(200);
     expect(await paths(paperId)).toEqual([
+      '.gitattributes',
       '.potentialpaper/metadata.json',
       'community/10-summary.md',
       'community/15-why-it-matters.md',
