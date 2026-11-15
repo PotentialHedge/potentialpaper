@@ -5,6 +5,8 @@ import { authorClaims, commentMentions } from '@/db/schema';
 import { decideClaim } from '@/server/claims';
 import { devOutbox } from '@/server/mail';
 import { mailMentions } from '@/server/mentions';
+import { commitPage, SYSTEM_ACTOR } from '@/server/pages/commit';
+import { readHead } from '@/server/pages/repo';
 import { savePaper } from '@/server/papers';
 import { api, closePool, lastMailTo, resetDatabase, signUp } from './helpers';
 
@@ -188,5 +190,30 @@ describe('comments', () => {
     expect(res.status).toBe(200);
     expect(res.body.mentions).toEqual(['ada']);
     expect(res.body.html).toContain('data-mention="ada"');
+  });
+
+  it('records the page head a comment was written against, and counts the edits since', async () => {
+    const paperId = await paper();
+    const ada = await person('ada');
+    const edit = async (n: number) =>
+      commitPage(
+        paperId,
+        await readHead(getDb(), paperId),
+        SYSTEM_ACTOR,
+        [{ path: '.potentialpaper/metadata.json', content: `{"title":"T${n}"}\n` }],
+        `Edit ${n}`,
+      );
+    await edit(1);
+    const head = await readHead(getDb(), paperId);
+    const posted = await post(ada, 'About this version.');
+    expect(posted.body).toMatchObject({ pageCommit: head, editsSince: 0 });
+
+    await edit(2);
+    await edit(3);
+    const later = await post(ada, 'About the newest.');
+    const list = await api('GET', LIST);
+    const byId = new Map(list.body.comments.map((c: { id: string }) => [c.id, c]));
+    expect(byId.get(posted.body.id)).toMatchObject({ pageCommit: head, editsSince: 2 });
+    expect(byId.get(later.body.id)).toMatchObject({ editsSince: 0 });
   });
 });

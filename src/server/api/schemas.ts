@@ -545,6 +545,10 @@ export const Comment = z.object({
   removed: z.boolean(),
   replyCount: z.number().int(),
   mentions: z.array(z.string()),
+  /** The page's commit the comment was written against (the head when it was posted); null before the first. */
+  pageCommit: z.string().nullable(),
+  /** Commits to the page since `pageCommit`: 0 while the comment is about the page as it stands. */
+  editsSince: z.number().int(),
   author: CommentAuthor,
 });
 

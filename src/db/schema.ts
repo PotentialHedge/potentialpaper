@@ -780,6 +780,11 @@ export const comments = pgTable(
     body: text('body').notNull(),
     /** Shown under the account's alias on this paper rather than its handle. Never set by a confirmed author. */
     anonymous: boolean('anonymous').notNull().default(false),
+    /**
+     * The page's head (`page_refs.head`) when the comment was posted: the version it was written against.
+     * Null when the page had no commits yet. Lets a reader see that the page has changed since.
+     */
+    head: bytea('head'),
     removedAt: timestamp('removed_at', { withTimezone: true, mode: 'date' }),
     createdAt: createdAt(),
   },

@@ -118,6 +118,7 @@ export function Comments({ paper, path }: { paper: PaperId; path: string }) {
   const tree: Tree = {
     paper,
     viewer,
+    historyHref: `/history${path}`,
     children: (id) => children.get(id) ?? [],
     loaded: add,
     posted: (c) => {
@@ -181,6 +182,8 @@ export function Comments({ paper, path }: { paper: PaperId; path: string }) {
 interface Tree {
   paper: PaperId;
   viewer: Viewer | null;
+  /** The page's history, where the edits since a comment are read. */
+  historyHref: string;
   /** The loaded direct replies to a comment, oldest first. */
   children: (id: string) => Comment[];
   /** Replies fetched by "more replies". */
@@ -218,6 +221,7 @@ function Thread({ c, tree }: { c: Comment; tree: Tree }) {
     <>
       <CommentItem
         c={c}
+        historyHref={tree.historyHref}
         onReply={tree.viewer?.canComment && !c.removed ? () => setReplying(true) : undefined}
         onRemoved={() => tree.replaced({ ...c, removed: true, body: null, html: null, mentions: [] })}
       />
@@ -403,12 +407,38 @@ function Byline({ author }: { author: Comment['author'] }) {
   );
 }
 
+/**
+ * A small mark beside a comment written against an older version of the page: it may answer text that has
+ * since changed. Links to the page's history.
+ */
+function Outdated({ editsSince, href }: { editsSince: number; href: string }) {
+  const label = `The page has had ${editsSince} ${editsSince === 1 ? 'edit' : 'edits'} since this comment`;
+  return (
+    <a
+      href={href}
+      title={label}
+      aria-label={label}
+      className="inline-flex items-center gap-0.5 text-faint no-underline hover:text-muted"
+    >
+      <svg viewBox="0 0 16 16" width="12" height="12" aria-hidden="true" className="self-center">
+        <path
+          fill="currentColor"
+          d="M8 1.5a1 1 0 0 1 .87.5l6.06 10.5A1 1 0 0 1 14.06 14H1.94a1 1 0 0 1-.87-1.5L7.13 2A1 1 0 0 1 8 1.5Zm0 4a.75.75 0 0 0-.75.75v3a.75.75 0 0 0 1.5 0v-3A.75.75 0 0 0 8 5.5Zm0 6.75a.9.9 0 1 0 0-1.8.9.9 0 0 0 0 1.8Z"
+        />
+      </svg>
+      <span>{editsSince}</span>
+    </a>
+  );
+}
+
 function CommentItem({
   c,
+  historyHref,
   onReply,
   onRemoved,
 }: {
   c: Comment;
+  historyHref: string;
   /** Opens the thread's reply form; absent when the viewer cannot comment. */
   onReply?: () => void;
   onRemoved: () => void;
@@ -431,6 +461,7 @@ function CommentItem({
       <div className="flex flex-wrap items-baseline gap-x-2 font-sans text-[13px] text-muted">
         <Byline author={c.author} />
         <span title={new Date(c.createdAt).toISOString().slice(0, 16).replace('T', ' ')}>{ago(c.createdAt)}</span>
+        {c.editsSince > 0 && !c.removed && <Outdated editsSince={c.editsSince} href={historyHref} />}
       </div>
       {c.removed ? (
         <p className="mt-1 text-sm text-muted italic">Removed by its author.</p>

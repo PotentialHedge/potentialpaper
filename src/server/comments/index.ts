@@ -73,6 +73,10 @@ export interface CommentView {
   replyCount: number;
   /** The names `@`-mentioned in the body that resolve on this paper, in order of first mention. */
   mentions: string[];
+  /** The page's commit (hex) it was written against: the head when it was posted; null before the first. */
+  pageCommit: string | null;
+  /** Commits to the page since then: 0 while the comment is about the page as it stands. */
+  editsSince: number;
   author: CommentAuthor & {
     /** True when the viewer wrote it. Lets a client say "you" without revealing anyone else. */
     isYou: boolean;
@@ -126,7 +130,14 @@ export async function postComment(
   const row = await database.transaction(async (tx) => {
     const [inserted] = await tx
       .insert(comments)
-      .values({ paperId: input.paperId, accountId, parentId, body, anonymous })
+      .values({
+        paperId: input.paperId,
+        accountId,
+        parentId,
+        body,
+        anonymous,
+        head: sql`(select head from page_refs where paper_id = ${input.paperId}::uuid)`,
+      })
       .returning({ id: comments.id });
     const recipients = [...new Set(mentioned.values())].filter((id) => id !== accountId);
     if (recipients.length > 0) {
@@ -225,6 +236,11 @@ const commentColumns = {
   isBot: accounts.isBot,
   // Uses comments_parent_created_idx. `r` is the reply; the outer row is `comments`.
   replyCount: sql<number>`(select count(*)::int from comments r where r.parent_id = ${comments.id})`,
+  head: comments.head,
+  // Commits on the page after the one the comment was written against, by page_revisions' primary key.
+  editsSince: sql<number>`(select count(*)::int from page_revisions pr where pr.paper_id = ${comments.paperId}
+    and pr.seq > coalesce((select h.seq from page_revisions h where h.paper_id = ${comments.paperId}
+      and h.oid = ${comments.head}), 0))`,
 };
 
 type CommentRow = {
@@ -243,6 +259,8 @@ type CommentRow = {
   institutions: string[];
   isBot: boolean;
   replyCount: number;
+  head: Buffer | null;
+  editsSince: number;
 };
 
 function rowsWhere(where: ReturnType<typeof eq>, database: Database): Promise<CommentRow[]> {
@@ -490,6 +508,8 @@ async function decorate(rows: CommentRow[], viewerId: string | null, database: D
       removed,
       replyCount: r.replyCount,
       mentions,
+      pageCommit: r.head ? r.head.toString('hex') : null,
+      editsSince: r.editsSince,
       author: {
         ...authorFor(r, aliasOf.get(key(r.paperId, r.accountId)), authorOf.get(key(r.paperId, r.accountId))),
         isYou: viewerId === r.accountId,
