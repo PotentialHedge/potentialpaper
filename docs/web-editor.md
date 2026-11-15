@@ -56,6 +56,23 @@ Code.
 - **The frame:** `/editor/vscode?scheme&value` (`src/app/editor/vscode/route.ts`, `src/editors/vscode/workbench.ts`)
   is the build's `workbench.html` with its configuration: the page repo as the folder `potentialpaper://page/`, the
   extension added to the built-in ones, auto-save on, light theme, AI features off.
+- **Trimmed:** `editors/vscode/patch-vscode.mjs` patches the sources before the build: no terminal, Run and Debug,
+  Ports, Remote or Extensions views (hidden from the activity bar and panel; the services stay, as much of the
+  workbench asks for them), no Run or Terminal menus, and no GitHub/Microsoft sign-in, notebook, npm, simple
+  browser or prompt-file extensions. Settings in `workbench.ts` hide Accounts, the secondary side bar, the
+  layout controls and the debug toolbar; the extension binds the terminal/debug/extensions keys to nothing. Their
+  commands are still in the command palette.
+- **Schemas:** the JSON files of a page (links, versions, `thumbnail.json`, `pdf.json`) are checked as they're
+  typed against JSON Schemas made from the zod definitions the site checks them with
+  (`src/server/pages/schemas.ts`; `z.toJSONSchema`). `scripts/write-page-schemas.ts` writes them into the
+  extension with its `jsonValidation` when it is built (VS Code's JSON support ignores `json.schemas` set as a
+  default); the site serves the same at `/schemas/<name>.json` for `prek.toml` and other editors.
+- **Before a commit** (the extension's `precommit.ts`), what `prek.toml` does in a clone: sections formatted with
+  Prettier (the same version as the hook; also Format Document), JSON laid out as the site writes it, and no
+  commit while a changed file has an error.
+- **Sign-in:** `/code/…` sends someone signed out to sign in, and back.
+- **Starter files:** a page with no repo yet shows the files its first commit starts with (`starter.ts`): empty
+  sections and `prek.toml`.
 - **The extension** (`editors/vscode/extension/`): a file system for the page repo (`store.ts`), which keeps saved
   changes in the browser until they are committed, with the commit they started from; Source Control, whose
   message box and ✓ commit; a 409 rebases the changes with conflict markers to settle. It posts the open file to

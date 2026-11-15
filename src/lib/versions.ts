@@ -6,7 +6,9 @@
  *
  * Pure, so the server, the editor and the tests share it.
  */
+import { z } from 'zod';
 import { evidenceProblem, MAX_EVIDENCE } from './evidence';
+import { httpUrl } from './paper-links';
 
 export const VERSION_KINDS = ['preprint', 'workshop', 'conference', 'journal', 'camera-ready', 'other'] as const;
 export type VersionKind = (typeof VERSION_KINDS)[number];
@@ -94,91 +96,132 @@ const MAX_URL = 2000;
 export const VERSION_ID = /^[a-z0-9][a-z0-9_-]{0,47}$/;
 const DATE = /^\d{4}(-(0[1-9]|1[0-2])(-(0[1-9]|[12]\d|3[01]))?)?$/;
 
-function httpsProblem(value: unknown): boolean {
-  if (typeof value !== 'string' || value.length > MAX_URL) return true;
-  const url = URL.parse(value);
-  return !url || (url.protocol !== 'https:' && url.protocol !== 'http:');
+/** Free text: not blank, and no control characters but newlines. */
+function text(max: number) {
+  return z
+    .string()
+    .min(1)
+    .max(max)
+    .refine((value) => value.trim() !== '' && !/\p{Cc}/u.test(value.replace(/\n/g, '')));
 }
 
-function textProblem(value: unknown, max: number): boolean {
-  return (
-    typeof value !== 'string' || value.trim() === '' || value.length > max || /\p{Cc}/u.test(value.replace(/\n/g, ''))
-  );
+const evidenceSchema = z
+  .array(
+    z.string().superRefine((url, ctx) => {
+      const problem = evidenceProblem(url);
+      if (problem) ctx.addIssue({ code: 'custom', message: `has evidence that ${problem}` });
+    }),
+  )
+  .max(MAX_EVIDENCE, { error: `has more than ${MAX_EVIDENCE} pieces of evidence` })
+  .meta({
+    description: `Up to ${MAX_EVIDENCE} https addresses (or files uploaded here) that back the version up: its forum, the venue's list of accepted papers.`,
+  });
+
+/** What a version is, as its file and the site both have it, but for its id and PDF. */
+const versionShape = {
+  label: text(MAX_VERSION_LABEL).meta({
+    description: 'What the version is: "ICML 2026 Workshop on Structured Probabilistic Inference", "arXiv v2".',
+  }),
+  kind: z.enum(VERSION_KINDS).meta({ description: 'What kind of version it is.' }),
+  date: z
+    .string()
+    .regex(DATE)
+    .optional()
+    .meta({ description: 'When it was submitted, or made public: YYYY, YYYY-MM or YYYY-MM-DD.' }),
+  status: z.enum(VERSION_STATUSES).optional().meta({ description: 'Where it stands at its venue.' }),
+  decision: text(MAX_VERSION_DECISION)
+    .optional()
+    .meta({ description: 'The decision as the venue words it: "Poster", "Oral", "Accept (Spotlight)".' }),
+  title: text(MAX_VERSION_TITLE).optional().meta({ description: "The title it had, when not the paper's." }),
+  abstract: text(MAX_VERSION_ABSTRACT).optional().meta({ description: "Its abstract, when not the paper's." }),
+  url: httpUrl(MAX_URL)
+    .optional()
+    .meta({ description: 'Where the version is: its forum, its arXiv page, its proceedings page.' }),
+  note: text(MAX_VERSION_NOTE)
+    .optional()
+    .meta({ description: 'What changed from the version before, in a sentence or two.' }),
+  evidence: evidenceSchema.optional(),
+};
+
+/** What each field's problem is called, so a refusal says what to fix rather than how the check failed. */
+const FIELD_PROBLEMS: Record<string, string> = {
+  id: 'needs an id like v_k3x9q2ab',
+  label: `needs a label of 1 to ${MAX_VERSION_LABEL} characters`,
+  kind: `needs a kind: ${VERSION_KINDS.join(', ')}`,
+  date: 'needs a date as YYYY, YYYY-MM or YYYY-MM-DD',
+  status: `needs a status: ${VERSION_STATUSES.join(', ')}`,
+  decision: 'has a bad decision',
+  title: 'has a bad title',
+  abstract: 'has a bad abstract',
+  note: 'has a bad note',
+  url: 'needs an http or https address',
+};
+
+const PDF_PROBLEMS: Record<string, string> = {
+  sha256: 'has a PDF without a SHA-256',
+  bytes: 'has a PDF without its size',
+  url: 'has a PDF without an address',
+  source: 'has a PDF with a bad source',
+  license: 'has a PDF with a bad license',
+};
+
+function firstProblem(error: z.ZodError): string {
+  const issue = error.issues[0];
+  const [field, sub] = issue.path.map(String);
+  if (issue.code === 'unrecognized_keys') {
+    return field === 'pdf'
+      ? `has “pdf.${issue.keys[0]}”; the PDF itself is versions/<id>.pdf, and “pdf” only says its “source” and “license”`
+      : `has an unknown field “${issue.keys[0]}”`;
+  }
+  if (field === undefined) return 'is not an object';
+  if (field === 'pdf') return (sub && PDF_PROBLEMS[sub]) ?? 'has a “pdf” that is not an object';
+  if (field === 'evidence')
+    return issue.code === 'custom' || issue.code === 'too_big' ? issue.message : 'has evidence that is not an address';
+  return FIELD_PROBLEMS[field] ?? issue.message;
 }
 
-function pdfProblem(value: unknown): string | null {
-  if (value === null || typeof value !== 'object' || Array.isArray(value)) return 'has a PDF that is not an object';
-  const { sha256, bytes, url, source, license } = value as Partial<VersionPdf>;
-  if (typeof sha256 !== 'string' || !/^[0-9a-f]{64}$/.test(sha256)) return 'has a PDF without a SHA-256';
-  if (typeof bytes !== 'number' || !Number.isSafeInteger(bytes) || bytes <= 0) return 'has a PDF without its size';
-  const hosted = typeof url === 'string' && (/^\/[^/\\]/.test(url) || URL.parse(url)?.protocol === 'https:');
-  if (!hosted) return 'has a PDF without an address';
-  if (source !== undefined && httpsProblem(source)) return 'has a PDF with a bad source';
-  if (license !== undefined && textProblem(license, 100)) return 'has a PDF with a bad license';
-  return null;
-}
+const pdfSourceShape = {
+  source: httpUrl(MAX_URL).optional().meta({ description: 'Where the PDF was copied from.' }),
+  license: text(100).optional().meta({ description: 'The license it was copied under, such as "CC BY 4.0".' }),
+};
 
-const FIELDS = new Set([
-  'id',
-  'label',
-  'kind',
-  'date',
-  'status',
-  'decision',
-  'title',
-  'abstract',
-  'url',
-  'pdf',
-  'note',
-  'evidence',
-]);
+/** A version as the site holds it: with its id, and its PDF where it is hosted. */
+const paperVersionSchema = z.strictObject({
+  id: z.string().regex(VERSION_ID),
+  ...versionShape,
+  pdf: z
+    .strictObject({
+      sha256: z.string().regex(/^[0-9a-f]{64}$/),
+      bytes: z.number().int().positive(),
+      url: z.string().refine((url) => /^\/[^/\\]/.test(url) || URL.parse(url)?.protocol === 'https:'),
+      ...pdfSourceShape,
+    })
+    .optional(),
+});
+
+/**
+ * A `versions/<id>.json`: the one definition, which both checks the file and is the JSON Schema editors and the
+ * pre-commit hook check it with (`server/pages/schemas.ts`). The id is the file's name; the PDF is the file beside
+ * it, `versions/<id>.pdf`, and `pdf` only says where it came from.
+ */
+export const versionFileSchema = z
+  .strictObject({
+    ...versionShape,
+    pdf: z
+      .strictObject(pdfSourceShape)
+      .optional()
+      .meta({ description: 'Where versions/<id>.pdf, beside this file, came from: needed when it was copied.' }),
+  })
+  .meta({
+    title: 'Version',
+    description:
+      "A version of the paper: a preprint, a submission, the camera-ready. The file's name is its id, like v_k3x9q2ab.json.",
+  });
 
 /** A version's problem, or `null`. */
 export function versionProblem(value: unknown): string | null {
-  if (value === null || typeof value !== 'object' || Array.isArray(value)) return 'is not an object';
-  const v = value as Record<string, unknown>;
-  for (const key of Object.keys(v)) if (!FIELDS.has(key)) return `has an unknown field “${key}”`;
-  if (typeof v.id !== 'string' || !VERSION_ID.test(v.id)) return 'needs an id like v_k3x9q2ab';
-  if (textProblem(v.label, MAX_VERSION_LABEL)) return `needs a label of 1 to ${MAX_VERSION_LABEL} characters`;
-  if (!VERSION_KINDS.includes(v.kind as VersionKind)) return `needs a kind: ${VERSION_KINDS.join(', ')}`;
-  if (v.date !== undefined && (typeof v.date !== 'string' || !DATE.test(v.date))) {
-    return 'needs a date as YYYY, YYYY-MM or YYYY-MM-DD';
-  }
-  if (v.status !== undefined && !VERSION_STATUSES.includes(v.status as VersionStatus)) {
-    return `needs a status: ${VERSION_STATUSES.join(', ')}`;
-  }
-  if (v.decision !== undefined && textProblem(v.decision, MAX_VERSION_DECISION)) return 'has a bad decision';
-  if (v.title !== undefined && textProblem(v.title, MAX_VERSION_TITLE)) return 'has a bad title';
-  if (v.abstract !== undefined && textProblem(v.abstract, MAX_VERSION_ABSTRACT)) return 'has a bad abstract';
-  if (v.note !== undefined && textProblem(v.note, MAX_VERSION_NOTE)) return 'has a bad note';
-  if (v.url !== undefined && httpsProblem(v.url)) return 'needs an http or https address';
-  if (v.pdf !== undefined) {
-    const problem = pdfProblem(v.pdf);
-    if (problem) return problem;
-  }
-  if (v.evidence !== undefined) {
-    if (!Array.isArray(v.evidence) || v.evidence.length > MAX_EVIDENCE) {
-      return `has more than ${MAX_EVIDENCE} pieces of evidence`;
-    }
-    for (const url of v.evidence) {
-      const problem = typeof url === 'string' ? evidenceProblem(url) : 'is not an address';
-      if (problem) return `has evidence that ${problem}`;
-    }
-  }
-  return null;
-}
-
-function pdfInfoProblem(value: unknown): string | null {
-  if (value === null || typeof value !== 'object' || Array.isArray(value)) return 'has a “pdf” that is not an object';
-  for (const key of Object.keys(value)) {
-    if (key !== 'source' && key !== 'license') {
-      return `has “pdf.${key}”; the PDF itself is versions/<id>.pdf, and “pdf” only says its “source” and “license”`;
-    }
-  }
-  const { source, license } = value as VersionPdfInfo;
-  if (source !== undefined && httpsProblem(source)) return 'has a PDF with a bad source';
-  if (license !== undefined && textProblem(license, 100)) return 'has a PDF with a bad license';
-  return null;
+  const parsed = paperVersionSchema.safeParse(value);
+  return parsed.success ? null : firstProblem(parsed.error);
 }
 
 /**
@@ -197,14 +240,11 @@ export function parseVersionFile(
   }
   if (value === null || typeof value !== 'object' || Array.isArray(value)) return { problem: 'is not a JSON object' };
   if ('id' in value) return { problem: 'takes its id from its file name, so leave “id” out' };
+  if (!VERSION_ID.test(id)) return { problem: FIELD_PROBLEMS.id };
+  const parsed = versionFileSchema.safeParse(value);
+  if (!parsed.success) return { problem: firstProblem(parsed.error) };
   const { pdf, ...rest } = value as Record<string, unknown>;
-  if (pdf !== undefined) {
-    const problem = pdfInfoProblem(pdf);
-    if (problem) return { problem };
-  }
   const version = { id, ...rest } as PaperVersion;
-  const problem = versionProblem(version);
-  if (problem) return { problem };
   const { source, license } = (pdf ?? {}) as VersionPdfInfo;
   return { version, pdfInfo: { ...(source ? { source } : {}), ...(license ? { license } : {}) } };
 }

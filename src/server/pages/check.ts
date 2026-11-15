@@ -29,6 +29,7 @@ import {
   parseLfsPointer,
   pathDenied,
   PDF_PATH,
+  PREK_PATH,
   type Roles,
   sectionName,
   THUMBNAIL_PATH,
@@ -39,6 +40,7 @@ import {
   versionPath,
   versionPdfIdOf,
 } from './rules';
+import { prekProblem } from './starter';
 
 /**
  * Whether a change to a page's tree is allowed: who is making it, what it writes, and what the whole tree
@@ -170,7 +172,7 @@ export function checkPath(path: string, content: string | null | undefined, role
   const misplaced = layoutProblem(path);
   if (misplaced) throw new ApiError(422, 'validation_error', `${path}: ${misplaced}`, { path });
   if (content === undefined) return;
-  const invalid = contentProblem(path, content);
+  const invalid = fileProblem(path, content);
   if (invalid) throw invalidContent(path, invalid);
 }
 
@@ -184,6 +186,11 @@ export async function checkMayWrite(
   const roles = await rolesOf(db, actor, paperId);
   await checkPaper(db, paperId);
   for (const path of paths) checkPath(path, undefined, roles, false);
+}
+
+/** Why this can't be the file's content, or `null`: `contentProblem`, and the page's fixed `prek.toml`. */
+export function fileProblem(path: string, content: string): string | null {
+  return path === PREK_PATH ? prekProblem(content) : contentProblem(path, content);
 }
 
 export function invalidContent(path: string, problem: string): ApiError {
@@ -378,7 +385,7 @@ export async function checkTree(db: Reader, check: TreeCheck): Promise<string[]>
             : 'is not UTF-8 text',
       );
     }
-    const invalid = contentProblem(path, content);
+    const invalid = fileProblem(path, content);
     if (invalid) throw invalidContent(path, invalid);
   }
 

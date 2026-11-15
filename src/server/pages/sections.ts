@@ -26,7 +26,10 @@ export function sectionPaths(files: Iterable<string>, part: PagePart): string[] 
   return [...files].filter((path) => sectionName(path, part)).sort(byBytes);
 }
 
-/** The part's sections in a tree, in order. */
+/**
+ * The part's sections in a tree, in order, as the page shows them: a blank file is a section nobody has
+ * written yet (every page starts with some, `starter.ts`), so it isn't one.
+ */
 export async function readSections(
   db: Reader,
   paperId: string,
@@ -35,7 +38,8 @@ export async function readSections(
 ): Promise<SectionFile[]> {
   const out: SectionFile[] = [];
   for (const path of sectionPaths(files.keys(), part)) {
-    out.push({ path, name: sectionName(path, part)!, text: (await readText(db, paperId, files.get(path))) ?? '' });
+    const text = (await readText(db, paperId, files.get(path))) ?? '';
+    if (text.trim() !== '') out.push({ path, name: sectionName(path, part)!, text });
   }
   return out;
 }

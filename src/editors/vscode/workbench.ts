@@ -46,9 +46,27 @@ export function workbenchHtml(paper: PaperId & { title: string }): string {
       'update.mode': 'none',
       'extensions.autoCheckUpdates': false,
       'chat.disableAIFeatures': true,
+      // A page editor, not a workbench for code: no accounts, chat sidebar, layout menu or debugging. The
+      // terminal, debugging and extensions views go at build time (editors/vscode/patch-vscode.mjs).
+      'workbench.activity.showAccounts': false,
+      'workbench.secondarySideBar.defaultVisibility': 'hidden',
+      'workbench.layoutControl.enabled': false,
+      'debug.showInStatusBar': 'never',
+      'debug.toolBarLocation': 'hidden',
+      // Each JSON file is checked against its schema, which the extension carries (scripts/write-page-schemas.ts),
+      // for errors, completion and hovers as people type. A commit is refused while one has an error.
+      'json.schemaDownload.trustedDomains': { [`${site}/`]: true },
       // Saved changes are what Source Control lists and what a reload keeps, so save as people type.
       'files.autoSave': 'afterDelay',
-      '[markdown]': { 'editor.wordWrap': 'on' },
+      'files.insertFinalNewline': true,
+      'files.trimFinalNewlines': true,
+      'files.trimTrailingWhitespace': true,
+      // Sections are formatted with Prettier, as `prek.toml` formats them (the extension's `precommit.ts`).
+      '[markdown]': {
+        'editor.wordWrap': 'on',
+        'editor.defaultFormatter': 'potentialpaper.potentialpaper',
+        'files.trimTrailingWhitespace': false,
+      },
       '[html]': { 'editor.wordWrap': 'on' },
     },
   };

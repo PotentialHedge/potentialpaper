@@ -74,7 +74,7 @@ export function EditDialog({ codePath, clone, hasRepo }: EditOptions) {
           <h3 className={`${ui.runIn} mt-4 block`}>In the browser</h3>
           <p className="mt-1 text-muted">
             The page&apos;s files in VS Code, with a preview of each section as the page will show it. Commit from
-            Source Control when you&apos;re done.
+            Source Control when you&apos;re done. If you aren&apos;t signed in, you&apos;ll be asked to first.
           </p>
           <p className="mt-2">
             <a href={codePath} rel="nofollow" className={ui.btn({ inline: true, flush: true })}>

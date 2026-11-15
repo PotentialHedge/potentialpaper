@@ -172,7 +172,7 @@ describe('a bad tree is refused, whoever made it', () => {
   const cases: [string, Record<string, Content>, number, RegExp][] = [
     ['the system files', { '.potentialpaper/metadata.json': '{}\n' }, 403, /only the system and admins/],
     ['the author section, by someone else', { 'author/10-mine.md': '# Mine\n' }, 403, /confirmed authors/],
-    ['a path with no place', { 'page.md': 'hello\n' }, 403, /pages hold \.gitattributes, \.potentialpaper/],
+    ['a path with no place', { 'page.md': 'hello\n' }, 403, /pages hold \.gitattributes, prek\.toml, \.potentialpaper/],
     ['a section not named NN-slug', { 'community/summary.md': 'x\n' }, 422, /one file per section/],
     ['a dot file', { 'community/.hidden': 'x\n' }, 422, /starting with a dot/],
     [

@@ -2,6 +2,7 @@
  * What a paper page shows under its title: links to the paper elsewhere, and its BibTeX entry. Pure, so
  * the page, the client island and the tests share it.
  */
+import { z } from 'zod';
 import type { PaperId } from './paper-ids';
 
 export interface TitleLink {
@@ -66,15 +67,49 @@ export const MAX_LINKS = 12;
 export const MAX_LINK_LABEL = 30;
 const MAX_LINK_URL = 2000;
 
+/** An `http:` or `https:` address, so a link can't run anything. */
+export function httpUrl(max: number) {
+  return z
+    .string()
+    .max(max)
+    .regex(/^https?:\/\//i)
+    .refine((value) => {
+      const url = URL.parse(value);
+      return url !== null && (url.protocol === 'https:' || url.protocol === 'http:');
+    })
+    .meta({ format: 'uri' });
+}
+
+/**
+ * A `links/10-code.json`: the one definition, which both checks the file and is the JSON Schema editors and the
+ * pre-commit hook check it with (`server/pages/schemas.ts`).
+ */
+export const linkFileSchema = z
+  .strictObject({
+    label: z
+      .string()
+      .min(1)
+      .max(MAX_LINK_LABEL)
+      .regex(/^[^[\]]*$/)
+      .refine((label) => label.trim() !== '' && !/\p{C}/u.test(label))
+      .meta({
+        description: `What the link says under the title, such as "Code" or "Video" (1 to ${MAX_LINK_LABEL} characters, no brackets). One named like a built-in link (arXiv, PDF, OpenReview, DOI, Scholar) replaces it.`,
+      }),
+    url: httpUrl(MAX_LINK_URL).meta({ description: 'Where it goes: an http or https address.' }),
+  })
+  .meta({
+    title: 'Link',
+    description:
+      "A link shown under the paper's title. One file per link, named like 10-code.json; they show in the order of their names.",
+  });
+
 /** A link's problem, or `null`. Only http(s), so a link can't run anything. */
 export function linkProblem(link: TitleLink): string | null {
   const label = link.label.trim();
-  if (label === '' || label.length > MAX_LINK_LABEL) return `needs a label of 1 to ${MAX_LINK_LABEL} characters`;
-  if (/[[\]\p{C}]/u.test(label)) return 'has a label with a bracket or a control character';
-  const url = URL.parse(link.url);
-  if (!url || (url.protocol !== 'https:' && url.protocol !== 'http:') || link.url.length > MAX_LINK_URL) {
-    return 'needs an http or https address';
+  if (!linkFileSchema.shape.label.safeParse(label).success) {
+    return `needs a label of 1 to ${MAX_LINK_LABEL} characters, without brackets or control characters`;
   }
+  if (!linkFileSchema.shape.url.safeParse(link.url).success) return 'needs an http or https address';
   return null;
 }
 
@@ -86,11 +121,8 @@ export function parseLinkFile(text: string): TitleLink | null {
   } catch {
     return null;
   }
-  if (value === null || typeof value !== 'object' || Array.isArray(value)) return null;
-  const { label, url, ...rest } = value as Record<string, unknown>;
-  if (typeof label !== 'string' || typeof url !== 'string' || Object.keys(rest).length > 0) return null;
-  const link = { label: label.trim(), url };
-  return linkProblem(link) ? null : link;
+  const parsed = linkFileSchema.safeParse(value);
+  return parsed.success ? { label: parsed.data.label.trim(), url: parsed.data.url } : null;
 }
 
 export function encodeLinkFile({ label, url }: TitleLink): string {

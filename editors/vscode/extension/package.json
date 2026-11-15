@@ -75,6 +75,11 @@
         "command": "potentialpaper.newSection",
         "title": "New Section",
         "category": "PotentialPaper"
+      },
+      {
+        "command": "potentialpaper.nothing",
+        "title": "Nothing",
+        "category": "PotentialPaper"
       }
     ],
     "menus": {
@@ -114,6 +119,10 @@
         {
           "command": "potentialpaper.openChange",
           "when": "false"
+        },
+        {
+          "command": "potentialpaper.nothing",
+          "when": "false"
         }
       ],
       "explorer/context": [
@@ -122,6 +131,48 @@
           "when": "resourceScheme == potentialpaper && explorerResourceIsFolder"
         }
       ]
-    }
+    },
+    "keybindings": [
+      {
+        "key": "ctrl+`",
+        "command": "potentialpaper.nothing"
+      },
+      {
+        "key": "ctrl+shift+`",
+        "command": "potentialpaper.nothing"
+      },
+      {
+        "key": "ctrl+shift+d",
+        "command": "potentialpaper.nothing",
+        "mac": "cmd+shift+d"
+      },
+      {
+        "key": "f5",
+        "command": "potentialpaper.nothing"
+      },
+      {
+        "key": "ctrl+f5",
+        "command": "potentialpaper.nothing"
+      },
+      {
+        "key": "shift+f5",
+        "command": "potentialpaper.nothing"
+      },
+      {
+        "key": "ctrl+shift+y",
+        "command": "potentialpaper.nothing",
+        "mac": "cmd+shift+y"
+      },
+      {
+        "key": "ctrl+shift+x",
+        "command": "potentialpaper.nothing",
+        "mac": "cmd+shift+x"
+      },
+      {
+        "key": "ctrl+shift+c",
+        "command": "potentialpaper.nothing",
+        "mac": "cmd+shift+c"
+      }
+    ]
   }
 }

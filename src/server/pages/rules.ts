@@ -1,3 +1,4 @@
+import { z } from 'zod';
 import { DEMO_NAME, DEMOS_DIR, MAX_DEMO_NAME } from '@/lib/demos';
 import { parseLinkFile } from '@/lib/paper-links';
 import { parseVersionFile, VERSION_ID } from '@/lib/versions';
@@ -9,6 +10,7 @@ import { htmlProblem } from './html';
  * filesystem as well as valid to git. The layout is many small files a person can edit with a text editor:
  *
  *   .gitattributes                  the system's, always the same: which files are kept with Git LFS
+ *   prek.toml                       the system's, always the same: checks to run before a commit
  *   .potentialpaper/metadata.json   the system's: identifiers, title, authors, abstract snapshot
  *   .potentialpaper/paper.pdf       the system's: the paper's PDF (Git LFS)
  *   .potentialpaper/pdf.json        the system's: where that PDF came from, and its license
@@ -40,6 +42,11 @@ const SYSTEM_PATHS = new Set([METADATA_PATH, PAPER_PDF_PATH, PDF_PATH]);
  * on `git add`. Nobody can change it: an attribute can name a filter, and filters run programs.
  */
 export const GITATTRIBUTES_PATH = '.gitattributes';
+/**
+ * The checks a clone runs before each commit (`starter.ts`): the same on every page, and the system's, as it
+ * names programs to run. `check.ts` holds it to its one content.
+ */
+export const PREK_PATH = 'prek.toml';
 export const GITATTRIBUTES = `# PDFs and pictures are kept with Git LFS (https://git-lfs.com). With it installed (\`git lfs install\`),
 # a clone has the files, and \`git add\` of one stores a pointer. This file is the same on every page.
 /.potentialpaper/*.pdf filter=lfs diff=lfs merge=lfs -text
@@ -219,13 +226,15 @@ export function encodeLfsPointer({ sha256, bytes }: LfsPointer): string {
 
 /** What a page holds, said when a path isn't one of them. */
 const LAYOUT =
-  'pages hold .gitattributes, .potentialpaper/ (metadata.json, paper.pdf, pdf.json), author/ and community/ ' +
+  'pages hold .gitattributes, prek.toml, .potentialpaper/ (metadata.json, paper.pdf, pdf.json), author/ and community/ ' +
   '(sections named like 10-summary.md or 20-results.html), versions/<id>.json and <id>.pdf, links/ (named like ' +
   '10-code.json), thumbnail.png (or .jpg, .gif, .webp, .avif) and thumbnail.json, demos/<name>/ and extensions/';
 
 /** Why nothing can be written at this path, or `null`. Deleting a file needs no such check. */
 export function layoutProblem(path: string): string | null {
-  if (SYSTEM_PATHS.has(path) || path === GITATTRIBUTES_PATH || path === THUMBNAIL_PATH) return null;
+  if (SYSTEM_PATHS.has(path) || path === GITATTRIBUTES_PATH || path === PREK_PATH || path === THUMBNAIL_PATH) {
+    return null;
+  }
   if (thumbnailImageType(path)) return null;
   if (path.startsWith('extensions/')) return null;
   for (const part of PAGE_PARTS) {
@@ -317,7 +326,7 @@ export interface Roles {
 
 /** Why these roles cannot write this path, or `null`. Checked for each path of a commit. */
 export function pathDenied(path: string, roles: Roles): string | null {
-  if (path.startsWith(`${SYSTEM_DIR}/`) || path === GITATTRIBUTES_PATH) {
+  if (path.startsWith(`${SYSTEM_DIR}/`) || path === GITATTRIBUTES_PATH || path === PREK_PATH) {
     return roles.system || roles.admin ? null : `only the system and admins can change ${SYSTEM_DIR}/`;
   }
   if (path.startsWith(`${VERSIONS_DIR}/`)) {
@@ -394,28 +403,33 @@ export interface PdfPointer {
   fetchedAt: string;
 }
 
-function isHttps(value: unknown): boolean {
-  if (typeof value !== 'string') return false;
-  return URL.parse(value)?.protocol === 'https:';
-}
-
 /** What `pdf.json` says about `paper.pdf`. */
 export type PdfSource = Pick<PdfPointer, 'source' | 'license' | 'fetchedAt'>;
 
-/** A `pdf.json`, or `null` if it isn't one. Pages credit `source`, so it has to be checked. */
+/**
+ * A `.potentialpaper/pdf.json`: the one definition, which both checks the file and is its JSON Schema
+ * (`schemas.ts`). Pages credit `source`, so it has to be checked.
+ */
+export const pdfSourceSchema = z
+  .strictObject({
+    source: z
+      .url({ protocol: /^https$/ })
+      .meta({ description: 'The page the PDF was copied from, which the license requires us to credit.' }),
+    license: z.string().min(1).meta({ description: 'The license it was copied under, such as "CC BY 4.0".' }),
+    fetchedAt: z.string().meta({ description: 'When it was copied (ISO 8601).' }),
+  })
+  .meta({ title: 'Paper PDF', description: 'Where .potentialpaper/paper.pdf came from. Written by the system.' });
+
+/** A `pdf.json`, or `null` if it isn't one. */
 export function parsePdfSource(text: string): PdfSource | null {
-  let value: Partial<PdfSource> | null;
+  let value: unknown;
   try {
-    value = JSON.parse(text) as Partial<PdfSource> | null;
+    value = JSON.parse(text);
   } catch {
     return null;
   }
-  if (value === null || typeof value !== 'object' || Array.isArray(value)) return null;
-  if (Object.keys(value).some((key) => !['source', 'license', 'fetchedAt'].includes(key))) return null;
-  const { source, license, fetchedAt } = value;
-  if (!isHttps(source)) return null;
-  if (typeof license !== 'string' || license === '' || typeof fetchedAt !== 'string') return null;
-  return { source: source as string, license, fetchedAt };
+  const parsed = pdfSourceSchema.safeParse(value);
+  return parsed.success ? parsed.data : null;
 }
 
 export function encodePdfSource({ source, license, fetchedAt }: PdfSource): string {
@@ -454,20 +468,39 @@ export function imageType(bytes: Uint8Array): ThumbnailType | null {
 
 export type ThumbnailWords = Pick<ThumbnailPointer, 'alt' | 'caption'>;
 
+/**
+ * A `thumbnail.json`: the one definition, which both checks the file and is its JSON Schema (`schemas.ts`).
+ */
+export const thumbnailWordsSchema = z
+  .strictObject({
+    alt: z
+      .string()
+      .max(MAX_ALT_LENGTH)
+      .optional()
+      .meta({ description: "What the picture shows, for a reader who can't see it." }),
+    caption: z
+      .string()
+      .max(MAX_ALT_LENGTH)
+      .optional()
+      .meta({ description: 'The caption under the picture, after "Figure 1:".' }),
+  })
+  .meta({
+    title: 'Picture',
+    description:
+      "The words for the paper's picture, thumbnail.png (or .jpg, .gif, .webp, .avif) beside this file. Both optional.",
+  });
+
 /** The words in a `thumbnail.json`, or `null` if it isn't that. */
 export function parseThumbnailWords(text: string): ThumbnailWords | null {
-  let value: ThumbnailWords | null;
+  let value: unknown;
   try {
-    value = JSON.parse(text) as ThumbnailWords | null;
+    value = JSON.parse(text);
   } catch {
     return null;
   }
-  if (value === null || typeof value !== 'object' || Array.isArray(value)) return null;
-  if (Object.keys(value).some((key) => key !== 'alt' && key !== 'caption')) return null;
-  const { alt, caption } = value;
-  for (const text of [alt, caption]) {
-    if (text !== undefined && (typeof text !== 'string' || text.length > MAX_ALT_LENGTH)) return null;
-  }
+  const parsed = thumbnailWordsSchema.safeParse(value);
+  if (!parsed.success) return null;
+  const { alt, caption } = parsed.data;
   return { ...(alt ? { alt } : {}), ...(caption ? { caption } : {}) };
 }
 

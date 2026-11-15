@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { COMMUNITY_STARTER, renderMarkdown, shiftHeadings, splitSections } from '@/server/pages/markdown';
+import { renderMarkdown, shiftHeadings, splitSections } from '@/server/pages/markdown';
 
 const PAGE = `Intro.
 
@@ -23,17 +23,6 @@ describe('sections', () => {
     expect(parts.map((s) => s.text).join('')).toBe(PAGE);
     expect(splitSections('# Only\n').map((s) => s.title)).toEqual(['Only']);
     expect(splitSections('\n\n')).toEqual([]);
-  });
-
-  it('has a starter with the agreed headings', () => {
-    expect(splitSections(COMMUNITY_STARTER).map((s) => s.title)).toEqual([
-      'Summary',
-      'Why it matters',
-      'Critique',
-      'Errata',
-      'Reproductions',
-      'Follow-ups',
-    ]);
   });
 
   it('moves headings, but not a # in code or a quote', () => {

@@ -7,6 +7,7 @@ import { dirname, join } from 'node:path';
 import { asc, eq, sql } from 'drizzle-orm';
 import fc from 'fast-check';
 import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it } from 'vitest';
+import { starterFiles } from '@/server/pages/starter';
 import * as gitRoute from '@/app/git/[...path]/route';
 import { getDb } from '@/db';
 import {
@@ -34,6 +35,12 @@ import { recordLfsObject } from '@/server/lfs';
 import { savePaper } from '@/server/papers';
 import { searchPapers } from '@/server/search';
 import { closePool, resetDatabase } from './helpers';
+
+/** The paths a page's first commit has besides its own: the metadata, `.gitattributes` and the starter files. */
+const byBytes = (a: string, b: string) => Buffer.compare(Buffer.from(a), Buffer.from(b));
+const STARTER_PATHS = starterFiles().map(([path]) => path);
+const firstPaths = (...own: string[]) =>
+  [...new Set(['.gitattributes', '.potentialpaper/metadata.json', ...STARTER_PATHS, ...own])].sort(byBytes);
 
 const NO_LIMIT = { burst: 100_000, perSecond: 1000 };
 const ARXIV = { scheme: 'arxiv', value: '1706.03762' } as const;
@@ -185,6 +192,12 @@ describe('every repo passes git fsck --strict', () => {
           try {
             const result = await commitPage(paperId, head, admin, changes, summary, { rateLimit: NO_LIMIT });
             if (result.status === 'committed') accepted += 1;
+            // A page's first commit starts it with the starter files the commit doesn't write itself.
+            if (!head && result.status === 'committed') {
+              for (const [p, c] of starterFiles()) {
+                if (!changes.some((change) => change.path.normalize('NFC') === p)) expected.set(p, c);
+              }
+            }
             for (const { path: p, content: c } of changes) {
               const normal = p.normalize('NFC');
               if (c === null) expected.delete(normal);
@@ -406,7 +419,7 @@ describe('concurrent commits', () => {
     const repo = await exportRepo(paperId);
     fsck(repo);
     expect(git(['rev-list', '--count', 'main'], repo).trim()).toBe('50');
-    expect(filesAt(repo).size).toBe(52);
+    expect(filesAt(repo).size).toBe(52 + STARTER_PATHS.length);
     expect(git(['rev-list', '--max-parents=0', 'main'], repo).trim().split('\n')).toHaveLength(1);
   }, 60_000);
 
@@ -517,7 +530,7 @@ describe('commitPage', () => {
       status: 'committed',
       seq: 1,
       merged: false,
-      paths: ['.gitattributes', '.potentialpaper/metadata.json', 'community/10-summary.md'],
+      paths: firstPaths(),
     });
     const repo = await exportRepo(paperId);
     expect(JSON.parse(filesAt(repo).get('.potentialpaper/metadata.json')!)).toEqual({
@@ -750,7 +763,7 @@ describe('commitPage', () => {
     expect(events[0].payload).toMatchObject({
       authorId: identity.id,
       kind: 'edit',
-      paths: ['.gitattributes', '.potentialpaper/metadata.json', 'community/10-summary.md'],
+      paths: firstPaths(),
     });
   });
 
@@ -864,11 +877,10 @@ describe('revert', () => {
     );
     expect((await refusal(revertCommit(paperId, author.oid!, person))).code).toBe('forbidden');
     await revertCommit(paperId, one.oid!, person);
-    expect([...filesAt(await exportRepo(paperId)).keys()].sort()).toEqual([
-      '.gitattributes',
-      '.potentialpaper/metadata.json',
-      'author/10-overview.md',
-    ]);
+    // The summary someone wrote goes; the starter files stay, as the metadata does.
+    expect([...filesAt(await exportRepo(paperId)).keys()].sort(byBytes)).toEqual(
+      firstPaths('author/10-overview.md').filter((path) => path !== 'community/10-summary.md'),
+    );
     expect((await refusal(revertCommit(paperId, 'd'.repeat(40), person))).code).toBe('not_found');
   });
 });
@@ -914,12 +926,9 @@ describe('diffs between commits', () => {
     expect(await diffCommits(paperId, 'a'.repeat(40), two.oid!)).toBeNull();
     expect(await diffCommits(paperId, one.oid!, 'nope')).toBeNull();
     // From nothing, a commit's whole tree is new.
-    expect((await diffCommits(paperId, null, one.oid!))!.map((d) => d.status)).toEqual([
-      'added',
-      'added',
-      'added',
-      'added',
-    ]);
+    const all = (await diffCommits(paperId, null, one.oid!))!;
+    expect(all.length).toBe(git(['ls-tree', '-r', '--name-only', one.oid!], repo).trim().split('\n').length);
+    expect(all.every((d) => d.status === 'added')).toBe(true);
   });
 });
 
@@ -1229,12 +1238,9 @@ describe('the PDF', () => {
     const [current] = await getDb().select().from(pageCurrent).where(eq(pageCurrent.paperId, id));
     expect(current.pdf).toEqual(POINTER);
     const [revision] = await getDb().select().from(pageRevisions).where(eq(pageRevisions.paperId, id));
-    expect(revision.paths.toSorted()).toEqual([
-      '.gitattributes',
-      '.potentialpaper/metadata.json',
-      PAPER_PDF_PATH,
-      PDF_PATH,
-    ]);
+    expect(revision.paths.toSorted()).toEqual(
+      ['.gitattributes', '.potentialpaper/metadata.json', PAPER_PDF_PATH, PDF_PATH, ...STARTER_PATHS].toSorted(),
+    );
   });
 
   it('gives search results its cover once one is rendered', async () => {

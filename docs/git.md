@@ -42,10 +42,13 @@ git clone ssh://git@git.papers.potentialhedge.com:2222/abs/1706.03762.git
 | `demos/<name>/index.html`, … | a demo kept in the page                               | any verified account; once the author section shows it, its authors |
 | `.potentialpaper/…`          | metadata and the paper's PDF, written by the site     | nobody but the site                                                 |
 | `.gitattributes`             | says which files are Git LFS; the same on every page  | nobody                                                              |
+| `prek.toml`                  | checks to run before a commit; the same on every page | nobody                                                              |
 
 Sections can also be `.html` files, from a small allowlist of tags (no scripts, styles or classes). They show
 in the order of their file names, so `10-summary.md` comes before `20-results.md`; a section's title is the
-`#` heading its file starts with. Files are plain text (UTF-8), at most 256 KB each (1 MB in `demos/`), except
+`#` heading its file starts with, or else its file name. Every page starts with an empty file for each section
+it might have (`community/10-summary.md`, `author/10-tl-dr.md`, …): an empty file isn't shown, so write in one to
+add that section, and rename or delete the rest as you like. Files are plain text (UTF-8), at most 256 KB each (1 MB in `demos/`), except
 the PDFs and the picture.
 
 ### PDFs and the picture
@@ -101,6 +104,21 @@ commands, filled in for that page. Then remake your commits with the new identit
 git commit --amend --reset-author --no-edit                                     # one commit
 git rebase --exec 'git commit --amend --reset-author --no-edit' origin/main     # several
 ```
+
+## Check before you commit
+
+`prek.toml` holds the checks the site runs, to run before each commit with [prek](https://prek.j178.dev)
+(`pre-commit` reads it too if you convert it). Once in a clone:
+
+```sh
+prek install
+```
+
+Then each `git commit` checks the JSON files (syntax, and each against its schema at
+`https://papers.potentialhedge.com/schemas/<link|version|thumbnail>.json`), formats the sections with Prettier and
+the JSON as the site writes it, and fixes whitespace. A hook that changes a file stops the commit: `git add` the
+change and commit again. The site checks every push anyway; the hooks catch mistakes sooner. Editors that read
+JSON Schema (VS Code: `json.schemas`) can use the same addresses for completion as you type.
 
 ## Push
 

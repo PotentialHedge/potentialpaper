@@ -22,6 +22,9 @@ WORKDIR /build/vscode
 RUN jq 'del(.builtInExtensions) | del(.extensionsGallery) | .enableTelemetry = false' product.json > p.json && mv p.json product.json
 ENV ELECTRON_SKIP_BINARY_DOWNLOAD=1 PLAYWRIGHT_SKIP_BROWSER_DOWNLOAD=1 VSCODE_SKIP_NODE_VERSION_CHECK=1
 RUN npm ci
+# Our trims: no terminal, debugging, sign-in or notebooks (editors/vscode/patch-vscode.mjs).
+COPY editors/vscode/patch-vscode.mjs /build/patch-vscode.mjs
+RUN node /build/patch-vscode.mjs /build/vscode
 RUN npm run gulp core-ci
 RUN npm run gulp vscode-web-min-ci
 

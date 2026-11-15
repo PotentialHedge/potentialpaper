@@ -1,0 +1,93 @@
+import { describe, expect, it } from 'vitest';
+import { parseLinkFile } from '@/lib/paper-links';
+import { parseVersionFile } from '@/lib/versions';
+import { contentProblem, layoutProblem, parsePdfSource, parseThumbnailWords, pathDenied } from '@/server/pages/rules';
+import { PAGE_SCHEMAS, pageJsonSchema, type PageSchemaName } from '@/server/pages/schemas';
+import { missingStarterFiles, prekConfig, prekProblem, starterFiles } from '@/server/pages/starter';
+
+const roles = { system: false, admin: false, verified: true, confirmedAuthor: false, claimed: false };
+
+describe('page file schemas', () => {
+  it('makes a closed JSON Schema for each kind of file, with its fields described', () => {
+    for (const name of Object.keys(PAGE_SCHEMAS) as PageSchemaName[]) {
+      const schema = pageJsonSchema(name, 'https://example.org');
+      expect(schema.$id).toBe(`https://example.org/schemas/${name}.json`);
+      expect(schema.type).toBe('object');
+      expect(schema.additionalProperties).toBe(false);
+      for (const field of Object.values(schema.properties as Record<string, { description?: string }>)) {
+        expect(field.description).toBeTruthy();
+      }
+    }
+    const version = pageJsonSchema('version') as {
+      required: string[];
+      properties: Record<string, { enum?: string[] }>;
+    };
+    expect(version.required).toEqual(['label', 'kind']);
+    expect(version.properties.kind.enum).toContain('workshop');
+  });
+
+  it('checks files with the same definitions', () => {
+    expect(parseLinkFile('{"label":" Code ","url":"https://github.com/o/r"}')).toEqual({
+      label: 'Code',
+      url: 'https://github.com/o/r',
+    });
+    expect(parseLinkFile('{"label":"[x]","url":"https://a.org"}')).toBeNull();
+    expect(parseLinkFile('{"label":"Code","url":"javascript:alert(1)"}')).toBeNull();
+    expect(parseLinkFile('{"label":"Code","url":"https://a.org","extra":1}')).toBeNull();
+
+    expect(parseVersionFile('v_a', '{"label":"arXiv v1","kind":"preprint","date":"2026-05"}')).toMatchObject({
+      version: { id: 'v_a', label: 'arXiv v1' },
+    });
+    expect(parseVersionFile('v_a', '{"label":"x","kind":"blog"}')).toEqual({ problem: expect.stringMatching(/kind/) });
+    expect(parseVersionFile('v_a', '{"label":"x","kind":"other","pdf":{"sha256":"0"}}')).toEqual({
+      problem: expect.stringMatching(/pdf\.sha256/),
+    });
+    expect(parseVersionFile('v_a', '{"label":"x","kind":"other","what":1}')).toEqual({
+      problem: 'has an unknown field “what”',
+    });
+
+    expect(
+      parsePdfSource('{"source":"https://arxiv.org/abs/1","license":"CC BY 4.0","fetchedAt":"2026"}'),
+    ).toBeTruthy();
+    expect(parsePdfSource('{"source":"http://arxiv.org/abs/1","license":"CC BY 4.0","fetchedAt":"2026"}')).toBeNull();
+    expect(parseThumbnailWords('{"alt":"","caption":"A plot"}')).toEqual({ caption: 'A plot' });
+  });
+});
+
+describe('starter files', () => {
+  it('starts a page with prek.toml and empty sections', () => {
+    const files = new Map(starterFiles());
+    expect(files.get('prek.toml')).toBe(prekConfig());
+    expect(files.get('community/10-summary.md')).toBe('');
+    expect(files.get('author/10-tl-dr.md')).toBe('');
+    for (const path of files.keys()) expect(layoutProblem(path)).toBeNull();
+  });
+
+  it('checks each writable JSON file against its schema on the site, and keeps prek.toml fixed', () => {
+    const config = prekConfig('https://papers.example.org');
+    for (const name of ['link', 'version', 'thumbnail']) {
+      expect(config).toContain(`https://papers.example.org/schemas/${name}.json`);
+    }
+    expect(config).not.toContain('schemas/pdf.json');
+    expect(prekProblem(prekConfig())).toBeNull();
+    expect(prekProblem(`${prekConfig()}\n[[repos]]\nrepo = "local"\n`)).toMatch(/fixed/);
+    expect(pathDenied('prek.toml', roles)).toMatch(/system/);
+    expect(contentProblem('community/10-summary.md', '')).toBeNull();
+  });
+
+  it('adds what an older page is missing, without touching a part that has sections', () => {
+    const paths = new Set(['.potentialpaper/metadata.json', 'community/10-summary.md']);
+    const changes = missingStarterFiles(paths, undefined);
+    expect(changes.map((c) => c.path)).toEqual([
+      'prek.toml',
+      'author/10-tl-dr.md',
+      'author/20-overview.md',
+      'author/30-results.md',
+      'author/40-demos.md',
+      'author/50-code-and-data.md',
+      'author/60-talks.md',
+    ]);
+    const all = new Set([...paths, ...changes.map((c) => c.path)]);
+    expect(missingStarterFiles(all, prekConfig())).toEqual([]);
+  });
+});

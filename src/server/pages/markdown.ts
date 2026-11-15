@@ -211,12 +211,6 @@ export function leadingTitle(markdown: string): string | null {
   return tokens[0] && isSectionHeading(tokens[0]) ? (tokens[1]?.content ?? '') : null;
 }
 
-/** What an empty part starts as, in the editor: a heading for each section it might have. */
-export const STARTER_HEADINGS = ['Summary', 'Why it matters', 'Critique', 'Errata', 'Reproductions', 'Follow-ups'];
-export const COMMUNITY_STARTER = STARTER_HEADINGS.map((title) => `# ${title}\n`).join('\n');
-export const AUTHOR_STARTER_HEADINGS = ['TL;DR', 'Overview', 'Results', 'Demos', 'Code and data', 'Talks'];
-export const AUTHOR_STARTER = AUTHOR_STARTER_HEADINGS.map((title) => `# ${title}\n`).join('\n');
-
 export interface RenderOptions {
   demos?: ReadonlyMap<string, DemoSource>;
   /**

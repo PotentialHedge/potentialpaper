@@ -1,5 +1,6 @@
 import * as vscode from 'vscode';
 import { Api, ApiError, type PaperRef } from './api';
+import { firstError, formatted, markdownFormatter } from './precommit';
 import { ORIGINAL_SCHEME, SCHEME, Store } from './store';
 
 /**
@@ -144,6 +145,15 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
     }),
   );
 
+  context.subscriptions.push(
+    vscode.languages.registerDocumentFormattingEditProvider(
+      { scheme: SCHEME, language: 'markdown' },
+      markdownFormatter(),
+    ),
+    // The terminal, debugging and extensions are hidden (editors/vscode/patch-vscode.mjs); their keys do nothing.
+    vscode.commands.registerCommand('potentialpaper.nothing', () => {}),
+  );
+
   const channel = new BroadcastChannel(`potentialpaper-editor:${paper.scheme}:${paper.value}`);
   const tell = (message: HostMessage) => channel.postMessage(message);
 
@@ -192,6 +202,21 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
         const conflicts = store.conflicts();
         if (conflicts.length > 0) {
           void vscode.window.showWarningMessage(`Settle the conflict markers in ${conflicts.join(', ')} first.`);
+          return;
+        }
+        // What `prek.toml` does before a commit in a clone: format, then refuse while a file has an error.
+        const changed = store.changes().filter(([, p]) => p.content !== null);
+        for (const [path, p] of changed) {
+          const out = await formatted(path, p.content!);
+          if (out !== null) await store.write(path, new TextEncoder().encode(out));
+        }
+        const error = firstError(changed.map(([path]) => uriOf(path)));
+        if (error) {
+          const pick = await vscode.window.showWarningMessage(
+            `Not committed: ${pathOf(error.uri)} line ${error.diagnostic.range.start.line + 1}: ${error.diagnostic.message}`,
+            'Show',
+          );
+          if (pick) await vscode.window.showTextDocument(error.uri, { selection: error.diagnostic.range });
           return;
         }
         const message = scm.inputBox.value.trim();

@@ -13,6 +13,7 @@ import {
   checkPaper,
   checkPath,
   checkTree,
+  fileProblem,
   rolesOf,
   takeCommit,
 } from './check';
@@ -22,13 +23,14 @@ import { lockPage, writeCurrent, writeRevision, type Writer } from './projection
 import { changedFiles, findCommit, readCommit, readFiles, readHead, readText, toBytes } from './repo';
 import {
   cleanSummary,
-  contentProblem,
   GITATTRIBUTES,
   GITATTRIBUTES_PATH,
   layoutProblem,
   METADATA_PATH,
   normalizePath,
+  PREK_PATH,
 } from './rules';
+import { starterFiles } from './starter';
 
 export { type Actor, COMMIT_RATE_LIMIT, newIdentity, SYSTEM_ACTOR } from './check';
 
@@ -245,7 +247,7 @@ export async function commitPage(
           continue;
         }
         // Two valid edits can merge into something invalid, which is as much a conflict as any other.
-        if (merge.content !== content && contentProblem(path, merge.content)) {
+        if (merge.content !== content && fileProblem(path, merge.content)) {
           conflicts.push({ path, base, ours: content, theirs });
           continue;
         }
@@ -263,13 +265,16 @@ export async function commitPage(
       const changedAny = changedFiles(headFiles, files).length > 0;
       const recordAnyway = (isFirstCommit || options.recordEmpty) && actor.kind === 'system';
       if (!changedAny && !recordAnyway) return { status: 'unchanged', oid: head };
-      // The system starts every repo with the metadata and `.gitattributes`, whoever's edit starts it, so they
-      // are checked as there.
+      // The system starts every repo with the metadata, `.gitattributes` and the starter files (`starter.ts`),
+      // whoever's edit starts it, so they are checked as there. An edit to a starter file replaces it.
       const before = new Map(headFiles);
       if (isFirstCommit) {
         const start: [string, () => Promise<string>][] = [
           [METADATA_PATH, () => metadataSnapshot(tx, paperId)],
           [GITATTRIBUTES_PATH, async () => GITATTRIBUTES],
+          ...starterFiles()
+            .filter(([path]) => !changes.some((change) => change.path === path))
+            .map(([path, content]): [string, () => Promise<string>] => [path, async () => content]),
         ];
         for (const [path, make] of start) {
           if (files.has(path)) continue;
@@ -337,8 +342,13 @@ export async function revertCommit(
 
   const parent = commit.parent ? await readCommit(database, paperId, commit.parent) : null;
   const before = parent ? await readFiles(database, paperId, parent.tree) : new Map<string, string>();
+  // The first commit's starter files are the system's, as its metadata is, unless the commit wrote in one.
+  const started = new Map(starterFiles().map(([path, text]) => [path, gitObject('blob', Buffer.from(text)).oid]));
   const changed = changedFiles(before, await readFiles(database, paperId, commit.tree)).filter(
-    (file) => (parent || file.path !== METADATA_PATH) && file.path !== GITATTRIBUTES_PATH,
+    (file) =>
+      (parent || (file.path !== METADATA_PATH && started.get(file.path) !== file.after)) &&
+      file.path !== GITATTRIBUTES_PATH &&
+      file.path !== PREK_PATH,
   );
   // A commit from before the page's files were laid out as they are now (`layout-migration.ts`) would put
   // back files that have no place any more. Its text is still in the history and the diff, to copy from.

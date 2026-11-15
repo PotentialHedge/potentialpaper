@@ -70,7 +70,15 @@ describe('the web editor workspace', () => {
     const empty = await paper();
     const before = await read();
     expect(before.status).toBe(200);
-    expect(before.body).toMatchObject({ head: null, files: [], signedIn: false });
+    // A page without a repo shows the files its first commit starts with: empty sections, prek.toml.
+    expect(before.body).toMatchObject({ head: null, signedIn: false });
+    expect(before.body.files.map((f: { path: string }) => f.path)).toEqual(
+      expect.arrayContaining(['prek.toml', 'community/10-summary.md', 'author/10-tl-dr.md']),
+    );
+    expect(before.body.files.find((f: { path: string }) => f.path === 'community/10-summary.md')).toMatchObject({
+      text: '',
+      readonly: 'sign in to edit',
+    });
     expect(before.body.clone.https).toMatch(/\/git\/arxiv\/1706\.03762\.git$/);
     expect(empty).toBeTruthy();
 

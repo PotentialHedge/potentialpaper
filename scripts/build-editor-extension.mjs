@@ -1,7 +1,9 @@
-// Bundles the site's VS Code extension, and copies the startup module (editors/vscode/boot.js), (editors/vscode/extension) into the web editor's files, beside the
+// Bundles the site's VS Code extension (editors/vscode/extension), with the page files' JSON Schemas, and copies the
+// startup module (editors/vscode/boot.js) into the web editor's files, beside the
 // VS Code build: public/editor/vscode/<version>/potentialpaper/. Run by scripts/build-web-editor.sh and the
 // Dockerfile.
-import { copyFileSync, mkdirSync, readFileSync } from 'node:fs';
+import { execFileSync } from 'node:child_process';
+import { copyFileSync, mkdirSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { build } from 'esbuild';
@@ -14,7 +16,17 @@ const out = join(root, 'public/editor/vscode', version, 'potentialpaper');
 mkdirSync(join(out, 'dist'), { recursive: true });
 // The startup module, beside the build it imports.
 copyFileSync(join(root, 'editors/vscode/boot.js'), join(out, '..', 'boot.js'));
-for (const file of ['package.json', 'package.nls.json']) copyFileSync(join(source, file), join(out, file));
+copyFileSync(join(source, 'package.nls.json'), join(out, 'package.nls.json'));
+// The JSON Schemas of the page's files, made from the site's definitions (src/server/pages/schemas.ts), and the
+// manifest's `jsonValidation` that points VS Code's JSON support at them.
+execFileSync(process.execPath, ['--import', 'tsx', join(root, 'scripts/write-page-schemas.ts'), out], {
+  cwd: root,
+  stdio: 'inherit',
+});
+const manifest = JSON.parse(readFileSync(join(source, 'package.json'), 'utf8'));
+manifest.contributes.jsonValidation = JSON.parse(readFileSync(join(out, 'jsonValidation.json'), 'utf8'));
+rmSync(join(out, 'jsonValidation.json'));
+writeFileSync(join(out, 'package.json'), `${JSON.stringify(manifest, null, 2)}\n`);
 await build({
   entryPoints: [join(source, 'src/extension.ts')],
   outfile: join(out, 'dist/extension.js'),
