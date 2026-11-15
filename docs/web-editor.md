@@ -25,7 +25,7 @@ An editor gets two things from the site, and nothing else.
 | `POST /api/v1/workspace/commit`               | `{ paper, baseOid, changes: [{ path, content \| null }], message }`. `baseOid` is the head the editor loaded: changes made since are merged in. `message` is a git message: first line the summary, `Evidence: <url>` trailers last. `409 edit_conflict` when both changed the same lines. |
 | `POST /api/v1/workspace/rebase`               | `{ paper, baseOid, changes }`: the changes moved onto the head without committing, merged, with git's conflict markers where both changed the same lines. Each file comes back with `original` (the head's text) and `conflict`. What an editor does after a 409.                          |
 | `POST /api/v1/workspace/files`                | Multipart `file`, `scheme`, `value`, `path`: stores a PDF or picture for a Git LFS path (`thumbnail.png`, `versions/<id>.pdf`) and answers with the pointer to write at that path.                                                                                                         |
-| `POST /api/v1/pages/render`                   | `{ content, format }`: a section as the page renders it. The host page's preview uses it.                                                                                                                                                                                                  |
+| `POST /api/v1/pages/render`                   | `{ content, format }`: a section as the page renders it. The previews use it (the extension's and the host page's).                                                                                                                                                                        |
 
 Requests are same-origin, so the reader's session signs them.
 
@@ -35,8 +35,9 @@ An editor is a `WebEditor` (`src/editors/types.ts`): a page at `frameSrc(paper)`
 frames. It talks to the host page over a `BroadcastChannel` named `potentialpaper-editor:<scheme>:<value>`
 (`src/editors/channel.ts`):
 
-- from the editor: `ready`; `active` (the open file's path and text as typed, for the preview); `committed`;
-- from the host page: `hello` (send `active` again); `open` (open a file).
+- from the editor: `ready` (with `previews`: the editor shows sections as the page does itself, so the host page
+  doesn't); `active` (the open file's path and text as typed, for the preview); `committed`;
+- from the host page: `hello` (send `ready` and `active` again); `open` (open a file).
 
 ## Swapping the editor
 
@@ -77,11 +78,39 @@ Code.
 - **The extension** (`editors/vscode/extension/`): a file system for the page repo (`store.ts`), which keeps saved
   changes in the browser until they are committed, with the commit they started from; Source Control, whose
   message box and ✓ commit; a 409 rebases the changes with conflict markers to settle. It posts the open file to
-  the host page for the preview.
+  the host page, for its preview where the extension can't show one.
+- **The preview** (`preview.ts`): a panel beside the section in front, as the page will show it, following the
+  section being edited and updating as it is typed (the editor title's button, Ctrl/Cmd+Shift+V, in place of VS
+  Code's Markdown preview on sections). The site renders it (`/api/v1/pages/render`); its stylesheet is the
+  site's `globals.css`, compiled into the extension with nothing scanned (`webview/preview.css`), with KaTeX's.
+- **PDFs** (`pdf.ts`, `webview/pdf.ts`): a read-only custom editor for `*.pdf`, PDF.js's viewer component with
+  its fonts, character maps and decoders in the extension, parsing on the page (a webview can't start a worker
+  from its resources). The bytes come through VS Code, so in the browser from R2, in a clone from the disk; a
+  file that is still a Git LFS pointer says so.
+- **JSON files** get their schemas' errors, completion and hovers, and on an empty file a skeleton of the required
+  fields (`defaultSnippets`, added by `scripts/write-page-schemas.ts` to the extension's copy only).
+  **PotentialPaper: New Link** writes `links/NN-<slug>.json`.
 - **CSP:** the editor's frame and files have their own policy (`src/editors/vscode/csp.ts`), since VS Code runs
   workers from `blob:` and frames its extension host from this origin. The site's policy leaves `/editor/` out.
-- **Webviews** (VS Code's Markdown and image previews) need an origin per webview: `{{uuid}}.<host>` with
+- **Webviews** (the preview, the PDF viewer, VS Code's image preview) need an origin per webview: `{{uuid}}.<host>` with
   wildcard DNS and TLS (`WEB_EDITOR_WEBVIEW_URL`, a URL template ending in
   `/editor/vscode/<version>/out/vs/workbench/contrib/webview/browser/pre/`). Development uses
   `{{uuid}}.localhost`, which browsers resolve to the machine. Production has none yet (TODO.md), so those
-  previews don't open there; the host page's own preview works without them.
+  previews don't open there: the workbench sets `potentialpaper.webviews` off, so the extension shows neither, PDFs
+  open as VS Code shows a file it can't read, and the host page shows its own preview beside the frame instead.
+
+## VS Code on the desktop
+
+The same extension works in VS Code on a computer (and VS Codium, Cursor…), on a `git clone` of a page: a folder
+with the page's `prek.toml` at its root. `npm run editor:extension` also packages it as
+`public/editor/potentialpaper.vsix`, served at `/editor/potentialpaper.vsix` and linked from the Edit dialog's
+"With git" part; install it with Extensions → ⋯ → Install from VSIX, or `code --install-extension`. The `.vsix` is
+built without the proposed API the browser build turns on, and needs VS Code 1.90.
+
+There it has the preview, the PDF viewer, the JSON schemas, the section formatter and New Link; Source Control is
+git's own, and `prek` runs the checks before a commit. The site's address comes from the clone's git remote
+(`https://<host>/git/…`, or the SSH one's host without `git.`), or the `potentialpaper.origin` setting. The site
+renders previews only for someone signed in, so the first preview asks for an API key from the profile
+(**PotentialPaper: Sign In for Previews**), kept in VS Code's secret storage per site. JSON schemas apply by file
+name (`links/*.json`, `thumbnail.json`…), as VS Code's `jsonValidation` can't ask which repo a file is in, so a
+file with those names in another project is checked too.

@@ -10,8 +10,8 @@ export function editorChannelName({ scheme, value }: PaperId): string {
 
 /** From the editor. */
 export type EditorMessage =
-  /** The editor has loaded the page. */
-  | { type: 'ready' }
+  /** The editor has loaded the page; `previews` if it shows sections as the page does itself, beside the file. */
+  | { type: 'ready'; previews?: boolean }
   /** The file in front, and its text as typed (saved or not), or `null` for none of the page's files. */
   | { type: 'active'; path: string | null; text: string | null }
   /** A commit went in. */
@@ -19,7 +19,7 @@ export type EditorMessage =
 
 /** From the host page. */
 export type HostMessage =
-  /** The host page has (re)loaded: send `active` again. */
+  /** The host page has (re)loaded: send `ready` and `active` again. */
   | { type: 'hello' }
   /** Open this file. */
   | { type: 'open'; path: string };

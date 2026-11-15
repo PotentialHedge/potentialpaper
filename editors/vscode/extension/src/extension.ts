@@ -1,13 +1,19 @@
 import * as vscode from 'vscode';
 import { Api, ApiError, type PaperRef } from './api';
+import { PageRepos, SCHEME } from './page';
+import { PdfViewer } from './pdf';
 import { firstError, formatted, markdownFormatter } from './precommit';
-import { ORIGINAL_SCHEME, SCHEME, Store } from './store';
+import { Preview } from './preview';
+import { Site } from './site';
+import { ORIGINAL_SCHEME, Store } from './store';
 
 /**
- * PotentialPaper in VS Code for the Web: the page repo as a folder, its uncommitted changes in Source Control,
- * and a commit that goes to the site (`docs/web-editor.md`). The site's host page shows a live preview beside
- * the editor, fed through a `BroadcastChannel` (`channel` below), so the preview is the page's own look and
- * needs no webview.
+ * PotentialPaper in VS Code (`docs/web-editor.md`). Wherever a page repo is open, in the browser or a clone on the
+ * desktop: a preview of each section as the page shows it (`preview.ts`), a PDF viewer (`pdf.ts`), the JSON files
+ * checked against their schemas (the manifest's `jsonValidation`) and sections formatted as `prek.toml` formats
+ * them. In VS Code for the Web on the site, also the page repo as a folder, its uncommitted changes in Source
+ * Control, and a commit that goes to the site. The host page around it hears what is open through a
+ * `BroadcastChannel` (`channel` below), and shows its own preview where webviews can't open.
  */
 
 const ROOT = vscode.Uri.from({ scheme: SCHEME, authority: 'page', path: '/' });
@@ -32,7 +38,7 @@ interface ActionButton {
 
 /** What goes to the host page: the open file, for its preview, and commits, for its links. Same-origin only. */
 type HostMessage =
-  | { type: 'ready' }
+  | { type: 'ready'; previews: boolean }
   | { type: 'active'; path: string | null; text: string | null }
   | { type: 'committed'; head: string | null };
 
@@ -135,11 +141,117 @@ function describe(err: unknown): string {
   return err instanceof Error ? err.message : String(err);
 }
 
+/** What works in any page repo, in the browser or on the desktop. */
+async function activateAnywhere(context: vscode.ExtensionContext, previews: boolean): Promise<PageRepos> {
+  const repos = new PageRepos();
+  const site = new Site(context.secrets);
+  context.subscriptions.push(repos);
+  void vscode.commands.executeCommand('setContext', 'potentialpaper.webviews', previews);
+
+  if (previews) {
+    const preview = new Preview(context.extensionUri, repos, site);
+    context.subscriptions.push(
+      preview,
+      vscode.commands.registerCommand('potentialpaper.showPreview', (uri?: vscode.Uri) => {
+        const editor =
+          uri && vscode.window.activeTextEditor?.document.uri.toString() !== uri.toString()
+            ? vscode.window.visibleTextEditors.find((e) => e.document.uri.toString() === uri.toString())
+            : vscode.window.activeTextEditor;
+        preview.show(editor);
+      }),
+      PdfViewer.register(context),
+    );
+  }
+
+  const rootFor = async (uri?: vscode.Uri) => {
+    const root = repos.rootOf(uri ?? vscode.window.activeTextEditor?.document.uri);
+    if (!root) void vscode.window.showInformationMessage('Open a page repo (a clone of a page from the site) first.');
+    return root;
+  };
+  context.subscriptions.push(
+    vscode.commands.registerCommand('potentialpaper.signIn', async () => {
+      const root = await rootFor();
+      const origin = root && (await site.originOf(root));
+      if (origin && (await site.signIn(origin))) void vscode.window.showInformationMessage(`Signed in to ${origin}.`);
+    }),
+    vscode.commands.registerCommand('potentialpaper.signOut', async () => {
+      const root = await rootFor();
+      const origin = root && (await site.originOf(root));
+      if (origin) await site.signOut(origin);
+    }),
+    vscode.commands.registerCommand('potentialpaper.newLink', async (folder?: vscode.Uri) => {
+      const root = await rootFor(folder);
+      if (root) await newLink(root);
+    }),
+  );
+
+  // Sections formatted as `prek.toml` formats them, in clones too (the browser's are registered with its folder).
+  let formatters: vscode.Disposable | undefined;
+  repos.onDidChange(() => {
+    formatters?.dispose();
+    const roots = (vscode.workspace.workspaceFolders ?? [])
+      .map((f) => f.uri)
+      .filter((uri) => uri.scheme !== SCHEME && repos.fileOf(vscode.Uri.joinPath(uri, 'prek.toml')));
+    formatters = vscode.Disposable.from(
+      ...roots.map((root) =>
+        vscode.languages.registerDocumentFormattingEditProvider(
+          { language: 'markdown', pattern: new vscode.RelativePattern(root, '{author,community}/*.md') },
+          markdownFormatter(),
+        ),
+      ),
+    );
+  });
+  context.subscriptions.push({ dispose: () => formatters?.dispose() });
+  return repos;
+}
+
+/** A link under the paper's title: `links/NN-<slug>.json`, after the others. */
+async function newLink(root: vscode.Uri): Promise<void> {
+  const label = await vscode.window.showInputBox({
+    prompt: 'What the link says under the title',
+    placeHolder: 'Code',
+    validateInput: (v) =>
+      v.trim().length === 0 || v.trim().length > 30 || /[[\]]/.test(v) ? '1 to 30 characters, no brackets' : null,
+  });
+  if (!label) return;
+  const url = await vscode.window.showInputBox({
+    prompt: 'Where it goes',
+    placeHolder: 'https://github.com/…',
+    validateInput: (v) => (/^https?:\/\/\S+$/.test(v.trim()) ? null : 'An http or https address'),
+  });
+  if (!url) return;
+  const dir = vscode.Uri.joinPath(root, 'links');
+  let names: string[] = [];
+  try {
+    names = (await vscode.workspace.fs.readDirectory(dir)).map(([name]) => name);
+  } catch {
+    // No links yet.
+  }
+  const taken = names.map((n) => Number(n.slice(0, 2))).filter(Number.isFinite);
+  const order = Math.min(99, Math.floor(Math.max(0, ...taken) / 10) * 10 + 10);
+  const slug =
+    label
+      .toLowerCase()
+      .replace(/[^a-z0-9]+/g, '-')
+      .replace(/^-|-$/g, '')
+      .slice(0, 60) || 'link';
+  const uri = vscode.Uri.joinPath(dir, `${String(order).padStart(2, '0')}-${slug}.json`);
+  const text = `${JSON.stringify({ label: label.trim(), url: url.trim() }, null, 2)}\n`;
+  await vscode.workspace.fs.writeFile(uri, new TextEncoder().encode(text));
+  await vscode.window.showTextDocument(uri);
+}
+
 export async function activate(context: vscode.ExtensionContext): Promise<void> {
   const config = vscode.workspace.getConfiguration('potentialpaper');
   const paper = config.get<PaperRef | null>('paper');
   const origin = config.get<string>('origin') || globalThis.location?.origin || '';
-  if (!paper) return;
+  const previews = config.get<boolean>('webviews', true);
+  void vscode.commands.executeCommand('setContext', 'potentialpaper.inBrowser', Boolean(paper));
+  if (!paper) {
+    const repos = await activateAnywhere(context, previews);
+    await repos.refresh();
+    return;
+  }
 
   const api = new Api(origin, paper);
   const store = new Store(api, context.workspaceState, `pending:${paper.scheme}:${paper.value}`);
@@ -150,6 +262,7 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
       provideTextDocumentContent: (uri) => store.original(pathOf(uri)),
     }),
   );
+  const repos = await activateAnywhere(context, previews);
 
   context.subscriptions.push(
     vscode.languages.registerDocumentFormattingEditProvider(
@@ -377,7 +490,10 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
   );
   channel.onmessage = (event: MessageEvent<{ type?: string; path?: string }>) => {
     // The host page asks for the open file when it (re)loads, and can open one.
-    if (event.data?.type === 'hello') sendActive();
+    if (event.data?.type === 'hello') {
+      if (store.workspace) tell({ type: 'ready', previews });
+      sendActive();
+    }
     if (event.data?.type === 'open' && event.data.path) void vscode.window.showTextDocument(uriOf(event.data.path));
   };
 
@@ -396,7 +512,8 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
       'You have changes from before the page last changed. They will be merged when you commit.',
     );
   }
-  tell({ type: 'ready' });
+  tell({ type: 'ready', previews });
+  await repos.refresh();
   sendActive();
 
   // Open the first community section, or the folder's first file, so there is something to start from.

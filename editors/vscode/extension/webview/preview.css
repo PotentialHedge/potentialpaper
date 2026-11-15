@@ -1,0 +1,37 @@
+/*
+ * The preview panel's stylesheet: the site's own (`src/app/globals.css`, its `.md` rules for rendered sections),
+ * compiled by `scripts/build-editor-extension.mjs` with nothing scanned, so only what it defines and applies is
+ * in it, plus the page around the section.
+ */
+@import '../../../../src/app/globals.css';
+
+@layer components {
+  body {
+    margin: 0;
+    padding: 1rem 1.5rem 3rem;
+    font-size: 15px;
+  }
+  .md {
+    max-width: 44rem;
+  }
+  .preview-note {
+    max-width: 44rem;
+    margin: 0 0 1rem;
+    font: 14px/1.5 var(--font-sans);
+    color: var(--color-muted);
+    font-style: italic;
+  }
+  .preview-note[hidden] {
+    display: none;
+  }
+  .preview-note button {
+    font: inherit;
+    font-style: normal;
+    color: var(--color-accent);
+    background: none;
+    border: 0;
+    padding: 0;
+    cursor: pointer;
+    text-decoration: underline;
+  }
+}

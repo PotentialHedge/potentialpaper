@@ -121,6 +121,14 @@ export function EditDialog({ codePath, clone, hasRepo }: EditOptions) {
                   )}{' '}
                   If a push breaks a rule, git says what to change.
                 </li>
+                <li>
+                  In VS Code,{' '}
+                  <a href="/editor/potentialpaper.vsix" download>
+                    our extension
+                  </a>{' '}
+                  previews each section as the page shows it, opens the PDFs and checks the JSON files (Extensions view,
+                  ⋯, Install from VSIX).
+                </li>
               </ul>
             </>
           ) : (

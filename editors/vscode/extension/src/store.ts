@@ -1,5 +1,6 @@
 import * as vscode from 'vscode';
 import { type Api, ApiError, type Change, type RemoteFile, type Workspace } from './api';
+import { SCHEME } from './page';
 
 /**
  * The page repo as this editor holds it: the files at the head the site gave, and on top of them the changes
@@ -8,7 +9,7 @@ import { type Api, ApiError, type Change, type RemoteFile, type Workspace } from
  * saved in the browser (`workspaceState`), so a reload loses nothing.
  */
 
-export const SCHEME = 'potentialpaper';
+export { SCHEME };
 /** The files as they were before the changes, for diffs. */
 export const ORIGINAL_SCHEME = 'potentialpaper-original';
 

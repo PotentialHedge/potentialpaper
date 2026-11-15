@@ -1,0 +1,47 @@
+/* The PDF viewer's page (`pdf.ts`), around PDF.js's own `pdf_viewer.css`, in the editor's colours. */
+html,
+body {
+  margin: 0;
+  height: 100%;
+  overflow: hidden;
+  background: var(--vscode-editor-background);
+  color: var(--vscode-foreground);
+  font: var(--vscode-font-size, 13px) / 1.4 var(--vscode-font-family, sans-serif);
+}
+#bar {
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  height: 26px;
+  display: flex;
+  gap: 1rem;
+  justify-content: flex-end;
+  align-items: center;
+  padding: 0 12px;
+  color: var(--vscode-descriptionForeground);
+  font-variant-numeric: tabular-nums;
+  border-bottom: 1px solid var(--vscode-editorGroup-border, transparent);
+}
+#note {
+  position: absolute;
+  top: 26px;
+  left: 0;
+  right: 0;
+  margin: 0;
+  padding: 1rem;
+}
+#note[hidden] {
+  display: none;
+}
+#viewerContainer {
+  position: absolute;
+  top: 27px;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  overflow: auto;
+}
+.pdfViewer .page {
+  box-shadow: 0 1px 4px rgb(0 0 0 / 0.25);
+}

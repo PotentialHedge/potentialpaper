@@ -39,6 +39,10 @@ export function workbenchHtml(paper: PaperId & { title: string }): string {
     configurationDefaults: {
       'potentialpaper.paper': { scheme: paper.scheme, value: paper.value },
       'potentialpaper.origin': site,
+      // The section preview and the PDF viewer are webviews, which need an origin each (`csp.ts`). Where there is
+      // none, the host page shows its own preview, and a PDF opens as VS Code shows any file it can't read.
+      'potentialpaper.webviews': Boolean(webview),
+      ...(webview ? {} : { 'workbench.editorAssociations': { '*.pdf': 'default' } }),
       'workbench.colorTheme': 'Default Light Modern',
       'workbench.startupEditor': 'none',
       'workbench.tips.enabled': false,

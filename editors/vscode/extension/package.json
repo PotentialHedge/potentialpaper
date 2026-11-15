@@ -1,7 +1,7 @@
 {
   "name": "potentialpaper",
   "displayName": "PotentialPaper",
-  "description": "Edit a PotentialPaper page repo in the browser and commit it to the site.",
+  "description": "PotentialPaper page repos in VS Code: a preview of each section as the page shows it, a PDF viewer, checked JSON files, and, in the browser, commits to the site.",
   "publisher": "potentialpaper",
   "version": "0.1.0",
   "license": "UNLICENSED",
@@ -14,12 +14,15 @@
   "browser": "./dist/extension.js",
   "activationEvents": [
     "onFileSystem:potentialpaper",
-    "onStartupFinished"
+    "onStartupFinished",
+    "onCustomEditor:potentialpaper.pdf",
+    "workspaceContains:prek.toml"
   ],
   "capabilities": {
     "virtualWorkspaces": true,
     "untrustedWorkspaces": {
-      "supported": true
+      "supported": "limited",
+      "description": "Previews are made by the site, which needs the address in the repo's git remote."
     }
   },
   "contributes": {
@@ -34,7 +37,17 @@
         "potentialpaper.origin": {
           "type": "string",
           "default": "",
-          "description": "The site's origin (set by the site)."
+          "description": "The site's address, such as https://papers.potentialhedge.com. Set by the site in the browser; on the desktop it is read from the clone's git remote, and this overrides it."
+        },
+        "potentialpaper.webviews": {
+          "type": "boolean",
+          "default": true,
+          "description": "Whether previews and the PDF viewer can open (set by the site in the browser, which turns them off where it has no address for them)."
+        },
+        "potentialpaper.previewOnOpen": {
+          "type": "boolean",
+          "default": true,
+          "description": "Open the preview beside the first section opened."
         }
       }
     },
@@ -83,6 +96,45 @@
         "command": "potentialpaper.nothing",
         "title": "Nothing",
         "category": "PotentialPaper"
+      },
+      {
+        "command": "potentialpaper.showPreview",
+        "title": "Open Page Preview to the Side",
+        "category": "PotentialPaper",
+        "icon": "$(open-preview)"
+      },
+      {
+        "command": "potentialpaper.newLink",
+        "title": "New Link",
+        "category": "PotentialPaper"
+      },
+      {
+        "command": "potentialpaper.signIn",
+        "title": "Sign In for Previews",
+        "category": "PotentialPaper"
+      },
+      {
+        "command": "potentialpaper.signOut",
+        "title": "Sign Out",
+        "category": "PotentialPaper"
+      },
+      {
+        "command": "potentialpaper.pdfZoomIn",
+        "title": "Zoom In",
+        "category": "PotentialPaper",
+        "icon": "$(zoom-in)"
+      },
+      {
+        "command": "potentialpaper.pdfZoomOut",
+        "title": "Zoom Out",
+        "category": "PotentialPaper",
+        "icon": "$(zoom-out)"
+      },
+      {
+        "command": "potentialpaper.pdfFitWidth",
+        "title": "Fit to Width",
+        "category": "PotentialPaper",
+        "icon": "$(screen-full)"
       }
     ],
     "menus": {
@@ -126,56 +178,172 @@
         {
           "command": "potentialpaper.nothing",
           "when": "false"
+        },
+        {
+          "command": "potentialpaper.showPreview",
+          "when": "potentialpaper.section && potentialpaper.webviews"
+        },
+        {
+          "command": "potentialpaper.pdfZoomIn",
+          "when": "activeCustomEditorId == potentialpaper.pdf"
+        },
+        {
+          "command": "potentialpaper.pdfZoomOut",
+          "when": "activeCustomEditorId == potentialpaper.pdf"
+        },
+        {
+          "command": "potentialpaper.pdfFitWidth",
+          "when": "activeCustomEditorId == potentialpaper.pdf"
+        },
+        {
+          "command": "potentialpaper.signIn",
+          "when": "!potentialpaper.inBrowser"
+        },
+        {
+          "command": "potentialpaper.signOut",
+          "when": "!potentialpaper.inBrowser"
+        },
+        {
+          "command": "potentialpaper.commit",
+          "when": "potentialpaper.inBrowser"
+        },
+        {
+          "command": "potentialpaper.refresh",
+          "when": "potentialpaper.inBrowser"
+        },
+        {
+          "command": "potentialpaper.discardAll",
+          "when": "potentialpaper.inBrowser"
+        },
+        {
+          "command": "potentialpaper.openPage",
+          "when": "potentialpaper.inBrowser"
+        },
+        {
+          "command": "potentialpaper.newSection",
+          "when": "potentialpaper.inBrowser"
         }
       ],
       "explorer/context": [
         {
           "command": "potentialpaper.newSection",
           "when": "resourceScheme == potentialpaper && explorerResourceIsFolder"
+        },
+        {
+          "command": "potentialpaper.newLink",
+          "when": "potentialpaper.pageRepo && explorerResourceIsFolder"
+        }
+      ],
+      "editor/title": [
+        {
+          "command": "potentialpaper.showPreview",
+          "group": "navigation",
+          "when": "potentialpaper.section && potentialpaper.webviews"
+        },
+        {
+          "command": "potentialpaper.pdfZoomOut",
+          "group": "navigation@1",
+          "when": "activeCustomEditorId == potentialpaper.pdf"
+        },
+        {
+          "command": "potentialpaper.pdfZoomIn",
+          "group": "navigation@2",
+          "when": "activeCustomEditorId == potentialpaper.pdf"
+        },
+        {
+          "command": "potentialpaper.pdfFitWidth",
+          "group": "navigation@3",
+          "when": "activeCustomEditorId == potentialpaper.pdf"
         }
       ]
     },
     "keybindings": [
       {
+        "key": "ctrl+shift+v",
+        "mac": "cmd+shift+v",
+        "command": "potentialpaper.showPreview",
+        "when": "potentialpaper.section && potentialpaper.webviews"
+      },
+      {
+        "key": "ctrl+k v",
+        "mac": "cmd+k v",
+        "command": "potentialpaper.showPreview",
+        "when": "potentialpaper.section && potentialpaper.webviews"
+      },
+      {
+        "key": "ctrl+=",
+        "mac": "cmd+=",
+        "command": "potentialpaper.pdfZoomIn",
+        "when": "activeCustomEditorId == potentialpaper.pdf"
+      },
+      {
+        "key": "ctrl+-",
+        "mac": "cmd+-",
+        "command": "potentialpaper.pdfZoomOut",
+        "when": "activeCustomEditorId == potentialpaper.pdf"
+      },
+      {
         "key": "ctrl+`",
-        "command": "potentialpaper.nothing"
+        "command": "potentialpaper.nothing",
+        "when": "potentialpaper.inBrowser"
       },
       {
         "key": "ctrl+shift+`",
-        "command": "potentialpaper.nothing"
+        "command": "potentialpaper.nothing",
+        "when": "potentialpaper.inBrowser"
       },
       {
         "key": "ctrl+shift+d",
         "command": "potentialpaper.nothing",
-        "mac": "cmd+shift+d"
+        "mac": "cmd+shift+d",
+        "when": "potentialpaper.inBrowser"
       },
       {
         "key": "f5",
-        "command": "potentialpaper.nothing"
+        "command": "potentialpaper.nothing",
+        "when": "potentialpaper.inBrowser"
       },
       {
         "key": "ctrl+f5",
-        "command": "potentialpaper.nothing"
+        "command": "potentialpaper.nothing",
+        "when": "potentialpaper.inBrowser"
       },
       {
         "key": "shift+f5",
-        "command": "potentialpaper.nothing"
+        "command": "potentialpaper.nothing",
+        "when": "potentialpaper.inBrowser"
       },
       {
         "key": "ctrl+shift+y",
         "command": "potentialpaper.nothing",
-        "mac": "cmd+shift+y"
+        "mac": "cmd+shift+y",
+        "when": "potentialpaper.inBrowser"
       },
       {
         "key": "ctrl+shift+x",
         "command": "potentialpaper.nothing",
-        "mac": "cmd+shift+x"
+        "mac": "cmd+shift+x",
+        "when": "potentialpaper.inBrowser"
       },
       {
         "key": "ctrl+shift+c",
         "command": "potentialpaper.nothing",
-        "mac": "cmd+shift+c"
+        "mac": "cmd+shift+c",
+        "when": "potentialpaper.inBrowser"
+      }
+    ],
+    "customEditors": [
+      {
+        "viewType": "potentialpaper.pdf",
+        "displayName": "PDF",
+        "selector": [
+          {
+            "filenamePattern": "*.pdf"
+          }
+        ],
+        "priority": "default"
       }
     ]
-  }
+  },
+  "main": "./dist/extension.js"
 }

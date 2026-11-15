@@ -9,7 +9,8 @@ import { PreviewHtml } from './PreviewHtml';
 
 /**
  * The page around a web editor (`src/editors`): the editor in a frame, and beside it the file being edited as
- * the paper's page will show it, rendered by the site as a commit would. Knows nothing of which editor it is:
+ * the paper's page will show it, rendered by the site as a commit would, unless the editor says it shows that
+ * itself (VS Code does, in a panel of its own, where it can open webviews). Knows nothing of which editor it is:
  * the editor tells it what is open through the channel (`src/editors/channel.ts`).
  */
 
@@ -36,6 +37,8 @@ export function EditorHost({
   const [problem, setProblem] = useState<string | null>(null);
   const [committed, setCommitted] = useState(false);
   const [showPreview, setShowPreview] = useState(true);
+  /** Whether the editor previews sections itself; not known until it has loaded. */
+  const [editorPreviews, setEditorPreviews] = useState<boolean | null>(null);
   const format = sectionFormat(active.path);
   const html = rendered && rendered.path === active.path ? rendered.html : null;
   const seq = useRef(0);
@@ -44,6 +47,7 @@ export function EditorHost({
     const channel = new BroadcastChannel(editorChannelName(paper));
     channel.onmessage = (event: MessageEvent<EditorMessage>) => {
       const message = event.data;
+      if (message?.type === 'ready') setEditorPreviews(Boolean(message.previews));
       if (message?.type === 'active') setActive({ path: message.path, text: message.text });
       if (message?.type === 'committed') setCommitted(true);
     };
@@ -53,7 +57,7 @@ export function EditorHost({
 
   useEffect(() => {
     const { path, text } = active;
-    if (!format || path === null || text === null) return;
+    if (editorPreviews !== false || !format || path === null || text === null) return;
     const mine = ++seq.current;
     const timer = setTimeout(async () => {
       try {
@@ -75,7 +79,7 @@ export function EditorHost({
       }
     }, 200);
     return () => clearTimeout(timer);
-  }, [active, format]);
+  }, [active, format, editorPreviews]);
 
   return (
     <div className="flex min-h-0 flex-1 flex-col">
@@ -89,9 +93,11 @@ export function EditorHost({
             Committed: see the page
           </a>
         )}
-        <button type="button" className={ui.linkBtn} onClick={() => setShowPreview((v) => !v)}>
-          {showPreview ? 'hide preview' : 'show preview'}
-        </button>
+        {editorPreviews === false && (
+          <button type="button" className={ui.linkBtn} onClick={() => setShowPreview((v) => !v)}>
+            {showPreview ? 'hide preview' : 'show preview'}
+          </button>
+        )}
         <a href={pagePath} className="text-accent">
           back to the page
         </a>
@@ -103,7 +109,7 @@ export function EditorHost({
           className="min-h-0 min-w-0 flex-[3] border-0 narrow:min-h-[70vh]"
           allow="clipboard-read; clipboard-write"
         />
-        {showPreview && (
+        {showPreview && editorPreviews === false && (
           <section
             aria-label="Preview"
             className="min-h-0 flex-[2] overflow-y-auto border-l border-rule px-6 py-4 narrow:border-t narrow:border-l-0"
