@@ -9,6 +9,16 @@ import { commitWorkspace, readBlob, readWorkspace, rebaseWorkspace, storeWorkspa
 import { issueAgentCode, redeemAgentCode, requestAgentCode } from '../agent-codes';
 import { uploadAgentFile } from '../agent-files';
 import { agentPostsOf, createAgentPost, removeAgentPost, type PresentedAgentPost } from '../agent-posts';
+import {
+  listComments,
+  listMentions,
+  listReplies,
+  postComment,
+  previewComment,
+  removeComment,
+  type CommentView,
+} from '../comments';
+import { mailMentions } from '../mentions';
 import { listTokens, mintToken, revokeToken } from '../tokens';
 import { addSshKey, listSshKeys, removeSshKey } from '../ssh-keys';
 import { previewDemoSources } from '../demos/attach';
@@ -47,6 +57,7 @@ function presentMe(a: Account) {
     institutions: a.institutions,
     verified: a.verifiedAt !== null,
     profileComplete: a.profileCompletedAt !== null,
+    mentionMail: a.mentionMail,
   };
 }
 
@@ -501,6 +512,75 @@ export const deleteAgentPost = route(async (req, params) => {
   const id = parseParam(params.id, S.IdParam, 'id');
   await removeAgentPost(principal.account.id, id);
   return respond(S.Ok, { status: 'ok' }, { principal });
+});
+
+function presentComment(c: CommentView) {
+  return { ...c, createdAt: toIso(c.createdAt) };
+}
+
+/** A paper's discussion: a page of top-level comments with previews of their replies. Public. */
+export const getComments = route(async (req) => {
+  const { scheme, value, cursor, limit } = parseQuery(req, S.CommentsQuery);
+  const { paper } = await knownPaper(scheme, value);
+  const principal = await authenticate(req);
+  const list = await listComments(paper.id, { cursor, limit, viewer: principal?.account ?? null });
+  return respond(
+    S.CommentList,
+    {
+      ...list,
+      comments: list.comments.map(presentComment),
+      replies: list.replies.map(presentComment),
+    },
+    { principal },
+  );
+});
+
+/** A comment on a paper, or with `parentId` a reply. Its mentions are mailed after it is saved. */
+export const postCommentRoute = route(async (req) => {
+  const principal = await requireVerified(req);
+  const { paper: id, ...input } = await parseBody(req, S.CommentBody);
+  const { paper } = await knownPaper(id.scheme, id.value);
+  const comment = await postComment({ paperId: paper.id, account: principal.account, ...input });
+  if (comment.mentions.length > 0) {
+    void mailMentions(comment.id).catch((err) => console.error('mention mail failed', err));
+  }
+  return respond(S.Comment, presentComment(comment), { status: 201, principal });
+});
+
+/** A draft rendered as it would be posted, its mentions resolved on the paper. */
+export const postCommentPreview = route(async (req) => {
+  const principal = await requireAuth(req);
+  const { paper: id, body } = await parseBody(req, S.CommentPreviewBody);
+  const { paper } = await knownPaper(id.scheme, id.value);
+  return respond(S.CommentPreview, await previewComment(paper.id, body, principal.account), { principal });
+});
+
+/** More of a comment's replies, oldest first. Public. */
+export const getCommentReplies = route(async (req, params) => {
+  const id = parseParam(params.id, S.IdParam, 'id');
+  const { after, limit } = parseQuery(req, S.CommentRepliesQuery);
+  const principal = await authenticate(req);
+  const replies = await listReplies(id, { after, limit, viewer: principal?.account ?? null });
+  return respond(S.CommentReplies, { replies: replies.map(presentComment) }, { principal });
+});
+
+export const deleteCommentRoute = route(async (req, params) => {
+  const principal = await requireAuth(req);
+  const id = parseParam(params.id, S.IdParam, 'id');
+  await removeComment(principal.account.id, id);
+  return respond(S.Ok, { status: 'ok' }, { principal });
+});
+
+/** The comments that mention the caller, newest first: what an agent checks for what it missed. */
+export const getMyMentions = route(async (req) => {
+  const principal = await requireAuth(req);
+  const q = parseQuery(req, S.MentionsQuery);
+  const { mentions, nextCursor } = await listMentions(principal.account.id, q);
+  return respond(
+    S.MentionList,
+    { mentions: mentions.map((m) => ({ ...m, comment: presentComment(m.comment) })), nextCursor },
+    { principal },
+  );
 });
 
 /**

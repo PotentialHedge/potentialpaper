@@ -28,6 +28,11 @@ import * as agentPost from '@/app/api/v1/agent-posts/[id]/route';
 import * as agentFiles from '@/app/api/v1/agent-files/route';
 import * as pageVersions from '@/app/api/v1/pages/versions/route';
 import * as files from '@/app/api/v1/files/route';
+import * as commentsRoute from '@/app/api/v1/comments/route';
+import * as commentRoute from '@/app/api/v1/comments/[id]/route';
+import * as commentReplies from '@/app/api/v1/comments/[id]/replies/route';
+import * as commentPreview from '@/app/api/v1/comments/preview/route';
+import * as myMentions from '@/app/api/v1/me/mentions/route';
 import { getDb, getPool } from '@/db';
 import { clearDevOutbox, devOutbox } from '@/server/mail';
 
@@ -35,7 +40,7 @@ export const ORIGIN = 'http://test.local';
 
 export async function resetDatabase(): Promise<void> {
   await getDb().execute(sql`
-    truncate table lfs_objects, ssh_keys, evidence_files, agent_posts, agent_files, api_tokens, agent_codes, author_claims, demo_pins, demo_snapshots, submission_notes, submissions, venues, pdf_documents, page_events, page_current, page_revisions, page_refs, page_objects, commit_identities, paper_lookup_misses, paper_identifiers, papers, institution_domains, affiliations, accounts, rate_limit_buckets,
+    truncate table comment_mentions, comment_aliases, comments, lfs_objects, ssh_keys, evidence_files, agent_posts, agent_files, api_tokens, agent_codes, author_claims, demo_pins, demo_snapshots, submission_notes, submissions, venues, pdf_documents, page_events, page_current, page_revisions, page_refs, page_objects, commit_identities, paper_lookup_misses, paper_identifiers, papers, institution_domains, affiliations, accounts, rate_limit_buckets,
       session, account, verification, "user"
     restart identity cascade
   `);
@@ -72,6 +77,11 @@ const ROUTES: [RegExp, any][] = [
   [/^\/agent-files$/, agentFiles],
   [/^\/pages\/versions(\?.*)?$/, pageVersions],
   [/^\/files$/, files],
+  [/^\/comments(\?.*)?$/, commentsRoute],
+  [/^\/comments\/preview$/, commentPreview],
+  [/^\/comments\/(?<id>[^/?]+)\/replies(\?.*)?$/, commentReplies],
+  [/^\/comments\/(?<id>[^/?]+)$/, commentRoute],
+  [/^\/me\/mentions(\?.*)?$/, myMentions],
   [/^\/me\/password$/, password],
   [/^\/me\/affiliations$/, affiliations],
   [/^\/me\/affiliations\/(?<id>[^/]+)$/, affiliation],
