@@ -18,8 +18,9 @@ Things only you can do or decide, most urgent first. Milestones 1 and 2 and the 
       own subdomain with wildcard DNS, set `DEMO_ORIGIN`, and harden it: `__Host-` auth cookies, Origin
       checks on writes, and a strict CSP on the demo host. The web editor needs the same kind of domain for VS Code's
       own Markdown and image previews (webviews): one name per webview, `{{uuid}}.<domain>`, with wildcard DNS and
-      TLS, set as `WEB_EDITOR_WEBVIEW_URL` (docs/web-editor.md). Until then those previews don't open in
-      production; the editor page's own preview works. `potentialpaper.com` was also available at the
+      TLS, set as `WEB_EDITOR_WEBVIEW_URL` (docs/web-editor.md). Until then the editor's preview panel, PDF viewer and
+      image preview don't open in production (the page beside the editor shows its own preview instead). Quicker
+      alternative: a proxied `*.potentialhedge.com` wildcard, free today, but it catches every undefined subdomain. `potentialpaper.com` was also available at the
       same price.
 - [ ] **Mail and final domain.** Sign-up fails on the live site until production has `RESEND_API_KEY` and
       `MAIL_FROM`, and watchlist digests will need them too. Set up the domain (`potentialpaper.com` is the

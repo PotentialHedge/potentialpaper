@@ -81,6 +81,49 @@ Milestones 0, 1 and 2 are built, merged into `main` and deployed, and Milestone 
   ICLR 2027 submissions are anonymous, so almost none have emails (0 of the dev database's 500); recent arXiv
   first pages give at least one for 69%.
 
+## Preview and PDFs inside VS Code, desktop extension (2026-11-15, merged into `main` and deployed at dd7eb99)
+
+All in `docs/web-editor.md` ("VS Code for the Web", "VS Code on the desktop"); the short of it:
+
+- **Preview panel** (`editors/vscode/extension/src/preview.ts`, `webview/preview.ts`): a webview beside the section
+  in front, rendered by `/api/v1/pages/render`, styled by `src/app/globals.css` compiled into the extension
+  (`webview/preview.css`, Tailwind with nothing scanned) plus KaTeX. It follows the edited section and patches only
+  changed blocks. The extension sets `hasCustomMarkdownPreview` on sections, and `workbench.ts` hides VS Code's own
+  Markdown Preview/Markdown Editor (`workbench.editor.hiddenEditorTypes`, `*.md` → `default`), so there is one
+  preview button and no "Text Editor" picker.
+- **PDF viewer** (`src/pdf.ts`, `webview/pdf.ts`): custom editor for `*.pdf`, PDF.js 6 (`pdfjs-dist`) parsing on
+  the page (no worker: a webview can't start one from its resources), its cmaps/fonts/wasm shipped in
+  `media/pdf/`. Webview bundles are IIFE, not modules (a module script would need CORS across the webview origin).
+- **Webviews need an origin each.** Dev: `{{uuid}}.localhost:<port>` (works in Chrome; Safari unverified). Pre
+  pages get their own CSP (`webviewCsp`, `frame-ancestors` the site and the webview wildcard), set after the
+  editor's rule in `next.config.ts`. **Production has none yet**, so there `potentialpaper.webviews` is false: no
+  panel or PDF viewer, PDFs open as binary, and the host page keeps its side preview (`EditorHost` shows it only
+  when the editor's `ready` says `previews: false`). Open decision for Benedict (TODO.md): a proxied
+  `*.potentialhedge.com` wildcard (free today, Universal SSL covers it) or a separate domain such as
+  `ppusercontent.com` (also needed for demos; recommended). Then set `WEB_EDITOR_WEBVIEW_URL`, route that host to
+  the app in Traefik, and redeploy.
+- **R2 CORS** (Cloudflare, not in the repo): bucket `papertrail-pdfs` has a GET/HEAD any-origin CORS rule, and the
+  zone has a response-header transform rule setting `Access-Control-Allow-Origin: *` on `pdfs.potentialhedge.com`
+  (the edge cache ignores `Origin`, so it served header-less copies). Before this the editor only ever got LFS
+  pointers for PDFs.
+- **Host page:** a loading overlay covers the frame until the extension's `ready` (sent even when the workspace
+  fails to load, so the error shows).
+- **Caching:** `/editor/vscode/<version>/potentialpaper/*` is `Cache-Control: no-cache` (the extension changes
+  without the version path changing); VS Code's own files keep a day. Anyone who loaded the editor before dd7eb99
+  may need DevTools → Application → Clear site data once.
+- **JSON:** the extension's copies of the schemas get `defaultSnippets` (skeleton of required fields);
+  **PotentialPaper: New Link** writes `links/NN-<slug>.json`.
+- **Desktop:** `npm run editor:extension` also builds `public/editor/potentialpaper.vsix` (served at
+  `/editor/potentialpaper.vsix`, linked in the Edit dialog), without the proposed API, engine `^1.90.0`. One bundle
+  runs in both hosts. On a clone (folder with `prek.toml`) it gives the preview (site from the git remote,
+  `editors/vscode/extension/src/paths.ts`, tested in `tests/unit/editor-extension.test.ts`; API key from the
+  profile in secret storage), PDF viewer, schemas, formatter and New Link. Not published to the Marketplace/Open
+  VSX (needs a publisher account). Schemas match by file name, so same-named files elsewhere get checked too.
+- Debugging the editor headless worked well: Playwright from `~/.npm/_npx/e41f203b7505f1fb` with the
+  `chromium_headless_shell-1248` binary (the full Chromium lacks libcups), reading console output and frames.
+- Housekeeping: the papermarket dev server that held port 3000 was stopped at Benedict's request
+  (`~/projects/papermarket/platform-sfw`, `next dev -p 3000 -H 127.0.0.1`); it is still off.
+
 ## Editor trims, starter files, schemas (2026-11-15, merged into `main` and deployed at d08eec6)
 
 - `/code/…` redirects someone signed out to `/signin?next=…`.
@@ -124,7 +167,7 @@ Milestones 0, 1 and 2 are built, merged into `main` and deployed, and Milestone 
   Dockerfile's `vscode` stage does it for production. A conflict comes back as 409, and the editor rebases with
   git conflict markers (`/workspace/rebase`, `mergeWithMarkers`). `/api/v1/pages/edit`, `editor`, `links` and
   `thumbnail` are removed (`setLinks`/`setThumbnail` stay for scripts); `render`, `revert` and `versions` stay.
-  Not there yet: VS Code's own Markdown/image previews in production (need a webview domain, TODO.md), search
+  Not there yet: the in-editor preview, PDF viewer and image preview in production (need a webview domain, TODO.md), search
   across files, the versions look-up and "insert a demo" helpers the old editors had, and phones.
 - **Pages:** `/history` and `/diff` (and `/edit`, now a redirect to `/code`), each in front of the paper's own path
   (`/history/abs/1706.03762`, `/diff/doi/…?oid=…`), because the paper routes are catch-alls. They're dynamic
