@@ -62,20 +62,21 @@ function watchDemos() {
 
 window.addEventListener('message', (event: MessageEvent) => {
   const data = event.data as (Message & { height?: unknown }) | { type?: unknown; height?: unknown } | null;
-  if (event.source && event.source !== window && event.source !== window.parent) {
-    // From a demo's frame.
+  // A demo's frame reports its height; anything else is from VS Code, whose messages come from a window of its own.
+  const demo = event.source
+    ? [...page.querySelectorAll<HTMLIFrameElement>('iframe.demo-frame')].find((f) => f.contentWindow === event.source)
+    : undefined;
+  if (demo) {
     if (data?.type !== 'potentialpaper:demo-height' || typeof data.height !== 'number') return;
-    const frame = [...page.querySelectorAll<HTMLIFrameElement>('iframe.demo-frame')].find(
-      (f) => f.contentWindow === event.source,
-    );
-    if (!frame || new URL(frame.src).origin !== event.origin) return;
+    if (new URL(demo.src).origin !== event.origin) return;
     const height = Math.round(Math.min(4000, data.height));
     if (height < 120) return;
-    frame.style.height = `${height}px`;
-    frame.classList.add('demo-sized');
+    demo.style.height = `${height}px`;
+    demo.classList.add('demo-sized');
     return;
   }
-  const message = data as Message;
+  const message = data as Message | null;
+  if (!message) return;
   if (message.type === 'html') {
     note.textContent = '';
     note.hidden = true;

@@ -59,6 +59,9 @@ export class Preview implements vscode.Disposable {
   follow(editor: vscode.TextEditor | undefined): void {
     const file = this.sectionOf(editor);
     void vscode.commands.executeCommand('setContext', 'potentialpaper.section', file !== null);
+    // VS Code's own Markdown preview buttons and keys step aside on a section (its menus check this key), so the
+    // editor's title has one preview button, the page's.
+    void vscode.commands.executeCommand('setContext', 'hasCustomMarkdownPreview', file !== null);
     if (!file || !editor) return;
     if (!this.panel) {
       const auto = vscode.workspace.getConfiguration('potentialpaper').get<boolean>('previewOnOpen', true);
