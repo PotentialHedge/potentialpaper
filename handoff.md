@@ -222,8 +222,11 @@ redoing it. They still describe a strict CSP, `node-diff3`, and `page_current` h
   system via `mergeFoundVersions`. Labels come from the venue id (`venueName`), not the venue string.
 - Ran for the ICLR 2026↔2027 resubmissions: 508 pages committed. **The full dump died at venue 882 of 3,098**
   (`data/openreview-dump.log`, last line 2026-11-13 19:40 UTC), and the waiting `data/run-venue-import.sh` died with it, so
-  the full import never ran. The dump is resumable: rerun it detached, then `data/run-venue-import.sh`. The import now
-  writes the new layout (`versions/<id>.json`), since it runs from `main`.
+  the full import never ran. **Cause:** T3 Code runs each agent session in its own systemd scope, and stopping the
+  session (19:40:43, journal) kills everything in it, `nohup`/`&` included. **Restarted 2026-11-15 14:04 CET** as the
+  user unit `openreview-dump-import` (`systemd-run --user`, linger is on), which runs the dump and then
+  `data/run-venue-import.sh` (log `data/venue-import.log`). Check with `systemctl --user status openreview-dump-import`.
+  The import writes the new layout (`versions/<id>.json`), since it runs from `main`.
 - **Merged** (`server/merge-papers.ts`, `npm run papers:merge -- <dup> <survivor>` or `--iclr-resubmissions`): 242
   ICLR 2026 papers into their ICLR 2027 resubmissions, as the system, each with a commit on the survivor naming the
   duplicate (empty when nothing folds: `CommitOptions.recordEmpty`). LygvJQPPJ2 and uuKARZrXNO are one paper submitted
