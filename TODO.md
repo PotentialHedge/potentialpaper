@@ -3,11 +3,6 @@
 Things only you can do or decide, most urgent first. Milestones 1 and 2 and the ICLR import are merged into
 `main`. Next up is Milestone 3, community editing.
 
-## Urgent
-
-- [ ] **acceptodds is running vulnerable Next 16.4.0 in production.** `npm audit` lists critical advisories,
-      including unauthenticated remote code execution. Fix it, or ask me to.
-
 ## Before the Milestone 3 alpha
 
 - [ ] **Contribution license.** The starting proposal is CC BY-SA for community content and CC BY for author
@@ -21,7 +16,10 @@ Things only you can do or decide, most urgent first. Milestones 1 and 2 and the 
       site with the app, so it isn't a real sandbox. Before anyone outside tries demos, buy a separate
       domain (`ppusercontent.com`, $11.17/yr on Cloudflare, was available on 2026-11-07), give each demo its
       own subdomain with wildcard DNS, set `DEMO_ORIGIN`, and harden it: `__Host-` auth cookies, Origin
-      checks on writes, and a strict CSP on the demo host. `potentialpaper.com` was also available at the
+      checks on writes, and a strict CSP on the demo host. The web editor needs the same kind of domain for VS Code's
+      own Markdown and image previews (webviews): one name per webview, `{{uuid}}.<domain>`, with wildcard DNS and
+      TLS, set as `WEB_EDITOR_WEBVIEW_URL` (docs/web-editor.md). Until then those previews don't open in
+      production; the editor page's own preview works. `potentialpaper.com` was also available at the
       same price.
 - [ ] **Mail and final domain.** Sign-up fails on the live site until production has `RESEND_API_KEY` and
       `MAIL_FROM`, and watchlist digests will need them too. Set up the domain (`potentialpaper.com` is the

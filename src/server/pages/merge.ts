@@ -58,8 +58,16 @@ function sideOf(base: string[], side: Hunk[], start: number, end: number): strin
   return lines;
 }
 
-/** A three-way merge of lines, or `null` for a conflict. Changes that touch conflict, as they do in git. */
-function mergeLines(base: string[], ours: Hunk[], theirs: Hunk[]): string[] | null {
+/**
+ * A three-way merge of lines, or `null` for a conflict. Changes that touch conflict, as they do in git. With
+ * `markers`, a conflict is written into the result between git's conflict markers instead.
+ */
+function mergeLines(
+  base: string[],
+  ours: Hunk[],
+  theirs: Hunk[],
+  markers?: { ours: string; theirs: string },
+): string[] | null {
   const merged: string[] = [];
   let copied = 0;
   let a = 0;
@@ -81,7 +89,9 @@ function mergeLines(base: string[], ours: Hunk[], theirs: Hunk[]): string[] | nu
     // Only one side changed this region, or both made the same change.
     if (a === firstA) merged.push(...theirsText);
     else if (b === firstB || oursText.join('\n') === theirsText.join('\n')) merged.push(...oursText);
-    else return null;
+    else if (markers) {
+      merged.push(`<<<<<<< ${markers.ours}`, ...oursText, '=======', ...theirsText, `>>>>>>> ${markers.theirs}`);
+    } else return null;
     copied = end;
   }
   merged.push(...base.slice(copied));
@@ -103,6 +113,29 @@ export function mergeFile(base: Version, ours: Version, theirs: Version): MergeR
   const theirsHunks = oursHunks && hunks(lines, theirs.split('\n'));
   const merged = theirsHunks && mergeLines(lines, oursHunks, theirsHunks);
   return merged ? { ok: true, content: merged.join('\n') } : { ok: false };
+}
+
+/**
+ * As `mergeFile`, but never failing: where both sides changed the same lines, both are kept between git's
+ * conflict markers, for a person to choose. A file one side deleted keeps the other side's text.
+ */
+export function mergeWithMarkers(
+  base: Version,
+  ours: Version,
+  theirs: Version,
+  labels: { ours: string; theirs: string },
+): { content: Version; conflict: boolean } {
+  const plain = mergeFile(base, ours, theirs);
+  if (plain.ok) return { content: plain.content, conflict: false };
+  if (ours === null || theirs === null) return { content: ours ?? theirs, conflict: true };
+  const lines = (base ?? '').split('\n');
+  const oursHunks = hunks(lines, ours.split('\n'));
+  const theirsHunks = oursHunks && hunks(lines, theirs.split('\n'));
+  const merged = theirsHunks && mergeLines(lines, oursHunks, theirsHunks, labels);
+  if (merged) return { content: merged.join('\n'), conflict: true };
+  // Too different to merge line by line: the whole of both.
+  const whole = [`<<<<<<< ${labels.ours}`, ours, '=======', theirs, `>>>>>>> ${labels.theirs}`].join('\n');
+  return { content: whole, conflict: true };
 }
 
 export interface FileDiff {

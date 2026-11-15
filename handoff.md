@@ -83,7 +83,7 @@ Milestones 0, 1 and 2 are built, merged into `main` and deployed, and Milestone 
 
 ## Milestone 3, community editing (in progress)
 
-**Built:** the section editor, history, diff and revert.
+**Built:** the web editor, history, diff and revert.
 
 - **Rendering:** `server/pages/markdown.ts`. markdown-it with raw HTML off, `rel="nofollow ugc noopener"` on
   links, and KaTeX 0.19 for `$…$` and `$$…$$` through our own small rule, since `@vscode/markdown-it-katex`
@@ -91,19 +91,19 @@ Milestones 0, 1 and 2 are built, merged into `main` and deployed, and Milestone 
   `writeCurrent` fills `page_current.community_html` and `author_html`, and `pages:rebuild` regenerates them.
   Each section is its own file (`community/10-summary.md`; see `handoffs/git-push.md`), titled by its leading `#`; the same parse splits the whole-part text for the editor and marks
   `data-section` in the HTML, where `slots.tsx` adds the edit links.
-- **API:** `POST /api/v1/pages/edit` `{ paper, baseOid, section, content, summary }` (section 0 is the whole
-  community section) puts the section back into the file _as it was at `baseOid`_, then calls `commitPage`,
-  so edits to other sections merge. A conflict is `409 edit_conflict`, and adds `details.current`
-  `{ head, section, text }`. `POST /api/v1/pages/render` (signed in) serves the preview, and
-  `POST /api/v1/pages/revert` takes `{ paper, oid }`. `GET /api/v1/pages/editor?scheme&value&part&section`
-  (part `author`, `community` or `card`) is what an editor opens with, and answers 403 up front by the same
-  rules the commit enforces.
-- **Editing in place:** every edit link on a paper's page is a hash (`#edit-community`, `#edit-community-2`,
-  `#edit-author`, `#edit-links`, `#edit-picture`), and the part it names turns into its editor where it was
-  (`components/paper/edit`): Markdown beside a live preview in the page's own type, the links row as it will
-  be, the figure with its caption typed under it. The page stays the same cached HTML for everyone; a visitor
-  is sent to sign in and back to that hash. `/edit/<paper>?part=…&section=…` only redirects there.
-- **Pages:** `/history` and `/diff` (and `/edit`, now a redirect), each in front of the paper's own path
+- **Editing (2026-11-15, branch `web-editor`):** the inline editors are gone. The "edit" button under a paper's
+  title (and any `#edit` link) opens a dialog (`components/paper/EditDialog.tsx`): open the web editor, or
+  `git clone` over HTTPS (SSH shows "not open yet" until `GIT_SSH_URL` is set). The web editor is VS Code for the
+  Web built from source, framed by `/code/<paper>` beside a live preview in the page's own look. It sits behind an
+  editor-neutral contract (the workspace API `/api/v1/workspace…` in `server/workspace.ts`, and a
+  `BroadcastChannel` to the host page), so it can be swapped: `docs/web-editor.md`. Build it with
+  `npm run editor:build` (first time ~20 min, in Docker; cached after) into `public/editor/` (gitignored); the
+  Dockerfile's `vscode` stage does it for production. A conflict comes back as 409, and the editor rebases with
+  git conflict markers (`/workspace/rebase`, `mergeWithMarkers`). `/api/v1/pages/edit`, `editor`, `links` and
+  `thumbnail` are removed (`setLinks`/`setThumbnail` stay for scripts); `render`, `revert` and `versions` stay.
+  Not there yet: VS Code's own Markdown/image previews in production (need a webview domain, TODO.md), search
+  across files, the versions look-up and "insert a demo" helpers the old editors had, and phones.
+- **Pages:** `/history` and `/diff` (and `/edit`, now a redirect to `/code`), each in front of the paper's own path
   (`/history/abs/1706.03762`, `/diff/doi/…?oid=…`), because the paper routes are catch-alls. They're dynamic
   and noindex, and `/edit/` is disallowed in robots. History shows handles through `historyWithHandles`
   (`server/pages/edit.ts`) and never account ids.

@@ -254,7 +254,7 @@ export default async function VersionsPage({ params, searchParams }: Props) {
               <TextSection
                 text={comparison.text}
                 labels={[comparison.a.label, comparison.b.label]}
-                editPath={editHref(found.id, 'versions')}
+                editPath={editHref(found.id)}
               />
             </>
           )}

@@ -1,0 +1,127 @@
+{
+  "name": "potentialpaper",
+  "displayName": "PotentialPaper",
+  "description": "Edit a PotentialPaper page repo in the browser and commit it to the site.",
+  "publisher": "potentialpaper",
+  "version": "0.1.0",
+  "license": "UNLICENSED",
+  "engines": {
+    "vscode": "^1.145.0"
+  },
+  "browser": "./dist/extension.js",
+  "activationEvents": [
+    "onFileSystem:potentialpaper",
+    "onStartupFinished"
+  ],
+  "capabilities": {
+    "virtualWorkspaces": true,
+    "untrustedWorkspaces": {
+      "supported": true
+    }
+  },
+  "contributes": {
+    "configuration": {
+      "title": "PotentialPaper",
+      "properties": {
+        "potentialpaper.paper": {
+          "type": "object",
+          "default": null,
+          "description": "The paper this editor opened (set by the site)."
+        },
+        "potentialpaper.origin": {
+          "type": "string",
+          "default": "",
+          "description": "The site's origin (set by the site)."
+        }
+      }
+    },
+    "commands": [
+      {
+        "command": "potentialpaper.commit",
+        "title": "Commit to the Page",
+        "category": "PotentialPaper",
+        "icon": "$(check)"
+      },
+      {
+        "command": "potentialpaper.refresh",
+        "title": "Load the Page's Latest Version",
+        "category": "PotentialPaper",
+        "icon": "$(refresh)"
+      },
+      {
+        "command": "potentialpaper.discard",
+        "title": "Discard Change",
+        "category": "PotentialPaper",
+        "icon": "$(discard)"
+      },
+      {
+        "command": "potentialpaper.discardAll",
+        "title": "Discard All Changes",
+        "category": "PotentialPaper",
+        "icon": "$(discard)"
+      },
+      {
+        "command": "potentialpaper.openChange",
+        "title": "Open Change",
+        "category": "PotentialPaper"
+      },
+      {
+        "command": "potentialpaper.openPage",
+        "title": "Open the Paper's Page",
+        "category": "PotentialPaper",
+        "icon": "$(link-external)"
+      },
+      {
+        "command": "potentialpaper.newSection",
+        "title": "New Section",
+        "category": "PotentialPaper"
+      }
+    ],
+    "menus": {
+      "scm/title": [
+        {
+          "command": "potentialpaper.commit",
+          "group": "navigation",
+          "when": "scmProvider == potentialpaper"
+        },
+        {
+          "command": "potentialpaper.refresh",
+          "group": "navigation",
+          "when": "scmProvider == potentialpaper"
+        },
+        {
+          "command": "potentialpaper.openPage",
+          "group": "navigation",
+          "when": "scmProvider == potentialpaper"
+        },
+        {
+          "command": "potentialpaper.discardAll",
+          "when": "scmProvider == potentialpaper"
+        }
+      ],
+      "scm/resourceState/context": [
+        {
+          "command": "potentialpaper.discard",
+          "group": "inline",
+          "when": "scmProvider == potentialpaper"
+        }
+      ],
+      "commandPalette": [
+        {
+          "command": "potentialpaper.discard",
+          "when": "false"
+        },
+        {
+          "command": "potentialpaper.openChange",
+          "when": "false"
+        }
+      ],
+      "explorer/context": [
+        {
+          "command": "potentialpaper.newSection",
+          "when": "resourceScheme == potentialpaper && explorerResourceIsFolder"
+        }
+      ]
+    }
+  }
+}

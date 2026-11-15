@@ -12,10 +12,10 @@ import { submissionsOf } from '@/server/submissions';
 import { bibtex, titleLinks } from '@/lib/paper-links';
 import { sortVersions } from '@/lib/versions';
 import { DemoFrames } from './DemoFrames';
-import { EditableLinks } from './edit/EditableLinks';
 import { toolPath } from './page-tools';
 import { Slot } from './slots';
 import { TitleActions } from './TitleActions';
+import { cloneAddresses } from '@/server/pages/clone';
 
 /**
  * What the routes at `/abs`, `/doi` and `/openreview` share. Each page is rendered once and cached, by
@@ -106,17 +106,25 @@ export async function PaperRoute({ scheme, segments }: { scheme: PaperScheme; se
           )}
         </p>
         {about && <p className={`${ui.fine} text-center`}>{about}</p>}
-        <EditableLinks
-          paper={panel.canonical}
-          builtIn={titleLinks(linkSources)}
-          shown={titleLinks({ ...linkSources, extra: current?.links ?? [] })}
-          claimPath={toolPath('claim', panel.canonical)}
-        />
+        <nav
+          className="mt-1.5 flex flex-wrap justify-center gap-x-3 font-sans text-[13px]"
+          aria-label="The paper elsewhere"
+        >
+          {titleLinks({ ...linkSources, extra: current?.links ?? [] }).map((l, i) => (
+            <a key={i} href={l.url} className="text-accent" rel="noopener noreferrer" target="_blank">
+              [{l.label}]
+            </a>
+          ))}
+        </nav>
         <TitleActions
           bibtex={bibtex({ paper, identifiers })}
-          editPath="#edit-community"
           historyPath={toolPath('history', panel.canonical)}
           agentPath={agentPaperPath(panel.canonical)}
+          edit={{
+            codePath: toolPath('code', panel.canonical),
+            clone: cloneAddresses(panel.canonical),
+            hasRepo: current !== undefined,
+          }}
         />
         <div className="mt-5 grid grid-cols-[minmax(0,1fr)_300px] items-start gap-8 narrow:grid-cols-1">
           <div>

@@ -24,3 +24,6 @@ next-env.d.ts
 /public/agent-files/
 /public/files/
 /secrets/
+
+# The web editor, built by scripts/build-web-editor.sh (VS Code for the Web and the site's extension)
+/public/editor/

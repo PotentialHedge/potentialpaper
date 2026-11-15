@@ -1,4 +1,5 @@
 import type { NextConfig } from 'next';
+import { editorCsp } from './src/editors/vscode/csp';
 import { DEMO_HOSTNAME, DEMO_ORIGIN } from './src/lib/demos';
 import { HOME_LIST_PARAMS, PRIVATE_PAGES } from './src/lib/private-paths';
 
@@ -21,8 +22,8 @@ const CSP = [
   "img-src 'self' data: https:",
   "font-src 'self'",
   `connect-src 'self' ${ANALYTICS}${dev ? ' ws:' : ''}`,
-  // Demos, which run on a host of their own (`lib/demos.ts`).
-  `frame-src ${DEMO_ORIGIN}`,
+  // Demos, which run on a host of their own (`lib/demos.ts`), and the web editor's frame (`app/code`).
+  `frame-src 'self' ${DEMO_ORIGIN}`,
   "object-src 'none'",
   "base-uri 'self'",
   "form-action 'self'",
@@ -46,13 +47,24 @@ const nextConfig: NextConfig = {
   async headers() {
     return [
       {
-        source: '/:path*',
+        // Everything but the web editor, which has a policy of its own (`src/editors/vscode/csp.ts`).
+        source: '/:path((?!editor/).*)',
         // The demo host sends its own headers (`server/demos/serve.ts`).
         missing: [{ type: 'host' as const, value: DEMO_HOSTNAME.replaceAll('.', '\\.') }],
         headers: [
           { key: 'Content-Security-Policy', value: CSP },
           { key: 'X-Content-Type-Options', value: 'nosniff' },
           { key: 'Referrer-Policy', value: 'strict-origin-when-cross-origin' },
+        ],
+      },
+      {
+        // The editor's files. Its page (`app/editor/vscode/route.ts`) sends the same policy itself.
+        source: '/editor/vscode/:version/:path*',
+        missing: [{ type: 'host' as const, value: DEMO_HOSTNAME.replaceAll('.', '\\.') }],
+        headers: [
+          { key: 'Content-Security-Policy', value: editorCsp() },
+          { key: 'X-Content-Type-Options', value: 'nosniff' },
+          { key: 'Cache-Control', value: 'public, max-age=86400' },
         ],
       },
       ...PRIVATE_PAGES.map((source) => ({

@@ -3,6 +3,7 @@ import { getDb, type Database } from '@/db';
 import { pageObjects, paperIdentifiers } from '@/db/schema';
 import { canonicalPaperId, PAPER_SCHEMES, type PaperId, type PaperScheme, parsePaperId } from '@/lib/paper-ids';
 import { findPaper } from '../papers';
+import { gitSshUrl, siteUrl } from '../site';
 import { looseObject } from './git-objects';
 import { readHead, toBytes } from './repo';
 
@@ -104,4 +105,15 @@ export async function answerGitRequest(pathname: string, database: Database = ge
   const repo = await findRepo(address, database);
   if (repo.kind !== 'repo') return repo;
   return { kind: 'text', body: file === 'HEAD' ? 'ref: refs/heads/main\n' : `${repo.head}\trefs/heads/main\n` };
+}
+
+/**
+ * The addresses to clone a paper's page from, as the Edit dialog shows them: HTTPS always, SSH only once its
+ * server is set up (`GIT_SSH_URL`, DEPLOY.md "Git over SSH").
+ */
+export function cloneAddresses(id: PaperId): { https: string; ssh: string | null } {
+  return {
+    https: `${siteUrl()}${clonePath(id)}`,
+    ssh: process.env.GIT_SSH_URL ? `${gitSshUrl()}${clonePath(id).slice(CLONE_PREFIX.length)}` : null,
+  };
 }

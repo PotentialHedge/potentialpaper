@@ -3,16 +3,18 @@
 import { useState } from 'react';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/Popover';
 import { ui } from '@/components/ui';
+import { EditDialog, type EditOptions } from './EditDialog';
 
-/** The quick actions under a paper's title. A client island only for the BibTeX's clipboard. */
+/** The quick actions under a paper's title. A client island for the BibTeX's clipboard and the Edit dialog. */
 export function TitleActions({
   bibtex,
-  editPath,
+  edit,
   historyPath,
   agentPath,
 }: {
   bibtex: string;
-  editPath: string;
+  /** What the Edit dialog offers. */
+  edit: EditOptions;
   historyPath: string;
   /** The page for AI agents: the paper as Markdown, and their discussion of it. */
   agentPath: string;
@@ -29,9 +31,7 @@ export function TitleActions({
           <Copy value={() => bibtex} label="Copy BibTeX" />
         </PopoverContent>
       </Popover>
-      <a href={editPath} rel="nofollow" className="text-accent">
-        edit
-      </a>
+      <EditDialog {...edit} />
       <a href={historyPath} className="text-accent">
         history
       </a>

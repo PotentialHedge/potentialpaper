@@ -8,12 +8,13 @@ import * as affiliationVerify from '@/app/api/v1/me/affiliations/[id]/verify/rou
 import * as password from '@/app/api/v1/me/password/route';
 import * as onboarding from '@/app/api/v1/onboarding/route';
 import * as demos from '@/app/api/v1/demos/route';
-import * as pageEdit from '@/app/api/v1/pages/edit/route';
-import * as pageEditor from '@/app/api/v1/pages/editor/route';
 import * as pageRender from '@/app/api/v1/pages/render/route';
 import * as pageRevert from '@/app/api/v1/pages/revert/route';
-import * as pageLinks from '@/app/api/v1/pages/links/route';
-import * as pageThumbnail from '@/app/api/v1/pages/thumbnail/route';
+import * as workspace from '@/app/api/v1/workspace/route';
+import * as workspaceBlob from '@/app/api/v1/workspace/blob/route';
+import * as workspaceCommit from '@/app/api/v1/workspace/commit/route';
+import * as workspaceRebase from '@/app/api/v1/workspace/rebase/route';
+import * as workspaceFiles from '@/app/api/v1/workspace/files/route';
 import * as claims from '@/app/api/v1/claims/route';
 import * as agentCode from '@/app/api/v1/agent/code/route';
 import * as agentToken from '@/app/api/v1/agent/token/route';
@@ -51,12 +52,13 @@ const ROUTES: [RegExp, any][] = [
   [/^\/onboarding$/, onboarding],
   [/^\/me$/, me],
   [/^\/demos(\?.*)?$/, demos],
-  [/^\/pages\/edit$/, pageEdit],
-  [/^\/pages\/editor(\?.*)?$/, pageEditor],
   [/^\/pages\/render$/, pageRender],
   [/^\/pages\/revert$/, pageRevert],
-  [/^\/pages\/links$/, pageLinks],
-  [/^\/pages\/thumbnail(\?.*)?$/, pageThumbnail],
+  [/^\/workspace(\?.*)?$/, workspace],
+  [/^\/workspace\/blob(\?.*)?$/, workspaceBlob],
+  [/^\/workspace\/commit$/, workspaceCommit],
+  [/^\/workspace\/rebase$/, workspaceRebase],
+  [/^\/workspace\/files$/, workspaceFiles],
   [/^\/claims(\?.*)?$/, claims],
   [/^\/agent\/code$/, agentCode],
   [/^\/agent\/token$/, agentToken],
@@ -81,6 +83,21 @@ export interface ApiResult {
   body: any;
 }
 
+/**
+ * Commits files through the web editor's API, as an editor would: the whole new text of each, or `null` to
+ * delete it. The message's first line is the summary; `Evidence:` trailers go in its last paragraph.
+ */
+export function commitFiles(
+  cookie: string,
+  paper: { scheme: string; value: string },
+  baseOid: string | null,
+  files: Record<string, string | null>,
+  message = 'Edit',
+) {
+  const changes = Object.entries(files).map(([path, content]) => ({ path, content }));
+  return api('POST', '/workspace/commit', { cookie, body: { paper, baseOid, changes, message } });
+}
+
 /** A request through the real route handler, as Next would make it. */
 export async function api(
   method: string,
@@ -100,6 +117,8 @@ export async function api(
     const match = pattern.exec(path);
     if (match) {
       const res: Response = await module[method](request, { params: Promise.resolve({ ...match.groups }) });
+      const type = res.headers.get('content-type') ?? '';
+      if (!type.includes('json')) return { status: res.status, body: Buffer.from(await res.arrayBuffer()) };
       return { status: res.status, body: await res.json().catch(() => null) };
     }
   }

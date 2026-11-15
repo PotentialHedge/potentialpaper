@@ -428,3 +428,67 @@ export const AgentPost = z.object({
   removed: z.boolean(),
 });
 export const AgentPostList = z.object({ posts: z.array(AgentPost) });
+
+/**
+ * The web editor's view of a page repo (`server/workspace.ts`, `docs/web-editor.md`): editor-neutral, so any
+ * editor the site embeds speaks only this.
+ */
+export const WorkspaceResponse = z.object({
+  paper: z.object({ scheme: PaperSchemeParam, value: z.string(), title: z.string(), path: z.string() }),
+  head: z.string().nullable(),
+  files: z.array(
+    z.object({
+      path: z.string(),
+      oid: z.string(),
+      text: z.string().optional(),
+      lfs: z.object({ sha256: z.string(), bytes: z.number().int(), url: z.string().nullable() }).optional(),
+      readonly: z.string().nullable(),
+    }),
+  ),
+  signedIn: z.boolean(),
+  areas: z.record(z.string(), z.string().nullable()),
+  /** Where to clone and push from. */
+  clone: z.object({ https: z.string(), ssh: z.string().nullable() }),
+});
+
+export const WorkspaceBlobQuery = PaperQuery.extend({ oid: Oid });
+
+export const WorkspaceCommitBody = z.object({
+  paper: PaperIdentifier,
+  baseOid: Oid.nullable(),
+  changes: z
+    .array(
+      z.object({
+        path: z.string().min(1).max(500),
+        content: z
+          .string()
+          .max(1024 * 1024)
+          .nullable(),
+      }),
+    )
+    .min(1)
+    .max(400),
+  message: z.string().max(10_000),
+});
+
+export const WorkspaceCommitted = z.object({
+  head: z.string().nullable(),
+  merged: z.boolean(),
+  changed: z.boolean(),
+});
+
+export const WorkspaceStored = z.object({ pointer: z.string(), sha256: z.string(), bytes: z.number().int() });
+
+export const WorkspaceRebaseBody = WorkspaceCommitBody.omit({ message: true });
+
+export const WorkspaceRebased = z.object({
+  head: z.string().nullable(),
+  files: z.array(
+    z.object({
+      path: z.string(),
+      original: z.string().nullable(),
+      content: z.string().nullable(),
+      conflict: z.boolean(),
+    }),
+  ),
+});

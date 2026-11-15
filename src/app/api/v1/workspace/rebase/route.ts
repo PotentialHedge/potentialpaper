@@ -3,5 +3,5 @@ import { methodNotAllowed } from '@/server/api/http';
 
 export const dynamic = 'force-dynamic';
 
-export const GET = h.getEditor;
-export const { POST, PUT, PATCH, DELETE } = methodNotAllowed('GET');
+export const POST = h.postWorkspaceRebase;
+export const { GET, PUT, PATCH, DELETE } = methodNotAllowed('POST');

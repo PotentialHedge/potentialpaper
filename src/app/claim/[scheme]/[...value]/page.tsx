@@ -61,7 +61,7 @@ export default async function ClaimPage({ params }: Props) {
                 (addresses.onPaper.length > 0
                   ? `, because your address ${addresses.onPaper.join(' and ')} is printed on its first page`
                   : ', from an address of yours printed on its first page')}
-              . <a href={editHref(found.id, 'author')}>Write the author section</a>.
+              . <a href={editHref(found.id)}>Write the author section</a> (in <code>author/</code>).
             </p>
             {mine.method === 'email' && (
               <p className={ui.fine}>

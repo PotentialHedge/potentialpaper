@@ -14,7 +14,7 @@ import { type Actor, commitPage, type FileChange } from '@/server/pages/commit';
 import { rebuildAllPages } from '@/server/pages/projections';
 import { pageHistory, readCommit, readFiles, readHead, readText } from '@/server/pages/repo';
 import { savePaper } from '@/server/papers';
-import { api, closePool, resetDatabase, signUp } from './helpers';
+import { api, closePool, commitFiles, resetDatabase, signUp } from './helpers';
 
 const OWNER = 'someone';
 const REPO = 'attention-3d';
@@ -152,10 +152,7 @@ describe('a demo', () => {
     expect(await getDb().select().from(demoSnapshots)).toHaveLength(1);
 
     const content = `# Reproductions\n\n${demoBlockMarkdown({ ref: { kind: 'snapshot', id: first.body.id }, title: 'Attention, in 3D', description: 'Rotate it.' })}`;
-    const edit = await api('POST', '/pages/edit', {
-      cookie,
-      body: { paper: PAPER, baseOid: null, section: 0, content, summary: '' },
-    });
+    const edit = await commitFiles(cookie, PAPER, null, { 'community/10-reproductions.md': content });
     expect(edit.status).toBe(200);
     const [before] = await getDb().select().from(pageCurrent).where(eq(pageCurrent.paperId, paperId));
     expect(before.communityHtml).toContain(`<figure class="demo" data-demo="${first.body.id}">`);
@@ -172,10 +169,7 @@ describe('a demo', () => {
     await paper();
     const cookie = await signUp('ada@ethz.ch');
     const content = demoBlockMarkdown({ ref: { kind: 'snapshot', id: 'e'.repeat(32) }, title: 'Made up' });
-    const edit = await api('POST', '/pages/edit', {
-      cookie,
-      body: { paper: PAPER, baseOid: null, section: 0, content, summary: '' },
-    });
+    const edit = await commitFiles(cookie, PAPER, null, { 'community/10-demos.md': content });
     expect(edit.status).toBe(422);
     expect(edit.body.error.details.missing).toEqual(['e'.repeat(32)]);
   });
@@ -247,10 +241,7 @@ describe('a demo block naming a GitHub address', () => {
     const paperId = await paper();
     const cookie = await signUp('ada@ethz.ch');
     vi.stubGlobal('fetch', fakeGitHub());
-    const edit = await api('POST', '/pages/edit', {
-      cookie,
-      body: { paper: PAPER, baseOid: null, section: 0, content: URL_BLOCK, summary: '' },
-    });
+    const edit = await commitFiles(cookie, PAPER, null, { 'community/10-demos.md': URL_BLOCK });
     expect(edit.status).toBe(200);
     expect(await fileAtHead(paperId, 'community/10-demos.md')).toBe(URL_BLOCK);
     const [snapshot] = await getDb().select().from(demoSnapshots);
@@ -267,15 +258,8 @@ describe('a demo block naming a GitHub address', () => {
       'fetch',
       vi.fn(async () => new Response('down', { status: 500 })),
     );
-    const again = await api('POST', '/pages/edit', {
-      cookie,
-      body: {
-        paper: PAPER,
-        baseOid: edit.body.head,
-        section: 1,
-        content: `${URL_BLOCK}\nNow with words.\n`,
-        summary: '',
-      },
+    const again = await commitFiles(cookie, PAPER, edit.body.head, {
+      'community/10-demos.md': `${URL_BLOCK}\nNow with words.\n`,
     });
     expect(again.status).toBe(200);
     const before = (await current(paperId)).communityHtml;
@@ -289,23 +273,13 @@ describe('a demo block naming a GitHub address', () => {
     const cookie = await signUp('ada@ethz.ch');
     vi.stubGlobal('fetch', fakeGitHub());
     const content = `\`\`\`demo https://github.com/${OWNER}/${REPO}/tree/nope\nBroken\n\`\`\`\n`;
-    const edit = await api('POST', '/pages/edit', {
-      cookie,
-      body: { paper: PAPER, baseOid: null, section: 0, content, summary: '' },
-    });
+    const edit = await commitFiles(cookie, PAPER, null, { 'community/10-demos.md': content });
     expect(edit.status).toBe(422);
     expect(edit.body.error.message).toMatch(/^the demo at https:\/\/github\.com\/.*branch/);
     expect(await pageHistory(paperId)).toEqual([]);
 
-    const bad = await api('POST', '/pages/edit', {
-      cookie,
-      body: {
-        paper: PAPER,
-        baseOid: null,
-        section: 0,
-        content: '```demo https://gitlab.com/a/b\nX\n```\n',
-        summary: '',
-      },
+    const bad = await commitFiles(cookie, PAPER, null, {
+      'community/10-demos.md': '```demo https://gitlab.com/a/b\nX\n```\n',
     });
     expect(bad.status).toBe(422);
     expect(bad.body.error.message).toMatch(/not a demo/);

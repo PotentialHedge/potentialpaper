@@ -6,10 +6,10 @@ import { afterAll, beforeAll, beforeEach, describe, expect, it } from 'vitest';
 import { getDb } from '@/db';
 import { accounts, authorClaims, commitIdentities, pageCurrent, pageObjects } from '@/db/schema';
 import { decideClaim } from '@/server/claims';
-import { setThumbnail } from '@/server/pages/card';
+import { setLinks, setThumbnail } from '@/server/pages/card';
 import { historyWithHandles } from '@/server/pages/edit';
 import { savePaper } from '@/server/papers';
-import { api, closePool, resetDatabase, signUp } from './helpers';
+import { api, closePool, commitFiles, resetDatabase, signUp } from './helpers';
 
 const PAPER = { scheme: 'arxiv', value: '1706.03762' } as const;
 const PNG = Buffer.from('89504e470d0a1a0a0000000d49484452000000010000000108060000001f15c489', 'hex');
@@ -36,10 +36,7 @@ async function accountOf(email: string) {
 }
 
 const authorEdit = (cookie: string, content: string, baseOid: string | null = null) =>
-  api('POST', '/pages/edit', {
-    cookie,
-    body: { paper: PAPER, part: 'author', baseOid, section: 0, content, summary: '' },
-  });
+  commitFiles(cookie, PAPER, baseOid, { 'author/10-tldr.md': content });
 
 let images: string;
 beforeAll(() => {
@@ -77,9 +74,8 @@ describe('claiming a paper', () => {
     expect(current.authorHtml).toContain('Attention.');
 
     // Everything they do on their own paper is under the per-claim id, never their handle.
-    const community = await api('POST', '/pages/edit', {
-      cookie: ashish.cookie,
-      body: { paper: PAPER, baseOid: written.body.head, section: 0, content: '# Errata\nNone.\n', summary: '' },
+    const community = await commitFiles(ashish.cookie, PAPER, written.body.head, {
+      'community/10-errata.md': '# Errata\nNone.\n',
     });
     expect(community.status).toBe(200);
     const history = await historyWithHandles(paperId);
@@ -127,24 +123,16 @@ describe("a paper's picture and links", () => {
     const ada = await accountOf('ada@ethz.ch');
     const ashish = await accountOf('ashish@ethz.ch');
 
-    const links = await api('POST', '/pages/links', {
-      cookie: ada.cookie,
-      body: {
-        paper: PAPER,
-        links: [
-          { label: 'Code', url: 'https://github.com/tensorflow/tensor2tensor' },
-          { label: 'PDF', url: 'https://example.org/attention.pdf' },
-        ],
-      },
-    });
-    expect(links.status).toBe(200);
-    const bad = await api('POST', '/pages/links', {
-      cookie: ada.cookie,
-      body: { paper: PAPER, links: [{ label: 'X', url: 'javascript:alert(1)' }] },
-    });
-    expect(bad.status).toBe(422);
-
     const actor = { kind: 'account' as const, accountId: ada.account.id, isAdmin: false };
+    const links = await setLinks(paperId, actor, [
+      { label: 'Code', url: 'https://github.com/tensorflow/tensor2tensor' },
+      { label: 'PDF', url: 'https://example.org/attention.pdf' },
+    ]);
+    expect(links.status).toBe('committed');
+    await expect(setLinks(paperId, actor, [{ label: 'X', url: 'javascript:alert(1)' }])).rejects.toMatchObject({
+      status: 422,
+    });
+
     const picture = await setThumbnail(paperId, actor, { image: PNG, alt: 'One pixel' });
     expect(picture.status).toBe('committed');
     const [current] = await getDb().select().from(pageCurrent).where(eq(pageCurrent.paperId, paperId));
@@ -162,44 +150,33 @@ describe("a paper's picture and links", () => {
     const [claim] = await getDb().select().from(authorClaims);
     await decideClaim(claim.id, 'confirmed', null);
 
-    const denied = await api('POST', '/pages/links', { cookie: ada.cookie, body: { paper: PAPER, links: [] } });
-    expect(denied.status).toBe(403);
+    await expect(setLinks(paperId, actor, [])).rejects.toMatchObject({ status: 403 });
     await expect(setThumbnail(paperId, actor, { caption: 'Mine now' })).rejects.toMatchObject({ status: 403 });
-    const allowed = await api('POST', '/pages/links', { cookie: ashish.cookie, body: { paper: PAPER, links: [] } });
-    expect(allowed.status).toBe(200);
+    const owner = { kind: 'account' as const, accountId: ashish.account.id, isAdmin: false };
+    expect((await setLinks(paperId, owner, [])).status).toBe('committed');
   });
 });
 
-describe('opening an editor on the page', () => {
-  const opened = (cookie: string, part: string, section = 0) =>
-    api('GET', `/pages/editor?${new URLSearchParams({ ...PAPER, part, section: String(section) })}`, { cookie });
+describe('what the web editor says each viewer may change', () => {
+  const areas = async (cookie: string) =>
+    (await api('GET', `/workspace?${new URLSearchParams(PAPER)}`, { cookie })).body.areas;
 
-  it('says up front who may edit what, by the rules the commit enforces', async () => {
+  it('follows the rules the commit enforces', async () => {
     await paper();
     const ada = await accountOf('ada@ethz.ch');
     const ashish = await accountOf('ashish@ethz.ch');
 
-    expect((await opened('', 'community')).status).toBe(401);
-    const community = await opened(ada.cookie, 'community');
-    expect(community.status).toBe(200);
-    expect(community.body).toMatchObject({ part: 'community', section: 0, starter: true, baseOid: null });
-    expect((await opened(ada.cookie, 'community', 3)).status).toBe(404);
-    expect((await opened(ada.cookie, 'author')).body.error.code).toBe('forbidden');
-    expect((await opened(ada.cookie, 'card')).body).toEqual({
-      part: 'card',
-      thumbnail: null,
-      links: [],
-      claimed: false,
-    });
+    expect((await areas(''))['community/']).toBe('sign in to edit');
+    expect(await areas(ada.cookie)).toMatchObject({ 'community/': null, 'thumbnail.json': null, 'links/': null });
+    expect((await areas(ada.cookie))['author/']).toMatch(/confirmed authors/);
 
     await api('POST', '/claims', { cookie: ashish.cookie, body: { paper: PAPER, authorIndex: 0 } });
     const [claim] = await getDb().select().from(authorClaims);
     await decideClaim(claim.id, 'confirmed', null);
-    expect((await opened(ada.cookie, 'card')).status).toBe(403);
-    expect((await opened(ashish.cookie, 'card')).body.claimed).toBe(true);
-    expect((await opened(ashish.cookie, 'author')).body).toMatchObject({ part: 'author', starter: true });
+    expect((await areas(ada.cookie))['links/']).toMatch(/confirmed authors/);
+    expect(await areas(ashish.cookie)).toMatchObject({ 'author/': null, 'links/': null, 'thumbnail.json': null });
 
     await getDb().update(accounts).set({ verifiedAt: null }).where(eq(accounts.id, ada.account.id));
-    expect((await opened(ada.cookie, 'community')).body.error.code).toBe('not_verified');
+    expect((await areas(ada.cookie))['community/']).toMatch(/institutional email/);
   });
 });

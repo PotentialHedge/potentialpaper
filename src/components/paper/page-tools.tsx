@@ -18,7 +18,7 @@ import { findPaper, type FoundPaper } from '@/server/papers';
 
 export type ToolParams = Promise<{ scheme: string; value: string[] }>;
 export type ToolSearchParams = Promise<Record<string, string | string[] | undefined>>;
-export type Tool = 'edit' | 'history' | 'diff' | 'claim' | 'versions';
+export type Tool = 'edit' | 'code' | 'history' | 'diff' | 'claim' | 'versions';
 
 const SCHEME_OF_PREFIX = Object.fromEntries(
   Object.entries(PATH_PREFIX).map(([scheme, prefix]) => [prefix.slice(1), scheme as PaperScheme]),
@@ -53,15 +53,9 @@ export function toolPath(tool: Tool, id: PaperId, query = ''): string {
   return `/${tool}${paperPath(id)}${query ? `?${query}` : ''}`;
 }
 
-/**
- * What an edit link asks for: the part, or one of its sections, opens as its editor on the paper's page
- * (`components/paper/edit`).
- */
-export type EditTarget =
-  'community' | 'author' | 'links' | 'picture' | 'versions' | `${'community' | 'author'}-${number}`;
-
-export function editHref(id: PaperId, target: EditTarget = 'community'): string {
-  return `${paperPath(id)}#edit-${target}`;
+/** The paper's files in the web editor (`app/code`). */
+export function editHref(id: PaperId): string {
+  return toolPath('code', id);
 }
 
 export function first(value: string | string[] | undefined): string | undefined {

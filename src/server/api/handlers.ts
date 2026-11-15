@@ -3,7 +3,9 @@ import type { z } from 'zod';
 import type { Account, Affiliation } from '@/db/schema';
 import { updateProfile } from '../accounts';
 import { addAffiliation, listAffiliations, removeAffiliation, verifyAffiliation } from '../affiliations';
-import { requireAuth, requireSession, requireVerified, viewerFromHeaders, type Principal } from '../auth';
+import { authenticate, requireAuth, requireSession, requireVerified, viewerFromHeaders, type Principal } from '../auth';
+import { cloneAddresses } from '../pages/clone';
+import { commitWorkspace, readBlob, readWorkspace, rebaseWorkspace, storeWorkspaceFile } from '../workspace';
 import { issueAgentCode, redeemAgentCode, requestAgentCode } from '../agent-codes';
 import { uploadAgentFile } from '../agent-files';
 import { agentPostsOf, createAgentPost, removeAgentPost, type PresentedAgentPost } from '../agent-posts';
@@ -12,10 +14,8 @@ import { addSshKey, listSshKeys, removeSshKey } from '../ssh-keys';
 import { previewDemoSources } from '../demos/attach';
 import { snapshotDemo } from '../demos/snapshot';
 import { demoUrl } from '@/lib/demos';
-import { claimRoles, ownClaim, requestClaim, withdrawClaim } from '../claims';
-import { removeThumbnail, setLinks, setThumbnail } from '../pages/card';
+import { ownClaim, requestClaim, withdrawClaim } from '../claims';
 import { revertCommit, type Actor, type CommitResult } from '../pages/commit';
-import { editorState, editSection } from '../pages/edit';
 import { renderHtml } from '../pages/html';
 import { renderMarkdown } from '../pages/markdown';
 import { getDb } from '@/db';
@@ -220,62 +220,6 @@ function committed(result: CommitResult) {
     : { head: result.oid, merged: false, changed: false };
 }
 
-/**
- * What the editor on a paper's page opens with, and whether this viewer may save it: the same rules the
- * commit enforces (`pages/rules.ts`), asked up front so that the page can say so before anything is typed.
- */
-export const getEditor = route(async (req) => {
-  const principal = await requireAuth(req);
-  const { scheme, value, part, section } = parseQuery(req, S.EditorQuery);
-  const { paper } = await knownPaper(scheme, value);
-  const verified = principal.account.isBot || principal.account.verifiedAt !== null;
-  const roles = await claimRoles(paper.id, principal.account.id);
-  const may = principal.isAdmin || roles.confirmedAuthor;
-  if (!verified && !principal.isAdmin) {
-    throw new ApiError(403, 'not_verified', 'editing needs a confirmed institutional email address');
-  }
-  if (part === 'author' && !may) {
-    throw new ApiError(403, 'forbidden', "only this paper's confirmed authors can write its author section");
-  }
-  if (part === 'card') {
-    if (roles.claimed && !may) {
-      throw new ApiError(403, 'forbidden', 'this paper is claimed, so its authors choose its picture and links');
-    }
-    const [current] = await getDb()
-      .select({ thumbnail: pageCurrent.thumbnail, links: pageCurrent.links })
-      .from(pageCurrent)
-      .where(eq(pageCurrent.paperId, paper.id));
-    const thumbnail = current?.thumbnail ?? null;
-    return respond(
-      S.EditorOpened,
-      {
-        part,
-        thumbnail: thumbnail && { url: thumbnail.url, alt: thumbnail.alt ?? null, caption: thumbnail.caption ?? null },
-        links: current?.links ?? [],
-        claimed: roles.claimed,
-      },
-      { principal },
-    );
-  }
-  if (part === 'versions') {
-    const { head, versions } = await versionsAt(paper.id);
-    return respond(S.EditorOpened, { part, baseOid: head, versions: sortVersions(versions) }, { principal });
-  }
-  const state = await editorState(paper.id, part, section);
-  if (!state) throw new ApiError(404, 'not_found', `the page has no section ${section} any more`);
-  return respond(S.EditorOpened, state, { principal });
-});
-
-/** One section of the author or community page, put back into the file as it was when the editor loaded it. */
-export const postSectionEdit = route(async (req) => {
-  const principal = await requireVerified(req);
-  const { paper: id, evidence, ...edit } = await parseBody(req, S.SectionEditBody);
-  const { paper, identifiers } = await knownPaper(id.scheme, id.value);
-  const result = await editSection(paper.id, actorOf(principal), edit, { evidence });
-  if (result.status === 'committed') await refreshPaperPages(identifiers);
-  return respond(S.PageCommitted, committed(result), { principal });
-});
-
 /** The editor's preview, through the renderer commits use. Signed-in only, as only editors need it. */
 export const postRender = route(async (req) => {
   const principal = await requireAuth(req);
@@ -291,16 +235,6 @@ export const postRevert = route(async (req) => {
   const { paper: id, oid, summary, evidence } = await parseBody(req, S.RevertBody);
   const { paper, identifiers } = await knownPaper(id.scheme, id.value);
   const result = await revertCommit(paper.id, oid, actorOf(principal), summary?.trim() || undefined, { evidence });
-  if (result.status === 'committed') await refreshPaperPages(identifiers);
-  return respond(S.PageCommitted, committed(result), { principal });
-});
-
-/** The page's own links under its title, replaced as a whole. */
-export const postLinks = route(async (req) => {
-  const principal = await requireVerified(req);
-  const { paper: id, links, summary, evidence } = await parseBody(req, S.LinksBody);
-  const { paper, identifiers } = await knownPaper(id.scheme, id.value);
-  const result = await setLinks(paper.id, actorOf(principal), links, { evidence }, summary);
   if (result.status === 'committed') await refreshPaperPages(identifiers);
   return respond(S.PageCommitted, committed(result), { principal });
 });
@@ -399,40 +333,6 @@ export const postFile = route(async (req) => {
     },
     { status: 201, principal },
   );
-});
-
-/** A new picture (multipart `image`), or new words for the current one. */
-export const postThumbnail = route(async (req) => {
-  const principal = await requireVerified(req);
-  let form: FormData;
-  try {
-    form = await req.formData();
-  } catch {
-    throw new ApiError(400, 'validation_error', 'send a multipart form');
-  }
-  const fields = S.ThumbnailFields.safeParse(
-    Object.fromEntries([...form.entries()].filter(([, v]) => typeof v === 'string')),
-  );
-  if (!fields.success) throw new ApiError(400, 'validation_error', 'invalid form');
-  const { paper, identifiers } = await knownPaper(fields.data.scheme, fields.data.value);
-  const file = form.get('image');
-  const image = file instanceof File && file.size > 0 ? Buffer.from(await file.arrayBuffer()) : undefined;
-  const result = await setThumbnail(paper.id, actorOf(principal), {
-    image,
-    alt: fields.data.alt,
-    caption: fields.data.caption,
-  });
-  if (result.status === 'committed') await refreshPaperPages(identifiers);
-  return respond(S.PageCommitted, committed(result), { principal });
-});
-
-export const deleteThumbnail = route(async (req) => {
-  const principal = await requireVerified(req);
-  const { scheme, value } = parseQuery(req, S.PaperQuery);
-  const { paper, identifiers } = await knownPaper(scheme, value);
-  const result = await removeThumbnail(paper.id, actorOf(principal));
-  if (result.status === 'committed') await refreshPaperPages(identifiers);
-  return respond(S.PageCommitted, committed(result), { principal });
 });
 
 /** The viewer's own claim on the paper. */
@@ -601,4 +501,82 @@ export const deleteAgentPost = route(async (req, params) => {
   const id = parseParam(params.id, S.IdParam, 'id');
   await removeAgentPost(principal.account.id, id);
   return respond(S.Ok, { status: 'ok' }, { principal });
+});
+
+/**
+ * The web editor's API (`server/workspace.ts`). Reading is anyone's, as a clone is; a viewer who isn't signed in
+ * gets every file read-only.
+ */
+export const getWorkspace = route(async (req) => {
+  const principal = await authenticate(req);
+  const { scheme, value } = parseQuery(req, S.PaperQuery);
+  const { paper, identifiers } = await knownPaper(scheme, value);
+  const id = canonicalPaperId(identifiers) ?? { scheme, value };
+  const workspace = await readWorkspace(paper.id, principal ? actorOf(principal) : null);
+  return respond(
+    S.WorkspaceResponse,
+    {
+      ...workspace,
+      paper: { ...id, title: paper.title, path: paperPath(id) },
+      clone: cloneAddresses(id),
+    },
+    { principal, headers: { 'Cache-Control': 'private, no-store' } },
+  );
+});
+
+export const getWorkspaceBlob = route(async (req) => {
+  const { scheme, value, oid } = parseQuery(req, S.WorkspaceBlobQuery);
+  const { paper } = await knownPaper(scheme, value);
+  const body = await readBlob(paper.id, oid);
+  return new Response(new Uint8Array(body), {
+    headers: {
+      'Content-Type': 'application/octet-stream',
+      'Cache-Control': 'public, max-age=31536000, immutable',
+      'X-Content-Type-Options': 'nosniff',
+      'Content-Disposition': 'attachment',
+    },
+  });
+});
+
+export const postWorkspaceCommit = route(async (req) => {
+  const principal = await requireVerified(req);
+  const { paper: id, ...commit } = await parseBody(req, S.WorkspaceCommitBody);
+  const { paper, identifiers } = await knownPaper(id.scheme, id.value);
+  const result = await commitWorkspace(paper.id, actorOf(principal), commit);
+  if (result.status === 'committed') await refreshPaperPages(identifiers);
+  return respond(S.WorkspaceCommitted, committed(result), { principal });
+});
+
+/** A PDF or picture for a Git LFS path (multipart `file`, with `scheme`, `value` and `path`). */
+export const postWorkspaceFile = route(async (req) => {
+  const principal = await requireVerified(req);
+  let form: FormData;
+  try {
+    form = await req.formData();
+  } catch {
+    throw new ApiError(400, 'validation_error', 'send a multipart form');
+  }
+  const field = (name: string) => {
+    const v = form.get(name);
+    return typeof v === 'string' ? v : '';
+  };
+  const { scheme, value } = parseParam({ scheme: field('scheme'), value: field('value') }, S.PaperQuery, 'paper');
+  const { paper } = await knownPaper(scheme, value);
+  const file = form.get('file');
+  if (!(file instanceof File) || file.size === 0) throw new ApiError(400, 'validation_error', 'send a file');
+  const stored = await storeWorkspaceFile(
+    paper.id,
+    { kind: 'account', accountId: principal.account.id, isAdmin: principal.isAdmin },
+    field('path'),
+    Buffer.from(await file.arrayBuffer()),
+  );
+  return respond(S.WorkspaceStored, stored, { status: 201, principal });
+});
+
+/** Changes made from an older head, merged onto the current one with conflict markers; nothing is committed. */
+export const postWorkspaceRebase = route(async (req) => {
+  const principal = await requireAuth(req);
+  const { paper: id, baseOid, changes } = await parseBody(req, S.WorkspaceRebaseBody);
+  const { paper } = await knownPaper(id.scheme, id.value);
+  return respond(S.WorkspaceRebased, await rebaseWorkspace(paper.id, baseOid, changes), { principal });
 });
