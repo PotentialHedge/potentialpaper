@@ -57,7 +57,9 @@ await build({
   entryPoints: { preview: join(source, 'webview/preview.ts'), 'pdf/viewer': join(source, 'webview/pdf.ts') },
   outdir: join(out, 'media'),
   bundle: true,
-  format: 'esm',
+  // Classic scripts: a webview's resources come from another origin through its service worker, without the CORS
+  // headers a module script needs.
+  format: 'iife',
   platform: 'browser',
   target: 'es2022',
   minify: true,

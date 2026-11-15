@@ -115,7 +115,7 @@ export class PdfViewer implements vscode.CustomReadonlyEditorProvider {
     </div>
     <p id="note" hidden></p>
     <div id="viewerContainer"><div id="viewer" class="pdfViewer"></div></div>
-    <script nonce="${n}" type="module" src="${asset('viewer.js')}"></script>
+    <script nonce="${n}" src="${asset('viewer.js')}"></script>
   </body>
 </html>`;
   }

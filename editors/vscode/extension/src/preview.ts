@@ -149,7 +149,9 @@ export class Preview implements vscode.Disposable {
       if (mine !== this.seq) return;
       const signIn = err instanceof SignInNeeded;
       const text = signIn
-        ? `Previews are made by ${new URL(err.origin).host}: sign in with an API key from your profile to see them.`
+        ? file.root.scheme === 'file'
+          ? `Previews are made by ${new URL(err.origin).host}: sign in with an API key from your profile to see them.`
+          : 'Sign in on the site to see the preview.'
         : err instanceof Error
           ? err.message
           : String(err);

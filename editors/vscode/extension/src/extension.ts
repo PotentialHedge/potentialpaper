@@ -494,7 +494,9 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
       if (store.workspace) tell({ type: 'ready', previews });
       sendActive();
     }
-    if (event.data?.type === 'open' && event.data.path) void vscode.window.showTextDocument(uriOf(event.data.path));
+    // `vscode.open`, so a PDF opens in its viewer.
+    if (event.data?.type === 'open' && event.data.path)
+      void vscode.commands.executeCommand('vscode.open', uriOf(event.data.path));
   };
 
   try {

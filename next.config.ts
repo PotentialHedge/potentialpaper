@@ -1,5 +1,5 @@
 import type { NextConfig } from 'next';
-import { editorCsp } from './src/editors/vscode/csp';
+import { editorCsp, WEBVIEW_PRE_PATH, webviewCsp } from './src/editors/vscode/csp';
 import { DEMO_HOSTNAME, DEMO_ORIGIN } from './src/lib/demos';
 import { HOME_LIST_PARAMS, PRIVATE_PAGES } from './src/lib/private-paths';
 
@@ -66,6 +66,12 @@ const nextConfig: NextConfig = {
           { key: 'X-Content-Type-Options', value: 'nosniff' },
           { key: 'Cache-Control', value: 'public, max-age=86400' },
         ],
+      },
+      {
+        // A webview's own pages, on the webview's origin, framed by the editor (`webviewCsp`). After the rule
+        // above, so its policy replaces the editor's.
+        source: `/editor/vscode/:version${WEBVIEW_PRE_PATH}:path*`,
+        headers: [{ key: 'Content-Security-Policy', value: webviewCsp() }],
       },
       ...PRIVATE_PAGES.map((source) => ({
         source,

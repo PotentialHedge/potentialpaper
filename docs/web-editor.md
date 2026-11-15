@@ -86,7 +86,11 @@ Code.
 - **PDFs** (`pdf.ts`, `webview/pdf.ts`): a read-only custom editor for `*.pdf`, PDF.js's viewer component with
   its fonts, character maps and decoders in the extension, parsing on the page (a webview can't start a worker
   from its resources). The bytes come through VS Code, so in the browser from R2, in a clone from the disk; a
-  file that is still a Git LFS pointer says so.
+  file that is still a Git LFS pointer says so. The browser fetches PDFs from R2's public host, so that host answers CORS
+  requests from anywhere: a CORS rule on the `papertrail-pdfs` bucket (GET and HEAD, any origin), and a response
+  header transform rule on the `pdfs.` host that sets `Access-Control-Allow-Origin: *`, since Cloudflare's cache
+  keeps one copy whatever the `Origin` and would otherwise serve one without the header. Both set 2026-11-15 in
+  the Cloudflare dashboard's account and zone, not in this repo.
 - **JSON files** get their schemas' errors, completion and hovers, and on an empty file a skeleton of the required
   fields (`defaultSnippets`, added by `scripts/write-page-schemas.ts` to the extension's copy only).
   **PotentialPaper: New Link** writes `links/NN-<slug>.json`.
