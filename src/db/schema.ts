@@ -59,6 +59,8 @@ export const accounts = pgTable(
     /** When the account's first institutional address was confirmed; `null` once none is. Gates writing. */
     verifiedAt: timestamp('verified_at', { withTimezone: true, mode: 'date' }),
     isBot: boolean('is_bot').notNull().default(false),
+    /** Whether a `@` mention in a comment may be mailed (`server/mentions.ts`). On by default. */
+    mentionMail: boolean('mention_mail').notNull().default(true),
     createdAt: createdAt(),
   },
   (t) => [
@@ -751,3 +753,83 @@ export const evidenceFiles = pgTable(
 );
 
 export type EvidenceFile = typeof evidenceFiles.$inferSelect;
+
+/**
+ * The discussion under a paper (DESIGN.md §9), on its page. Kept in Postgres, not the page's git: each comment
+ * has one writer, there are many, and they never need merging. Stored as written (Markdown) and rendered on
+ * read (`server/comments/render.ts`).
+ *
+ * **Who wrote it is shown as §5.3 says** (`server/comments/index.ts`): by handle, or with `anonymous` by the
+ * account's alias on this paper (`comment_aliases`), and always by their name on the paper when the account
+ * is one of its confirmed authors. `account_id` is for that and for moderation, never for display.
+ *
+ * **Replies nest.** `parent_id` is null on a top-level comment and names the comment answered, on the same
+ * paper, at any depth. A removed comment keeps its place in the thread and loses its words.
+ */
+export const comments = pgTable(
+  'comments',
+  {
+    id: uuid('id').primaryKey().defaultRandom(),
+    paperId: uuid('paper_id')
+      .notNull()
+      .references(() => papers.id, { onDelete: 'cascade' }),
+    parentId: uuid('parent_id').references((): AnyPgColumn => comments.id, { onDelete: 'cascade' }),
+    accountId: uuid('account_id')
+      .notNull()
+      .references(() => accounts.id, { onDelete: 'cascade' }),
+    body: text('body').notNull(),
+    /** Shown under the account's alias on this paper rather than its handle. Never set by a confirmed author. */
+    anonymous: boolean('anonymous').notNull().default(false),
+    removedAt: timestamp('removed_at', { withTimezone: true, mode: 'date' }),
+    createdAt: createdAt(),
+  },
+  (t) => [
+    index('comments_paper_created_idx').on(t.paperId, t.createdAt, t.id),
+    index('comments_parent_created_idx').on(t.parentId, t.createdAt, t.id),
+  ],
+);
+
+export type Comment = typeof comments.$inferSelect;
+
+/**
+ * An account's pseudonym on one paper, OpenReview-style: "Anonymous k3xm" (`lib/aliases.ts`). The same on
+ * every anonymous comment the account makes on the paper, so a reader can follow one voice and `@k3xm` it,
+ * and unrelated to its alias on any other paper. Made the first time the account comments anonymously
+ * there, by `server/comments` only, and never changed. Random, never derived from the account.
+ */
+export const commentAliases = pgTable(
+  'comment_aliases',
+  {
+    paperId: uuid('paper_id')
+      .notNull()
+      .references(() => papers.id, { onDelete: 'cascade' }),
+    accountId: uuid('account_id')
+      .notNull()
+      .references(() => accounts.id, { onDelete: 'cascade' }),
+    alias: text('alias').notNull(),
+    createdAt: createdAt(),
+  },
+  (t) => [
+    primaryKey({ columns: [t.paperId, t.accountId] }),
+    uniqueIndex('comment_aliases_paper_alias_key').on(t.paperId, t.alias),
+  ],
+);
+
+/**
+ * Who a comment `@`-mentions: one row per (comment, account), for the mentioned account's inbox
+ * (`GET /api/v1/me/mentions`) and its mail (`server/mentions.ts`). Resolved once, when the comment is posted,
+ * as the page highlights it: an alias on that paper, or a handle. Never the author. Written by
+ * `server/comments` only, in the comment's own transaction, and never changed after.
+ */
+export const commentMentions = pgTable(
+  'comment_mentions',
+  {
+    commentId: uuid('comment_id')
+      .notNull()
+      .references(() => comments.id, { onDelete: 'cascade' }),
+    accountId: uuid('account_id')
+      .notNull()
+      .references(() => accounts.id, { onDelete: 'cascade' }),
+  },
+  (t) => [primaryKey({ columns: [t.commentId, t.accountId] }), index('comment_mentions_account_idx').on(t.accountId)],
+);

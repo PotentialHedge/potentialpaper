@@ -1,5 +1,5 @@
 import katex from 'katex';
-import MarkdownIt, { type StateBlock, type StateInline, type Token } from 'markdown-it';
+import MarkdownIt, { type MarkdownIt as Md, type StateBlock, type StateInline, type Token } from 'markdown-it';
 import {
   DEMO_ALLOW,
   DEMO_SANDBOX,
@@ -133,8 +133,8 @@ function renderDemo(ref: DemoRef, body: string, demo: DemoSource | undefined, es
   ].join('');
 }
 
-function newRenderer() {
-  const md = new MarkdownIt({ html: false, linkify: true, typographer: false });
+/** TeX math, `$…$` and `$$…$$`, through KaTeX: the pages' renderer and the comments' (`server/comments/render.ts`). */
+export function mathPlugin(md: Md): void {
   md.inline.ruler.after('escape', 'math_inline', inlineMath);
   md.block.ruler.after('blockquote', 'math_block', blockMath, {
     alt: ['paragraph', 'reference', 'blockquote', 'list'],
@@ -142,6 +142,11 @@ function newRenderer() {
   md.renderer.rules.math_inline = (tokens, idx) => renderMath(tokens[idx].content, false);
   md.renderer.rules.math_block = (tokens, idx) =>
     `<div class="math-display">${renderMath(tokens[idx].content, true)}</div>\n`;
+}
+
+function newRenderer() {
+  const md = new MarkdownIt({ html: false, linkify: true, typographer: false });
+  mathPlugin(md);
 
   const fence = md.renderer.rules.fence!;
   md.renderer.rules.fence = (tokens, idx, options, env: RenderEnv | undefined, self) => {

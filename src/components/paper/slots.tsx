@@ -1,7 +1,8 @@
 import type { ComponentType } from 'react';
 import { ui } from '@/components/ui';
 import type { Paper } from '@/db/schema';
-import { sourceLinks, sourceName, type PaperId } from '@/lib/paper-ids';
+import { paperPath, sourceLinks, sourceName, type PaperId } from '@/lib/paper-ids';
+import { Comments } from './Comments';
 import type { Submission } from '@/lib/submissions';
 import type { PdfPointer } from '@/server/pages/rules';
 import { toolPath } from './page-tools';
@@ -221,10 +222,15 @@ function VersionsAside({ versions }: PanelProps) {
   return <VersionsBox versions={versions} />;
 }
 
+/** The discussion (DESIGN.md §9): a client island, since what it shows depends on who is reading. */
+function Discussion({ canonical }: PanelProps) {
+  return <Comments paper={canonical} path={paperPath(canonical)} />;
+}
+
 const PANELS: Record<PaperSlot, ComponentType<PanelProps>[]> = {
   'paper.main': [Abstract, AuthorSection],
   'paper.aside': [ReadThePaper, VersionsAside, SubmissionsAside],
-  'paper.body': [CommunitySection, Versions, Submissions],
+  'paper.body': [CommunitySection, Versions, Submissions, Discussion],
 };
 
 export function Slot({ name, ...props }: PanelProps & { name: PaperSlot }) {

@@ -169,6 +169,13 @@
       "when": 1794739340790,
       "tag": "0023_lfs_objects",
       "breakpoints": true
+    },
+    {
+      "idx": 24,
+      "version": "7",
+      "when": 1794766633690,
+      "tag": "0024_comments",
+      "breakpoints": true
     }
   ]
 }

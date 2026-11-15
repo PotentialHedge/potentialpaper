@@ -11,6 +11,7 @@ import { listSshKeys } from '@/server/ssh-keys';
 import { listTokens } from '@/server/tokens';
 import { ApiKeys } from './ApiKeys';
 import { Affiliations } from './Affiliations';
+import { MentionMail } from './MentionMail';
 import { ProfileForm } from './ProfileForm';
 import { SshKeys } from './SshKeys';
 
@@ -57,6 +58,10 @@ export default async function Profile() {
           createdAt: r.createdAt.toISOString(),
         }))}
       />
+      <h2 className={ui.groupHeading} id="email">
+        Email
+      </h2>
+      <MentionMail initial={account.mentionMail} />
       <h2 className={ui.groupHeading} id="agents">
         API keys and agents
       </h2>

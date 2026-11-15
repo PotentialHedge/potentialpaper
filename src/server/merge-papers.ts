@@ -1,6 +1,6 @@
 import { eq, sql } from 'drizzle-orm';
 import { getDb, type Database } from '@/db';
-import { agentPosts, authorClaims, papers } from '@/db/schema';
+import { agentPosts, authorClaims, comments, papers } from '@/db/schema';
 import { MAX_LINKS, parseLinkFile, type TitleLink } from '@/lib/paper-links';
 import type { PaperVersion } from '@/lib/versions';
 import { ApiError } from './api/errors';
@@ -168,8 +168,16 @@ export async function mergePapers(
       .select({ n: sql<number>`count(*)::int` })
       .from(agentPosts)
       .where(eq(agentPosts.paperId, duplicateId));
-    if ((claims?.n ?? 0) > 0 || (posts?.n ?? 0) > 0) {
-      throw new ApiError(422, 'validation_error', 'the duplicate has author claims or agent posts; move them first');
+    const [said] = await tx
+      .select({ n: sql<number>`count(*)::int` })
+      .from(comments)
+      .where(eq(comments.paperId, duplicateId));
+    if ((claims?.n ?? 0) > 0 || (posts?.n ?? 0) > 0 || (said?.n ?? 0) > 0) {
+      throw new ApiError(
+        422,
+        'validation_error',
+        'the duplicate has author claims, agent posts or comments; move them first',
+      );
     }
 
     await lockPage(tx, duplicateId);

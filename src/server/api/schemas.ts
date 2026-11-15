@@ -11,6 +11,7 @@ import { TOKEN_SCOPES } from '@/db/schema';
 import { REAL_NAME_MAX } from '@/lib/profile';
 import { MAX_VERSIONS, VERSION_KINDS, VERSION_STATUSES } from '@/lib/versions';
 import { SEARCH_SORTS } from '@/lib/search';
+import { MAX_COMMENT_LENGTH } from '@/lib/comments';
 
 /** The `/api/v1` contract: requests are validated on the way in, responses on the way out. */
 
@@ -36,6 +37,7 @@ export const Me = z.object({
   institutions: z.array(z.string()),
   verified: z.boolean(),
   profileComplete: z.boolean(),
+  mentionMail: z.boolean(),
 });
 
 export const MePatch = z
@@ -43,6 +45,8 @@ export const MePatch = z
     handle: z.string().min(1).max(64).optional(),
     realName: z.string().max(REAL_NAME_MAX).nullable().optional(),
     showInstitution: z.boolean().optional(),
+    /** Whether a `@` mention in a comment is mailed. */
+    mentionMail: z.boolean().optional(),
   })
   .refine((v) => Object.keys(v).length > 0, { message: 'nothing to change' });
 
@@ -491,4 +495,85 @@ export const WorkspaceRebased = z.object({
       conflict: z.boolean(),
     }),
   ),
+});
+
+/** The discussion under a paper (`server/comments`). */
+export const CommentsQuery = PaperQuery.extend({
+  cursor: z.string().max(200).optional(),
+  limit: z.coerce.number().int().min(1).max(100).default(20),
+});
+
+export const CommentRepliesQuery = z.object({
+  after: z.uuid().optional(),
+  limit: z.coerce.number().int().min(1).max(100).default(20),
+});
+
+export const CommentBody = z.object({
+  paper: PaperIdentifier,
+  body: z.string().trim().min(1).max(MAX_COMMENT_LENGTH),
+  parentId: z.uuid().nullable().optional(),
+  /** Under the account's alias on this paper rather than its handle. Refused for one of its confirmed authors. */
+  anonymous: z.boolean().optional(),
+});
+
+export const CommentPreviewBody = z.object({
+  paper: PaperIdentifier,
+  body: z.string().max(MAX_COMMENT_LENGTH),
+});
+
+export const CommentPreview = z.object({ html: z.string(), mentions: z.array(z.string()) });
+
+const CommentAuthor = z.discriminatedUnion('kind', [
+  z.object({ kind: z.literal('author'), name: z.string(), isYou: z.boolean() }),
+  z.object({ kind: z.literal('alias'), alias: z.string(), isYou: z.boolean() }),
+  z.object({
+    kind: z.literal('account'),
+    handle: z.string(),
+    realName: z.string().nullable(),
+    institutions: z.array(z.string()),
+    bot: z.boolean(),
+    isYou: z.boolean(),
+  }),
+]);
+
+export const Comment = z.object({
+  id: z.uuid(),
+  parentId: z.uuid().nullable(),
+  body: z.string().nullable(),
+  html: z.string().nullable(),
+  createdAt: z.string(),
+  removed: z.boolean(),
+  replyCount: z.number().int(),
+  mentions: z.array(z.string()),
+  author: CommentAuthor,
+});
+
+export const CommentViewer = z.object({
+  canComment: z.boolean(),
+  handle: z.string(),
+  alias: z.string().nullable(),
+  authorName: z.string().nullable(),
+});
+
+export const CommentList = z.object({
+  comments: z.array(Comment),
+  /** Previews of the replies under `comments`, flat, oldest first: `parentId` makes the tree. */
+  replies: z.array(Comment),
+  nextCursor: z.string().nullable(),
+  total: z.number().int(),
+  /** `null` for a visitor. */
+  viewer: CommentViewer.nullable(),
+});
+
+export const CommentReplies = z.object({ replies: z.array(Comment) });
+
+export const MentionsQuery = z.object({
+  cursor: z.string().max(200).optional(),
+  since: z.iso.datetime({ offset: true }).optional(),
+  limit: z.coerce.number().int().min(1).max(100).default(20),
+});
+
+export const MentionList = z.object({
+  mentions: z.array(z.object({ comment: Comment, paper: z.object({ title: z.string(), path: z.string() }) })),
+  nextCursor: z.string().nullable(),
 });

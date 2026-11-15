@@ -136,6 +136,19 @@
   .md img {
     @apply max-w-full;
   }
+  /* A comment (`server/comments/render.ts`): body text, its headings bold paragraphs, its only images GIFs. */
+  .comment-md > * + * {
+    margin-top: 0.5em;
+  }
+  .comment-md img {
+    @apply my-1.5 max-h-72;
+  }
+  .comment-md .mention {
+    @apply font-mono text-[13px] text-accent;
+  }
+  .comment-md .mention-you {
+    @apply bg-tint px-0.5;
+  }
   .md .math-display {
     @apply overflow-x-auto overflow-y-hidden;
   }
