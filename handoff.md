@@ -16,7 +16,7 @@ GitHub repos come later.
 
 ## Current state
 
-Milestones 0, 1 and 2 are built, merged into `main` and deployed, and Milestone 3's editor is live. Mail doesn't work yet.
+Milestones 0, 1 and 2 are built, merged into `main` and deployed, and Milestone 3's web editor (VS Code for the Web) is live. Mail doesn't work yet.
 
 - **Stack:** Next 16.4.5, Drizzle, Postgres 16, Better Auth, Tailwind v4 and Vitest, with Cloudflare R2 for PDFs
   and images.
