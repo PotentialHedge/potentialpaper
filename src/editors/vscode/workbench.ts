@@ -42,7 +42,6 @@ export function workbenchHtml(paper: PaperId & { title: string }): string {
       // The section preview and the PDF viewer are webviews, which need an origin each (`csp.ts`). Where there is
       // none, the host page shows its own preview, and a PDF opens as VS Code shows any file it can't read.
       'potentialpaper.webviews': Boolean(webview),
-      ...(webview ? {} : { 'workbench.editorAssociations': { '*.pdf': 'default' } }),
       'workbench.colorTheme': 'Default Light Modern',
       'workbench.startupEditor': 'none',
       'workbench.tips.enabled': false,
@@ -58,6 +57,13 @@ export function workbenchHtml(paper: PaperId & { title: string }): string {
       'workbench.layoutControl.enabled': false,
       'debug.showInStatusBar': 'never',
       'debug.toolBarLocation': 'hidden',
+      // One way to see a section: as text, with the page's preview beside it (the extension's). VS Code's own
+      // Markdown preview and Markdown editor are left out of the editor-type picker, which then isn't shown.
+      'workbench.editor.hiddenEditorTypes': ['vscode.markdown.preview.editor', 'vscode.markdown.editor'],
+      'workbench.editorAssociations': {
+        '*.md': 'default',
+        ...(webview ? {} : { '*.pdf': 'default' }),
+      },
       // Each JSON file is checked against its schema, which the extension carries (scripts/write-page-schemas.ts),
       // for errors, completion and hovers as people type. A commit is refused while one has an error.
       'json.schemaDownload.trustedDomains': { [`${site}/`]: true },
