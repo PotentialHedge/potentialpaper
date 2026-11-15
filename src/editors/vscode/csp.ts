@@ -12,8 +12,9 @@ export function webviewTemplate(): string | undefined {
   const configured = process.env.WEB_EDITOR_WEBVIEW_URL;
   if (configured) return configured;
   const origin = new URL(siteUrl());
-  // Browsers resolve every name under `localhost` to this machine, so in development each webview gets one.
-  if (origin.hostname === 'localhost') {
+  // Browsers resolve every name under `localhost` to this machine, so in development each webview gets one. Not in
+  // a production build, whose headers are fixed at build time, when `APP_URL` may not be set yet.
+  if (origin.hostname === 'localhost' && process.env.NODE_ENV !== 'production') {
     return `${origin.protocol}//{{uuid}}.localhost${origin.port ? `:${origin.port}` : ''}${VSCODE_BASE}/out/vs/workbench/contrib/webview/browser/pre/`;
   }
   return undefined;
