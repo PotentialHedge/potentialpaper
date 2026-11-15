@@ -501,6 +501,8 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
     await store.load();
   } catch (err) {
     void vscode.window.showErrorMessage(`The page could not be loaded: ${describe(err)}`);
+    // Ready all the same, so the host page uncovers the frame and the message shows.
+    tell({ type: 'ready', previews });
     return;
   }
   refreshGroup();

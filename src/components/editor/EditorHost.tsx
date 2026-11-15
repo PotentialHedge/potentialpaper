@@ -39,6 +39,10 @@ export function EditorHost({
   const [showPreview, setShowPreview] = useState(true);
   /** Whether the editor previews sections itself; not known until it has loaded. */
   const [editorPreviews, setEditorPreviews] = useState<boolean | null>(null);
+  /** The editor has loaded the page's files (its `ready`); until then a notice covers its frame. */
+  const [ready, setReady] = useState(false);
+  /** Loading has taken long enough to say so. */
+  const [slow, setSlow] = useState(false);
   const format = sectionFormat(active.path);
   const html = rendered && rendered.path === active.path ? rendered.html : null;
   const seq = useRef(0);
@@ -47,12 +51,19 @@ export function EditorHost({
     const channel = new BroadcastChannel(editorChannelName(paper));
     channel.onmessage = (event: MessageEvent<EditorMessage>) => {
       const message = event.data;
-      if (message?.type === 'ready') setEditorPreviews(Boolean(message.previews));
+      if (message?.type === 'ready') {
+        setEditorPreviews(Boolean(message.previews));
+        setReady(true);
+      }
       if (message?.type === 'active') setActive({ path: message.path, text: message.text });
       if (message?.type === 'committed') setCommitted(true);
     };
     channel.postMessage({ type: 'hello' } satisfies HostMessage);
-    return () => channel.close();
+    const timer = setTimeout(() => setSlow(true), 20_000);
+    return () => {
+      channel.close();
+      clearTimeout(timer);
+    };
   }, [paper]);
 
   useEffect(() => {
@@ -103,12 +114,35 @@ export function EditorHost({
         </a>
       </div>
       <div className="flex min-h-0 flex-1 narrow:flex-col">
-        <iframe
-          src={frameSrc}
-          title={`${editorName}: the page's files`}
-          className="min-h-0 min-w-0 flex-[3] border-0 narrow:min-h-[70vh]"
-          allow="clipboard-read; clipboard-write"
-        />
+        <div className="relative flex min-h-0 min-w-0 flex-[3] narrow:min-h-[70vh]">
+          <iframe
+            src={frameSrc}
+            title={`${editorName}: the page's files`}
+            className="min-h-0 min-w-0 flex-1 border-0"
+            allow="clipboard-read; clipboard-write"
+          />
+          {!ready && (
+            <div
+              role="status"
+              className="absolute inset-0 flex flex-col items-center justify-center gap-3 bg-bg font-sans text-sm text-muted"
+            >
+              <span
+                aria-hidden
+                className="size-6 animate-spin rounded-full border-2 border-rule-strong border-t-accent"
+              />
+              <span>Loading {editorName} and the page&apos;s files…</span>
+              {slow && (
+                <span className="max-w-sm text-center text-xs">
+                  This is taking a while. The first time, the editor has a lot to download; if nothing changes,{' '}
+                  <button type="button" className={ui.linkBtn} onClick={() => window.location.reload()}>
+                    reload the page
+                  </button>
+                  .
+                </span>
+              )}
+            </div>
+          )}
+        </div>
         {showPreview && editorPreviews === false && (
           <section
             aria-label="Preview"
