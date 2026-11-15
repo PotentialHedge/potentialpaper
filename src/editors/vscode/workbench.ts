@@ -31,6 +31,8 @@ export function workbenchHtml(paper: PaperId & { title: string }): string {
       nameShort: 'PotentialPaper',
       nameLong: 'PotentialPaper Editor',
       enableTelemetry: false,
+      // The Commit button in Source Control (the extension's `actionButton`), a proposed API.
+      extensionEnabledApiProposals: { 'potentialpaper.potentialpaper': ['scmActionButton'] },
       ...(webview ? { webviewContentExternalBaseUrlTemplate: webview } : {}),
     },
     windowIndicator: { label: `$(book) ${paper.title.slice(0, 60)}`, tooltip: paper.title },
@@ -46,9 +48,8 @@ export function workbenchHtml(paper: PaperId & { title: string }): string {
       'update.mode': 'none',
       'extensions.autoCheckUpdates': false,
       'chat.disableAIFeatures': true,
-      // A page editor, not a workbench for code: no accounts, chat sidebar, layout menu or debugging. The
-      // terminal, debugging and extensions views go at build time (editors/vscode/patch-vscode.mjs).
-      'workbench.activity.showAccounts': false,
+      // A page editor, not a workbench for code: no chat sidebar, layout menu or debugging. The terminal,
+      // debugging, extensions views and Accounts go at build time (editors/vscode/patch-vscode.mjs).
       'workbench.secondarySideBar.defaultVisibility': 'hidden',
       'workbench.layoutControl.enabled': false,
       'debug.showInStatusBar': 'never',

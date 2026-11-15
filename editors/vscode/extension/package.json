@@ -8,6 +8,9 @@
   "engines": {
     "vscode": "^1.145.0"
   },
+  "enabledApiProposals": [
+    "scmActionButton"
+  ],
   "browser": "./dist/extension.js",
   "activationEvents": [
     "onFileSystem:potentialpaper",

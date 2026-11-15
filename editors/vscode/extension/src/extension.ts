@@ -24,6 +24,12 @@ function originalUri(path: string): vscode.Uri {
   return vscode.Uri.from({ scheme: ORIGINAL_SCHEME, authority: 'page', path: `/${path}` });
 }
 
+/** VS Code's `scmActionButton` API, not in `@types/vscode` as it isn't final. */
+interface ActionButton {
+  command: vscode.Command & { shortTitle?: string };
+  enabled: boolean;
+}
+
 /** What goes to the host page: the open file, for its preview, and commits, for its links. Same-origin only. */
 type HostMessage =
   | { type: 'ready' }
@@ -185,6 +191,15 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
       };
     });
     scm.count = group.resourceStates.length;
+    // The Commit button under the message box (the `scmActionButton` API, which `workbench.ts` turns on).
+    (scm as vscode.SourceControl & { actionButton?: ActionButton }).actionButton = {
+      command: {
+        command: 'potentialpaper.commit',
+        title: scm.count > 0 ? '$(check) Commit to the page' : '$(check) Commit (nothing changed yet)',
+        shortTitle: 'Commit',
+      },
+      enabled: scm.count > 0,
+    };
   };
   store.onDidChange(refreshGroup);
 

@@ -59,7 +59,8 @@ Code.
 - **Trimmed:** `editors/vscode/patch-vscode.mjs` patches the sources before the build: no terminal, Run and Debug,
   Ports, Remote or Extensions views (hidden from the activity bar and panel; the services stay, as much of the
   workbench asks for them), no Run or Terminal menus, and no GitHub/Microsoft sign-in, notebook, npm, simple
-  browser or prompt-file extensions. Settings in `workbench.ts` hide Accounts, the secondary side bar, the
+  browser or prompt-file extensions. Accounts is hidden by default (also the patch, as it is stored, not a setting). Settings in `workbench.ts`
+  hide the secondary side bar, the
   layout controls and the debug toolbar; the extension binds the terminal/debug/extensions keys to nothing. Their
   commands are still in the command palette.
 - **Schemas:** the JSON files of a page (links, versions, `thumbnail.json`, `pdf.json`) are checked as they're

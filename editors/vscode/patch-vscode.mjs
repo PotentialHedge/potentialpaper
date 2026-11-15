@@ -52,6 +52,14 @@ patch(
     `!${JSON.stringify(HIDDEN_MENUS)}.includes(mainMenuAction.item.title.original)) {`,
 );
 
+// Accounts hidden in the activity bar unless someone turns it back on. Kept in the browser's storage, not a
+// setting, so only its default can be changed.
+patch(
+  'src/vs/workbench/browser/parts/globalCompositeBar.ts',
+  'return storageService.getBoolean(AccountsActivityActionViewItem.ACCOUNTS_VISIBILITY_PREFERENCE_KEY, StorageScope.PROFILE, true);',
+  'return storageService.getBoolean(AccountsActivityActionViewItem.ACCOUNTS_VISIBILITY_PREFERENCE_KEY, StorageScope.PROFILE, false);',
+);
+
 // Left out when the built-in extensions are packaged (they are still compiled, which the build insists on).
 patch(
   'build/lib/extensions.ts',
