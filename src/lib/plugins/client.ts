@@ -1,9 +1,9 @@
 'use client';
 
 import { useSyncExternalStore } from 'react';
-import { load as reloadSettings, settingsSnapshot, subscribeSettings } from '../settings/client';
+import { load as reloadSettings, setSetting, settingsSnapshot, subscribeSettings } from '../settings/client';
 import type { InstalledPlugin } from './installed';
-import { validateManifest } from './manifest';
+import { type PluginPermission, validateManifest } from './manifest';
 import { MANIFEST_FILE, parsePluginSource } from './sources';
 
 /**
@@ -64,7 +64,13 @@ export function removeDevPlugin(url: string) {
 
 /** A dev server's plugin, as the server would list it; its manifest checked here, with the same validator. */
 async function devPlugin(url: string): Promise<InstalledPlugin> {
-  const base = { source: url, ref: null, enabled: true, from: 'dev' as const, missing: { permissions: [], network: [] } };
+  const base = {
+    source: url,
+    ref: null,
+    enabled: true,
+    from: 'dev' as const,
+    missing: { permissions: [], network: [] },
+  };
   try {
     const res = await fetch(new URL(MANIFEST_FILE, url), { cache: 'no-store' });
     if (!res.ok) throw new Error(`${MANIFEST_FILE}: HTTP ${res.status}`);
@@ -188,4 +194,106 @@ export async function installPlugin(source: string): Promise<InstalledPlugin> {
   // Its settings join the reader's, and it joins the pages; the settings change reloads the plugins.
   void reloadSettings();
   return body as InstalledPlugin;
+}
+
+async function call<T>(url: string, init: RequestInit, what: string): Promise<T> {
+  const res = await fetch(url, {
+    ...init,
+    headers: init.body ? { 'Content-Type': 'application/json' } : undefined,
+    cache: 'no-store',
+  });
+  const body = await res.json().catch(() => null);
+  if (!res.ok) throw new Error(body?.error?.message ?? `couldn't ${what} (${res.status})`);
+  return body as T;
+}
+
+/** Remove a plugin from the reader's settings.json (a site default is turned off instead). */
+export async function uninstallPlugin(source: string): Promise<void> {
+  await call(`/api/v1/me/plugins?source=${encodeURIComponent(source)}`, { method: 'DELETE' }, 'remove it');
+  void reloadSettings();
+}
+
+/** Withdraw the reader's approval: the plugin asks again before it runs. */
+export async function revokePlugin(pluginId: string): Promise<void> {
+  await call(`/api/v1/me/plugins/grants?plugin=${encodeURIComponent(pluginId)}`, { method: 'DELETE' }, 'withdraw it');
+  reloadPlugins();
+}
+
+/**
+ * Turn an installed plugin on or off: its entry in settings.json's `plugins`. A site default turned back on loses
+ * its entry, so it follows the site again.
+ */
+export async function setPluginEnabled(plugin: InstalledPlugin, enabled: boolean): Promise<void> {
+  const entry =
+    plugin.from === 'site' && enabled
+      ? undefined
+      : { enabled, ...(plugin.ref && plugin.from !== 'site' ? { ref: plugin.ref } : {}) };
+  await setSetting(['plugins', plugin.source], entry);
+}
+
+/** A public repo with the topic `potentialpaper-plugin` (`GET /api/v1/plugins/discover`). */
+export interface DiscoveredPlugin {
+  source: string;
+  owner: string;
+  repo: string;
+  description: string | null;
+  stars: number;
+  pushedAt: string | null;
+  htmlUrl: string;
+  avatarUrl: string | null;
+  topics: string[];
+}
+
+export type Discovery =
+  | { status: 'loading' }
+  | { status: 'error'; error: string }
+  | { status: 'ready'; plugins: DiscoveredPlugin[]; stale: boolean };
+
+/** Fetched once per page load; the server caches GitHub's answer for everyone anyway. */
+let discovering: Promise<{ plugins: DiscoveredPlugin[]; stale: boolean }> | null = null;
+
+export function fetchDiscovered(): Promise<{ plugins: DiscoveredPlugin[]; stale: boolean }> {
+  discovering ??= call<{ plugins: DiscoveredPlugin[]; stale: boolean }>(
+    '/api/v1/plugins/discover',
+    {},
+    'load the plugin list',
+  ).catch((err: Error) => {
+    discovering = null;
+    throw err.name === 'TypeError' ? new Error("couldn't reach the site for the plugin list") : err;
+  });
+  return discovering;
+}
+
+/** An installed plugin with a newer release (`GET /api/v1/me/plugins/updates`). */
+export interface PluginUpdate {
+  source: string;
+  pluginId: string;
+  current: { ref: string | null; commit: string | null; version: string };
+  latest: { tag: string; commit: string; version: string };
+}
+
+export async function fetchUpdates(): Promise<PluginUpdate[]> {
+  return (await call<{ updates: PluginUpdate[] }>('/api/v1/me/plugins/updates', {}, 'check for updates')).updates;
+}
+
+export type UpdateResult =
+  | { status: 'updated'; plugin: InstalledPlugin }
+  | {
+      status: 'consent';
+      to: { ref: string; commit: string; version: string; name: string };
+      missing: { permissions: PluginPermission[]; network: string[] };
+    };
+
+/**
+ * Move a plugin to its newest release (or `ref`). If the new version asks for more than the reader approved, nothing
+ * changes and the answer says what it asks for; `approve` switches and approves it at once.
+ */
+export async function updatePluginTo(source: string, ref: string, approve = false): Promise<UpdateResult> {
+  const result = await call<UpdateResult>(
+    '/api/v1/me/plugins/updates',
+    { method: 'POST', body: JSON.stringify({ source, ref, approve }) },
+    'update it',
+  );
+  if (result.status === 'updated') void reloadSettings();
+  return result;
 }

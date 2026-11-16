@@ -14,6 +14,9 @@ import {
   type CoreSetting,
   type SettingsProblem,
 } from '@/lib/settings';
+import { usePlugins } from '@/lib/plugins/client';
+import { pluginPanelChoices } from '@/lib/plugins/installed';
+import { PANEL_KINDS, type PanelKind } from '@/lib/panels';
 import { SettingsError, saveSettings, useSettings } from '@/lib/settings/client';
 
 type Note = { ok: boolean; text: string } | null;
@@ -127,15 +130,25 @@ function SettingsForm({ text, siteText, onNote }: { text: string; siteText: stri
     [siteText, text],
   );
   const [busy, setBusy] = useState(false);
+  const { plugins } = usePlugins(null);
   const groups = useMemo(() => {
     const out = new Map<string, [string, CoreSetting][]>();
-    for (const entry of Object.entries(CORE_SETTINGS)) {
-      const list = out.get(entry[1].group) ?? [];
+    for (const [key, setting] of Object.entries(CORE_SETTINGS)) {
+      // Plugins are managed on /settings/plugins; the site-only keys aren't the reader's to set.
+      if (setting.group === 'Plugins') continue;
+      // A kind's panel lists offer installed plugins' panels too, beside the built-in ones.
+      const kind = key.split('.')[0] as PanelKind;
+      const extra = setting.widget && PANEL_KINDS.includes(kind) ? pluginPanelChoices(plugins, kind) : [];
+      const entry: [string, CoreSetting] = [
+        key,
+        extra.length ? { ...setting, choices: [...(setting.choices ?? []), ...extra] } : setting,
+      ];
+      const list = out.get(setting.group) ?? [];
       list.push(entry);
-      out.set(entry[1].group, list);
+      out.set(setting.group, list);
     }
     return [...out];
-  }, []);
+  }, [plugins]);
 
   if (!isEditable(text)) {
     return (
@@ -210,7 +223,11 @@ function SettingField({
                 onChange(
                   e.target.checked
                     ? list.filter((v) => v !== c.value)
-                    : choices.map((x) => x.value).filter((v) => v === c.value || list.includes(v)),
+                    : [
+                        // Ids the form doesn't show (a plugin not loaded here) stay as they are.
+                        ...list.filter((v) => !choices.some((x) => x.value === v)),
+                        ...choices.map((x) => x.value).filter((v) => v === c.value || list.includes(v)),
+                      ],
                 )
               }
             />

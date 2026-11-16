@@ -1,7 +1,9 @@
 import type { PluginEntry } from '../settings/core';
 import type { ResolvedSettings } from '../settings/document';
 import { parsePluginSource, sourceKey } from './sources';
-import type { PluginManifest, PluginPermission } from './manifest';
+import type { PageKind } from '../kinds';
+import { SLOT_TITLES } from '../panels';
+import { kindSlot, panelSlot, pluginPanelId, type PluginManifest, type PluginPermission } from './manifest';
 
 /**
  * Which plugins a reader has installed, from their resolved settings (DESIGN.md §10): the site's `plugins.default`
@@ -88,4 +90,28 @@ export interface InstalledPlugin {
     manifest: PluginManifest;
   } | null;
   missing: { permissions: PluginPermission[]; network: string[] };
+}
+
+/**
+ * Installed plugins' panels on a kind's pages, as choices for that kind's `<kind>.panels.hidden` and `.order` in the
+ * settings form: each by `<plugin id>.<panel id>`, named with its plugin, grouped by the slot it takes there.
+ */
+export function pluginPanelChoices(
+  plugins: readonly Pick<InstalledPlugin, 'plugin'>[],
+  kind: PageKind,
+): { value: string; label: string; group: string }[] {
+  const out: { value: string; label: string; group: string }[] = [];
+  const seen = new Set<string>();
+  for (const { plugin } of plugins) {
+    if (!plugin) continue;
+    for (const panel of plugin.manifest.contributes.panels) {
+      const slot = panelSlot(panel, kind);
+      const value = pluginPanelId(plugin.id, panel.id);
+      if (!slot || seen.has(value)) continue;
+      seen.add(value);
+      const at = kindSlot(kind, slot);
+      out.push({ value, label: `${panel.title} (${plugin.manifest.name})`, group: SLOT_TITLES[at] ?? at });
+    }
+  }
+  return out;
 }
