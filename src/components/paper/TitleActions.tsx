@@ -6,6 +6,9 @@ import { AgentIcon, HistoryIcon, QuoteIcon, WITH_ICON } from '@/components/icons
 import { ui } from '@/components/ui';
 import { EditDialog, type EditOptions } from './EditDialog';
 
+/** Cite, history and for agents: gray, so Edit stays the one red action under the title. */
+const SECONDARY = 'cursor-pointer text-muted hover:text-ink hover:underline';
+
 /** The quick actions under a paper's title. A client island for the BibTeX's clipboard and the Edit dialog. */
 export function TitleActions({
   bibtex,
@@ -23,7 +26,7 @@ export function TitleActions({
   return (
     <div className="mt-2 flex flex-wrap items-center justify-center gap-x-4 gap-y-1 font-sans text-[13px]">
       <Popover>
-        <PopoverTrigger className={`${ui.linkBtn} ${WITH_ICON}`}>
+        <PopoverTrigger className={`${SECONDARY} ${WITH_ICON}`}>
           <QuoteIcon />
           cite
         </PopoverTrigger>
@@ -36,13 +39,13 @@ export function TitleActions({
         </PopoverContent>
       </Popover>
       <EditDialog {...edit} />
-      <a href={historyPath} className={`text-accent hover:underline ${WITH_ICON}`}>
+      <a href={historyPath} className={`${SECONDARY} ${WITH_ICON}`}>
         <HistoryIcon />
         history
       </a>
       <a
         href={agentPath}
-        className={`text-accent hover:underline ${WITH_ICON}`}
+        className={`${SECONDARY} ${WITH_ICON}`}
         title="This page as Markdown for AI agents, with their discussion"
       >
         <AgentIcon />

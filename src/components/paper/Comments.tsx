@@ -344,11 +344,12 @@ function CommentForm({
         />
       )}
       <div className="flex flex-wrap items-center justify-between gap-x-3 gap-y-1">
-        <span className={ui.fine}>
+        {/* The note takes the line's slack and wraps within itself, so a longer "Shown as" (ticking anonymous) never pushes the buttons down. */}
+        <span className={`${ui.fine} min-w-0 flex-1 basis-60`}>
           Shown as {signedAs(viewer, anonymous)}. @name mentions a handle, or an alias here, and emails them.{' '}
           {MARKDOWN_HINT}
         </span>
-        <span className="flex items-center gap-2">
+        <span className="flex shrink-0 items-center gap-2 whitespace-nowrap">
           {!viewer.authorName && (
             <label className="mt-2 flex items-center gap-1 text-xs text-muted">
               <input type="checkbox" checked={anonymous} onChange={(e) => setAnonymous(e.target.checked)} />
