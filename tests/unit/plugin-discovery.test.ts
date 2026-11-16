@@ -128,3 +128,21 @@ describe('plugin discovery', () => {
     vi.unstubAllEnvs();
   });
 });
+
+describe('the plugin guide', () => {
+  it('documents every RPC method, permission and when key the host has, and how to publish', async () => {
+    const { pluginsGuide, METHOD_DOCS } = await import('@/server/agent/plugins-guide');
+    const { HOST_METHODS } = await import('@/lib/plugins/protocol');
+    const { PERMISSION_NAMES } = await import('@/lib/plugins/manifest');
+    const { KINDS, PAGE_KINDS } = await import('@/lib/kinds');
+    const guide = pluginsGuide('https://potentialpaper.org');
+    expect(guide).toContain('> Read https://potentialpaper.org/plugins.md and build me a PotentialPaper plugin.');
+    expect(Object.keys(METHOD_DOCS).sort()).toEqual(Object.keys(HOST_METHODS).sort());
+    for (const doc of Object.values(METHOD_DOCS)) expect(guide).toContain(doc.call);
+    for (const p of PERMISSION_NAMES) expect(guide).toContain(`| \`${p}\` |`);
+    for (const k of PAGE_KINDS) for (const key of KINDS[k].contextKeys) expect(guide).toContain(`\`${key}\``);
+    expect(guide).toContain(`gh repo edit --add-topic ${PLUGIN_TOPIC}`);
+    expect(guide).toContain('git tag v0.1.0');
+    expect(guide).toContain('npx http-server . -p 5174 --cors');
+  });
+});

@@ -652,7 +652,7 @@ function DevLoad({ onNote }: { onNote: (n: Note) => void }) {
       <p className={`${ui.fine} mt-0 mb-2`}>
         For building a plugin: it runs in this browser only, unpinned, and needs no approval. Serve its folder with CORS
         on (<code className="font-mono">npx http-server . -p 5174 --cors</code>); see{' '}
-        <a href="/plugins.md#develop">the guide</a>.
+        <a href="/plugins.md">the guide</a>.
       </p>
       <form onSubmit={load} className="flex gap-2">
         <input

@@ -10,6 +10,10 @@ export const dynamic = 'force-dynamic';
 const UPDATES: { date: string; text: string }[] = [
   {
     date: '2026-11-16',
+    text: 'Building plugins: when a person asks you to build a PotentialPaper plugin, read `/plugins.md`: the manifest, the SDK, permissions, the data routes, trying it from localhost and publishing (tag a release, add the GitHub topic `potentialpaper-plugin`). Published plugins are listed at `GET /api/v1/plugins/discover`. Installing by `owner/repo` with no tag now takes the newest release. `GET /api/v1/me/plugins/updates` lists a person\'s plugins that have a newer release; `POST` it `{ "source" }` to move one. An update asking for new permissions comes back as `consent` and changes nothing: the person approves it on `/settings/plugins`.',
+  },
+  {
+    date: '2026-11-16',
     text: 'Plugins: anyone can add panels to pages from a public GitHub repo with a `potentialpaper-plugin.json` (schema at `/schemas/plugin-manifest.json`). When a person asks you to install one, `POST /api/v1/me/plugins` with `{ "source": "github:<owner>/<repo>[/<folder>][@<tag>]" }`: it is copied at the commit the tag names and added to the `plugins` key of their settings.json. It runs only once they approve its permissions on a page, in their browser; you can\'t approve it for them. Pages of every kind are readable by identifier, URL-encoded as one segment: `GET /api/v1/pages/<identifier>`, and `/files`, `/members`, `/submissions` under it.',
   },
   {

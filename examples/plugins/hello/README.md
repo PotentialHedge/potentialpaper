@@ -9,5 +9,8 @@ Run it against `npm run dev` from its folder, with any static server that sends 
 
     npx http-server examples/plugins/hello -p 5174 --cors
 
-then, on `/settings`, load `http://localhost:5174/` under "Load a plugin from your dev server". It shows on every
+then, on `/settings/plugins`, load `http://localhost:5174/` under "Load from localhost". It shows on every
 kind of page: in the side column of a paper, in the main column elsewhere.
+
+To build your own, ask your agent: "Read https://<the site>/plugins.md and build me a PotentialPaper plugin." (`/settings/plugins` shows the line with the
+site's address.)
