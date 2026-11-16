@@ -10,6 +10,7 @@ PDFs. Clone one from the site (each page's **edit** button gives the address) an
 - **JSON files** (`links/*.json`, `versions/*.json`, `thumbnail.json`) are checked as you type against the
   site's schemas, with completion and descriptions on hover.
 - **Format Document** formats a section as the page's `prek.toml` does before each commit.
-- **PotentialPaper: New Link** adds a link under the title.
+- **PotentialPaper: New Link** adds a link under the title. The **Page** view in the explorer lists the links and
+  the picture, with a way to add each where the page has none.
 
 The site's address comes from the clone's git remote; set `potentialpaper.origin` to use another.

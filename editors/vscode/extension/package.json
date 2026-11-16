@@ -16,7 +16,8 @@
     "onFileSystem:potentialpaper",
     "onStartupFinished",
     "onCustomEditor:potentialpaper.pdf",
-    "workspaceContains:prek.toml"
+    "workspaceContains:prek.toml",
+    "onView:potentialpaper.page"
   ],
   "capabilities": {
     "virtualWorkspaces": true,
@@ -48,6 +49,11 @@
           "type": "boolean",
           "default": true,
           "description": "Open the preview beside the first section opened."
+        },
+        "potentialpaper.checks": {
+          "type": "boolean",
+          "default": true,
+          "description": "In the browser, run the page's prek.toml checks before each commit, as prek does in a clone (there is no terminal to run it in): files formatted and whitespace fixed, and no commit while a file has an error. The site checks every commit again."
         }
       }
     },
@@ -106,7 +112,19 @@
       {
         "command": "potentialpaper.newLink",
         "title": "New Link",
+        "category": "PotentialPaper",
+        "icon": "$(add)"
+      },
+      {
+        "command": "potentialpaper.addPicture",
+        "title": "Add a Picture",
         "category": "PotentialPaper"
+      },
+      {
+        "command": "potentialpaper.runChecks",
+        "title": "Run the Page's Checks (prek)",
+        "category": "PotentialPaper",
+        "icon": "$(checklist)"
       },
       {
         "command": "potentialpaper.signIn",
@@ -156,6 +174,10 @@
         },
         {
           "command": "potentialpaper.discardAll",
+          "when": "scmProvider == potentialpaper"
+        },
+        {
+          "command": "potentialpaper.runChecks",
           "when": "scmProvider == potentialpaper"
         }
       ],
@@ -222,6 +244,18 @@
         {
           "command": "potentialpaper.newSection",
           "when": "potentialpaper.inBrowser"
+        },
+        {
+          "command": "potentialpaper.runChecks",
+          "when": "potentialpaper.inBrowser"
+        },
+        {
+          "command": "potentialpaper.addPicture",
+          "when": "potentialpaper.pageRepo"
+        },
+        {
+          "command": "potentialpaper.newLink",
+          "when": "potentialpaper.pageRepo"
         }
       ],
       "explorer/context": [
@@ -254,6 +288,13 @@
           "command": "potentialpaper.pdfFitWidth",
           "group": "navigation@3",
           "when": "activeCustomEditorId == potentialpaper.pdf"
+        }
+      ],
+      "view/title": [
+        {
+          "command": "potentialpaper.newLink",
+          "group": "navigation",
+          "when": "view == potentialpaper.page"
         }
       ]
     },
@@ -343,7 +384,17 @@
         ],
         "priority": "default"
       }
-    ]
+    ],
+    "views": {
+      "explorer": [
+        {
+          "id": "potentialpaper.page",
+          "name": "Page",
+          "when": "potentialpaper.pageRepo",
+          "icon": "$(book)"
+        }
+      ]
+    }
   },
   "main": "./dist/extension.js"
 }

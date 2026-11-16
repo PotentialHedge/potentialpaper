@@ -1,8 +1,9 @@
 import * as vscode from 'vscode';
 import { Api, ApiError, type PaperRef } from './api';
 import { PageRepos, SCHEME } from './page';
+import { addPicture, PageView } from './outline';
 import { PdfViewer } from './pdf';
-import { firstError, formatted, markdownFormatter } from './precommit';
+import { checksOn, firstError, formatted, markdownFormatter } from './precommit';
 import { Preview } from './preview';
 import { Site } from './site';
 import { ORIGINAL_SCHEME, Store } from './store';
@@ -170,10 +171,15 @@ function describe(err: unknown): string {
 }
 
 /** What works in any page repo, in the browser or on the desktop. */
-async function activateAnywhere(context: vscode.ExtensionContext, previews: boolean): Promise<PageRepos> {
+async function activateAnywhere(
+  context: vscode.ExtensionContext,
+  previews: boolean,
+  denied?: (path: string) => string | null,
+): Promise<{ repos: PageRepos; view: PageView }> {
   const repos = new PageRepos();
+  const view = new PageView(repos, denied);
   const site = new Site(context.secrets);
-  context.subscriptions.push(repos);
+  context.subscriptions.push(repos, view);
   void vscode.commands.executeCommand('setContext', 'potentialpaper.webviews', previews);
 
   if (previews) {
@@ -211,6 +217,10 @@ async function activateAnywhere(context: vscode.ExtensionContext, previews: bool
       const root = await rootFor(folder);
       if (root) await newLink(root);
     }),
+    vscode.commands.registerCommand('potentialpaper.addPicture', async (folder?: vscode.Uri) => {
+      const root = await rootFor(folder);
+      if (root) await addPicture(root);
+    }),
   );
 
   // Sections formatted as `prek.toml` formats them, in clones too (the browser's are registered with its folder).
@@ -230,7 +240,7 @@ async function activateAnywhere(context: vscode.ExtensionContext, previews: bool
     );
   });
   context.subscriptions.push({ dispose: () => formatters?.dispose() });
-  return repos;
+  return { repos, view };
 }
 
 /** A link under the paper's title: `links/NN-<slug>.json`, after the others. */
@@ -276,7 +286,7 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
   const previews = config.get<boolean>('webviews', true);
   void vscode.commands.executeCommand('setContext', 'potentialpaper.inBrowser', Boolean(paper));
   if (!paper) {
-    const repos = await activateAnywhere(context, previews);
+    const { repos } = await activateAnywhere(context, previews);
     await repos.refresh();
     return;
   }
@@ -295,7 +305,8 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
       provideTextDocumentContent: (uri) => store.original(pathOf(uri)),
     }),
   );
-  const repos = await activateAnywhere(context, previews);
+  const { repos, view } = await activateAnywhere(context, previews, (path) => store.readonlyReason(path));
+  store.onDidChange(() => view.refresh());
 
   context.subscriptions.push(
     vscode.languages.registerDocumentFormattingEditProvider(
@@ -349,7 +360,36 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
   };
   store.onDidChange(refreshGroup);
 
+  /** The page's checks over the changed files (`precommit.ts`): fixes written, the first error shown. */
+  const runChecks = async (failed = 'Not committed'): Promise<boolean> => {
+    for (const [path, p] of store.changes()) {
+      if (p.content === null) continue;
+      const out = await formatted(path, p.content);
+      if (out !== null) await store.write(path, new TextEncoder().encode(out));
+    }
+    const files = store
+      .changes()
+      .filter(([, p]) => p.content !== null)
+      .map(([path, p]) => ({ path, text: p.content!, added: p.original === null, uri: uriOf(path) }));
+    const error = await firstError(files, store.paths());
+    if (!error) return true;
+    const where = error.range ? `${pathOf(error.uri)} line ${error.range.start.line + 1}: ` : '';
+    const pick = await vscode.window.showWarningMessage(`${failed}: ${where}${error.message}`, 'Show');
+    if (pick) await vscode.window.showTextDocument(error.uri, error.range ? { selection: error.range } : {});
+    return false;
+  };
+
   const commands: [string, (...args: never[]) => unknown][] = [
+    [
+      'potentialpaper.runChecks',
+      async () => {
+        if (store.changes().length === 0) {
+          void vscode.window.showInformationMessage('There is nothing to check: save a change first.');
+          return;
+        }
+        if (await runChecks('A check failed')) void vscode.window.showInformationMessage('The checks passed.');
+      },
+    ],
     [
       'potentialpaper.commit',
       async () => {
@@ -365,21 +405,8 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
           void vscode.window.showWarningMessage(`Settle the conflict markers in ${conflicts.join(', ')} first.`);
           return;
         }
-        // What `prek.toml` does before a commit in a clone: format, then refuse while a file has an error.
-        const changed = store.changes().filter(([, p]) => p.content !== null);
-        for (const [path, p] of changed) {
-          const out = await formatted(path, p.content!);
-          if (out !== null) await store.write(path, new TextEncoder().encode(out));
-        }
-        const error = firstError(changed.map(([path]) => uriOf(path)));
-        if (error) {
-          const pick = await vscode.window.showWarningMessage(
-            `Not committed: ${pathOf(error.uri)} line ${error.diagnostic.range.start.line + 1}: ${error.diagnostic.message}`,
-            'Show',
-          );
-          if (pick) await vscode.window.showTextDocument(error.uri, { selection: error.diagnostic.range });
-          return;
-        }
+        // What `prek.toml` does before a commit in a clone, unless turned off: fix, then refuse while a file has an error.
+        if (checksOn() && !(await runChecks())) return;
         const message = scm.inputBox.value.trim();
         if (!message) {
           void vscode.window.showWarningMessage('Say what you changed in the message box, then commit.');
