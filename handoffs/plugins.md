@@ -198,7 +198,7 @@ TypeScript, with `dist/` committed (we never build) and CI that fails if `dist/`
 
 - Manifest:
   - Permissions: `reviews.read`, `scope.read`.
-  - One panel for `kinds: [paper, venue, topic, org]`, `slot: aside` on papers and `main` elsewhere,
+  - One panel for `kinds: [paper, venue, org]` (not topics), `slot: aside` on papers and `main` elsewhere,
     `when: page.hasScores`.
   - Settings:
     - `view`: `both` (default), `histogram` or `curve`.
@@ -218,14 +218,9 @@ TypeScript, with `dist/` committed (we never build) and CI that fails if `dist/`
   - A field switcher lists the venue's score fields (rating, soundness, presentation, …) and changes the `field`
     setting.
 - One figure, shown differently on each kind of page:
-  - **Paper:** the paper's standing at its venue, plus "among papers in <topic>" for each of its topics. The topic
-    view uses that topic's statistics at the same venue.
+  - **Paper:** the paper's standing at its venue.
   - **Venue:** the whole distribution, split by decision once decisions are out. This is the venue's "how hard was
     it" figure.
-  - **Topic:** the topic's papers at each venue, with a venue switcher, against the venue's whole distribution in
-    outline, which shows whether a topic scores above its venue. Topics are small, so a venue is offered only once
-    the topic has enough scored papers there (acceptodds' `MIN_FIELD`, raised to something like 10). Otherwise the
-    panel lists the papers' scores instead of a figure.
   - **Org:** the venue's distribution, with the org's papers as open circles on the curve, named on hover. This is
     acceptodds' `marks`.
 - Data comes from A only (`scope.scores`). The plugin caches by ETag in its own IndexedDB, so moving between papers
@@ -248,8 +243,8 @@ TypeScript, with `dist/` committed (we never build) and CI that fails if `dist/`
 phase's branch so this file stays current. Commit and push after each working step. At the end, add your entry below
 and launch the next phase's thread pointing at this file. Merging into `main` waits for Benedict.
 Phase 1 (settings) can start at once. Phase 2 needs `handoffs/pages.md` Phase 1 (the page model). Phases 4 and 5
-need Phase 2, and Phase 4 also needs `page_members`. Phase 6 needs Phases 2–4, and its venue, topic and org views
-need those kinds' pages (`handoffs/pages.md` Phases 2, 4 and 5). The paper view can ship first.
+need Phase 2, and Phase 4 also needs `page_members`. Phase 6 needs Phases 2–4, and its venue and org views need
+those kinds' pages (`handoffs/pages.md` Phases 2 and 4). The paper view can ship first.
 
 Suggested order: plugins 1 → pages 1 → plugins 2 → pages 2 (venues) → plugins 3, 4 → plugins 6 (paper and venue
-views) → pages 3, 4, 5 alongside plugins 5 → the topic and org views of score standing.
+views) → pages 3, 4, 5 alongside plugins 5 → the org view of score standing.
