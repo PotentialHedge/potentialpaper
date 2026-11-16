@@ -323,7 +323,10 @@ async function serve(
   }
 
   let output: AsyncGenerator<Buffer>;
-  const reader = new PktReader(channel);
+  // Not the channel's own async iterator: at the client's EOF that destroys the stream (Node 26 does so
+  // even on a clean end), and ssh2's destroy ends and closes the channel before `finish` can send the
+  // exit status, so the client's ssh exits 255 and git reports the fetch as failed.
+  const reader = new PktReader(channel.iterator({ destroyOnReturn: false }));
   if (service === 'git-upload-pack') {
     output = uploadPackSession(pageRepo(ctx.database, repo.paperId), reader, protocolVersion(gitProtocol));
   } else {
