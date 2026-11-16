@@ -113,7 +113,7 @@ Prior art to read before starting: Presio's plugin system (`gh api repos/Potenti
   - Frames load lazily when scrolled into view.
 - **RPC protocol** (`lib/plugins/protocol.ts`), versioned. It starts with:
   - `context.get`: the page (`kind`, identifier, address), its **scopes** (for a paper: its venues, topics and orgs;
-    for a topic: its parents; for an org: its parents), viewer signed in or not, theme.
+    for a topic: its broader topics; for an org: its parents), viewer signed in or not, theme.
   - `settings.get`, `settings.set` (own keys only), and a `settings.change` event.
   - `storage.get` and `storage.set`: per user and per plugin, 64 KB, in Postgres, for small state that should follow
     the account.
@@ -223,7 +223,9 @@ TypeScript, with `dist/` committed (we never build) and CI that fails if `dist/`
   - **Venue:** the whole distribution, split by decision once decisions are out. This is the venue's "how hard was
     it" figure.
   - **Topic:** the topic's papers at each venue, with a venue switcher, against the venue's whole distribution in
-    outline, which shows whether a topic scores above its venue.
+    outline, which shows whether a topic scores above its venue. Topics are small, so a venue is offered only once
+    the topic has enough scored papers there (acceptodds' `MIN_FIELD`, raised to something like 10). Otherwise the
+    panel lists the papers' scores instead of a figure.
   - **Org:** the venue's distribution, with the org's papers as open circles on the curve, named on hover. This is
     acceptodds' `marks`.
 - Data comes from A only (`scope.scores`). The plugin caches by ETag in its own IndexedDB, so moving between papers

@@ -5,7 +5,7 @@ page this plan adds.
 
 ## Goal
 
-Today the site has one kind of page, the paper. Researchers also think in venues, topics and sub-topics, institutions
+Today the site has one kind of page, the paper. Researchers also think in venues, research topics, institutions
 and labs, and people. Each of these becomes a page of its own, built the same way as a paper's: a git repo of small
 files with path rules, derived data from outbox consumers, named slots, and file types that bots write and plugins
 show. A plugin written once can then add a panel to a paper, a venue, a topic, an organisation or a person.
@@ -36,7 +36,7 @@ show. A plugin written once can then add a panel to a paper, a venue, a topic, a
 | ----- | ----------------------------------------------------------------------------- | ------------------ | -------------------------------------------------------------------------------- |
 | paper | `/abs/…` as today                                                             | `arxiv:…`, `doi:…` | `.potentialpaper/metadata.json`                                                  |
 | venue | `/v/iclr` (series), `/v/iclr/2027` (edition), deeper for tracks and workshops | `venue:iclr/2027`  | `venue.json`: name, dates, URL, `sources` (`openreview:ICLR.cc/2027/Conference`) |
-| topic | `/t/<slug>`                                                                   | `topic:<slug>`     | `topic.json`: name, aliases, `parents` (a DAG, not a tree)                       |
+| topic | `/t/<slug>`                                                                   | `topic:<slug>`     | `topic.json`: name, aliases, `broader` topics (optional, a DAG)                  |
 | org   | `/o/<slug>`, `/o/<slug>/<child>` for departments and labs                     | `org:<slug>`       | `org.json`: name, `domains`, `parents`, ROR id                                   |
 | user  | `/u/<handle>`                                                                 | `user:<handle>`    | `profile.json`: what the person chose to show                                    |
 
@@ -56,24 +56,30 @@ show. A plugin written once can then add a panel to a paper, a venue, a topic, a
       confirmed by an admin for now (`claims:decide`). Until someone claims it, the section stays empty and the
       page shows "Organise this venue? Claim it".
     - The kind file and `sources`: the `venues` bot, organisers and admins.
-  - Topic: community-run. Any verified account can make a topic and edit any topic's `community/`, `topic.json`
-    (name, aliases, parents) and links, subject to page protection. Changes to `parents` show in the patrol feed,
-    since they move papers between roll-ups. Topics the `topics` bot seeds are ordinary topics: the community edits
-    them like any other, and the bot never overwrites a human edit (it writes only files it made, and stops at a
-    file a person has changed).
+  - Topic: community-run, like a Wikipedia article. Any verified account can make a topic and edit any topic's
+    `community/`, `topic.json` (name, aliases, broader topics) and links, subject to page protection. Changes to
+    `broader` show in the patrol feed, since they move papers between roll-ups. No bot writes topic pages.
   - Org: `members/` for verified members (an affiliation whose domain is one of the org's `domains`), `community/`
     for any verified account, and the kind file for members and admins.
   - User: only the account itself, its agents' tokens, and admins.
 - **Membership is links and projections.**
   - A paper is at a venue through its submissions: the projection that already exists.
-  - A paper is in a topic through a labeled link `in-topic` from the paper to `topic:<slug>`. It can be asserted by
-    the community or by an author, or written by a bot under its own grant: arXiv categories, OpenReview keywords,
-    and later embedding clusters.
+  - A paper is in a topic through a labeled link from the paper to `topic:<slug>`, asserted by the community or by
+    an author: `in-topic` ("is about" / "covered by") or `introduces-topic` ("introduces" / "introduced by"), so a
+    topic page can list where the idea started apart from the work on it. Machines only suggest
+    (`topic_suggestions`, not links): OpenReview keywords, title and abstract matches on a topic's name and aliases,
+    and later the map's nearest neighbours of the papers already in it. A suggestion becomes a link when a person
+    confirms it.
   - A paper is from an org through confirmed author claims of verified members who chose to show their
     institution, and through the domains printed on page 1 (`pdf_documents.emails`).
   - One consumer keeps `page_members(scope_page_id, paper_id, via, weight)` from all of these. Every list, count,
     statistic and plugin query above the paper reads that table.
-- **Hierarchies roll up.** A topic's papers include its descendants'. A series' papers are its editions'. An org's
+- **Topics are concepts, not a taxonomy** (decided 2026-11-16). A topic is a research idea at the size of a
+  Wikipedia article ("Linear attention", "State space models", "Mixture of experts"), not a field such as `cs.LG`.
+  The page is an article the community writes, plus the papers on it. There is no seeded list: topics exist because
+  someone made them. `broader` is optional and loose ("Linear attention" under "Efficient transformers").
+  Topic-to-topic links (`related-to`) carry everything else.
+- **Hierarchies roll up.** A topic's papers include those of the topics it is broader than. A series' papers are its editions'. An org's
   papers are its children's. The consumer keeps the closure (`page_ancestors`), so a roll-up is one join.
 - **Every account has a public page at `/u/<handle>`** (decided 2026-11-16). It is made with the account, so a
   handle always resolves to a page. What it shows is the account's choice, through `profile.json` and the `user.*`
@@ -127,18 +133,20 @@ show. A plugin written once can then add a panel to a paper, a venue, a topic, a
 
 ### Phase 5: topic pages
 
-- Seed topics from the arXiv taxonomy (archives as parents, categories as children: `cs` → `cs.LG`), through a
-  `topics` bot, with categories as `in-topic` links in papers' `links.jsonl` under the bot's grant. OpenReview
-  keywords are suggestions, not links, until someone confirms them.
-- Anyone verified can make a topic: a "New topic" form, and a topic made on the fly when a link names a slug that
-  doesn't exist yet, as a paper page is made on first visit. New topics can sit under arXiv ones or anywhere else.
-- Editing a topic (name, aliases, parents, sections, links), merging and renaming is open to the community, with page
-  protection and the patrol feed. A merge or rename leaves a redirect, as paper merges do.
-- Shows sub-topics, papers (rolled up), venues where the topic is common, and orgs active in it.
+- No seeding. Anyone verified can make a topic: a "New topic" form, or "Add a topic" on a paper's page, which links
+  the paper and makes the topic if no topic of that name or alias exists yet. The form checks names and aliases
+  first, to keep duplicates down.
+- The page reads as an article: the community's sections first (what it is, key ideas, history, open problems), then
+  the papers that introduced it, the papers on it (rolled up from narrower topics, sortable by date, venue and
+  score), narrower, broader and related topics, the venues where it is common, and the orgs active in it.
+- "Might belong here": `topic_suggestions` for the topic, each with confirm and dismiss. A dismissal is remembered,
+  so the suggestion doesn't come back.
+- Editing a topic (name, aliases, broader topics, sections, links), merging and renaming is open to the community,
+  with page protection and the patrol feed. A merge or rename leaves a redirect, as paper merges do.
 
 ### Later (not this plan)
 
-- Embedding clusters as suggested topics, from the map's vectors.
+- Embedding clusters as suggested new topics, from the map's vectors.
 - Workshops and tracks as venue children with their own sources.
 - Following a page of any kind for the feed and notifications.
 
