@@ -352,6 +352,12 @@ export const pageCurrent = pgTable('page_current', {
   links: jsonb('links').$type<TitleLink[]>(),
   /** The page's `versions/`, oldest first (`lib/versions.ts`). */
   versions: jsonb('versions').$type<PaperVersion[]>(),
+  /**
+   * A page of another kind: its kind file as it parses (`venue.json`, …, `lib/kinds.ts`), or `null` if it has none
+   * or it doesn't parse, and the name it shows (`pageName`). A paper's are `null`: its title is `papers.title`.
+   */
+  kindFile: jsonb('kind_file').$type<Record<string, unknown>>(),
+  name: text('name'),
   updatedAt: timestamp('updated_at', { withTimezone: true, mode: 'date' }).notNull(),
 });
 
@@ -381,6 +387,124 @@ export const pageEvents = pgTable(
     createdAt: createdAt(),
   },
   (t) => [uniqueIndex('page_events_page_seq_key').on(t.pageId, t.seq), index('page_events_xid_id_idx').on(t.xid, t.id)],
+);
+
+/**
+ * The labeled links of every page (DESIGN.md §8), one row per line of a part's `links.jsonl`, written only by the
+ * `links` consumer (`server/page-links.ts`) and rebuildable from the repos. It answers "what links here" on a page
+ * of any kind: `target` is the identifier as the line names it, in normal form, and `target_page_id` the page it
+ * named when the line was indexed, if there was one then. `origin` is the part the line is in: the owners'
+ * (`author/` on a paper) or `community`.
+ */
+export const pageLinks = pgTable(
+  'page_links',
+  {
+    pageId: uuid('page_id')
+      .notNull()
+      .references(() => pages.id, { onDelete: 'cascade' }),
+    path: text('path').notNull(),
+    linkId: text('link_id').notNull(),
+    line: integer('line').notNull(),
+    target: text('target').notNull(),
+    targetKind: text('target_kind', { enum: PAGE_KINDS }).notNull(),
+    targetPageId: uuid('target_page_id').references(() => pages.id, { onDelete: 'set null' }),
+    label: text('label').notNull(),
+    origin: text('origin', { enum: ['owners', 'community'] }).notNull(),
+    note: text('note'),
+    fromAnchor: text('from_anchor'),
+    toAnchor: text('to_anchor'),
+    evidence: text('evidence'),
+  },
+  (t) => [
+    primaryKey({ columns: [t.pageId, t.path, t.linkId] }),
+    index('page_links_target_idx').on(t.target),
+    index('page_links_target_page_idx').on(t.targetPageId),
+  ],
+);
+
+/**
+ * What each paper says it belongs to, by public name: a submission's venue (`via` `submission`, `source`
+ * `openreview:ICLR.cc/2027/Conference`) or a topic it links to (`via` the label, `source` `topic:<slug>`). Written by
+ * the `members` consumer (`server/page-members.ts`) from the paper's files, whether or not a page of that name
+ * exists yet, so `page_members` can be joined again whenever one appears.
+ */
+export const pageMemberSources = pgTable(
+  'page_member_sources',
+  {
+    paperId: uuid('paper_id')
+      .notNull()
+      .references(() => pages.id, { onDelete: 'cascade' }),
+    via: text('via').notNull(),
+    source: text('source').notNull(),
+  },
+  (t) => [primaryKey({ columns: [t.paperId, t.via, t.source] }), index('page_member_sources_source_idx').on(t.source)],
+);
+
+/**
+ * The names a scope (a venue, topic or org page) answers to: its own identifier (`venue:iclr/2027`) and its kind
+ * file's `sources`. Written by the `members` consumer.
+ */
+export const pageScopeNames = pgTable(
+  'page_scope_names',
+  {
+    pageId: uuid('page_id')
+      .notNull()
+      .references(() => pages.id, { onDelete: 'cascade' }),
+    name: text('name').notNull(),
+  },
+  (t) => [primaryKey({ columns: [t.pageId, t.name] }), index('page_scope_names_name_idx').on(t.name)],
+);
+
+/** A scope's parents, by identifier (`lib/kinds.ts`'s `parentsOf`): an edition's series, a topic's broader topics. */
+export const pageParents = pgTable(
+  'page_parents',
+  {
+    pageId: uuid('page_id')
+      .notNull()
+      .references(() => pages.id, { onDelete: 'cascade' }),
+    parent: text('parent').notNull(),
+  },
+  (t) => [primaryKey({ columns: [t.pageId, t.parent] })],
+);
+
+/**
+ * The papers of every scope (`handoffs/pages.md`): a venue's through their submissions, a topic's through links,
+ * later an org's through claims and domains. Every list, count, statistic and plugin query above the paper reads
+ * this table, rolled up through `page_ancestors`. Written only by the `members` consumer; `weight` is for later
+ * sources that count for less than certain (a domain printed on page 1).
+ */
+export const pageMembers = pgTable(
+  'page_members',
+  {
+    scopePageId: uuid('scope_page_id')
+      .notNull()
+      .references(() => pages.id, { onDelete: 'cascade' }),
+    paperId: uuid('paper_id')
+      .notNull()
+      .references(() => pages.id, { onDelete: 'cascade' }),
+    via: text('via').notNull(),
+    weight: doublePrecision('weight').notNull().default(1),
+  },
+  (t) => [primaryKey({ columns: [t.scopePageId, t.paperId, t.via] }), index('page_members_paper_idx').on(t.paperId)],
+);
+
+/**
+ * The closure of `page_parents` over the pages they name: every ancestor of a scope, at its shortest depth, so a
+ * roll-up (a series' papers are its editions', a topic's include its narrower topics') is one join. Written by
+ * the `members` consumer.
+ */
+export const pageAncestors = pgTable(
+  'page_ancestors',
+  {
+    pageId: uuid('page_id')
+      .notNull()
+      .references(() => pages.id, { onDelete: 'cascade' }),
+    ancestorId: uuid('ancestor_id')
+      .notNull()
+      .references(() => pages.id, { onDelete: 'cascade' }),
+    depth: integer('depth').notNull(),
+  },
+  (t) => [primaryKey({ columns: [t.pageId, t.ancestorId] }), index('page_ancestors_ancestor_idx').on(t.ancestorId)],
 );
 
 /**

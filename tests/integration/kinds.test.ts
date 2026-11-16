@@ -11,7 +11,7 @@ import { getDb } from '@/db';
 import { accounts, pageCurrent, pages, papers } from '@/db/schema';
 import { ensureBot, grantBot } from '@/server/bots';
 import { pageClonePath } from '@/server/pages/clone';
-import { commitPage, createPage, SYSTEM_ACTOR } from '@/server/pages/commit';
+import { commitPage, createPage } from '@/server/pages/commit';
 import { findPage } from '@/server/pages/kinds';
 import { gitIdentity } from '@/server/pages/receive';
 import { readFiles, readCommit, readHead, readText } from '@/server/pages/repo';

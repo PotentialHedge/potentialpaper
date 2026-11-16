@@ -1,11 +1,11 @@
 import { eq, notInArray, sql } from 'drizzle-orm';
 import { getDb, type Database } from '@/db';
 import { authorClaims, commitIdentities, pageCurrent, pageRefs, pageRevisions } from '@/db/schema';
-import { KINDS } from '@/lib/kinds';
+import { KINDS, pageName } from '@/lib/kinds';
 import { pageDemoSources } from '../demos/attach';
 import { readLinks, readPagePdf, readThumbnail, readVersions } from './content';
 import { type Commit, SYSTEM_AUTHOR_ID } from './git-objects';
-import { mustPage } from './kinds';
+import { mustPage, type PageRow } from './kinds';
 import { demoRefs } from './markdown';
 import { changedFiles, readCommit, readFiles, readHead, readText, toBytes, type Reader } from './repo';
 import { partSource, readSections, renderPart } from './sections';
@@ -82,6 +82,24 @@ export async function writeRevision(
   return { paths, bytesDelta };
 }
 
+/** A keyed page's kind file as it parses, and the name it shows; both `null` on a paper's page. */
+async function readKindFile(
+  db: Reader,
+  page: PageRow,
+  files: ReadonlyMap<string, string>,
+): Promise<{ kindFile: Record<string, unknown> | null; name: string | null }> {
+  if (page.kind === 'paper') return { kindFile: null, name: null };
+  const { kindFile: path, kindFileSchema } = KINDS[page.kind];
+  let kindFile: Record<string, unknown> | null = null;
+  try {
+    const parsed = kindFileSchema?.safeParse(JSON.parse((await readText(db, page.id, files.get(path))) ?? ''));
+    if (parsed?.success) kindFile = parsed.data as Record<string, unknown>;
+  } catch {
+    // No kind file yet, or one from before its schema: the page shows its key.
+  }
+  return { kindFile, name: pageName(page.kind, page.key, kindFile) };
+}
+
 /** Makes `page_current` say what the commit at the head says. */
 export async function writeCurrent(tx: Writer, pageId: string, head: string, commit: Commit): Promise<void> {
   const files = await readFiles(tx, pageId, commit.tree);
@@ -90,7 +108,8 @@ export async function writeCurrent(tx: Writer, pageId: string, head: string, com
   const links = await readLinks(tx, pageId, files);
   const versions = await readVersions(tx, pageId, files);
   // The owners' part (a paper's `author/`, a venue's `organizers/`, …) goes in the `author_*` columns.
-  const { owners, community: hasCommunity } = KINDS[(await mustPage(tx, pageId)).kind];
+  const page = await mustPage(tx, pageId);
+  const { owners, community: hasCommunity } = KINDS[page.kind];
   const ownersPart = owners?.dir ?? null;
   const author = ownersPart ? await readSections(tx, pageId, files, ownersPart) : [];
   const community = hasCommunity ? await readSections(tx, pageId, files, 'community') : [];
@@ -112,6 +131,7 @@ export async function writeCurrent(tx: Writer, pageId: string, head: string, com
     thumbnail,
     links: links.length > 0 ? links : null,
     versions: versions.length > 0 ? versions : null,
+    ...(await readKindFile(tx, page, files)),
     updatedAt: commit.at,
   };
   await tx
