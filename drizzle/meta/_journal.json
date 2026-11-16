@@ -204,6 +204,13 @@
       "when": 1794838986750,
       "tag": "0028_search_docs",
       "breakpoints": true
+    },
+    {
+      "idx": 29,
+      "version": "7",
+      "when": 1794850106589,
+      "tag": "0029_agent_code_lookup",
+      "breakpoints": true
     }
   ]
 }

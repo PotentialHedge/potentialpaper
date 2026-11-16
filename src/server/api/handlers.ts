@@ -379,9 +379,9 @@ export const postAgentCode = route(async (req) => {
   return respond(S.Accepted, { status: 'accepted' }, { status: 202 });
 });
 
-/** Trades an address and its code for an API token, shown this once. */
+/** Trades an agent code for an API token, shown this once. */
 export const postAgentToken = route(async (req) => {
-  const minted = await redeemAgentCode(await parseBody(req, S.AgentTokenBody));
+  const minted = await redeemAgentCode(await parseBody(req, S.AgentTokenBody), req);
   return respond(
     S.AgentToken,
     { token: minted.token, id: minted.id, name: minted.name, scopes: minted.scopes },
@@ -392,8 +392,8 @@ export const postAgentToken = route(async (req) => {
 /** A code for the signed-in person's own agent prompt. A browser session only: a token cannot make tokens. */
 export const postMyAgentCode = route(async (req) => {
   const principal = await requireSession(req);
-  const { email, code, expiresAt } = await issueAgentCode(principal.account);
-  return respond(S.MyAgentCode, { email, code, expiresAt: toIso(expiresAt) }, { status: 201, principal });
+  const { code, expiresAt } = await issueAgentCode(principal.account);
+  return respond(S.MyAgentCode, { code, expiresAt: toIso(expiresAt) }, { status: 201, principal });
 });
 
 export const getMyTokens = route(async (req) => {

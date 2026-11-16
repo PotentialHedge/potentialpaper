@@ -334,7 +334,7 @@ export const OwnClaim = z.object({
 
 /** Asks for a code mailed to the person, for their agent to trade for a token (`server/agent-codes.ts`). */
 export const AgentCodeBody = z.object({ email: Email });
-export const AgentTokenBody = z.object({ email: Email, code: z.string().trim().min(1).max(16) });
+export const AgentTokenBody = z.object({ code: z.string().trim().min(1).max(32) });
 export const AgentToken = z.object({
   /** The secret, shown this once. Send it as `Authorization: Bearer <token>`. */
   token: z.string(),
@@ -343,7 +343,7 @@ export const AgentToken = z.object({
   scopes: z.array(z.enum(TOKEN_SCOPES)),
 });
 /** A code for the signed-in person's own agent prompt. */
-export const MyAgentCode = z.object({ email: z.string(), code: z.string(), expiresAt: z.string() });
+export const MyAgentCode = z.object({ code: z.string(), expiresAt: z.string() });
 
 /** A key the signed-in person makes by hand on their profile, for a script or an agent of their own. */
 export const CreateTokenBody = z.object({

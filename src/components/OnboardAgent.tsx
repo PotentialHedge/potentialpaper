@@ -48,14 +48,13 @@ export function OnboardAgent({
 
   async function build(): Promise<string> {
     const res = await fetch('/api/v1/me/agent-code', { method: 'POST' });
-    let signIn: { email: string; code: string } | undefined;
+    let code: string | undefined;
     if (res.ok) {
-      const { email, code } = await res.json();
-      signIn = { email, code };
+      ({ code } = await res.json());
     } else if (res.status !== 401) {
       throw new Error('agent-code');
     }
-    const text = agentPrompt(window.location.origin, signIn);
+    const text = agentPrompt(window.location.origin, code);
     setPrompt(text);
     return text;
   }
@@ -86,7 +85,7 @@ export function OnboardAgent({
           <textarea
             readOnly
             value={prompt}
-            rows={10}
+            rows={3}
             aria-label="Prompt for your AI agent"
             className={`${ui.input} font-mono text-xs`}
             onFocus={(e) => e.currentTarget.select()}

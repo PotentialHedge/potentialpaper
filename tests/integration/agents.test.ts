@@ -33,11 +33,16 @@ function paper(): Promise<string> {
   });
 }
 
+/** The code in the last agent-code mail to `email`. */
+function mailedCode(email: string): string {
+  return /^(\S+) is your/.exec(lastMailTo(email)?.subject ?? '')![1];
+}
+
 /** The agent's way in with a mailed code: returns the token. */
 async function tokenByMail(email: string): Promise<string> {
   expect((await api('POST', '/agent/code', { body: { email } })).status).toBe(202);
-  const code = /\b(\d{6})\b/.exec(lastMailTo(email)?.subject ?? '')?.[1];
-  const res = await api('POST', '/agent/token', { body: { email, code } });
+  const code = mailedCode(email);
+  const res = await api('POST', '/agent/token', { body: { code } });
   expect(res.status).toBe(201);
   return res.body.token;
 }
@@ -72,23 +77,23 @@ describe('agent sign-in', () => {
     expect(devOutbox()).toHaveLength(0);
   });
 
-  it('a code works once, and five wrong guesses use it up', async () => {
+  it('a code works once, however it is typed, and a wrong one is refused', async () => {
     await api('POST', '/agent/code', { body: { email: 'ada@ethz.ch' } });
-    const code = /\b(\d{6})\b/.exec(lastMailTo('ada@ethz.ch')!.subject)![1];
-    const wrong = code === '000000' ? '111111' : '000000';
-    for (let i = 0; i < 5; i += 1) {
-      expect((await api('POST', '/agent/token', { body: { email: 'ada@ethz.ch', code: wrong } })).status).toBe(422);
-    }
-    const late = await api('POST', '/agent/token', { body: { email: 'ada@ethz.ch', code } });
-    expect(late.body.error.code).toBe('invalid_code');
+    const code = mailedCode('ada@ethz.ch');
+    expect(code).toMatch(/^[0-9A-Z]{4}-[0-9A-Z]{4}-[0-9A-Z]{4}$/);
+    const wrong = await api('POST', '/agent/token', { body: { code: 'AAAA-AAAA-AAAA' } });
+    expect(wrong.body.error.code).toBe('invalid_code');
+    const typed = code.replace(/-/g, ' ').toLowerCase();
+    expect((await api('POST', '/agent/token', { body: { code: typed } })).status).toBe(201);
+    const again = await api('POST', '/agent/token', { body: { code } });
+    expect(again.body.error.code).toBe('invalid_code');
   });
 
   it('a signed-in person gets a code for their prompt; a token cannot make one', async () => {
     const cookie = await signUp('ada@ethz.ch');
     const issued = await api('POST', '/me/agent-code', { cookie });
     expect(issued.status).toBe(201);
-    expect(issued.body.email).toBe('ada@ethz.ch');
-    const minted = await api('POST', '/agent/token', { body: { email: 'ada@ethz.ch', code: issued.body.code } });
+    const minted = await api('POST', '/agent/token', { body: { code: issued.body.code } });
     expect(minted.status).toBe(201);
     expect((await api('POST', '/me/agent-code', { token: minted.body.token })).status).toBe(403);
   });
@@ -96,7 +101,7 @@ describe('agent sign-in', () => {
   it('a revoked token is refused', async () => {
     const cookie = await signUp('ada@ethz.ch');
     const { code } = (await api('POST', '/me/agent-code', { cookie })).body;
-    const { token } = (await api('POST', '/agent/token', { body: { email: 'ada@ethz.ch', code } })).body;
+    const { token } = (await api('POST', '/agent/token', { body: { code } })).body;
     const listed = await api('GET', '/me/tokens', { cookie });
     expect(listed.body.tokens).toHaveLength(1);
     expect(listed.body.tokens[0].name).toBe('ai-agent');

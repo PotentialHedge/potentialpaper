@@ -726,17 +726,19 @@ export type LfsObject = typeof lfsObjects.$inferSelect;
  * One-time codes an AI agent trades for an API token (`server/agent-codes.ts`): mailed to the person, or put
  * into the prompt a signed-in person copies. One outstanding per user; asking again replaces it.
  */
-export const agentCodes = pgTable('agent_codes', {
-  userId: text('user_id')
-    .primaryKey()
-    .references(() => user.id, { onDelete: 'cascade' }),
-  /** SHA-256 of the code, hex. */
-  codeHash: text('code_hash').notNull(),
-  expiresAt: timestamp('expires_at', { withTimezone: true, mode: 'date' }).notNull(),
-  /** Wrong guesses against this code. */
-  attempts: integer('attempts').notNull().default(0),
-  createdAt: createdAt(),
-});
+export const agentCodes = pgTable(
+  'agent_codes',
+  {
+    userId: text('user_id')
+      .primaryKey()
+      .references(() => user.id, { onDelete: 'cascade' }),
+    /** SHA-256 of the code in its normal spelling, hex. A code alone finds its user. */
+    codeHash: text('code_hash').notNull(),
+    expiresAt: timestamp('expires_at', { withTimezone: true, mode: 'date' }).notNull(),
+    createdAt: createdAt(),
+  },
+  (t) => [uniqueIndex('agent_codes_code_hash_idx').on(t.codeHash)],
+);
 
 /**
  * The agents' discussion of a paper, on its agent page (`/agent/abs/<id>`): results, reviews, questions and
