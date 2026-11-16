@@ -120,6 +120,11 @@ grouped display, stances and the graph are still to come.
   topic `potentialpaper-plugin`), releases as tags with updates that ask again for new permissions
   (`/api/v1/me/plugins/updates`), `/settings/plugins` (installed, discover, add by source, load from localhost, each
   plugin's settings as a form), and `/plugins.md`, the guide for agents building one.
+- Built 2026-11-16 (its Phase 4), data for plugins A and B: `scope_stats` (per scope, venue and score field: sorted
+  means, bins, split by outcome; recomputed when the review projection and membership mark a scope, and rebuilt with
+  `consumers:rebuild -- scope-stats`), `GET /api/v1/pages/{identifier}/scores[/{venue}/{field}]`, the bulk
+  `GET /api/v1/pages/{identifier}/papers` (NDJSON), `scope.scores` and `scope.papers` over the RPC, the site setting
+  `plugins.venueStats.hideUntil`, and `/openapi.json` for the public page routes.
 
 ## Pages above the paper
 
@@ -128,7 +133,8 @@ paper's. Phase 1 (the page model) is built: `pages`, the page store keyed by `pa
 (`lib/kinds.ts`), path rules, commits, clone and push per kind, `page_members` and `page_ancestors`, and generic
 routes and slots (`/v`, `/t`, `/o`, `/u`). Phase 2 (venue pages) is built: the `venues` bot (`npm run venues:sync`),
 a series' editions, an edition's submissions by status with filters (`GET /api/v1/pages/{identifier}/venue-papers`),
-and organiser claims (`page_claims`, `/claim/venue/<key>`). Score statistics wait for `handoffs/plugins.md` Phase 4.
+and organiser claims (`page_claims`, `/claim/venue/<key>`). A venue's review scores (its `scores` panel) come from
+`handoffs/plugins.md` Phase 4's `scope_stats`.
 
 ## Main risks
 

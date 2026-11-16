@@ -1,6 +1,6 @@
 # Handoff: settings.json, plugins from GitHub, data for plugins, and the score-standing plugin
 
-Status: plan, 2026-11-16. Phases 1 (settings.json), 2 (the plugin host) and 3 (discovery and the plugin pages) are
+Status: plan, 2026-11-16. Phases 1 (settings.json), 2 (the plugin host), 3 (discovery and the plugin pages) and 4 (data for plugins, A and B) are
 built; see the Log.
 
 ## Goal
@@ -545,3 +545,135 @@ permissions and an agent refused `approve`, re-pinning a site default for one re
 failures are the same as before this phase: six in `pdf-ingest.test.ts` (no poppler) and one in `follows.test.ts`.
 `page-git.test.ts`'s fast-check merge property failed once in a full unit run and passed on rerun, as in pages
 Phase 1. These ran against this worktree's own database, `potentialpaper_test_plugins3`, through an untracked `.env`.
+
+### Phase 4: data for plugins, A and B (2026-11-16, branch `plugins-phase-4`)
+
+Built:
+
+- **A, `scope_stats`** (`server/scope-stats.ts`, `lib/scope-stats.ts`, migration `0036_scope_stats.sql`):
+  - One row per `(scope, venue, field)`, for every field a venue's review forms mark `score` (the form's `summary`
+    first, then its order). Each holds the submissions' means over their reviews, sorted, and the count. It also
+    holds the form's `min`/`max`, 20 fixed-width bins between them (or between the means' own whole range when the
+    form gives none), the same split by outcome, `decisions_out` and `computed_at`. Rolled up through
+    `page_ancestors`, so a series has its editions' venues, each apart.
+  - **Which submissions count:** every submission of the scope's member papers. A paper that is a member through a
+    submission (a venue's) counts only its submissions to the venues the scope answers to, so NeurIPS doesn't show
+    up on ICLR's page. A topic or org gets every venue its papers went to.
+  - **When it runs:** the `reviews` and `members` consumers mark the affected scopes and every scope above them,
+    inside the transaction that changes their rows (`markPaperScopes`/`markScopes`). A paper's scopes are marked
+    before and after, so a scope it leaves is recomputed too. Marking writes `scope_state`: `changed_at`, plus a
+    `due_at` 5 s ahead that later marks push back, but never past `dirty_since` plus a minute. The worker runs
+    `recomputeDueScopes` after each pass of the consumers (`WorkerOptions.tasks`, `WORKER_TASKS`), and its sleep
+    shortens to the next due time. Each scope is taken with a 5-minute lease and released only if nothing marked it
+    meanwhile. Recomputing replaces the scope's rows from the tables, so it is idempotent.
+  - **The `scope-stats` consumer** only marks: a paper's scopes on any commit, which keeps `changed_at` moving when
+    a title changes, or the scope itself. Its `reset` empties the statistics and marks every scope, so
+    `consumers:rebuild -- scope-stats` rebuilds it. On a database migrated past `0036`, the worker starts this new
+    consumer from zero by itself.
+- **Routes** (public, `Cache-Control: public, max-age=60`):
+  - `GET /api/v1/pages/{identifier}/scores` gives the venues and fields with counts per outcome, venues with the
+    most submissions first.
+  - `GET /api/v1/pages/{identifier}/scores/{venue}/{field}` (the venue's id URL-encoded) gives the sorted values,
+    bins, `split` by outcome and `computedAt`.
+  - Both send an ETag (a hash of the body) and answer `If-None-Match` with a 304 (`respondCached` in
+    `server/api/http.ts`).
+  - A page of a kind that has no papers gets a 422. An unknown field gets a 404.
+- **B:** `GET /api/v1/pages/{identifier}/papers?fields=submissions,scores,status[&limit=&after=]` streams NDJSON.
+  - Each line is one paper: identifier, address, title and year, then every submission with venue, number and
+    link; `status` adds status and decision, and `scores` adds each review's score vector with its signature,
+    licence and link.
+  - Without `limit`, the whole scope streams in chunks of 500 (keyset by page id). With `limit`, one chunk, and
+    the cursor for the next in `X-Next-Cursor`.
+  - Gzipped with `CompressionStream` when asked (Next's compression leaves a response with `Content-Encoding`
+    alone), with `Link: <CC BY 4.0>; rel="license"`.
+  - ETagged on the scope's `changed_at`, the fields and the cursor.
+- **RPC:** `scope.scores` and `scope.papers` (permission `scope.read`) are in `HOST_METHODS` and `host.ts`.
+  - `scope.scores(identifier, venue?, field?)` gives the list, the list for one venue, or one field.
+  - `scope.papers` gives one chunk (`{ rows, next }`, up to 2,000) through a new `HostServices.apiLines`, which
+    `PluginFrame` implements by reading the NDJSON and the cursor header.
+  - The SDK's `pp.scope.papers(identifier?, { fields, chunkSize, onChunk })` follows the cursor to the end, and
+    resolves with every row, or streams them to `onChunk`.
+  - `pp.d.ts` has the types (`ScoreList`, `ScoreField`, `BulkPaper`).
+- **`plugins.venueStats.hideUntil`** is a site-only setting, `never` (the default) or `decisions`. With
+  `decisions`, a venue whose decisions aren't out has `hidden: true`: no values, zeroed bins and split, the counts
+  kept. This applies on the routes, the RPC and the venue page.
+- **The venue page's `scores` panel** (`venue.main`, after `editions`; in `lib/panels.ts`, so it can be hidden and
+  moved). `venueScoreStats` fills the place pages Phase 2 left. Per venue (several on a series), it shows:
+  - the first score field as a histogram stacked by outcome, with a hover title per bar, an accessible name that
+    summarises it, and a legend with counts;
+  - a table of every field: range, submissions, median, middle half, and the medians of accepted and rejected
+    submissions once there are decisions;
+  - when hidden, a line saying they show once decisions are out.
+
+  It reads quartiles and per-outcome medians in SQL, not the values.
+
+- **`page.hasScores` on a scope** is now exact: the scope has score statistics.
+- **Docs:**
+  - `/plugins.md` has both methods (`METHOD_DOCS`) and the three routes under "Data routes", with ETags,
+    `hideUntil`, the licence and the OpenAPI link.
+  - `llms.txt` names the routes and `/openapi.json`, and there is an `/agent/updates` notice.
+  - **`/openapi.json`** (`server/api/openapi.ts`) is a minimal OpenAPI 3.1 description of the public page routes
+    (summary, files, members, submissions, venue-papers, scores, the field, papers). Its response bodies are made
+    from the same zod schemas the routes check, so they can't drift.
+  - DESIGN.md §4.3 (venue pages), §4.9 (consumers that depend on other consumers) and §10 (A and B), and
+    IMPLEMENTATION.md Milestone 8 and "Pages above the paper", are updated.
+
+Calls I made where the plan left room:
+
+- **Chained, not a second reader of events.** The plan offered either. Reading events alone races the other two
+  consumers, since each has its own cursor. Marking inside their transactions guarantees a recompute after the data
+  changed, and the debounce coalesces an import.
+- **Outcomes:** `desk_rejected` counts as rejected. `under_review` and no status count as `pending`. The plan
+  named four groups.
+- **Decisions are "out"** when any submission at the venue (venue-wide, not only the scope's) is accepted or
+  rejected. Desk rejections come before decisions, so they don't count.
+- **The open question, settled:** `plugins.venueStats.hideUntil`, defaulting to `never`, applies to A (routes,
+  RPC, venue panel). It doesn't apply to B or to `reviews.forPaper`: those are the raw public reviews, shown on
+  every paper page anyway, and the setting withholds the site's own ranking, not the data. The counts stay visible
+  when hidden.
+- **Bins are 20 between the form's `min`/`max`**, with the last bin closed. Values outside go to the nearest end.
+  Each outcome's bins share the field's range, so they stack.
+- **B lists every submission of a paper**, not only those to the scope's venues, so a plugin sees "rejected at
+  NeurIPS, accepted at ICLR". A counts only the scope's venues, as above.
+- **B's ETag is the scope's `changed_at`,** not a hash of the stream, so a 304 needs no work. It moves on any member
+  paper's commit and on membership changes. It does not move on changes that make no commit (a paper identifier
+  added by an import's lookup).
+- **Only fields the forms mark `score` count,** as the plan says. On a paper, `page.hasScores` still infers
+  numeric fields (`scoreTable`), so a venue imported without forms has scores on its papers but no statistics. The
+  OpenReview import writes forms, so this is theoretical. `plugins.test.ts`'s page-routes test now commits forms.
+- **The venue id is the `venues` id** (`openreview:ICLR.cc/2027/Conference`), URL-encoded as one path segment like
+  identifiers. A venue page can have several sources, and tracks have no page yet. The list gives each venue's
+  name.
+- **Score parsing in SQL** follows `scoreOf`: a JSON number as it is, text by its leading number (`"6: marginally
+above"`).
+- **Performance:** I timed it on a synthetic ICLR-sized venue (40k submissions, 4 reviews each, 5 score fields).
+  - A recompute takes about 4 s. The scores are extracted in a materialized CTE before grouping, and `work_mem` is
+    raised to 128 MB inside the recompute's transaction. The first version took about 10 s, with sorts spilling
+    the note content to disk.
+  - With the one-minute cap, a scope under a continuous import is recomputed at most once a minute.
+  - The bulk stream of the same 40k papers took about 8 s.
+  - The seam, if this grows: recompute one venue of a scope rather than all of them, or keep per-submission means
+    in a table the review projection writes.
+
+For later phases:
+
+- Phase 5: `network` and the consent prompt are as Phase 2 left them. The guide's "Data routes" now ends with the
+  licence and OpenAPI paragraph, and the backend pattern goes after it. `/openapi.json` can grow to cover
+  `/.well-known/jwks.json` and whatever a backend calls.
+- Phase 6 (score standing):
+  - Take the venue's first field from `pp.scope.scores(scope).scores` (already in form order).
+  - Then call `pp.scope.scores(scope, venue.id, field)`. `values` is the curve's input, `bins` the histogram's,
+    `split` the per-outcome version. `decisionsOut` drives `splitByDecision: auto`.
+  - A paper's own mean comes from `reviews.forPaper` (or B's score vectors), averaged as `scoreTable` does.
+  - Cache by ETag: the browser's HTTP cache already revalidates within the minute, and the plugin can keep its own
+    copy in IndexedDB keyed by `computedAt`.
+  - The org view needs `page_members` for orgs (pages Phase 4); the statistics roll up already.
+- Moving a built-in panel onto the plugin API (Milestone 8) can now use these routes.
+- The venue page is cached for 5 minutes (pages Phase 1), so its `scores` panel lags the statistics by up to that.
+
+Checks: typecheck, lint and `next build` pass. Unit tests: 386 pass (7 new: `tests/unit/scope-stats.test.ts`, and
+`scope.scores`/`scope.papers` with the SDK following the cursor in `tests/unit/plugins.test.ts`). Integration: 279 of
+286 pass, 5 new in `tests/integration/scope-stats.test.ts` (statistics, roll-up and the venue panel's numbers;
+marking, debounce and rebuild; ETag and 304; `hideUntil`; the bulk stream with fields, gzip, ETag and chunks). The 7
+failures are the same as before this phase: six in `pdf-ingest.test.ts` (no poppler) and one in `follows.test.ts`.
+These ran against this worktree's own database, `potentialpaper_test_plugins4`, through an untracked `.env`.

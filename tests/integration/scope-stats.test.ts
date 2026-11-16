@@ -265,8 +265,8 @@ describe('scope statistics (A)', () => {
     // Not due yet: nothing is done.
     expect((await recomputeDueScopes()).scopes).toBe(0);
     expect((await recomputeDueScopes({ all: true })).scopes).toBeGreaterThan(0);
-    const [row] = await getDb().select().from(scopeStats).where(eq(scopeStats.scopePageId, edition.id));
-    expect(row.values).toEqual([6]);
+    const rows = await getDb().select().from(scopeStats).where(eq(scopeStats.scopePageId, edition.id));
+    expect(rows.find((r) => r.field === 'rating')?.values).toEqual([6]);
 
     // A rebuild empties and marks every scope; recomputing gives the same rows.
     await rebuildConsumer(scopeStatsConsumer);

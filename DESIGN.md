@@ -227,6 +227,8 @@ editions. The `venues` bot, granted `venue.json` on venue pages, makes both page
 venue's owners are its confirmed organisers (`page_claims`, the author claim flow with the venue as what is claimed,
 decided by an admin); a series' organisers also own its editions. They write `organizers/` and `venue.json` under
 their own handle's identity, since organising is a public role.
+A venue's page also shows its review scores (`scores`, from `scope_stats`, §10): the first score field as a
+histogram stacked by outcome, and every field's median, middle half and medians by decision, per venue on a series.
 
 **Sections** are named `NN-slug.md` or `NN-slug.html`: two digits, then a lower-case ASCII slug.
 They show in the order of their names, which is the order `ls` lists them in. A section's title is the
@@ -495,6 +497,13 @@ Now: one worker process (a compose service, like `ingest`) reads `page_events` i
 `LISTEN/NOTIFY` from the commit, with a poll as a fallback. Later, the same consumers can sit behind a
 queue (Kafka, NATS or a cloud queue), partitioned by `page_id` so each page's events stay in order.
 This is how GitHub's code search is fed: pushes go to Kafka, and crawlers turn them into documents.
+
+A consumer whose data depends on other consumers' rows rather than on the repo can't simply read the same events,
+since each consumer has its own cursor and may run first. Score statistics (`scope_stats`, §10) are the first: the
+review projection and the membership consumer **mark** the scopes they affect, in the transaction that changes their
+rows (`scope_state`: `changed_at`, and a `due_at` a few seconds ahead, debounced but never more than a minute past
+the first change), and the worker recomputes due scopes after each pass. Its own `scope-stats` consumer only marks,
+so `consumers:rebuild -- scope-stats` still starts it over.
 
 ### 4.10 Search
 
@@ -897,6 +906,18 @@ Arbitrary JavaScript on the main origin could act as any signed-in user. So:
   Data comes three ways: aggregates the site computes per scope (a `scope_stats` consumer, §4.9), generic bulk
   reads of a scope's papers with ETags, and a plugin's own backend (its `network` origins, or a bot, below).
   Per-user plugin storage is fine.
+  - **Aggregates (A)**, built: `scope_stats` keeps, per scope (a venue, topic or org, rolled up through
+    `page_ancestors`), venue and score field of the venue's review forms, every submission's mean over its reviews,
+    sorted, with 20 fixed-width bins between the form's range and the same split by outcome (accepted, rejected,
+    withdrawn, pending). The venue stays in the key, since a 6 at one venue is no 6 at another. Served at
+    `GET /api/v1/pages/{identifier}/scores` (venues, fields, counts) and `…/scores/{venue}/{field}` (the numbers),
+    public, ETagged and cached a minute, and by `scope.scores`. Curve-fitting is the client's. The site setting
+    `plugins.venueStats.hideUntil` (`never`, the default, or `decisions`) withholds a venue's numbers until it has
+    decided on a submission.
+  - **Bulk (B)**, built: `GET /api/v1/pages/{identifier}/papers?fields=submissions,scores,status` streams a scope's
+    papers as NDJSON, each with every submission, its status and decision, and every review's score vector with its
+    licence and link; gzipped, ETagged on the scope's `changed_at`, in chunks by cursor (`limit`, `after`,
+    `X-Next-Cursor`), and `scope.papers` over the RPC. Both are described at `/openapi.json`.
 - Writes go through `commitPage` like any others and record the extension in a trailer.
 
 VS Code makes the same trade: extensions get APIs and webviews, not the host's DOM. So "almost
