@@ -158,7 +158,8 @@ leased_until, last_error, failed_at, updated_at)`. A consumer reads only events 
 - **Tests** (`tests/integration/consumers.test.ts`, 8): newest head once per page, batching, an open transaction
   holding a lower id back (a later commit isn't read past it), an older transaction with a higher id coming first,
   failure/wait/retry, the lease and a rebuild during a run, rebuild replay, and the worker woken by a real commit
-  (poll set to 60 s).
+  (poll set to 60 s). Checks: lint, format, typecheck pass; 529 of 535 tests pass, the 6 failures being the known
+  poppler ones in `pdf-ingest.test.ts`.
 - Changed from the plan: the cursor is `(last_xid, last_event_id)` rather than `last_event_id` alone. Instead of a
   per-page `seq` table, a page's events within a batch are folded to the newest, and `handle` must be idempotent,
   as the plan says. Events of a deleted paper go with it (`on delete cascade`), so a consumer never hears of the
