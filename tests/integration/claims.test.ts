@@ -117,6 +117,92 @@ describe('claiming a paper', () => {
   });
 });
 
+describe('My papers and co-authors', () => {
+  async function confirmedAshish(paperId: string) {
+    const ashish = await accountOf('ashish@ethz.ch');
+    await api('POST', '/claims', { cookie: ashish.cookie, body: { paper: PAPER, authorIndex: 0, evidence: '' } });
+    const [row] = await getDb().select().from(authorClaims).where(eq(authorClaims.paperId, paperId));
+    await decideClaim(row.id, 'confirmed', null);
+    return ashish;
+  }
+
+  it('lists the papers an account has claimed, and lets a confirmed author add a co-author by handle', async () => {
+    const paperId = await paper();
+    const ashish = await confirmedAshish(paperId);
+    const noam = await accountOf('noam@ethz.ch');
+
+    const mine = await api('GET', '/me/papers', { cookie: ashish.cookie });
+    expect(mine.status).toBe(200);
+    expect(mine.body.authored).toEqual([
+      expect.objectContaining({
+        title: 'Attention Is All You Need',
+        paper: PAPER,
+        path: '/abs/1706.03762',
+        mine: expect.objectContaining({ authorName: 'Ashish Vaswani', status: 'confirmed' }),
+        confirmed: [{ authorIndex: 0, authorName: 'Ashish Vaswani' }],
+        waiting: [],
+      }),
+    ]);
+    expect((await api('GET', '/me/papers', { cookie: noam.cookie })).body.authored).toEqual([]);
+
+    // Only a confirmed author may vouch.
+    const refused = await api('POST', '/me/papers/co-authors', {
+      cookie: noam.cookie,
+      body: { paper: PAPER, handle: ashish.account.handle, authorIndex: 1 },
+    });
+    expect(refused.status).toBe(403);
+
+    // Not as an author someone is already confirmed as.
+    const taken = await api('POST', '/me/papers/co-authors', {
+      cookie: ashish.cookie,
+      body: { paper: PAPER, handle: `@${noam.account.handle}`, authorIndex: 0 },
+    });
+    expect(taken.status).toBe(409);
+
+    const added = await api('POST', '/me/papers/co-authors', {
+      cookie: ashish.cookie,
+      body: { paper: PAPER, handle: `@${noam.account.handle}`, authorIndex: 1 },
+    });
+    expect(added.status).toBe(201);
+    expect(added.body).toEqual({ authorIndex: 1, authorName: 'Noam Shazeer' });
+    const [claim] = await getDb().select().from(authorClaims).where(eq(authorClaims.accountId, noam.account.id));
+    expect(claim).toMatchObject({ status: 'confirmed', method: 'vouch', decidedBy: ashish.account.id });
+
+    // They can step down, and aren't added again over that.
+    expect((await api('DELETE', `/claims?scheme=arxiv&value=1706.03762`, { cookie: noam.cookie })).status).toBe(200);
+    const again = await api('POST', '/me/papers/co-authors', {
+      cookie: ashish.cookie,
+      body: { paper: PAPER, handle: noam.account.handle, authorIndex: 1 },
+    });
+    expect(again.status).toBe(409);
+  });
+
+  it("shows a co-author's pending claim to the paper's confirmed authors, who can confirm it", async () => {
+    const paperId = await paper();
+    const ashish = await confirmedAshish(paperId);
+    const noam = await accountOf('noam@ethz.ch');
+    await api('POST', '/claims', {
+      cookie: noam.cookie,
+      body: { paper: PAPER, authorIndex: 1, evidence: 'Ask Ashish.' },
+    });
+
+    const mine = await api('GET', '/me/papers', { cookie: ashish.cookie });
+    const [waiting] = mine.body.authored[0].waiting;
+    expect(waiting).toMatchObject({ authorName: 'Noam Shazeer', evidence: 'Ask Ashish.' });
+    // Their own view shows it pending, and nothing waiting on others.
+    const theirs = await api('GET', '/me/papers', { cookie: noam.cookie });
+    expect(theirs.body.authored[0]).toMatchObject({ mine: { status: 'pending' }, waiting: [] });
+
+    const confirmed = await api('POST', '/me/papers/co-authors', {
+      cookie: ashish.cookie,
+      body: { paper: PAPER, claim: waiting.claim },
+    });
+    expect(confirmed.status).toBe(201);
+    const after = await api('GET', '/me/papers', { cookie: noam.cookie });
+    expect(after.body.authored[0].mine).toMatchObject({ status: 'confirmed', method: 'vouch', canStepDown: true });
+  });
+});
+
 describe("a paper's picture and links", () => {
   it('are anyone verified until the paper is claimed, then its authors only', async () => {
     const paperId = await paper();

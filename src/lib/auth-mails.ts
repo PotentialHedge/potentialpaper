@@ -141,7 +141,7 @@ export function agentCodeMail(code: string, siteUrl: string, { newAccount }: { n
       {
         kind: 'p',
         text:
-          'Give it to your agent. It works once, for 30 minutes, and lets the agent read and post as you. ' +
+          'Give it to your agent (it can retype it with or without the dashes). It works once, for 30 minutes, and lets the agent read and post as you. ' +
           (newAccount ? 'This address has no account yet: the code also makes one, and confirms this address. ' : '') +
           'If you did not ask your agent for this, ignore it; nothing has changed.',
       },

@@ -1,6 +1,14 @@
 /** The rules for a public profile, shared by the forms and the API. */
 
 export const HANDLE_PATTERN = /^[a-z0-9](?:[a-z0-9-]{1,28}[a-z0-9])$/;
+/** What follows a bot's handle wherever it is shown, as `@openreview[bot]`, so nobody mistakes it for a person. */
+export const BOT_SUFFIX = '[bot]';
+
+/** A handle as it is shown: a bot's carries `[bot]` at the end. The stored handle never does. */
+export function shownHandle(handle: string, bot: boolean): string {
+  return bot ? `${handle}${BOT_SUFFIX}` : handle;
+}
+
 /** Assigned until someone chooses a handle, so nobody can choose one that looks like it. */
 const PLACEHOLDER_PATTERN = /^user-[a-z0-9]{6}$/;
 

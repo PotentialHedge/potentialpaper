@@ -30,7 +30,14 @@ import { buildTrees, encodeCommit, gitObject, looseObject, SYSTEM_AUTHOR_ID } fr
 import { mergeFile } from '@/server/pages/merge';
 import { rebuildAllPages } from '@/server/pages/projections';
 import { diffCommits, pageHistory, readHead } from '@/server/pages/repo';
-import { encodeLfsPointer, MAX_CHANGES, PAPER_PDF_PATH, PDF_PATH, THUMBNAIL_PATH } from '@/server/pages/rules';
+import {
+  encodeLfsPointer,
+  LAYOUT_VERSION,
+  MAX_CHANGES,
+  PAPER_PDF_PATH,
+  PDF_PATH,
+  THUMBNAIL_PATH,
+} from '@/server/pages/rules';
 import { recordLfsObject } from '@/server/lfs';
 import { savePaper } from '@/server/papers';
 import { searchPapers } from '@/server/search';
@@ -534,6 +541,7 @@ describe('commitPage', () => {
     });
     const repo = await exportRepo(paperId);
     expect(JSON.parse(filesAt(repo).get('.potentialpaper/metadata.json')!)).toEqual({
+      layout: LAYOUT_VERSION,
       identifiers: [ARXIV],
       title: expect.stringContaining('Über'),
       authors: ['Ada Lovelace', 'Émile Noether'],

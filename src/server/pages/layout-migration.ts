@@ -10,6 +10,7 @@ import {
   GITATTRIBUTES,
   GITATTRIBUTES_PATH,
   layoutProblem,
+  layoutVersionOf,
   METADATA_PATH,
   PAGE_PARTS,
   PAPER_PDF_PATH,
@@ -20,13 +21,14 @@ import {
   thumbnailImagePath,
   versionIdOf,
   versionPdfPath,
+  withLayoutVersion,
 } from './rules';
 import { planSections } from './sections';
 
 /**
  * From the first layout (one `page.md` per part, `links.json`, `versions.jsonl`, the system's files at the
- * top) to files and folders (`rules.ts`). Pure: `scripts/migrate-page-layout.ts` commits what this says, as
- * the system, a commit per page.
+ * top) to files and folders (`rules.ts`), layout 2, which `metadata.json` then records. Pure:
+ * `scripts/migrate-page-layout.ts` commits what this says, as the system, a commit per page.
  */
 
 const MOVED: Record<string, string> = { 'metadata.json': METADATA_PATH, 'pdf.json': PDF_PATH };
@@ -75,7 +77,8 @@ export function planLayout(files: ReadonlyMap<string, string>): LayoutPlan {
   const left: string[] = [];
   for (const [path, text] of files) {
     if (MOVED[path]) {
-      changes.push({ path, content: null }, { path: MOVED[path], content: text });
+      const content = MOVED[path] === METADATA_PATH ? (withLayoutVersion(text, 2) ?? text) : text;
+      changes.push({ path, content: null }, { path: MOVED[path], content });
     } else if (path === OLD_LINKS) {
       changes.push({ path, content: null }, ...linkChanges([], oldLinks(text)));
     } else if (path === OLD_VERSIONS) {
@@ -135,13 +138,17 @@ function parseJson(text: string | undefined): Record<string, unknown> | null {
 /**
  * From pointers in JSON (`pdf.json`, `thumbnail.json`, a version's `"pdf"` with its hash and address) to Git
  * LFS (`rules.ts`): the PDF as `.potentialpaper/paper.pdf`, the picture as `thumbnail.<ext>`, a version's PDF as
- * `versions/<id>.pdf`, each a pointer, with what else the JSON said left in it; and `.gitattributes`. Pure:
- * `scripts/migrate-page-lfs.ts` records the files and commits what this says. None if the page is there.
+ * `versions/<id>.pdf`, each a pointer, with what else the JSON said left in it; `.gitattributes`; and layout 3
+ * in `metadata.json`. Pure: `scripts/migrate-page-lfs.ts` records the files and commits what this says. None
+ * if the page is there.
  */
 export function planLfs(files: ReadonlyMap<string, string>): LfsPlan {
   const changes: FileChange[] = [];
   const stored: StoredFile[] = [];
   if (!files.has(GITATTRIBUTES_PATH)) changes.push({ path: GITATTRIBUTES_PATH, content: GITATTRIBUTES });
+  const metadata = files.get(METADATA_PATH);
+  const stamped = metadata !== undefined && (layoutVersionOf(metadata) ?? 0) < 3 && withLayoutVersion(metadata, 3);
+  if (stamped) changes.push({ path: METADATA_PATH, content: stamped });
 
   const pdf = parseJson(files.get(PDF_PATH));
   const pdfFile = pdf && oldPointer(pdf);

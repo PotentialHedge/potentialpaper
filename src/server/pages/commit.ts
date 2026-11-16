@@ -28,6 +28,7 @@ import {
   GITATTRIBUTES,
   GITATTRIBUTES_PATH,
   layoutProblem,
+  LAYOUT_VERSION,
   METADATA_PATH,
   normalizePath,
   PREK_PATH,
@@ -81,7 +82,7 @@ export interface CommitOptions {
   migration?: boolean;
 }
 
-/** The first commit's snapshot of the paper (DESIGN.md §4.2). Stable, so that it hashes the same when unchanged. */
+/** The first commit's snapshot of the paper (DESIGN.md §4.2), with the layout the repo starts in (`rules.ts`). Stable, so that it hashes the same when unchanged. */
 async function metadataSnapshot(tx: Writer, paperId: string): Promise<string> {
   const [paper] = await tx.select().from(papers).where(eq(papers.id, paperId));
   const identifiers = await tx
@@ -91,7 +92,7 @@ async function metadataSnapshot(tx: Writer, paperId: string): Promise<string> {
   identifiers.sort((a, b) => `${a.scheme}:${a.value}`.localeCompare(`${b.scheme}:${b.value}`, 'en'));
   const { title, authors, abstract, year, venue, source, metadataLicense, abstractLicense } = paper;
   const license = { metadata: metadataLicense, abstract: abstractLicense };
-  return `${JSON.stringify({ identifiers, title, authors, abstract, year, venue, source, license }, null, 2)}\n`;
+  return `${JSON.stringify({ layout: LAYOUT_VERSION, identifiers, title, authors, abstract, year, venue, source, license }, null, 2)}\n`;
 }
 
 function normalizeChanges(changes: readonly FileChange[], migration: boolean): FileChange[] {

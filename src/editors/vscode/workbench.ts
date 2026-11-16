@@ -34,6 +34,9 @@ export function workbenchHtml(paper: PaperId & { title: string }): string {
       extensionEnabledApiProposals: { 'potentialpaper.potentialpaper': ['scmActionButton'] },
       webviewContentExternalBaseUrlTemplate: webviewTemplate(),
     },
+    // Links to the site (Open the Paper's Page, links in a section, a commit's notification) open without VS Code
+    // asking whether to trust the address: it is the page's own site.
+    additionalTrustedDomains: [site],
     windowIndicator: { label: `$(book) ${paper.title.slice(0, 60)}`, tooltip: paper.title },
     configurationDefaults: {
       'potentialpaper.paper': { scheme: paper.scheme, value: paper.value },

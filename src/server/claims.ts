@@ -4,6 +4,7 @@ import { pgErrorCode } from '@/db/errors';
 import {
   accounts,
   authorClaims,
+  paperFollows,
   paperIdentifiers,
   papers,
   type Account,
@@ -30,7 +31,9 @@ import { authorsForEmails } from './pdfs/authors';
  *   created, when it confirms an address, and when ingest reads a PDF. An automatic author can take it
  *   back (`withdrawClaim`), which leaves the claim `declined` so it isn't made again.
  * - **`manual`:** everything else waits for an admin (`scripts/decide-claim.ts`).
- * - `vouch`, by a confirmed co-author, comes next.
+ * - **`vouch`:** a confirmed author adds a co-author (`addCoAuthor`, from My papers): names their account by
+ *   handle and which printed author they are, or confirms a claim they are waiting on. It is confirmed at
+ *   once, and they can step down from it as from an automatic one.
  *
  * **The PDF's emails are private.** Nothing here returns them, or says which address matched, to anyone but
  * the account itself, and only its own addresses (`ownAddressesOnPaper`).
@@ -45,6 +48,11 @@ async function refreshPaper(paperId: string, database: Database): Promise<void> 
     .from(paperIdentifiers)
     .where(eq(paperIdentifiers.paperId, paperId));
   await refreshPaperPages(identifiers);
+}
+
+/** Authors follow their own papers (`server/follows.ts`): called wherever a claim becomes confirmed. */
+async function followAsAuthor(paperId: string, accountId: string, database: Database): Promise<void> {
+  await database.insert(paperFollows).values({ paperId, accountId }).onConflictDoNothing();
 }
 
 /** A paper's confirmed authors, by their printed names, in the paper's order. **Public:** no account ids. */
@@ -220,7 +228,10 @@ export async function requestClaim(
       throw new ApiError(409, 'claim_taken', `${authorName} is already a confirmed author of this paper`);
     throw new ApiError(503, 'page_busy', 'could not record the claim; try again');
   }
-  if (verification) await refreshPaper(paperId, database);
+  if (verification) {
+    await followAsAuthor(paperId, account.id, database);
+    await refreshPaper(paperId, database);
+  }
   return { authorIndex: input.authorIndex, authorName, status: decision.status, method: decision.method, evidence };
 }
 
@@ -263,7 +274,10 @@ export async function recheckPendingClaims(
         )
         .returning({ id: authorClaims.id });
       confirmed += updated.length;
-      if (updated.length > 0) await refreshPaper(row.paper_id, database);
+      if (updated.length > 0) {
+        await followAsAuthor(row.paper_id, row.account_id, database);
+        await refreshPaper(row.paper_id, database);
+      }
     } catch (err) {
       if (pgErrorCode(err) !== '23505') throw err;
     }
@@ -329,6 +343,7 @@ export async function claimByEmail(
         .returning({ id: authorClaims.id });
       if (made.length > 0) {
         count += 1;
+        await followAsAuthor(row.paper_id, row.account_id, database);
         await refreshPaper(row.paper_id, database);
       }
     } catch (err) {
@@ -339,9 +354,17 @@ export async function claimByEmail(
   return count;
 }
 
+/** The ways a claim is confirmed without an admin, which the author may step down from. */
+const STEP_DOWN_METHODS: ClaimMethod[] = ['email', 'vouch'];
+
+/** Whether the account can step down from this claim (`withdrawClaim`) rather than only an admin undoing it. */
+export function canStepDown(claim: { status: ClaimStatus; method: ClaimMethod }): boolean {
+  return claim.status === 'confirmed' && STEP_DOWN_METHODS.includes(claim.method);
+}
+
 /**
- * Takes back a claim that hasn't been decided, or steps down as an author the site made automatically
- * (`method: 'email'`), which is kept as `declined` so it isn't made again. An admin's decision stays.
+ * Takes back a claim that hasn't been decided, or steps down as an author the site made without an admin
+ * (`method: 'email'` or `'vouch'`), which is kept as `declined` so it isn't made again. An admin's decision stays.
  */
 export async function withdrawClaim(paperId: string, accountId: string, database: Database = getDb()): Promise<void> {
   const mine = and(eq(authorClaims.paperId, paperId), eq(authorClaims.accountId, accountId));
@@ -353,10 +376,107 @@ export async function withdrawClaim(paperId: string, accountId: string, database
   const declined = await database
     .update(authorClaims)
     .set({ status: 'declined', decidedAt: new Date() })
-    .where(and(mine, eq(authorClaims.status, 'confirmed'), eq(authorClaims.method, 'email')))
+    .where(and(mine, eq(authorClaims.status, 'confirmed'), inArray(authorClaims.method, STEP_DOWN_METHODS)))
     .returning({ id: authorClaims.id });
   if (declined.length === 0) throw new ApiError(404, 'not_found', 'you have no claim on this paper to take back');
   await refreshPaper(paperId, database);
+}
+
+/** Who a co-author is: their handle and which printed author they are, or the pending claim they made. */
+export type CoAuthorTarget = { handle: string; authorIndex: number } | { claimId: string };
+
+/**
+ * A confirmed author vouches for a co-author (`method: 'vouch'`, DESIGN.md §6): confirms them at once as one of
+ * the paper's printed authors, by their account's handle, or confirms a claim they made and are waiting on.
+ * Never over a decision: not someone an admin rejected, nor one who stepped down (they can claim again), nor an
+ * author someone is already confirmed as.
+ */
+export async function addCoAuthor(
+  paperId: string,
+  voucher: Account,
+  target: CoAuthorTarget,
+  database: Database = getDb(),
+): Promise<{ accountId: string; authorIndex: number; authorName: string }> {
+  const { confirmedAuthor } = await claimRoles(paperId, voucher.id, database);
+  if (!confirmedAuthor)
+    throw new ApiError(403, 'forbidden', 'only a confirmed author of the paper can add a co-author');
+  const [paper] = await database.select({ authors: papers.authors }).from(papers).where(eq(papers.id, paperId));
+  if (!paper) throw new ApiError(404, 'not_found', 'no such paper');
+
+  let accountId: string;
+  let authorIndex: number;
+  if ('claimId' in target) {
+    const [claim] = await database
+      .select({ accountId: authorClaims.accountId, authorIndex: authorClaims.authorIndex })
+      .from(authorClaims)
+      .where(
+        and(eq(authorClaims.id, target.claimId), eq(authorClaims.paperId, paperId), eq(authorClaims.status, 'pending')),
+      );
+    if (!claim) throw new ApiError(404, 'not_found', 'no such claim waiting on this paper');
+    ({ accountId, authorIndex } = claim);
+  } else {
+    const handle = target.handle.trim().replace(/^@/, '').toLowerCase();
+    const [account] = await database
+      .select({ id: accounts.id, isBot: accounts.isBot, verifiedAt: accounts.verifiedAt })
+      .from(accounts)
+      .where(eq(accounts.handle, handle));
+    if (!account) throw new ApiError(404, 'not_found', `nobody has the handle @${handle}`);
+    if (account.isBot) throw new ApiError(422, 'validation_error', 'a bot cannot be an author');
+    if (!account.verifiedAt) {
+      throw new ApiError(422, 'not_verified', `@${handle} has to confirm an institutional address first`);
+    }
+    accountId = account.id;
+    authorIndex = target.authorIndex;
+  }
+  if (accountId === voucher.id) throw new ApiError(422, 'validation_error', 'you are already an author of this paper');
+  const authorName = paper.authors[authorIndex];
+  if (authorName === undefined) throw new ApiError(422, 'validation_error', 'that author is not on the paper');
+
+  const existing = await ownClaim(paperId, accountId, database);
+  if (existing?.status === 'confirmed') {
+    throw new ApiError(409, 'claim_taken', `they are already a confirmed author, as ${existing.authorName}`);
+  }
+  if (existing?.status === 'rejected') {
+    throw new ApiError(409, 'claim_decided', 'an admin turned down their claim on this paper');
+  }
+  if (existing?.status === 'declined') {
+    throw new ApiError(409, 'claim_decided', 'they stepped down from this paper; they can claim it again themselves');
+  }
+  const decision = {
+    authorIndex,
+    authorName,
+    status: 'confirmed' as const,
+    method: 'vouch' as const,
+    verification: null,
+    decidedBy: voucher.id,
+    decidedAt: new Date(),
+  };
+  try {
+    if (existing) {
+      const updated = await database
+        .update(authorClaims)
+        .set(decision)
+        .where(
+          and(
+            eq(authorClaims.paperId, paperId),
+            eq(authorClaims.accountId, accountId),
+            eq(authorClaims.status, 'pending'),
+          ),
+        )
+        .returning({ id: authorClaims.id });
+      if (updated.length === 0) throw new ApiError(503, 'page_busy', 'their claim changed meanwhile; try again');
+    } else {
+      await database
+        .insert(authorClaims)
+        .values({ paperId, accountId, evidence: '', identityId: newIdentity('a'), ...decision });
+    }
+  } catch (err) {
+    if (pgErrorCode(err) !== '23505') throw err;
+    throw new ApiError(409, 'claim_taken', `someone is already confirmed as ${authorName}, or claimed meanwhile`);
+  }
+  await followAsAuthor(paperId, accountId, database);
+  await refreshPaper(paperId, database);
+  return { accountId, authorIndex, authorName };
 }
 
 /** An admin's decision (`method: 'manual'`). Confirming fails if someone else is already confirmed as that author. */
@@ -373,6 +493,7 @@ export async function decideClaim(
       .where(eq(authorClaims.id, claimId))
       .returning();
     if (!row) throw new ApiError(404, 'not_found', 'no such claim');
+    if (row.status === 'confirmed') await followAsAuthor(row.paperId, row.accountId, database);
     return row;
   } catch (err) {
     if (pgErrorCode(err) === '23505') {

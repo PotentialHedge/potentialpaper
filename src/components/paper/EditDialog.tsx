@@ -5,9 +5,13 @@ import { PencilIcon, WITH_ICON } from '@/components/icons';
 import { ui } from '@/components/ui';
 
 /**
- * How to edit a paper's page: in the browser, in the web editor (`/code/…`), or with git. Every page is a git
- * repository, so both edit the same files, held to the same rules. Opens from the "edit" button under the
- * title, and from any link to `#edit` (and the old `#edit-…` links) on the page.
+ * How to edit a paper's page: in the web editor (`/code/…`), or with git. Every page is a git repository, so both
+ * edit the same files, held to the same rules. Opens from the "edit" button under the title, and from any link to
+ * `#edit` (and the old `#edit-…` links) on the page.
+ *
+ * It shows as little as it can: the two ways in, and the few words each needs. Copying the clone command then
+ * offers the desktop extension, as an install command for whichever VS Code-family editor the reader uses: the
+ * `.vsix` isn't on the Marketplace or Open VSX, so an `vscode:extension/…` link would have nothing to open.
  */
 
 export interface EditOptions {
@@ -19,9 +23,22 @@ export interface EditOptions {
 
 const OPENS = /^#edit(?:-[a-z0-9-]+)?$/;
 
+/** The command-line launcher of each VS Code-family editor, for `--install-extension`. */
+const EDITORS = [
+  { name: 'VS Code', cli: 'code' },
+  { name: 'Cursor', cli: 'cursor' },
+  { name: 'Windsurf', cli: 'windsurf' },
+  { name: 'VSCodium', cli: 'codium' },
+] as const;
+
+const VSIX = '/editor/potentialpaper.vsix';
+/** Remembers, in this browser, that the reader declined the extension, so copying doesn't ask again. */
+const DECLINED = 'pp:edit:no-extension';
+
 export function EditDialog({ codePath, clone, hasRepo }: EditOptions) {
   const dialog = useRef<HTMLDialogElement>(null);
   const [via, setVia] = useState<'https' | 'ssh'>('https');
+  const [offer, setOffer] = useState(false);
 
   useEffect(() => {
     const check = () => {
@@ -36,9 +53,27 @@ export function EditDialog({ codePath, clone, hasRepo }: EditOptions) {
     dialog.current?.close();
   };
   const onClose = () => {
+    setOffer(false);
     // So the same link opens it again.
     if (OPENS.test(window.location.hash))
       history.replaceState(null, '', window.location.pathname + window.location.search);
+  };
+  const onCopied = () => {
+    let declined = false;
+    try {
+      declined = localStorage.getItem(DECLINED) === '1';
+    } catch {
+      // No storage: ask.
+    }
+    if (!declined) setOffer(true);
+  };
+  const decline = () => {
+    setOffer(false);
+    try {
+      localStorage.setItem(DECLINED, '1');
+    } catch {
+      // No storage: it asks again next time.
+    }
   };
 
   const address = via === 'ssh' ? clone.ssh : clone.https;
@@ -67,76 +102,54 @@ export function EditDialog({ codePath, clone, hasRepo }: EditOptions) {
               close
             </button>
           </div>
-          <p className="text-muted">
-            Every paper&apos;s page is a git repository. Its sections, links, picture and versions are files, so you can
-            edit them in the browser or on your own computer. Either way, each change is checked by the same rules and
-            shows in the page&apos;s history.
-          </p>
 
-          <h3 className={`${ui.runIn} mt-4 block`}>In the browser</h3>
-          <p className="mt-1 text-muted">
-            The page&apos;s files in VS Code, with a preview of each section as the page will show it. Commit from
-            Source Control when you&apos;re done. If you aren&apos;t signed in, you&apos;ll be asked to first.
-          </p>
-          <p className="mt-2">
-            <a href={codePath} rel="nofollow" className={ui.btn({ inline: true, flush: true })}>
-              Open the web editor
-            </a>
-          </p>
+          <a href={codePath} rel="nofollow" className={ui.btn({ inline: true, flush: true })}>
+            Edit in web editor
+          </a>
 
-          <h3 className={`${ui.runIn} mt-5 block`}>With git</h3>
+          <h3 className={`${ui.runIn} mt-5 block`}>Or clone it with git</h3>
           {hasRepo ? (
             <>
-              <div role="tablist" aria-label="Clone over" className="mt-1 inline-flex border border-rule text-xs">
-                {(['https', 'ssh'] as const).map((v) => (
-                  <button
-                    key={v}
-                    type="button"
-                    role="tab"
-                    aria-selected={via === v}
-                    onClick={() => setVia(v)}
-                    className={`cursor-pointer px-2.5 py-1 not-first:border-l not-first:border-rule ${via === v ? 'bg-tint text-ink' : 'text-accent'}`}
-                  >
-                    {v.toUpperCase()}
-                  </button>
-                ))}
+              <div className="mt-1 flex items-center gap-2 text-xs text-muted">
+                <span>Run in a terminal:</span>
+                <span className="flex-1" />
+                <div role="tablist" aria-label="Clone over" className="inline-flex border border-rule">
+                  {(['https', 'ssh'] as const).map((v) => (
+                    <button
+                      key={v}
+                      type="button"
+                      role="tab"
+                      aria-selected={via === v}
+                      onClick={() => setVia(v)}
+                      className={`cursor-pointer px-2 py-0.5 not-first:border-l not-first:border-rule ${via === v ? 'bg-tint text-ink' : 'text-accent'}`}
+                    >
+                      {v.toUpperCase()}
+                    </button>
+                  ))}
+                </div>
               </div>
               {address ? (
-                <CopyLine text={`git clone ${address}`} />
+                <TerminalLine text={`git clone ${address}`} onCopied={onCopied} />
               ) : (
                 <p className="mt-2 text-muted">Cloning over SSH isn&apos;t open yet. Use HTTPS for now.</p>
               )}
-              <ul className="mt-2 list-disc space-y-1 pl-5 text-muted">
-                <li>
-                  Install <a href="https://git-lfs.com">Git LFS</a> first, so that the PDFs and the picture come as
-                  files.
-                </li>
-                <li>
-                  {via === 'ssh' ? (
-                    <>
-                      Pushing over SSH needs a key on <a href="/profile#ssh-keys">your profile</a>.
-                    </>
-                  ) : (
-                    <>
-                      To push, use an API key from <a href="/profile#agents">your profile</a> as the password.
-                    </>
-                  )}{' '}
-                  If a push breaks a rule, git says what to change.
-                </li>
-                <li>
-                  In VS Code,{' '}
-                  <a href="/editor/potentialpaper.vsix" download>
-                    our extension
-                  </a>{' '}
-                  previews each section as the page shows it, opens the PDFs and checks the JSON files (Extensions view,
-                  ⋯, Install from VSIX).
-                </li>
-              </ul>
+              <p className={ui.fine}>
+                Needs <a href="https://git-lfs.com">Git LFS</a>.{' '}
+                {via === 'ssh' ? (
+                  <>
+                    To push, add an SSH key on <a href="/profile#ssh-keys">your profile</a>.
+                  </>
+                ) : (
+                  <>
+                    To push, use an API key from <a href="/profile#agents">your profile</a> as the password.
+                  </>
+                )}
+              </p>
+              {offer && <ExtensionOffer onDecline={decline} />}
             </>
           ) : (
             <p className="mt-1 text-muted">
-              This page gets its repository with its first edit, so start in the web editor. You can clone it after
-              that.
+              The page gets its repository with its first edit, so start in the web editor.
             </p>
           )}
         </div>
@@ -145,11 +158,56 @@ export function EditDialog({ codePath, clone, hasRepo }: EditOptions) {
   );
 }
 
-function CopyLine({ text }: { text: string }) {
+/** After the clone command is copied: the desktop extension, as one command for the reader's editor. */
+function ExtensionOffer({ onDecline }: { onDecline: () => void }) {
+  const [cli, setCli] = useState<string>(EDITORS[0].cli);
+  const url = `${window.location.origin}${VSIX}`;
+  const command = `curl -fsSLo potentialpaper.vsix ${url} && ${cli} --install-extension potentialpaper.vsix && rm potentialpaper.vsix`;
+  return (
+    <div role="status" className="mt-4 border border-rule bg-tint p-3">
+      <p>
+        <b>Copied.</b> Also install our extension? It previews each section as the page shows it and checks the
+        page&apos;s files.
+      </p>
+      <div className="mt-2 flex flex-wrap items-center gap-x-3 gap-y-1 text-xs">
+        {EDITORS.map((e) => (
+          <button
+            key={e.cli}
+            type="button"
+            aria-pressed={cli === e.cli}
+            onClick={() => setCli(e.cli)}
+            className={cli === e.cli ? ui.on : ui.linkBtn}
+          >
+            {e.name}
+          </button>
+        ))}
+      </div>
+      <TerminalLine text={command} />
+      <p className="mt-2 text-xs">
+        <a href={VSIX} download>
+          Download the .vsix
+        </a>{' '}
+        <span className="text-muted">to install it by hand (Extensions, ⋯, Install from VSIX)</span>
+        <span className="mx-1.5 text-faint">·</span>
+        <button type="button" className={ui.linkBtn} onClick={onDecline}>
+          no thanks
+        </button>
+      </p>
+    </div>
+  );
+}
+
+/** A shell command: a `$` prompt, so it reads as one for a terminal, and a copy button. */
+function TerminalLine({ text, onCopied }: { text: string; onCopied?: () => void }) {
   const [copied, setCopied] = useState(false);
   return (
     <div className="mt-2 flex items-stretch border border-rule bg-white">
-      <code className={`${ui.mono} min-w-0 flex-1 overflow-x-auto px-2 py-1.5 whitespace-nowrap`}>{text}</code>
+      <code className={`${ui.mono} min-w-0 flex-1 overflow-x-auto px-2 py-1.5 whitespace-nowrap`}>
+        <span aria-hidden className="text-faint select-none">
+          ${' '}
+        </span>
+        {text}
+      </code>
       <button
         type="button"
         className={`${ui.linkBtn} border-l border-rule px-2.5 text-xs`}
@@ -158,6 +216,7 @@ function CopyLine({ text }: { text: string }) {
             await navigator.clipboard.writeText(text);
             setCopied(true);
             setTimeout(() => setCopied(false), 1500);
+            onCopied?.();
           } catch {
             // No clipboard: the command is there to select.
           }

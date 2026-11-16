@@ -69,9 +69,18 @@ Code.
   (`src/server/pages/schemas.ts`; `z.toJSONSchema`). `scripts/write-page-schemas.ts` writes them into the
   extension with its `jsonValidation` when it is built (VS Code's JSON support ignores `json.schemas` set as a
   default); the site serves the same at `/schemas/<name>.json` for `prek.toml` and other editors.
-- **Before a commit** (the extension's `precommit.ts`), what `prek.toml` does in a clone: sections formatted with
-  Prettier (the same version as the hook; also Format Document), JSON laid out as the site writes it, and no
-  commit while a changed file has an error.
+- **Before a commit** (the extension's `precommit.ts`, `checks.ts`), what `prek.toml` does in a clone, as there is
+  no terminal to run prek in: on by default (the `potentialpaper.checks` setting turns it off). The fixing hooks
+  (sections formatted with Prettier, the same version as the hook, also Format Document; JSON laid out as the site
+  writes it; trailing whitespace and the end of each file) rewrite the changed files, and no commit while one fails
+  a checking hook (bad JSON, a JSON Schema, an added file over 256 KB, a name that differs from another only in
+  case or that Windows can't have). **PotentialPaper: Run the Page's Checks (prek)** (also in Source Control's
+  menu) runs them without committing.
+- **Trusted domain:** the site's own address is a trusted domain (`additionalTrustedDomains` in `workbench.ts`), so
+  its links open without VS Code asking first.
+- **The Page view** (`outline.ts`, in the explorer, also in a clone): the links under the title and the picture,
+  each with an "Add…" item where the page has none (the New Link command; the picture is dragged in as
+  `thumbnail.png`), or why the viewer can't add one.
 - **Sign-in:** `/code/…` sends someone signed out to sign in, and back.
 - **Starter files:** a page with no repo yet shows the files its first commit starts with (`starter.ts`): empty
   sections and `prek.toml`.
@@ -105,8 +114,10 @@ Code.
 
 The same extension works in VS Code on a computer (and VS Codium, Cursor…), on a `git clone` of a page: a folder
 with the page's `prek.toml` at its root. `npm run editor:extension` also packages it as
-`public/editor/potentialpaper.vsix`, served at `/editor/potentialpaper.vsix` and linked from the Edit dialog's
-"With git" part; install it with Extensions → ⋯ → Install from VSIX, or `code --install-extension`. The `.vsix` is
+`public/editor/potentialpaper.vsix`, served at `/editor/potentialpaper.vsix`. The Edit dialog offers it once someone
+copies the clone command: a `curl … && <editor> --install-extension` command for VS Code, Cursor, Windsurf or
+VSCodium, or the download, for Extensions → ⋯ → Install from VSIX. (It isn't on the Marketplace or Open VSX, so no
+`vscode:extension/…` link.) The `.vsix` is
 built without the proposed API the browser build turns on, and needs VS Code 1.90.
 
 There it has the preview, the PDF viewer, the JSON schemas, the section formatter and New Link; Source Control is

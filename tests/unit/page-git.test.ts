@@ -234,6 +234,9 @@ describe('file contents', () => {
     expect(contentProblem(METADATA_PATH, '{"\\ud800":1}')).toMatch(/Postgres/);
     expect(contentProblem(METADATA_PATH, `{"a":${'['.repeat(40)}${']'.repeat(40)}}`)).toMatch(/deeply/);
     expect(contentProblem('extensions/x/data.json', '[1]')).toBeNull();
+    expect(contentProblem(METADATA_PATH, '{"layout":3}')).toBeNull();
+    expect(contentProblem(METADATA_PATH, '{"layout":"3"}')).toMatch(/layout/);
+    expect(contentProblem(METADATA_PATH, '{"layout":0}')).toMatch(/layout/);
   });
 });
 

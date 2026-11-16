@@ -85,6 +85,7 @@ export interface ProfileChange {
   realName?: string | null;
   showInstitution?: boolean;
   mentionMail?: boolean;
+  followMail?: boolean;
 }
 
 /**
@@ -114,6 +115,7 @@ export async function updateProfile(
         ...(realName !== undefined ? { realName } : {}),
         ...(change.showInstitution !== undefined ? { showInstitution: change.showInstitution } : {}),
         ...(change.mentionMail !== undefined ? { mentionMail: change.mentionMail } : {}),
+        ...(change.followMail !== undefined ? { followMail: change.followMail } : {}),
         profileCompletedAt: account.profileCompletedAt ?? new Date(),
       })
       .where(eq(accounts.id, account.id))

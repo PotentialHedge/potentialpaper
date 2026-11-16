@@ -40,6 +40,7 @@ export const Me = z.object({
   verified: z.boolean(),
   profileComplete: z.boolean(),
   mentionMail: z.boolean(),
+  followMail: z.boolean(),
 });
 
 export const MePatch = z
@@ -49,6 +50,8 @@ export const MePatch = z
     showInstitution: z.boolean().optional(),
     /** Whether a `@` mention in a comment is mailed. */
     mentionMail: z.boolean().optional(),
+    /** Whether edits and comments on followed papers are mailed. */
+    followMail: z.boolean().optional(),
   })
   .refine((v) => Object.keys(v).length > 0, { message: 'nothing to change' });
 
@@ -332,9 +335,70 @@ export const OwnClaim = z.object({
     .nullable(),
 });
 
+/**
+ * A confirmed author adds a co-author: an account by `handle` and which printed author (`authorIndex`) it is, or a
+ * `claim` someone made and is waiting on (`GET /me/papers`'s `waiting`).
+ */
+export const CoAuthorBody = z.union([
+  z.object({
+    paper: PaperIdentifier,
+    handle: z.string().trim().min(1).max(64),
+    authorIndex: z.number().int().min(0).max(10_000),
+  }),
+  z.object({ paper: PaperIdentifier, claim: z.uuid() }),
+]);
+export const CoAuthorAdded = z.object({ authorIndex: z.number().int(), authorName: z.string() });
+
+/** Whether the viewer follows a paper (`null` when nobody is signed in), and how many do. */
+export const FollowState = z.object({ following: z.boolean().nullable(), followers: z.number().int() });
+export const FollowBody = z.object({ paper: PaperIdentifier });
+
+/** The signed-in account's papers (`server/my-papers.ts`, `server/follows.ts`). */
+export const MyPapers = z.object({
+  following: z.array(
+    z.object({
+      title: z.string(),
+      year: z.number().int().nullable(),
+      venue: z.string().nullable(),
+      paper: PaperIdentifier,
+      path: z.string(),
+      followedAt: z.string(),
+    }),
+  ),
+  authored: z.array(
+    z.object({
+      title: z.string(),
+      year: z.number().int().nullable(),
+      venue: z.string().nullable(),
+      paper: PaperIdentifier,
+      path: z.string(),
+      authors: z.array(z.string()),
+      mine: z.object({
+        authorIndex: z.number().int(),
+        authorName: z.string(),
+        status: z.enum(['pending', 'confirmed', 'rejected', 'declined']),
+        method: z.enum(['manual', 'email', 'vouch']),
+        canStepDown: z.boolean(),
+      }),
+      confirmed: z.array(z.object({ authorIndex: z.number().int(), authorName: z.string() })),
+      waiting: z.array(
+        z.object({
+          claim: z.uuid(),
+          authorIndex: z.number().int(),
+          authorName: z.string(),
+          evidence: z.string(),
+          realName: z.string().nullable(),
+          institutions: z.array(z.string()),
+          createdAt: z.string(),
+        }),
+      ),
+    }),
+  ),
+});
+
 /** Asks for a code mailed to the person, for their agent to trade for a token (`server/agent-codes.ts`). */
 export const AgentCodeBody = z.object({ email: Email });
-export const AgentTokenBody = z.object({ email: Email, code: z.string().trim().min(1).max(16) });
+export const AgentTokenBody = z.object({ code: z.string().trim().min(1).max(32) });
 export const AgentToken = z.object({
   /** The secret, shown this once. Send it as `Authorization: Bearer <token>`. */
   token: z.string(),
@@ -343,7 +407,7 @@ export const AgentToken = z.object({
   scopes: z.array(z.enum(TOKEN_SCOPES)),
 });
 /** A code for the signed-in person's own agent prompt. */
-export const MyAgentCode = z.object({ email: z.string(), code: z.string(), expiresAt: z.string() });
+export const MyAgentCode = z.object({ code: z.string(), expiresAt: z.string() });
 
 /** A key the signed-in person makes by hand on their profile, for a script or an agent of their own. */
 export const CreateTokenBody = z.object({

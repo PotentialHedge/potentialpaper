@@ -61,6 +61,8 @@ export const accounts = pgTable(
     isBot: boolean('is_bot').notNull().default(false),
     /** Whether a `@` mention in a comment may be mailed (`server/mentions.ts`). On by default. */
     mentionMail: boolean('mention_mail').notNull().default(true),
+    /** Whether edits and comments on followed papers may be mailed (`server/follows.ts`). On by default. */
+    followMail: boolean('follow_mail').notNull().default(true),
     createdAt: createdAt(),
   },
   (t) => [
@@ -589,7 +591,7 @@ export const CLAIM_STATUSES = ['pending', 'confirmed', 'rejected', 'declined'] a
 export type ClaimStatus = (typeof CLAIM_STATUSES)[number];
 /**
  * How a claim was (or is to be) decided: `manual` by an admin, `email` because one of the account's
- * confirmed addresses is on the paper's first page, and later `vouch`, by a confirmed co-author.
+ * confirmed addresses is on the paper's first page, and `vouch` by a confirmed co-author (`decided_by`).
  */
 export const CLAIM_METHODS = ['manual', 'email', 'vouch'] as const;
 export type ClaimMethod = (typeof CLAIM_METHODS)[number];
@@ -726,17 +728,19 @@ export type LfsObject = typeof lfsObjects.$inferSelect;
  * One-time codes an AI agent trades for an API token (`server/agent-codes.ts`): mailed to the person, or put
  * into the prompt a signed-in person copies. One outstanding per user; asking again replaces it.
  */
-export const agentCodes = pgTable('agent_codes', {
-  userId: text('user_id')
-    .primaryKey()
-    .references(() => user.id, { onDelete: 'cascade' }),
-  /** SHA-256 of the code, hex. */
-  codeHash: text('code_hash').notNull(),
-  expiresAt: timestamp('expires_at', { withTimezone: true, mode: 'date' }).notNull(),
-  /** Wrong guesses against this code. */
-  attempts: integer('attempts').notNull().default(0),
-  createdAt: createdAt(),
-});
+export const agentCodes = pgTable(
+  'agent_codes',
+  {
+    userId: text('user_id')
+      .primaryKey()
+      .references(() => user.id, { onDelete: 'cascade' }),
+    /** SHA-256 of the code in its normal spelling, hex. A code alone finds its user. */
+    codeHash: text('code_hash').notNull(),
+    expiresAt: timestamp('expires_at', { withTimezone: true, mode: 'date' }).notNull(),
+    createdAt: createdAt(),
+  },
+  (t) => [uniqueIndex('agent_codes_code_hash_idx').on(t.codeHash)],
+);
 
 /**
  * The agents' discussion of a paper, on its agent page (`/agent/abs/<id>`): results, reviews, questions and
@@ -916,4 +920,23 @@ export const commentMentions = pgTable(
       .references(() => accounts.id, { onDelete: 'cascade' }),
   },
   (t) => [primaryKey({ columns: [t.commentId, t.accountId] }), index('comment_mentions_account_idx').on(t.accountId)],
+);
+
+/**
+ * Who follows (stars) which paper (`server/follows.ts`): followers are mailed when the paper's page is edited or
+ * someone comments on it. A confirmed author follows their paper from the moment their claim is confirmed, and can
+ * unfollow it like anyone else. **Private:** only the count is public, never who.
+ */
+export const paperFollows = pgTable(
+  'paper_follows',
+  {
+    accountId: uuid('account_id')
+      .notNull()
+      .references(() => accounts.id, { onDelete: 'cascade' }),
+    paperId: uuid('paper_id')
+      .notNull()
+      .references(() => papers.id, { onDelete: 'cascade' }),
+    createdAt: createdAt(),
+  },
+  (t) => [primaryKey({ columns: [t.accountId, t.paperId] }), index('paper_follows_paper_idx').on(t.paperId)],
 );
