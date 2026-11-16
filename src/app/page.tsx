@@ -4,6 +4,7 @@ import { redirect } from 'next/navigation';
 import { FilterIcon, MoreIcon } from '@/components/icons';
 import { Pager } from '@/components/Pager';
 import { PaperCard, PaperRow } from '@/components/paper/PaperRow';
+import { SearchMatches } from '@/components/paper/SearchMatches';
 import { SearchSyntax } from '@/components/paper/SearchSyntax';
 import { Popover, PopoverClose, PopoverContent, PopoverTrigger } from '@/components/Popover';
 import { SearchInput } from '@/components/SearchInput';
@@ -290,5 +291,10 @@ function Row({ hit, detailed }: { hit: SearchHit; detailed: boolean }) {
     pdf: hit.pdf ?? sourceLinks(hit).find((link) => link.label === 'PDF')?.url ?? null,
     href: paperPath(hit),
   };
-  return detailed ? <PaperCard {...props} abstract={hit.abstract} cover={hit.cover} /> : <PaperRow {...props} />;
+  return (
+    <>
+      {detailed ? <PaperCard {...props} abstract={hit.abstract} cover={hit.cover} /> : <PaperRow {...props} />}
+      <SearchMatches matches={hit.matches} count={hit.matchCount} />
+    </>
+  );
 }

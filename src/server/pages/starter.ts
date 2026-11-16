@@ -1,7 +1,7 @@
 import { siteUrl } from '../site';
 import type { FileChange } from './commit';
 import { PREK_PATH, sectionName } from './rules';
-import { PAGE_SCHEMAS } from './schemas';
+import { PAGE_SCHEMA_NAMES, PAGE_SCHEMAS } from './schemas';
 
 /**
  * What every page repo starts with besides its metadata (`commit.ts` writes these into a page's first
@@ -32,7 +32,7 @@ const PRETTIER_REV = 'v3.9.9';
  * programs to run. The schemas are the site's (`schemas.ts`), the ones the web editor checks with.
  */
 export function prekConfig(origin: string = siteUrl()): string {
-  const schemaHooks = Object.entries(PAGE_SCHEMAS)
+  const schemaHooks = PAGE_SCHEMA_NAMES.map((name) => [name, PAGE_SCHEMAS[name]] as const)
     .filter(([, entry]) => entry.writable)
     .map(
       ([name, entry]) =>

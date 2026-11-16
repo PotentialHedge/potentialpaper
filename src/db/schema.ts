@@ -369,6 +369,36 @@ export const consumerCursors = pgTable('consumer_cursors', {
   updatedAt: timestamp('updated_at', { withTimezone: true, mode: 'date' }).notNull().defaultNow(),
 });
 
+/**
+ * The search index over every file of every page (DESIGN.md §4.10), written only by the `search` consumer
+ * (`server/search-index.ts`) from each file type's indexer (`pages/schemas.ts`), and read only by
+ * `server/search.ts`. A file gives zero or more documents, numbered `n`. Rows carry the file's blob id, so a
+ * file that hasn't changed since it was indexed is never read again. `scope` is the type's `in:` scope.
+ */
+export const searchDocs = pgTable(
+  'search_docs',
+  {
+    paperId: uuid('paper_id')
+      .notNull()
+      .references(() => papers.id, { onDelete: 'cascade' }),
+    path: text('path').notNull(),
+    n: integer('n').notNull().default(0),
+    blobOid: bytea('blob_oid').notNull(),
+    kind: text('kind').notNull(),
+    scope: text('scope', { enum: ['page', 'reviews'] }).notNull(),
+    text: text('text').notNull(),
+    fields: jsonb('fields').$type<Record<string, string | number | boolean | null>>().notNull().default({}),
+    tsv: tsvector('tsv')
+      .notNull()
+      .generatedAlwaysAs(sql`to_tsvector('english', text)`),
+  },
+  (t) => [
+    primaryKey({ columns: [t.paperId, t.path, t.n] }),
+    index('search_docs_tsv_idx').using('gin', t.tsv),
+    check('search_docs_scope_check', sql`${t.scope} in ('page', 'reviews')`),
+  ],
+);
+
 /** One file of a demo snapshot: its bytes are in the blob store under `sha256`. */
 export interface DemoFile {
   sha256: string;

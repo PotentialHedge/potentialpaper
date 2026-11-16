@@ -51,3 +51,19 @@ export function prefixTsquery(q: string): string | null {
   if (!words) return null;
   return words.map((w, i) => (i === words.length - 1 ? `${w}:*` : w)).join(' & ');
 }
+
+/**
+ * The characters that mark matched words in a search hit's snippet (`server/search.ts`): private-use, so the
+ * index never holds them (`server/search-index.ts` takes them out) and the snippet stays plain text.
+ */
+export const MARK_START = '\uE000';
+export const MARK_END = '\uE001';
+
+/** A snippet as runs of plain and matched text, for the page to render (never as HTML). */
+export function snippetParts(snippet: string): { text: string; marked: boolean }[] {
+  const parts: { text: string; marked: boolean }[] = [];
+  for (const [i, piece] of snippet.split(/[\uE000\uE001]/).entries()) {
+    if (piece !== '') parts.push({ text: piece, marked: i % 2 === 1 });
+  }
+  return parts;
+}

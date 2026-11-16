@@ -3,7 +3,9 @@ import { linkFileSchema } from '@/lib/paper-links';
 import { formsFileSchema, noteFileSchema, submissionFileSchema } from '@/lib/review-files';
 import { scoreOf } from '@/lib/submissions';
 import { versionFileSchema } from '@/lib/versions';
-import { pdfSourceSchema, thumbnailWordsSchema } from './rules';
+import { leadingHtmlTitle } from './html';
+import { leadingTitle } from './markdown';
+import { type PagePart, pdfSourceSchema, sectionName, thumbnailWordsSchema } from './rules';
 
 /**
  * The file types of a page repo (DESIGN.md §4.8): the contract between whoever writes a file (people, bots) and
@@ -19,6 +21,9 @@ import { pdfSourceSchema, thumbnailWordsSchema } from './rules';
  *   extensions come later (§10), and plug in by the same pattern.
  *
  * What JSON Schema can't say (that a label isn't blank, an address parses) only the site checks.
+ *
+ * Most types are JSON. A `text` type (sections) is checked by its own rules in `rules.ts` and has no JSON Schema;
+ * its "schema" only takes the file's text as it is, so its indexer sees the same thing a JSON type's does.
  */
 
 /** A search document made from a file (DESIGN.md §4.10). */
@@ -31,6 +36,13 @@ export interface IndexedDoc {
   fields?: Record<string, string | number | boolean | null>;
 }
 
+/**
+ * Where a search looks (`lib/query.ts`'s `in:`): `page` is what people write on it (sections, links, versions, the
+ * picture's words), `reviews` what a bot imported under `reviews/<source>/`. Titles and abstracts are `paper`,
+ * searched through `papers.search`, not files.
+ */
+export type SearchScope = 'page' | 'reviews';
+
 /** Where on the paper's page a type is shown: the slots of `components/paper/slots.tsx`, and the title's links. */
 export type RenderSlot = 'paper.title' | 'paper.main' | 'paper.aside' | 'paper.body';
 
@@ -41,8 +53,12 @@ export interface FileType<S extends z.ZodType = z.ZodType> {
   glob: string;
   /** The same pattern as a regex over the path, for `prek.toml` (Python's `re`) and `fileTypeOf`. */
   filesRegex: string;
-  /** Whether people write it, and so `prek.toml` checks it before a commit. */
+  /** Whether people write it, and so `prek.toml` checks it before a commit (JSON types only). */
   writable: boolean;
+  /** `json` (the default): parsed, then checked against `schema`, which is served as JSON Schema. */
+  format?: 'json' | 'text';
+  /** Which `in:` scope its search documents belong to; every type with `index` has one. */
+  scope?: SearchScope;
   /** The search documents for a valid file. None: it isn't searched. */
   index?: (file: z.output<S>, path: string) => IndexedDoc[];
   /** The built-in panel that shows it. */
@@ -56,9 +72,60 @@ function fileType<S extends z.ZodType>(type: FileType<S>): FileType<S> {
 
 const words = (...parts: (string | null | undefined)[]) => parts.filter(Boolean).join('\n');
 
+/**
+ * A section's words without most of its markup, for search and its snippets: tags and entities of an HTML
+ * section, and in Markdown the link targets, images' addresses, heading marks and emphasis. Math and code stay.
+ */
+export function sectionText(text: string, html: boolean): string {
+  if (html) {
+    return text
+      .replace(/<[^>]*>/g, ' ')
+      .replace(/&nbsp;/g, ' ')
+      .replace(/&lt;/g, '<')
+      .replace(/&gt;/g, '>')
+      .replace(/&quot;/g, '"')
+      .replace(/&#39;/g, "'")
+      .replace(/&amp;/g, '&')
+      .replace(/[ \t]+/g, ' ')
+      .replace(/\s*\n\s*/g, '\n')
+      .trim();
+  }
+  return text
+    .replace(/!\[([^\]]*)\]\([^)]*\)/g, '$1')
+    .replace(/\[([^\]]*)\]\([^)]*\)/g, '$1')
+    .replace(/^#{1,6}\s+/gm, '')
+    .replace(/(\*\*|__|\*|~~)(?=\S)([^]*?\S)\1/g, '$2')
+    .trim();
+}
+
+/** The part a section file belongs to, from its path (which the registry's pattern already matched). */
+function partOf(path: string): PagePart {
+  return path.startsWith('author/') ? 'author' : 'community';
+}
+
 export const PAGE_SCHEMAS = {
+  section: fileType({
+    title: 'Section',
+    schema: z.string(),
+    glob: '{author,community}/[0-9][0-9]-*.{md,html}',
+    filesRegex: '^(author|community)/\\d{2}-[a-z0-9]+(-[a-z0-9]+)*\\.(md|html)$',
+    writable: true,
+    format: 'text',
+    scope: 'page',
+    index: (text, path) => {
+      const part = partOf(path);
+      const name = sectionName(path, part);
+      // A blank file is a section nobody has written yet (`starter.ts`); it isn't shown, so it isn't found.
+      if (!name || text.trim() === '') return [];
+      const html = name.format === 'html';
+      const title = (html ? leadingHtmlTitle(text) : leadingTitle(text)) || null;
+      return [{ kind: 'section', text: sectionText(text, html), fields: { part, title } }];
+    },
+    render: { panel: 'Sections', slots: ['paper.main'] },
+  }),
   link: fileType({
     title: 'Link',
+    scope: 'page',
     schema: linkFileSchema,
     glob: 'links/*.json',
     filesRegex: '^links/[^/]+\\.json$',
@@ -68,6 +135,7 @@ export const PAGE_SCHEMAS = {
   }),
   version: fileType({
     title: 'Version',
+    scope: 'page',
     schema: versionFileSchema,
     glob: 'versions/*.json',
     filesRegex: '^versions/[^/]+\\.json$',
@@ -76,13 +144,19 @@ export const PAGE_SCHEMAS = {
       {
         kind: 'version',
         text: words(version.label, version.title, version.decision, version.note, version.abstract),
-        fields: { kind: version.kind, status: version.status ?? null, date: version.date ?? null },
+        fields: {
+          label: version.label,
+          kind: version.kind,
+          status: version.status ?? null,
+          date: version.date ?? null,
+        },
       },
     ],
     render: { panel: 'Versions', slots: ['paper.aside', 'paper.body'] },
   }),
   thumbnail: fileType({
     title: 'Picture',
+    scope: 'page',
     schema: thumbnailWordsSchema,
     glob: 'thumbnail.json',
     filesRegex: '^thumbnail\\.json$',
@@ -101,6 +175,7 @@ export const PAGE_SCHEMAS = {
   }),
   submission: fileType({
     title: 'Submission',
+    scope: 'reviews',
     schema: submissionFileSchema,
     glob: 'reviews/*/*/submission.json',
     filesRegex: '^reviews/[^/]+/[^/]+/submission\\.json$',
@@ -125,6 +200,7 @@ export const PAGE_SCHEMAS = {
   }),
   note: fileType({
     title: 'Review',
+    scope: 'reviews',
     schema: noteFileSchema,
     glob: 'reviews/*/*/notes/*.json',
     filesRegex: '^reviews/[^/]+/[^/]+/notes/[^/]+\\.json$',
@@ -149,19 +225,34 @@ export const PAGE_SCHEMAS = {
   }),
 } as const satisfies Record<string, FileType>;
 
-export type PageSchemaName = keyof typeof PAGE_SCHEMAS;
+export type FileTypeName = keyof typeof PAGE_SCHEMAS;
+
+/** The JSON types: those with a JSON Schema, served at `/schemas/<name>.json` and checked by editors and `prek`. */
+export type PageSchemaName = {
+  [K in FileTypeName]: (typeof PAGE_SCHEMAS)[K] extends { format: 'text' } ? never : K;
+}[FileTypeName];
+
+export const PAGE_SCHEMA_NAMES = (Object.keys(PAGE_SCHEMAS) as FileTypeName[]).filter(
+  (name): name is PageSchemaName => (PAGE_SCHEMAS[name] as FileType).format !== 'text',
+);
 
 export function isPageSchemaName(name: string): name is PageSchemaName {
-  return Object.hasOwn(PAGE_SCHEMAS, name);
+  return (PAGE_SCHEMA_NAMES as readonly string[]).includes(name);
 }
 
-const PATTERNS = (Object.keys(PAGE_SCHEMAS) as PageSchemaName[]).map(
+const PATTERNS = (Object.keys(PAGE_SCHEMAS) as FileTypeName[]).map(
   (name) => [name, new RegExp(PAGE_SCHEMAS[name].filesRegex)] as const,
 );
 
 /** The registered type of the file at this path, or `null`. */
-export function fileTypeOf(path: string): PageSchemaName | null {
+export function fileTypeOf(path: string): FileTypeName | null {
   return PATTERNS.find(([, pattern]) => pattern.test(path))?.[0] ?? null;
+}
+
+/** The `in:` scope of the file at this path's search documents, or `null` if it isn't searched. */
+export function searchScopeOf(path: string): SearchScope | null {
+  const name = fileTypeOf(path);
+  return name ? ((PAGE_SCHEMAS[name] as FileType).scope ?? null) : null;
 }
 
 /**
@@ -172,11 +263,13 @@ export function indexFile(path: string, text: string): IndexedDoc[] | null {
   const name = fileTypeOf(path);
   if (!name) return null;
   const type: FileType = PAGE_SCHEMAS[name];
-  let value: unknown;
-  try {
-    value = JSON.parse(text);
-  } catch {
-    return null;
+  let value: unknown = text;
+  if (type.format !== 'text') {
+    try {
+      value = JSON.parse(text);
+    } catch {
+      return null;
+    }
   }
   const parsed = type.schema.safeParse(value);
   if (!parsed.success) return null;

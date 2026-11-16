@@ -101,6 +101,14 @@ export const SearchResponse = z.object({
       pdf: z.string().nullable(),
       cover: z.string().nullable(),
       path: z.string(),
+      /**
+       * With `in:page` or `in:reviews`: the files that matched, best first. `snippet` marks matched words with
+       * U+E000 and U+E001.
+       */
+      matches: z.array(
+        z.object({ path: z.string(), kind: z.string(), label: z.string().nullable(), snippet: z.string() }),
+      ),
+      matchCount: z.number().int(),
     }),
   ),
   total: z.number().int(),

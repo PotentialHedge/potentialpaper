@@ -1,6 +1,6 @@
 import { mkdirSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
-import { PAGE_SCHEMAS, pageJsonSchema, type PageSchemaName } from '@/server/pages/schemas';
+import { PAGE_SCHEMA_NAMES, PAGE_SCHEMAS, pageJsonSchema } from '@/server/pages/schemas';
 
 /**
  * Writes the page repos' JSON Schemas (`src/server/pages/schemas.ts`) into a folder, with the web editor
@@ -37,7 +37,7 @@ function defaultSnippets(schema: Record<string, unknown>, title: string) {
 }
 
 const jsonValidation = [];
-for (const name of Object.keys(PAGE_SCHEMAS) as PageSchemaName[]) {
+for (const name of PAGE_SCHEMA_NAMES) {
   const schema = pageJsonSchema(name);
   const forEditor = { ...schema, defaultSnippets: defaultSnippets(schema, PAGE_SCHEMAS[name].title) };
   writeFileSync(join(dir, 'schemas', `${name}.json`), `${JSON.stringify(forEditor, null, 2)}\n`);

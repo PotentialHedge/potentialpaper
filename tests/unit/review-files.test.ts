@@ -142,7 +142,8 @@ describe('the file type registry', () => {
     expect(fileTypeOf('reviews/openreview/x/notes/a.json')).toBe('note');
     expect(fileTypeOf('reviews/openreview/x/submission.json')).toBe('submission');
     expect(fileTypeOf('links/10-code.json')).toBe('link');
-    expect(fileTypeOf('community/10-summary.md')).toBeNull();
+    expect(fileTypeOf('community/10-summary.md')).toBe('section');
+    expect(fileTypeOf('community/notes.txt')).toBeNull();
     const [doc] = indexFile('reviews/openreview/x/notes/a.json', JSON.stringify(NOTE))!;
     expect(doc.kind).toBe('note');
     expect(doc.text).toContain('Masked diffusion, recursively.');

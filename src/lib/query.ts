@@ -13,6 +13,11 @@
  * last word still matches as a prefix (`lib/search.ts`). A `key:` that is not a field below is just text, so
  * a title like "BERT: pre-training" searches as one. A known field with a bad value is dropped with an
  * error the page shows.
+ *
+ * `in:` says where words are looked for (DESIGN.md §4.10): `in:paper`, titles and abstracts, which is where they
+ * are looked for without one; `in:page`, what is written on the paper's page (sections, links, versions, the
+ * picture's words); `in:reviews`, imported submissions and reviews; `in:all`, all three. Several `in:`s add up.
+ * A scope isn't a term: it applies to every word of the query, wherever it is written.
  */
 
 import { prefixTsquery } from './search';
@@ -43,6 +48,30 @@ export const FIELD_HELP: { field: SearchField; aliases: string[]; example: strin
   { field: 'year', aliases: ['y'], example: 'year>=2026', means: 'year published' },
 ];
 
+/** Where words are looked for: titles and abstracts (`papers.search`), or files of a kind (`search_docs`). */
+export const SEARCH_SCOPES = ['paper', 'page', 'reviews'] as const;
+export type SearchScope = (typeof SEARCH_SCOPES)[number];
+export const DEFAULT_SCOPES: ReadonlySet<SearchScope> = new Set(['paper']);
+
+const SCOPE_ALIASES: Record<string, readonly SearchScope[]> = {
+  paper: ['paper'],
+  papers: ['paper'],
+  title: ['paper'],
+  abstract: ['paper'],
+  page: ['page'],
+  pages: ['page'],
+  reviews: ['reviews'],
+  review: ['reviews'],
+  all: SEARCH_SCOPES,
+};
+
+/** One line per scope, for the syntax help. */
+export const SCOPE_HELP: { example: string; means: string }[] = [
+  { example: 'in:page', means: "words in the paper's page: sections, links, versions" },
+  { example: 'in:reviews', means: 'words in its submissions and reviews' },
+  { example: 'in:all', means: 'titles and abstracts, the page and reviews' },
+];
+
 export type CompareOp = '=' | '!=' | '>' | '<' | '>=' | '<=';
 
 export type SearchNode =
@@ -66,6 +95,8 @@ export interface ParsedSearch {
   errors: string[];
   /** Fields the query filters on, so the page can step its own filters aside. */
   fields: Set<SearchField>;
+  /** Where its words are looked for: `in:`, or titles and abstracts without one. */
+  scopes: ReadonlySet<SearchScope>;
 }
 
 // ---------------------------------------------------------------------------
@@ -78,7 +109,8 @@ type Token =
   | { t: 'or' }
   | { t: 'word'; neg: boolean; text: string }
   | { t: 'phrase'; neg: boolean; text: string }
-  | { t: 'field'; neg: boolean; key: string; op: string; value: string; raw: string };
+  | { t: 'field'; neg: boolean; key: string; op: string; value: string; raw: string }
+  | { t: 'scope'; neg: boolean; op: string; value: string; raw: string };
 
 const FIELD = /^([A-Za-z]+)(!=|>=|<=|:|=|>|<)/;
 
@@ -127,7 +159,11 @@ function tokenize(input: string): Token[] {
     } else {
       const start = i;
       const head = FIELD.exec(input.slice(i));
-      if (head && ALIASES[head[1].toLowerCase()] !== undefined) {
+      if (head && head[1].toLowerCase() === 'in') {
+        i += head[0].length;
+        const value = i < n && (input[i] === '"' || input[i] === '`') ? quoted() : bare();
+        out.push({ t: 'scope', neg, op: head[2], value, raw: input.slice(start, i) });
+      } else if (head && ALIASES[head[1].toLowerCase()] !== undefined) {
         i += head[0].length;
         const value = i < n && (input[i] === '"' || input[i] === '`') ? quoted() : bare();
         out.push({ t: 'field', neg, key: head[1].toLowerCase(), op: head[2], value, raw: input.slice(start, i) });
@@ -279,7 +315,15 @@ export function parseSearch(input: string): ParsedSearch {
   const tokens = tokenize(input);
   const errors: string[] = [];
   const fields = new Set<SearchField>();
+  const scopes = new Set<SearchScope>();
   let pos = 0;
+
+  const addScope = (tok: Extract<Token, { t: 'scope' }>) => {
+    const named = SCOPE_ALIASES[tok.value.trim().toLowerCase()];
+    if (tok.neg || tok.op !== ':') errors.push(`“${tok.raw}”: write in:page, in:reviews, in:paper or in:all`);
+    else if (!named) errors.push(`“${tok.raw}”: in: takes page, reviews, paper or all`);
+    else named.forEach((scope) => scopes.add(scope));
+  };
 
   // or := and (OR and)* ; and := unary* ; stops at ')' (consumed by the caller).
   const parseOr = (depth: number): SearchNode | null => {
@@ -306,6 +350,9 @@ export function parseSearch(input: string): ParsedSearch {
       if (tok.t === '(') {
         node = parseOr(depth + 1);
         if (tokens[pos]?.t === ')') pos += 1;
+      } else if (tok.t === 'scope') {
+        addScope(tok);
+        continue;
       } else if (tok.t === 'field') {
         node = fieldNode(tok, errors);
         if (node) fields.add(ALIASES[tok.key]);
@@ -331,7 +378,7 @@ export function parseSearch(input: string): ParsedSearch {
     };
     if (capped.node) collect(capped.node);
   }
-  return { node: capped.node, errors, fields };
+  return { node: capped.node, errors, fields, scopes: scopes.size > 0 ? scopes : DEFAULT_SCOPES };
 }
 
 // ---------------------------------------------------------------------------
@@ -368,4 +415,21 @@ export function requiredText(node: SearchNode | null): Extract<SearchNode, { kin
 /** `%value%` for ILIKE, with `\`, `%` and `_` escaped (backslash is ILIKE's default escape). */
 export function containsPattern(value: string): string {
   return `%${value.replace(/[\\%_]/g, (c) => `\\${c}`)}%`;
+}
+
+/**
+ * Every text node that asks for words, outside any NOT, with its exclusions dropped: what a matched file's
+ * snippet should mark, whichever branch of an OR it matched by.
+ */
+export function positiveText(node: SearchNode | null): { include: string[]; exclude: string[] }[] {
+  if (node === null) return [];
+  switch (node.kind) {
+    case 'and':
+    case 'or':
+      return node.items.flatMap(positiveText);
+    case 'text':
+      return node.include.length > 0 ? [{ include: node.include, exclude: [] }] : [];
+    default:
+      return [];
+  }
 }

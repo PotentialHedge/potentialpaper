@@ -2,14 +2,14 @@ import { describe, expect, it } from 'vitest';
 import { parseLinkFile } from '@/lib/paper-links';
 import { parseVersionFile } from '@/lib/versions';
 import { contentProblem, layoutProblem, parsePdfSource, parseThumbnailWords, pathDenied } from '@/server/pages/rules';
-import { PAGE_SCHEMAS, pageJsonSchema, type PageSchemaName } from '@/server/pages/schemas';
+import { PAGE_SCHEMA_NAMES, pageJsonSchema } from '@/server/pages/schemas';
 import { missingStarterFiles, prekConfig, prekProblem, starterFiles } from '@/server/pages/starter';
 
 const roles = { system: false, admin: false, verified: true, confirmedAuthor: false, claimed: false };
 
 describe('page file schemas', () => {
   it('makes a closed JSON Schema for each kind of file, with its fields described', () => {
-    for (const name of Object.keys(PAGE_SCHEMAS) as PageSchemaName[]) {
+    for (const name of PAGE_SCHEMA_NAMES) {
       const schema = pageJsonSchema(name, 'https://example.org');
       expect(schema.$id).toBe(`https://example.org/schemas/${name}.json`);
       expect(schema.type).toBe('object');

@@ -58,6 +58,18 @@ page_events` or 15 seconds. Each keeps its cursor in `consumer_cursors`; `last_e
 stopped one (it retries every minute). `dc logs -f worker` shows progress. To start one over, which clears what it
 holds and replays every event: `dc run --rm tools npm run consumers:rebuild -- <name>` (no name lists them).
 
+The consumers are:
+
+- **`search`** (`src/server/search-index.ts`) fills `search_docs` (migration `0028_search_docs`) from each file
+  type's indexer, which `in:page` and `in:reviews` searches read. The first deploy with it replays every page's
+  events from zero; that is expected, and the home page's plain search (titles and abstracts) works meanwhile.
+  After changing an indexer in `src/server/pages/schemas.ts`, rebuild it: `consumers:rebuild -- search`.
+
+In dev the worker is the transient user unit `papertrail-worker` (log `data/worker.log`), started beside
+`papertrail-dev`: `systemd-run --user --unit=papertrail-worker --working-directory=$PWD --setenv=PATH=$PATH
+bash -c 'node_modules/.bin/tsx scripts/consumer-worker.ts > data/worker.log 2>&1'`. Restart it after changing
+consumer code (`systemctl --user stop papertrail-worker`, then the command again).
+
 ## Bots and their grants
 
 A bot is an account with `is_bot`; what it may write is rows in `bot_grants` (DESIGN.md §10), checked on every
