@@ -25,6 +25,8 @@
     "papers:merge": "tsx scripts/merge-papers.ts",
     "pdfs:ingest": "tsx scripts/ingest-pdfs.ts",
     "git:ssh": "tsx scripts/git-ssh.ts",
+    "consumers:work": "tsx scripts/consumer-worker.ts",
+    "consumers:rebuild": "tsx scripts/rebuild-consumer.ts",
     "pages:edit": "tsx scripts/edit-page.ts",
     "pages:set-thumbnail": "tsx scripts/set-thumbnail.ts",
     "pages:rebuild": "tsx scripts/rebuild-page-projections.ts",

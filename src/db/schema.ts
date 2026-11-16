@@ -300,11 +300,15 @@ export const pageCurrent = pgTable('page_current', {
   updatedAt: timestamp('updated_at', { withTimezone: true, mode: 'date' }).notNull(),
 });
 
+/** A transaction id (`xid8`, `pg_current_xact_id()`), carried as its decimal text. */
+const xid8 = customType<{ data: string; driverData: string }>({ dataType: () => 'xid8' });
+
 /**
- * The event outbox (§10): one row per commit, in the commit's transaction, for feeds, webhooks and
- * extensions to read. **Not a projection**, since consumers remember how far they have read, so a rebuild
+ * The event outbox (DESIGN.md §4.9): one row per commit, in the commit's transaction, read by the consumers
+ * in `server/consumers/`. **Not a projection**, since consumers remember how far they have read, so a rebuild
  * leaves it alone. The payload is public, so it never holds an account id. `id`s are handed out before
- * commit, so a reader that keeps a cursor must allow for a lower id appearing late; per page, `seq` is exact.
+ * commit, so a lower id can appear late; `xid` (the writing transaction) is what a cursor follows instead,
+ * read only below the oldest transaction still running (`consumers/run.ts`). Per page, `seq` is exact.
  */
 export const pageEvents = pgTable(
   'page_events',
@@ -316,10 +320,33 @@ export const pageEvents = pgTable(
     seq: integer('seq').notNull(),
     type: text('type').notNull(),
     payload: jsonb('payload').$type<Record<string, unknown>>().notNull(),
+    xid: xid8('xid')
+      .notNull()
+      .default(sql`pg_current_xact_id()`),
     createdAt: createdAt(),
   },
-  (t) => [uniqueIndex('page_events_paper_seq_key').on(t.paperId, t.seq)],
+  (t) => [
+    uniqueIndex('page_events_paper_seq_key').on(t.paperId, t.seq),
+    index('page_events_xid_id_idx').on(t.xid, t.id),
+  ],
 );
+
+/**
+ * How far each outbox consumer (`server/consumers/`) has read `page_events`: everything up to and including
+ * `(last_xid, last_event_id)`, in that order. Rebuilding a consumer is setting both back to zero. `leased_until`
+ * keeps two workers from running one consumer at once; `last_error` is the page that stopped it, if one did.
+ */
+export const consumerCursors = pgTable('consumer_cursors', {
+  name: text('name').primaryKey(),
+  lastXid: xid8('last_xid')
+    .notNull()
+    .default(sql`'0'`),
+  lastEventId: bigint('last_event_id', { mode: 'number' }).notNull().default(0),
+  leasedUntil: timestamp('leased_until', { withTimezone: true, mode: 'date' }),
+  lastError: text('last_error'),
+  failedAt: timestamp('failed_at', { withTimezone: true, mode: 'date' }),
+  updatedAt: timestamp('updated_at', { withTimezone: true, mode: 'date' }).notNull().defaultNow(),
+});
 
 /** One file of a demo snapshot: its bytes are in the blob store under `sha256`. */
 export interface DemoFile {

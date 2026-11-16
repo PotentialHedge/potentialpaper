@@ -18,7 +18,7 @@ dc --profile tools build          # app and tools images; without --profile tool
 dc up -d postgres
 dc run --rm tools                 # migrations (npm run db:migrate)
 dc up -d app
-dc --profile tools up -d ingest ssh  # the PDF ingest pipeline and git over SSH, on the new image
+dc --profile tools up -d ingest worker ssh  # PDF ingest, the outbox consumers and git over SSH, on the new image
 scripts/purge-edge-cache.sh       # required, see below
 ```
 
@@ -49,6 +49,14 @@ minute it runs each stage that is missing or out of date (text and emails of pag
 points at, recording results in `pdf_documents`. `dc logs -f ingest` shows its progress. For a one-off rerun,
 `dc run --rm tools npm run pdfs:ingest -- --stage emails --force` or `-- --sha <sha256>`; `-- --help` lists the
 rest. It needs the `R2_*` keys for covers.
+
+## Outbox consumers
+
+The `worker` service runs `npm run consumers:work` (`scripts/consumer-worker.ts`, `src/server/consumers/`) from the
+tools image: every consumer of `page_events` (DESIGN.md §4.9) catches up, then waits for a commit's `NOTIFY
+page_events` or 15 seconds. Each keeps its cursor in `consumer_cursors`; `last_error` there names a page that
+stopped one (it retries every minute). `dc logs -f worker` shows progress. To start one over, which clears what it
+holds and replays every event: `dc run --rm tools npm run consumers:rebuild -- <name>` (no name lists them).
 
 ## Git over SSH
 
@@ -133,7 +141,7 @@ tagged (due 2026-11-19). Then, once:
    `pgdata19:/var/lib/postgresql` (not `.../data`: since 18 the image keeps data in
    `/var/lib/postgresql/<major>/docker`, and the old path would quietly leave it in the container). Keep the
    `pgdata` volume declared but unmounted.
-2. `dc stop app ingest ssh`, then dump the old cluster:
+2. `dc stop app ingest worker ssh`, then dump the old cluster:
    `docker exec potentialpaper-postgres-1 pg_dumpall -U "$POSTGRES_USER" > data/pg19/prod-pg16.sql`.
 3. `dc up -d postgres` (now 19, empty), restore with
    `docker exec -i potentialpaper-postgres-1 psql -U "$POSTGRES_USER" -d postgres < data/pg19/prod-pg16.sql`

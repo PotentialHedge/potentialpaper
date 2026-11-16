@@ -131,3 +131,38 @@ below and launch the next phase's thread pointing at this file. Merging into `ma
   still read `page_objects` directly to assert on storage; that's deliberate. Checks: lint, format, typecheck pass;
   521 of 527 tests pass, the 6 failures being the known poppler ones in `pdf-ingest.test.ts`.
 - Left: nothing for Phase 1.
+
+### Phase 2 (2026-11-16, branch `data-model-phase-2`)
+
+- **Framework** in `src/server/consumers/`: a consumer is `{ name, handle(paperId, head, { database }), reset? }`
+  (`types.ts`), registered in `CONSUMERS` (`index.ts`, empty until Phases 4 and 5 add search and the review
+  projection). `runConsumer` (`run.ts`) brings one up to date in batches of 500, handing each page over once per
+  batch at its last event's head; `rebuildConsumer` calls `reset` and sets the cursor back to zero.
+- **Late ids: a watermark on transactions.** Migration `0026_consumer_cursors` adds `page_events.xid` (`xid8`,
+  default `pg_current_xact_id()`, index on `(xid, id)`) and `consumer_cursors(name, last_xid, last_event_id,
+leased_until, last_error, failed_at, updated_at)`. A consumer reads only events with
+  `xid < pg_snapshot_xmin(pg_current_snapshot())`, in `(xid, id)` order, and the cursor is the last `(xid, id)`.
+  Everything below the oldest running transaction has ended, and new transactions get higher xids, so nothing can
+  appear behind the cursor. The cost: a long transaction that has written anything holds every consumer back until
+  it ends (it only delays them). The cursor also survives `page_events`' identity being reset.
+- **Failures and concurrency:** a page that throws stops its consumer just before that page's first event in the
+  batch. The error goes into `last_error`, and it retries after a minute. A lease (`leased_until`, which is also
+  the token) keeps two workers off one consumer. A rebuild clears the lease, so a worker mid-run stops at its next
+  step (`lease-lost`).
+- **Waking:** `recordCommit` runs `pg_notify('page_events', paperId)` inside the commit's transaction (delivered
+  only on commit, pushes included). The worker (`worker.ts`, `npm run consumers:work`) runs every consumer until it
+  catches up, then waits for a notification or 15 s. Its `LISTEN` connection reconnects after a failure.
+- **Ops:** `worker` compose service (tools image, `profiles: [tools]`, like `ingest`), DEPLOY.md "Outbox
+  consumers", the recipe's `up -d ingest worker ssh`. `npm run consumers:rebuild -- <name>`. With no name, it
+  lists the consumers and their cursors.
+- **Tests** (`tests/integration/consumers.test.ts`, 8): newest head once per page, batching, an open transaction
+  holding a lower id back (a later commit isn't read past it), an older transaction with a higher id coming first,
+  failure/wait/retry, the lease and a rebuild during a run, rebuild replay, and the worker woken by a real commit
+  (poll set to 60 s).
+- Changed from the plan: the cursor is `(last_xid, last_event_id)` rather than `last_event_id` alone. Instead of a
+  per-page `seq` table, a page's events within a batch are folded to the newest, and `handle` must be idempotent,
+  as the plan says. Events of a deleted paper go with it (`on delete cascade`), so a consumer never hears of the
+  deletion. Its own rows should reference `papers` with `on delete cascade` too.
+- Not done: no dev systemd unit for the worker (no consumers yet). Phase 4 should add one, or run
+  `npm run consumers:work` beside the dev server. Production needs `dc --profile tools up -d worker` on the next
+  deploy (migration `0026` first).

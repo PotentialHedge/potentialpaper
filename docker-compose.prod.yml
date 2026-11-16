@@ -10,7 +10,7 @@
 #   docker compose -f docker-compose.prod.yml --env-file .env.production up -d postgres
 #   docker compose -f docker-compose.prod.yml --env-file .env.production run --rm tools
 #   docker compose -f docker-compose.prod.yml --env-file .env.production up -d app
-#   docker compose -f docker-compose.prod.yml --env-file .env.production --profile tools up -d ingest ssh
+#   docker compose -f docker-compose.prod.yml --env-file .env.production --profile tools up -d ingest worker ssh
 #   scripts/purge-edge-cache.sh
 #
 # The purge is required: cached pages name the old build's scripts, which the new container no longer has.
@@ -129,6 +129,21 @@ services:
     logging: *logging
     env_file: .env.production
     command: ['npm', 'run', 'pdfs:ingest', '--', '--watch']
+    depends_on:
+      postgres:
+        condition: service_healthy
+
+  # The outbox consumers (src/server/consumers/, DESIGN.md §4.9): keeps derived data (search, the review
+  # tables) up with page_events, woken by each commit's NOTIFY and polling every 15 s. Starting a consumer
+  # over: `dc run --rm tools npm run consumers:rebuild -- <name>`.
+  worker:
+    image: potentialpaper-tools
+    profiles: [tools]
+    restart: unless-stopped
+    logging: *logging
+    env_file: .env.production
+    command: ['npm', 'run', 'consumers:work']
+    stop_signal: SIGTERM
     depends_on:
       postgres:
         condition: service_healthy

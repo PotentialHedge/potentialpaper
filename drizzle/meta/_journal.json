@@ -183,6 +183,13 @@
       "when": 1794776792516,
       "tag": "0025_comment_head",
       "breakpoints": true
+    },
+    {
+      "idx": 26,
+      "version": "7",
+      "when": 1794837077906,
+      "tag": "0026_consumer_cursors",
+      "breakpoints": true
     }
   ]
 }

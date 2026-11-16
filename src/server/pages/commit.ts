@@ -1,8 +1,9 @@
-import { and, eq, max } from 'drizzle-orm';
+import { and, eq, max, sql } from 'drizzle-orm';
 import { getDb, type Database } from '@/db';
 import { pgErrorCode } from '@/db/errors';
 import { pageEvents, pageRefs, pageRevisions, papers, paperIdentifiers } from '@/db/schema';
 import { ApiError } from '../api/errors';
+import { EVENTS_CHANNEL } from '../consumers/types';
 import { pageRepo } from '../git/repo';
 import { copyDemos, type DemoPin, newDemoUrls, pinDemos, pinsFor } from '../demos/attach';
 import type { RateLimitConfig } from '../ratelimit';
@@ -171,6 +172,8 @@ export async function recordCommit(
       ...(commit.evidence ? { evidence: commit.evidence } : {}),
     },
   });
+  // Wakes the consumer worker (`server/consumers/worker.ts`) once this transaction commits; never if it doesn't.
+  await tx.execute(sql`select pg_notify(${EVENTS_CHANNEL}, ${paperId})`);
   return { seq, paths };
 }
 
