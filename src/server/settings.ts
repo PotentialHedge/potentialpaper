@@ -12,6 +12,7 @@ import {
   type SettingsProblem,
 } from '@/lib/settings';
 import { ApiError } from './api/errors';
+import { pluginSettingsOf } from './plugins/installed';
 
 /**
  * settings.json on the server (DESIGN.md §10): each account's document (`user_settings`) over the site layer
@@ -20,12 +21,12 @@ import { ApiError } from './api/errors';
  */
 
 /**
- * The settings the account's installed plugins declare. None yet: the plugin host (`handoffs/plugins.md` Phase 2)
- * reads the `plugins` key and its manifests here, and everything below already takes the list.
+ * The settings the account's installed plugins declare (`contributes.settings`): the `plugins` key and the site's
+ * `plugins.default`, through the manifests of the copies they run (`server/plugins/installed.ts`). Signed out, the
+ * site's defaults only.
  */
-export async function installedPluginSettings(_account: Account | null): Promise<PluginSettings[]> {
-  void _account;
-  return [];
+export async function installedPluginSettings(account: Account | null): Promise<PluginSettings[]> {
+  return pluginSettingsOf(account);
 }
 
 // The site layer changes rarely and is read on every settings request: kept for a few seconds per process.
@@ -49,6 +50,8 @@ export async function userSettingsRow(accountId: string): Promise<{ text: string
 }
 
 export interface SettingsView {
+  /** The settings of the plugins the account has installed, which `values` and `problems` take into account. */
+  plugins: PluginSettings[];
   /** The account's settings.json, as written. */
   text: string;
   /** Every known setting's value: the user's where it reads, else the site's, else the default. */
@@ -65,6 +68,7 @@ export async function settingsFor(account: Account): Promise<SettingsView> {
     installedPluginSettings(account),
   ]);
   return {
+    plugins,
     text,
     values: resolveSettings({ site: parseSettings(site), user: parseSettings(text) }, plugins),
     problems: checkSettings(text, plugins),
@@ -73,9 +77,13 @@ export async function settingsFor(account: Account): Promise<SettingsView> {
 }
 
 /** The defaults and the site layer, for a reader who isn't signed in. */
-export async function siteSettingsView(): Promise<{ text: string; values: ResolvedSettings }> {
-  const text = await siteSettingsText();
-  return { text, values: resolveSettings({ site: parseSettings(text) }) };
+export async function siteSettingsView(): Promise<{
+  text: string;
+  values: ResolvedSettings;
+  plugins: PluginSettings[];
+}> {
+  const [text, plugins] = await Promise.all([siteSettingsText(), installedPluginSettings(null)]);
+  return { text, values: resolveSettings({ site: parseSettings(text) }, plugins), plugins };
 }
 
 /** Throw a 422 that lists every error in the text, one per line, each naming its key. */
@@ -107,7 +115,7 @@ export async function saveUserSettings(account: Account, text: string): Promise<
  * plugin's settings is kept with a warning, as a user's is.
  */
 export async function saveSiteSettings(text: string): Promise<SettingsProblem[]> {
-  const problems = checkSettings(text);
+  const problems = checkSettings(text, [], 'site');
   if (problems.some((p) => p.severity === 'error')) refuse(problems);
   await getDb()
     .insert(siteSettings)

@@ -54,6 +54,11 @@ import { searchPapers } from '../search';
 import { siteUrl } from '../site';
 import { saveUserSettings, settingsFor, siteSettingsView, type SettingsView } from '../settings';
 import { MAX_SETTINGS_BYTES } from '@/lib/settings';
+import { grantPlugin, installedPlugins, installPlugin, revokePlugin, uninstallPlugin } from '../plugins/installed';
+import { pageMembersForPlugins, paperSubmissionsForPlugins, readPageForPlugins, resolvePage } from '../plugins/pages';
+import { pluginStorage, setPluginStorage, storageBytes } from '../plugins/storage';
+import { findPage } from '../pages/kinds';
+import { rolesOf } from '../pages/check';
 import { ApiError } from './errors';
 import { parseBody, parseParam, parseQuery, respond, route, toIso, toIsoOrNull } from './http';
 import * as S from './schemas';
@@ -784,4 +789,129 @@ export const postWorkspaceRebase = route(async (req) => {
   const { paper: id, baseOid, changes } = await parseBody(req, S.WorkspaceRebaseBody);
   const { paper } = await knownPaper(id.scheme, id.value);
   return respond(S.WorkspaceRebased, await rebaseWorkspace(paper.id, baseOid, changes), { principal });
+});
+
+// Plugins (`handoffs/plugins.md` Phase 2, `server/plugins/`).
+
+/**
+ * The reader's plugins, as a page runs them: each with its copy, its manifest and whether it may run. Copies a plugin
+ * not copied yet. Signed out, the site's `plugins.default`. With `?page=<identifier>`, also whether the reader owns
+ * that page, for `when` conditions (`viewer.isOwner`).
+ */
+export const getInstalledPlugins = route(async (req) => {
+  const { page } = parseQuery(req, S.InstalledQuery);
+  const principal = await authenticate(req).catch(() => null);
+  const account = principal?.account ?? null;
+  const plugins = await installedPlugins(account);
+  let isOwner = false;
+  if (principal && page) {
+    const found = await findPage(page);
+    if (found) isOwner = (await rolesOf(getDb(), actorOf(principal), found.id)).owner;
+  }
+  return respond(
+    S.InstalledPlugins,
+    {
+      plugins: plugins.map((p) => ({
+        ...p,
+        plugin: p.plugin && { ...p.plugin, manifest: p.plugin.manifest as unknown as Record<string, unknown> },
+      })),
+      viewer: { signedIn: account !== null, isOwner },
+    },
+    { principal },
+  );
+});
+
+/** Install a plugin from a source: it is copied and added to settings.json's `plugins`. It runs once approved. */
+export const postMyPlugin = route(async (req) => {
+  const principal = await requireAuth(req);
+  const { source } = await parseBody(req, S.PluginInstallBody);
+  const installed = await installPlugin(principal.account, source);
+  return respond(
+    S.InstalledPlugin,
+    { ...installed, plugin: installed.plugin && { ...installed.plugin, manifest: installed.plugin.manifest as never } },
+    { principal, status: 201 },
+  );
+});
+
+/** Remove a plugin from settings.json (a site default is turned off instead). */
+export const deleteMyPlugin = route(async (req) => {
+  const principal = await requireAuth(req);
+  const { source } = parseQuery(req, S.PluginSourceQuery);
+  await uninstallPlugin(principal.account, source);
+  return respond(S.Ok, { status: 'ok' }, { principal });
+});
+
+/**
+ * Approve a plugin at the commit it runs, with what its manifest asks for. Only in a browser, by the reader: consent
+ * is never given by an agent's token.
+ */
+export const putPluginGrant = route(async (req) => {
+  const principal = await requireSession(req);
+  const { plugin, commit } = await parseBody(req, S.PluginGrantBody);
+  await grantPlugin(principal.account, plugin, commit);
+  return respond(S.Ok, { status: 'ok' }, { principal });
+});
+
+export const deletePluginGrant = route(async (req) => {
+  const principal = await requireAuth(req);
+  const { plugin } = parseQuery(req, S.PluginIdQuery);
+  await revokePlugin(principal.account, plugin);
+  return respond(S.Ok, { status: 'ok' }, { principal });
+});
+
+/** A plugin's storage for the account (`storage.get`). */
+export const getPluginStorage = route(async (req) => {
+  const principal = await requireAuth(req);
+  const { plugin } = parseQuery(req, S.PluginIdQuery);
+  const data = await pluginStorage(principal.account, plugin);
+  return respond(S.PluginStorage, { data, bytes: storageBytes(data) }, { principal });
+});
+
+/** Set one key of a plugin's storage (`storage.set`); `null` removes it. At most 64 KB per plugin. */
+export const putPluginStorage = route(async (req) => {
+  const principal = await requireAuth(req);
+  const { plugin, key, value } = await parseBody(req, S.PluginStorageBody);
+  const data = await setPluginStorage(principal.account, plugin, key, value);
+  return respond(S.PluginStorage, { data, bytes: storageBytes(data) }, { principal });
+});
+
+/** The identifier in a `/pages/{identifier}` path: one segment, URL-encoded (`venue%3Aiclr%2F2027`). */
+function identifierParam(params: Record<string, string | string[]>): string {
+  const raw = params.identifier;
+  const text = Array.isArray(raw) ? raw.join('/') : raw;
+  try {
+    return decodeURIComponent(text ?? '');
+  } catch {
+    throw new ApiError(400, 'validation_error', 'invalid path parameter "identifier"');
+  }
+}
+
+/** Public, and cached a minute: what anyone reading the page sees. */
+const PUBLIC_MINUTE = { 'Cache-Control': 'public, max-age=60' };
+
+/** A page of any kind by its identifier (`page.resolve`): its summary, its scopes and its facts. Public. */
+export const getPageSummary = route(async (_req, params) => {
+  return respond(S.PageResponse, await resolvePage(identifierParam(params)), { headers: PUBLIC_MINUTE });
+});
+
+/** A page's kind file, sections and links (`page.read`). Public. */
+export const getPageFiles = route(async (_req, params) => {
+  return respond(S.PageFiles, await readPageForPlugins(identifierParam(params)), { headers: PUBLIC_MINUTE });
+});
+
+/** A scope's papers, rolled up from the pages under it (`page.members`). Public. */
+export const getPageMembers = route(async (req, params) => {
+  const { offset, limit, rollUp } = parseQuery(req, S.PageMembersQuery);
+  return respond(
+    S.PageMembers,
+    await pageMembersForPlugins(identifierParam(params), { offset, limit, rollUp: rollUp === 'true' }),
+    { headers: PUBLIC_MINUTE },
+  );
+});
+
+/** A paper's submissions, their notes and their venues' forms (`reviews.forPaper`). Public: the reviews are CC BY. */
+export const getPageSubmissions = route(async (_req, params) => {
+  return respond(S.PageSubmissions, await paperSubmissionsForPlugins(identifierParam(params)), {
+    headers: PUBLIC_MINUTE,
+  });
 });

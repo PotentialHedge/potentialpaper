@@ -664,8 +664,14 @@ export const SettingsProblem = z.object({
   message: z.string(),
 });
 
+/** A plugin's declared settings (`lib/settings/spec.ts`), which the values were resolved with. */
+export const PluginSettingsList = z.array(
+  z.object({ id: z.string(), title: z.string().optional(), settings: z.record(z.string(), z.unknown()) }),
+);
+
 /** `GET`/`PUT /me/settings`: the account's settings.json as written, and every setting's value. */
 export const MySettings = z.object({
+  plugins: PluginSettingsList,
   text: z.string(),
   values: z.record(z.string(), z.unknown()),
   problems: z.array(SettingsProblem),
@@ -676,4 +682,96 @@ export const MySettings = z.object({
 export const SiteSettings = z.object({
   text: z.string(),
   values: z.record(z.string(), z.unknown()),
+  plugins: PluginSettingsList,
 });
+
+// Plugins (`handoffs/plugins.md` Phase 2, `server/plugins/`).
+
+const PluginMissing = z.object({ permissions: z.array(z.string()), network: z.array(z.string()) });
+
+/** A plugin as a page runs it (`lib/plugins/installed.ts`). */
+export const InstalledPlugin = z.object({
+  source: z.string(),
+  ref: z.string().nullable(),
+  enabled: z.boolean(),
+  from: z.enum(['site', 'user', 'dev']),
+  status: z.enum(['ready', 'consent', 'blocked', 'disabled', 'error']),
+  error: z.string().optional(),
+  plugin: z
+    .object({
+      id: z.string(),
+      commit: z.string().nullable(),
+      sourceUrl: z.string(),
+      baseUrl: z.string(),
+      origin: z.string(),
+      manifest: z.record(z.string(), z.unknown()),
+    })
+    .nullable(),
+  missing: PluginMissing,
+});
+
+/** `GET /plugins/installed`: the reader's plugins, and what the page's \`when\` conditions need about the reader. */
+export const InstalledPlugins = z.object({
+  plugins: z.array(InstalledPlugin),
+  viewer: z.object({ signedIn: z.boolean(), isOwner: z.boolean() }),
+});
+
+export const InstalledQuery = z.object({ page: z.string().max(400).optional() });
+
+export const PluginInstallBody = z.object({ source: z.string().min(1).max(400) });
+export const PluginSourceQuery = z.object({ source: z.string().min(1).max(400) });
+export const PluginGrantBody = z.object({
+  plugin: z.string().min(1).max(120),
+  commit: z.string().regex(/^[0-9a-f]{40}$/),
+});
+export const PluginIdQuery = z.object({ plugin: z.string().min(1).max(120) });
+export const PluginStorageBody = z.object({
+  plugin: z.string().min(1).max(120),
+  key: z.string().regex(/^[A-Za-z0-9_.:-]{1,100}$/),
+  /** `null` removes the key. */
+  value: z.unknown(),
+});
+export const PluginStorage = z.object({ data: z.record(z.string(), z.unknown()), bytes: z.number().int() });
+
+/** A page of any kind, as plugins and links see it (`page.resolve`, `GET /pages/{identifier}`). */
+export const PageSummary = z.object({
+  kind: z.string(),
+  identifier: z.string(),
+  address: z.string(),
+  url: z.string(),
+  name: z.string(),
+});
+
+export const PageResponse = PageSummary.extend({
+  /** The pages above it: a paper's venues, topics and orgs; a topic's broader topics; an org's parents. */
+  scopes: z.array(PageSummary),
+  /** What `when` conditions test. */
+  facts: z.object({ hasScores: z.boolean(), hasSubmissions: z.boolean() }),
+});
+
+/** `GET /pages/{identifier}/files`: what `page.read` gives, only what the page shows the public. */
+export const PageFiles = z.object({
+  page: PageSummary,
+  /** Its kind file as it parses (`venue.json`, …); a paper's metadata. */
+  kindFile: z.record(z.string(), z.unknown()).nullable(),
+  sections: z.array(z.object({ part: z.string(), path: z.string(), title: z.string(), markdown: z.string() })),
+  links: z.array(z.record(z.string(), z.unknown())),
+  /** The commit the files are at; `null` for a page with no repo yet. */
+  commit: z.string().nullable(),
+});
+
+export const PageMembersQuery = z.object({
+  offset: z.coerce.number().int().min(0).max(1_000_000).default(0),
+  limit: z.coerce.number().int().min(1).max(200).default(100),
+  rollUp: z.enum(['true', 'false']).default('true'),
+});
+
+/** `GET /pages/{identifier}/members`: a scope's papers, rolled up from the pages under it. */
+export const PageMembers = z.object({
+  total: z.number().int(),
+  papers: z.array(PageSummary.extend({ year: z.number().int().nullable(), via: z.array(z.string()) })),
+  nextOffset: z.number().int().nullable(),
+});
+
+/** `GET /pages/{identifier}/submissions`: a paper's submissions with their notes and their venues' forms. */
+export const PageSubmissions = z.object({ submissions: z.array(z.record(z.string(), z.unknown())) });

@@ -1,8 +1,10 @@
 import { NextResponse, type NextRequest } from 'next/server';
 import { WEBVIEW_PRE_PATH, webviewCsp } from '@/editors/vscode/csp';
 import { VSCODE_BASE } from '@/editors/vscode';
-import { demoOfHost, isContentHost } from '@/lib/demos';
+import { CONTENT_HOSTNAME, demoOfHost, isContentHost } from '@/lib/demos';
+import { pluginHostOf } from '@/lib/plugins/origin';
 import { serveDemo } from '@/server/demos/serve';
+import { servePlugin } from '@/server/plugins/serve';
 import { paperGate } from '@/server/paper-gate';
 import { siteUrl } from '@/server/site';
 
@@ -20,9 +22,17 @@ export async function proxy(req: NextRequest) {
   if (isContentHost(host)) {
     const snapshot = demoOfHost(host);
     if (snapshot) return serveDemo(req, snapshot);
+    // A plugin's own host (`lib/plugins/origin.ts`).
+    const plugin = pluginHostOf(host);
+    if (plugin) return servePlugin(req, plugin);
     if (req.nextUrl.pathname.startsWith(`${VSCODE_BASE}${WEBVIEW_PRE_PATH}`)) {
       return NextResponse.next({ headers: { 'Content-Security-Policy': webviewCsp() } });
     }
+    return new NextResponse('Not found\n', { status: 404, headers: { 'Cache-Control': 'no-store' } });
+  }
+  // The content domain itself serves the plugin SDK (`public/sdk/`) and nothing else. In development it is the app's
+  // own host, which serves everything.
+  if (host === CONTENT_HOSTNAME && host !== new URL(siteUrl()).hostname && !req.nextUrl.pathname.startsWith('/sdk/')) {
     return new NextResponse('Not found\n', { status: 404, headers: { 'Cache-Control': 'no-store' } });
   }
   const { pathname } = req.nextUrl;

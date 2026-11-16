@@ -1,6 +1,9 @@
 import { z } from 'zod';
 import { KINDS } from '../kinds';
 import { PAGE_PANELS, PANEL_KINDS, panelIds, SLOT_TITLES, type PanelKind } from '../panels';
+import { PLUGIN_PANEL_ID_RE } from '../plugins/manifest';
+import { parsePluginSource, sourceKey } from '../plugins/sources';
+import { PLUGIN_ID_RE } from './spec';
 
 /**
  * The site's own settings: one entry per key, with its schema, default and description. The settings form, the
@@ -27,9 +30,17 @@ export interface CoreSetting<T = unknown> {
   widget?: 'toggles' | 'order';
   /** The choices of a list setting, with their labels, for the form. */
   choices?: { value: string; label: string; group?: string }[];
+  /**
+   * Read from the site layer only: what admins decide for everyone (`plugins.default`, `plugins.blocked`). A user's
+   * file may name it, with a warning, and it changes nothing.
+   */
+  siteOnly?: boolean;
 }
 
-/** A list of a kind's panel ids, unique. Read leniently: ids that no longer exist are dropped. */
+/**
+ * A list of a kind's panel ids, unique: built-in ones (`lib/panels.ts`) and plugins' (`<plugin id>.<panel id>`,
+ * whichever plugins are installed). Read leniently: built-in ids that no longer exist are dropped.
+ */
 function panelList(
   kind: PanelKind,
   widget: 'toggles' | 'order',
@@ -39,7 +50,12 @@ function panelList(
   const ids = panelIds(kind);
   return {
     schema: z
-      .array(z.enum(ids as [string, ...string[]]))
+      .array(
+        z.union([
+          z.enum(ids as [string, ...string[]]),
+          z.string().regex(PLUGIN_PANEL_ID_RE, "a built-in panel's id, or a plugin's as <plugin id>.<panel id>"),
+        ]),
+      )
       .refine((list) => new Set(list).size === list.length, 'must not name a panel twice'),
     default: [],
     title,
@@ -49,7 +65,11 @@ function panelList(
     choices: PAGE_PANELS[kind].map((p) => ({ value: p.id, label: p.title, group: SLOT_TITLES[p.slot] ?? p.slot })),
     sanitize: (raw) => {
       if (!Array.isArray(raw)) return undefined;
-      return [...new Set(raw.filter((id): id is string => typeof id === 'string' && ids.includes(id)))];
+      return [
+        ...new Set(
+          raw.filter((id): id is string => typeof id === 'string' && (ids.includes(id) || PLUGIN_PANEL_ID_RE.test(id))),
+        ),
+      ];
     },
   };
 }
@@ -72,9 +92,92 @@ function kindSettings(kind: PanelKind): Record<string, CoreSetting> {
   };
 }
 
-export const CORE_SETTINGS: Record<string, CoreSetting> = Object.fromEntries(
-  PANEL_KINDS.flatMap((kind) => Object.entries(kindSettings(kind))),
-);
+/** An installed plugin, in settings.json's `plugins` key: whether it runs, and the tag, branch or commit to run. */
+export interface PluginEntry {
+  enabled: boolean;
+  /** A tag, branch or commit; absent for the default branch (or a dev source, which is never pinned). */
+  ref?: string;
+}
+
+const pluginEntrySchema = z.strictObject({
+  enabled: z.boolean().default(true),
+  ref: z
+    .string()
+    .regex(/^[A-Za-z0-9_.\/-]{1,200}$/)
+    .optional(),
+});
+
+/**
+ * Read a `plugins` value leniently, as Presio's `sanitizePluginList`: entries whose source reads, keyed canonically
+ * (`lib/plugins/sources.ts`), each with `enabled` (default true) and its `ref`; a ref written in the key
+ * (`github:a/b@v1`) counts when the entry has none. Anything else is dropped.
+ */
+export function sanitizePlugins(raw: unknown): Record<string, PluginEntry> | undefined {
+  if (typeof raw !== 'object' || raw === null || Array.isArray(raw)) return undefined;
+  const out: Record<string, PluginEntry> = {};
+  for (const [key, value] of Object.entries(raw)) {
+    const source = parsePluginSource(key);
+    if (!source || source.kind !== 'github') continue;
+    const entry = pluginEntrySchema.safeParse(value ?? {});
+    if (!entry.success) continue;
+    const ref = entry.data.ref ?? source.ref ?? undefined;
+    out[sourceKey(source)] = { enabled: entry.data.enabled, ...(ref ? { ref } : {}) };
+  }
+  return out;
+}
+
+const githubSource = z.string().refine((text) => parsePluginSource(text)?.kind === 'github', {
+  message: 'a plugin source: github:<owner>/<repo>[/<folder>][@<ref>]',
+});
+
+const PLUGIN_SETTINGS: Record<string, CoreSetting> = {
+  plugins: {
+    schema: z.record(githubSource, pluginEntrySchema) as z.ZodType,
+    default: {},
+    title: 'Plugins',
+    description:
+      'Installed plugins, by source ("github:<owner>/<repo>[/<folder>]"), each { "enabled": true|false, "ref": "<tag, branch or commit>" }. A plugin runs once you approve its permissions on a page.',
+    group: 'Plugins',
+    sanitize: sanitizePlugins,
+  },
+  'plugins.default': {
+    schema: z.array(githubSource).max(50) as z.ZodType,
+    default: [],
+    title: 'Plugins for everyone',
+    description:
+      'Set by the site: plugin sources ("github:<owner>/<repo>[@<ref>]") installed for every reader, who can turn one off in their own "plugins".',
+    group: 'Plugins',
+    siteOnly: true,
+    sanitize: (raw) =>
+      Array.isArray(raw)
+        ? raw.filter((s): s is string => typeof s === 'string' && parsePluginSource(s)?.kind === 'github')
+        : undefined,
+  },
+  'plugins.blocked': {
+    schema: z
+      .array(
+        z
+          .string()
+          .regex(
+            new RegExp(`^${PLUGIN_ID_RE.source.slice(1, -1)}(@[0-9a-f]{40})?$`),
+            'a plugin id, or <plugin id>@<commit>',
+          ),
+      )
+      .max(500) as z.ZodType,
+    default: [],
+    title: 'Blocked plugins',
+    description:
+      'Set by the site: plugin ids ("<owner>/<name>"), or ids at one commit ("<owner>/<name>@<commit>"), that never run, for anyone.',
+    group: 'Plugins',
+    siteOnly: true,
+    sanitize: (raw) => (Array.isArray(raw) ? raw.filter((s): s is string => typeof s === 'string') : undefined),
+  },
+};
+
+export const CORE_SETTINGS: Record<string, CoreSetting> = {
+  ...Object.fromEntries(PANEL_KINDS.flatMap((kind) => Object.entries(kindSettings(kind)))),
+  ...PLUGIN_SETTINGS,
+};
 
 export type CoreSettingKey = keyof typeof CORE_SETTINGS & string;
 

@@ -110,7 +110,13 @@ describe('settings documents', () => {
     };
     expect(schema.properties['paper.panels.hidden']).toMatchObject({
       type: 'array',
-      items: { enum: expect.arrayContaining(['abstract', 'discussion']) },
+      // Built-in ids to complete, or a plugin's panel as <plugin id>.<panel id>.
+      items: {
+        anyOf: expect.arrayContaining([
+          expect.objectContaining({ enum: expect.arrayContaining(['abstract', 'discussion']) }),
+          expect.objectContaining({ type: 'string', pattern: expect.any(String) }),
+        ]),
+      },
       default: [],
     });
     expect(schema.properties['benedict-armstrong/score-standing.view']).toMatchObject({

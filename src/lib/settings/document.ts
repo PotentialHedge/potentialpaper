@@ -87,7 +87,11 @@ function lineAt(text: string, offset: number): number {
  * unsaveable; warnings don't. Unknown keys are kept, with a warning, so a file can name a plugin's settings before
  * the plugin is installed.
  */
-export function checkSettings(text: string, plugins: PluginSettings[] = []): SettingsProblem[] {
+export function checkSettings(
+  text: string,
+  plugins: PluginSettings[] = [],
+  layer: 'user' | 'site' = 'user',
+): SettingsProblem[] {
   const problems: SettingsProblem[] = [];
   const error = (key: string | null, offset: number, message: string) =>
     problems.push({ severity: 'error', key, line: lineAt(text, offset), message });
@@ -122,6 +126,9 @@ export function checkSettings(text: string, plugins: PluginSettings[] = []): Set
     if (isCoreSetting(key)) {
       const parsed = CORE_SETTINGS[key].schema.safeParse(value);
       if (!parsed.success) error(key, at, zodMessage(parsed.error.issues));
+      else if (CORE_SETTINGS[key].siteOnly && layer === 'user') {
+        warn(key, at, "set by the site's admins for everyone; it changes nothing in your file");
+      }
       continue;
     }
     const qualified = splitQualified(key);
@@ -184,7 +191,13 @@ export function resolveSettings(layers: SettingsLayers, plugins: PluginSettings[
     return fallback;
   };
   for (const [key, setting] of Object.entries(CORE_SETTINGS)) {
-    out[key] = pick(key, (raw) => readCoreValue(setting, raw), setting.default);
+    const read = (raw: unknown) => readCoreValue(setting, raw);
+    if (setting.siteOnly) {
+      const site = layers.site && Object.hasOwn(layers.site, key) ? read(layers.site[key]) : undefined;
+      out[key] = site ?? setting.default;
+    } else {
+      out[key] = pick(key, read, setting.default);
+    }
   }
   for (const plugin of plugins) {
     for (const [name, spec] of Object.entries(plugin.settings)) {
@@ -204,8 +217,16 @@ export function sameValue(a: unknown, b: unknown): boolean {
  * The text with one key set, or removed (`undefined`), keeping the rest of it, comments and order, as written. The
  * text must already parse as an object (`checkSettings` has no syntax errors); an empty text becomes one.
  */
-export function setInSettings(text: string, key: string, value: unknown): string {
+export function setInSettings(text: string, key: string | string[], value: unknown): string {
   const base = text.trim() === '' ? EMPTY_SETTINGS : text;
+  if (Array.isArray(key)) {
+    // A key inside a setting's object (`plugins` → one source): jsonc-parser's edit, which keeps the rest.
+    if (key.length === 1) return setInSettings(base, key[0], value);
+    return applyEdits(
+      base,
+      modify(base, key, value, { formattingOptions: { insertSpaces: true, tabSize: 2, eol: '\n' } }),
+    );
+  }
   if (value === undefined) {
     // Every time it is set, or an earlier one would count again.
     let out = base;

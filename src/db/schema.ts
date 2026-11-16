@@ -1121,3 +1121,83 @@ export const siteSettings = pgTable(
   },
   (t) => [check('site_settings_one_row', sql`${t.id} = 1`)],
 );
+
+/**
+ * A plugin's files at one commit (`handoffs/plugins.md` Phase 2, DESIGN.md §10), copied once from GitHub when it is
+ * first installed, as demos are (`server/plugins/snapshot.ts`): the bytes are stored by SHA-256 with demos', and the
+ * manifest was checked when the copy was taken. Served at `<host>.<content domain>/<commit>/…`, where `host` is a
+ * hash of the plugin id (`server/plugins/serve.ts`).
+ */
+export const pluginSnapshots = pgTable(
+  'plugin_snapshots',
+  {
+    /** The source's key, without its ref: `github:<owner>/<repo>[/<folder>]` (`lib/plugins/sources.ts`). */
+    source: text('source').notNull(),
+    commit: text('commit').notNull(),
+    pluginId: text('plugin_id').notNull(),
+    /** The label of the plugin's host, from its id. */
+    host: text('host').notNull(),
+    /** The manifest as it was checked (`lib/plugins/manifest.ts`'s `PluginManifest`). */
+    manifest: jsonb('manifest').$type<Record<string, unknown>>().notNull(),
+    /** The manifest's warnings, kept to show its author. */
+    warnings: jsonb('warnings').$type<string[]>().notNull(),
+    /** Path under the plugin's folder → file. */
+    files: jsonb('files').$type<Record<string, DemoFile>>().notNull(),
+    totalBytes: bigint('total_bytes', { mode: 'number' }).notNull(),
+    createdAt: createdAt(),
+  },
+  (t) => [
+    primaryKey({ columns: [t.source, t.commit] }),
+    uniqueIndex('plugin_snapshots_host_commit').on(t.host, t.commit),
+  ],
+);
+
+/**
+ * The commit a plugin source's ref (a tag, branch, or `''` for the default branch) named when it was first installed.
+ * Kept until someone asks for an update, so a moving branch doesn't change what runs: updates are explicit.
+ */
+export const pluginRefs = pgTable(
+  'plugin_refs',
+  {
+    source: text('source').notNull(),
+    ref: text('ref').notNull(),
+    commit: text('commit').notNull(),
+    resolvedAt: timestamp('resolved_at', { withTimezone: true, mode: 'date' }).notNull().defaultNow(),
+  },
+  (t) => [primaryKey({ columns: [t.source, t.ref] })],
+);
+
+/**
+ * Consent, kept out of settings.json (DESIGN.md §10): which plugin, at which commit, an account let run with which
+ * permissions and network origins. A plugin whose manifest asks for anything its grant lacks shows an approval
+ * prompt instead of running.
+ */
+export const userPluginGrants = pgTable(
+  'user_plugin_grants',
+  {
+    accountId: uuid('account_id')
+      .notNull()
+      .references(() => accounts.id, { onDelete: 'cascade' }),
+    pluginId: text('plugin_id').notNull(),
+    /** The commit approved. */
+    sha: text('sha').notNull(),
+    permissions: text('permissions').array().notNull(),
+    network: text('network').array().notNull(),
+    grantedAt: timestamp('granted_at', { withTimezone: true, mode: 'date' }).notNull().defaultNow(),
+  },
+  (t) => [primaryKey({ columns: [t.accountId, t.pluginId] })],
+);
+
+/** A plugin's small state for one account (`storage.get`/`storage.set`): one JSON object, at most 64 KB. */
+export const userPluginStorage = pgTable(
+  'user_plugin_storage',
+  {
+    accountId: uuid('account_id')
+      .notNull()
+      .references(() => accounts.id, { onDelete: 'cascade' }),
+    pluginId: text('plugin_id').notNull(),
+    data: jsonb('data').$type<Record<string, unknown>>().notNull(),
+    updatedAt: timestamp('updated_at', { withTimezone: true, mode: 'date' }).notNull().defaultNow(),
+  },
+  (t) => [primaryKey({ columns: [t.accountId, t.pluginId] })],
+);

@@ -15,15 +15,20 @@ const dev = process.env.NODE_ENV !== 'production';
 // Page analytics (`lib/analytics.ts`): the tracker script and the beacons it sends back to its own origin.
 const ANALYTICS = 'https://analytics.potentialhedge.com';
 
+// A plugin served by its author's dev server runs from their own machine, in their browser only.
+const PLUGIN_DEV_SOURCES = 'http://localhost:* http://127.0.0.1:*';
+
 const CSP = [
   "default-src 'self'",
   `script-src 'self' 'unsafe-inline' ${ANALYTICS}${dev ? " 'unsafe-eval'" : ''}`,
   "style-src 'self' 'unsafe-inline'",
   "img-src 'self' data: https:",
   "font-src 'self'",
-  `connect-src 'self' ${ANALYTICS}${dev ? ' ws:' : ''}`,
-  // Demos, which run on a host each of the content domain (`lib/demos.ts`), and the web editor's frame (`app/code`).
-  `frame-src 'self' ${CONTENT_SOURCE}`,
+  // A plugin author's dev server (`handoffs/plugins.md` Phase 2): its manifest is read from the reader's own machine.
+  `connect-src 'self' ${ANALYTICS} ${PLUGIN_DEV_SOURCES}${dev ? ' ws:' : ''}`,
+  // Demos and plugins, which run on a host each of the content domain (`lib/demos.ts`), the web editor's frame
+  // (`app/code`), and a plugin author's dev server.
+  `frame-src 'self' ${CONTENT_SOURCE} ${PLUGIN_DEV_SOURCES}`,
   "object-src 'none'",
   "base-uri 'self'",
   "form-action 'self'",
@@ -77,6 +82,15 @@ const nextConfig: NextConfig = {
         // server on every load, which answers 304 while it is the same. After the rule above, so this replaces it.
         source: '/editor/vscode/:version/potentialpaper/:path*',
         headers: [{ key: 'Cache-Control', value: 'no-cache' }],
+      },
+      {
+        // The plugin SDK (`public/sdk/v1/pp.js`), on the content domain. v1 only ever grows, so it can be kept a day.
+        source: '/sdk/:path*',
+        headers: [
+          { key: 'Cache-Control', value: 'public, max-age=86400' },
+          { key: 'Access-Control-Allow-Origin', value: '*' },
+          { key: 'Cross-Origin-Resource-Policy', value: 'cross-origin' },
+        ],
       },
       ...PRIVATE_PAGES.map((source) => ({
         source,

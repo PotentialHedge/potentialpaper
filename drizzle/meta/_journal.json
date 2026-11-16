@@ -239,6 +239,13 @@
       "when": 1794856710451,
       "tag": "0033_page_links_members",
       "breakpoints": true
+    },
+    {
+      "idx": 34,
+      "version": "7",
+      "when": 1794858878158,
+      "tag": "0034_plugins",
+      "breakpoints": true
     }
   ]
 }
