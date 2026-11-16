@@ -219,6 +219,15 @@ page's kind. Every table of the page store is keyed by `page_id` (`pages(id, kin
 paper id. Other kinds' pages are made by `createPage` (`npm run pages:create`), which starts their repo with the
 system's commit, and are cloned and pushed at `/git/<kind>/<key>.git` (or over SSH at their own address).
 
+**Venue pages** (built in `handoffs/pages.md` Phase 2). A series (`/v/iclr`) lists its editions over time; an
+edition (`/v/iclr/2027`) has its dates and where its submissions come from, its organisers' and community sections,
+and its submissions by status with filters (status, decision, words in the title), which a series rolls up from its
+editions. The `venues` bot, granted `venue.json` on venue pages, makes both pages for every venue an import knows
+(`venues` rows → the edition's `sources`), and only ever adds a missing source to a `venue.json` someone wrote. A
+venue's owners are its confirmed organisers (`page_claims`, the author claim flow with the venue as what is claimed,
+decided by an admin); a series' organisers also own its editions. They write `organizers/` and `venue.json` under
+their own handle's identity, since organising is a public role.
+
 **Sections** are named `NN-slug.md` or `NN-slug.html`: two digits, then a lower-case ASCII slug.
 They show in the order of their names, which is the order `ls` lists them in. A section's title is the
 `#` heading (or `<h1>`) its file starts with, and otherwise its slug. HTML is checked against an
@@ -644,6 +653,9 @@ author_claims(paper_id, author_index, account_id, method, evidence jsonb, status
   it grants no edit rights, because acting as the named author would reveal the claim.
 - Any confirmed author can edit the section. It displays "maintained by" with their names as listed
   on the paper, never their handles (section 5.3), and history shows who did what.
+- **Claims on other pages** (built 2026-11-16, `handoffs/pages.md` Phase 2): a venue's organisers claim it the same
+  way, in their own words, and an admin decides (`page_claims`, `npm run claims:decide`). A series' organisers own
+  its editions. Unlike authorship, organising is a public role, so their commits carry their own identity.
 
 ### Content
 
@@ -906,7 +918,8 @@ Decided 2026-11-16: bots are how data gets onto pages, and they work like GitHub
   of the bot's.
 
 Our own OpenReview import is the first bot, `openreview`, and goes through exactly this route, which keeps
-the route honest. The activity feed hides bot commits by default.
+the route honest. The second is `venues` (`npm run venues:sync`), granted `venue.json` on venue pages: it makes a
+series' and an edition's pages from the venues the imports know. The activity feed hides bot commits by default.
 
 ### What to do now, so this stays cheap
 

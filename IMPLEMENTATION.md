@@ -122,7 +122,9 @@ grouped display, stances and the graph are still to come.
 Planned in `handoffs/pages.md`: venues, topics, organisations and people as pages of their own, built like a
 paper's. Phase 1 (the page model) is built: `pages`, the page store keyed by `page_id`, the kind registry
 (`lib/kinds.ts`), path rules, commits, clone and push per kind, `page_members` and `page_ancestors`, and generic
-routes and slots (`/v`, `/t`, `/o`, `/u`).
+routes and slots (`/v`, `/t`, `/o`, `/u`). Phase 2 (venue pages) is built: the `venues` bot (`npm run venues:sync`),
+a series' editions, an edition's submissions by status with filters (`GET /api/v1/pages/{identifier}/venue-papers`),
+and organiser claims (`page_claims`, `/claim/venue/<key>`). Score statistics wait for `handoffs/plugins.md` Phase 4.
 
 ## Main risks
 

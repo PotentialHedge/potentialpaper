@@ -1,6 +1,6 @@
 # Handoff: pages above the paper (venues, topics, organisations, people)
 
-Status: plan, 2026-11-16. Phase 1 (the page model) is built; see the Log. Read with `handoffs/plugins.md`: plugins work on every kind of
+Status: plan, 2026-11-16. Phases 1 (the page model) and 2 (venue pages) are built; see the Log. Read with `handoffs/plugins.md`: plugins work on every kind of
 page this plan adds.
 
 ## Goal
@@ -243,3 +243,78 @@ Integration: 258 of 265 pass, 11 new (`kinds.test.ts`, `page-members.test.ts`); 
 before this phase (six `pdf-ingest.test.ts` without poppler, one `follows.test.ts`). Run against this worktree's
 own database, `potentialpaper_test_pages1`. One fast-check merge property test (`page-git.test.ts`) failed once
 and passed on rerun; it touches nothing changed here.
+
+### Phase 2: venue pages (2026-11-16, branch `pages-phase-2`)
+
+Built:
+
+- **The `venues` bot** (`server/venue-pages.ts`'s `syncVenuePages`, `npm run venues:sync`, and run for its venue at
+  the end of `papers:import-reviews`). Migration `0035_venue_pages.sql` makes its account and grants it `venue.json`
+  on venue pages, as `0027` did for `openreview`. For every `venues` row that is a conference's main edition
+  (`lib/venues.ts`'s `venuePlace`: `openreview:ICLR.cc/2027/Conference` → series `iclr` "ICLR", edition `iclr/2027`
+  "ICLR 2027"), it makes both pages (`createPage`) and commits a `venue.json`: `{ name }` on the series,
+  `{ name, sources: [<venue id>] }` on the edition, whose source makes the venue's submissions its members. It is
+  idempotent, and on a page whose `venue.json` is there it only adds a missing source (`venueFileUpdate`).
+- **A series' page** (`/v/iclr`): an `editions` panel, the table of its editions newest first, each with dates,
+  submissions and accepted (with the rate). Its Papers tab rolls up its editions' submissions, each marked with its
+  edition.
+- **An edition's page** (`/v/iclr/2027`): `about` (dates, its own site, "Submissions from OpenReview" linking each
+  source), `editions` (its count line, "1,234 accepted of 4,567 (27%)", and the series' years to move between),
+  organisers, community, and the Papers tab: its submissions by status (accepted first, then by number), with
+  filters by status (with counts), decision as the venue words it, and words in the title, and "Show more".
+  The first page is rendered on the server (the page stays one cached HTML for every reader); filters and paging
+  fetch `GET /api/v1/pages/{identifier}/venue-papers?status=&decision=&q=&offset=&limit=` (public, a minute's cache),
+  which `server/venue-pages.ts`'s `venuePapers`/`presentVenuePapers` answer for any venue, rolled up.
+- **Organiser claims** (`server/page-claims.ts`, table `page_claims(page_id, account_id, evidence, status,
+decided_by, decided_at)`), the author claim flow with the venue as what is claimed: `/claim/venue/<key>` (the
+  page's "Organise this venue? Claim it" leads there) and `GET`/`POST`/`DELETE /api/v1/pages/{identifier}/claim`.
+  An admin decides with `npm run claims:decide`, which now lists and decides both kinds of claim. A confirmed
+  organiser is an owner in `check.ts`'s `rolesOf` (so `viewer.isOwner` for plugins too), and writes `organizers/`
+  and `venue.json`.
+- **Score statistics' place:** `venueScoreStats(pageId)` in `server/venue-pages.ts` returns `null`, and the
+  `VenuePapers` panel (`components/pages/venue-panels.tsx`) renders whatever it returns above the list.
+- DESIGN.md §4.3 (venue pages), §6 (claims on other pages) and §10 (the `venues` bot), IMPLEMENTATION.md ("Pages
+  above the paper") and `llms.txt` (the two routes) updated.
+
+Calls I made where the plan left room:
+
+- **Only a conference's main edition maps to a page.** Tracks (`NeurIPS.cc/2025/Datasets_and_Benchmarks_Track`),
+  workshops and undated venues (`TMLR`) are skipped and reported, waiting for "Workshops and tracks as venue children
+  with their own sources" (Later). The series is named from the segment before the year without its domain
+  (`ICLR.cc` → ICLR, `robot-learning.org/CoRL` → CoRL); the edition by the venue's own name.
+- **The bot is a script, not a consumer.** Consumers rebuild derived rows and shouldn't commit to repos; the import
+  already knows its venue, so it calls the bot at its end, and `venues:sync` covers everything else.
+- **The bot writes no `url` and no `dates`.** `venues.url` is OpenReview's group page, not the venue's own site, so
+  the source link is derived from `sources` instead; OpenReview gives no dates. Organisers and admins add both.
+- **A series' organisers own its editions** (by key prefix, `keysAbove`, not `page_ancestors`, so it holds the moment
+  a claim is decided). Organisers' commits carry their own `u_` identity, as organising is a public role; still,
+  the page doesn't list who the organisers are, only what they wrote.
+- **Claims are admin-decided only**: nothing on a venue says who organised it, so there is no automatic route.
+  Stepping down or withdrawing deletes the row; a rejection stays, so the same claim isn't made again. Only venues
+  are claimable (`CLAIMABLE_KINDS`); an org's members (Phase 4) come from affiliations.
+- **"Papers by status" lists submissions**, a paper at a venue: on a series a paper submitted to two editions shows
+  under each. A submission whose source gave no status is "Status unknown".
+- **The organisers write by `git push`.** The web editor is still paper-only (Phase 1's note), so the claim page
+  says to clone the page; a web editor for keyed pages is still to come.
+- **`editions` is a new panel id** in `lib/panels.ts` (`venue.main`), so readers can hide or move it.
+  `KindPanelProps.key` became `pageKey`, since React keeps `key` to itself and the panels never received it.
+- `/claim/venue/<key>` is a static segment beside `/claim/[scheme]/…`; `venue` is no paper scheme.
+
+For later phases:
+
+- Plugins Phase 4 (`scope_stats`): fill `venueScoreStats`, add a `scores` panel to the venue slots in
+  `lib/panels.ts`, and `page.hasScores` on a scope can then use the statistics.
+- Workshops and tracks: extend `venuePlace` to map them to deeper keys (`iclr/2027/<workshop>`, venue `maxDepth` is
+  4); organisers of the edition then own them already.
+- Phase 3/4: `page_claims` is per page and kind-agnostic; another claimable kind is a `CLAIMABLE_KINDS` entry plus
+  its rule in `rolesOf`.
+- The edition list on a series counts each edition's statuses with one query each; fine for tens of editions.
+
+Checks: typecheck, lint and `next build` pass. Unit tests: 372 pass (5 new in `tests/unit/venues.test.ts`).
+Integration: 271 of 278 pass, 6 new in `tests/integration/venue-pages.test.ts` (the bot and its idempotence, never
+overwriting, its grant; submissions by status, filters, roll-up and the route; organiser claims through the API,
+inherited from the series, stepping down, rejection). The 7 failures are the same as before this phase (six
+`pdf-ingest.test.ts` without poppler, one `follows.test.ts`). Run against this worktree's own database,
+`potentialpaper_test_pages2`, through an untracked `.env`. A smoke run of `next start` against seeded venues served
+`/v/iclr` (the editions table) and `/v/iclr/2027` (the source line, the claim link, the empty list), redirected a
+signed-out `/claim/venue/iclr` to sign-in, and answered the `venue-papers` route.
