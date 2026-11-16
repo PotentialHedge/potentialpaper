@@ -1,8 +1,9 @@
 import { and, eq, max } from 'drizzle-orm';
 import { getDb, type Database } from '@/db';
 import { pgErrorCode } from '@/db/errors';
-import { pageEvents, pageObjects, pageRefs, pageRevisions, papers, paperIdentifiers } from '@/db/schema';
+import { pageEvents, pageRefs, pageRevisions, papers, paperIdentifiers } from '@/db/schema';
 import { ApiError } from '../api/errors';
+import { pageRepo } from '../git/repo';
 import { copyDemos, type DemoPin, newDemoUrls, pinDemos, pinsFor } from '../demos/attach';
 import type { RateLimitConfig } from '../ratelimit';
 import {
@@ -127,14 +128,6 @@ export async function moveHead(tx: Writer, paperId: string, expected: string | n
   return moved.length === 1;
 }
 
-async function writeObjects(tx: Writer, paperId: string, objects: readonly GitObject[]): Promise<void> {
-  if (objects.length === 0) return;
-  await tx
-    .insert(pageObjects)
-    .values(objects.map(({ oid, type, body }) => ({ paperId, oid: toBytes(oid), type, body })))
-    .onConflictDoNothing();
-}
-
 /**
  * Stores a checked commit on top of the head, which has to be its parent: its objects, the head, the pins of
  * its new demos, its revision row and its event. The caller holds the page's lock, has run `checkTree`, and
@@ -149,7 +142,7 @@ export async function recordCommit(
   others: readonly GitObject[],
   pins: readonly DemoPin[],
 ): Promise<{ seq: number; paths: string[] }> {
-  await writeObjects(tx, paperId, [...others, object]);
+  await pageRepo(tx, paperId).write([...others, object]);
   if (!(await moveHead(tx, paperId, commit.parent, object.oid))) {
     throw new ApiError(503, 'page_busy', 'the page changed during the edit; try again');
   }

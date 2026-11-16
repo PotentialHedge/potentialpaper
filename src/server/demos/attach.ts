@@ -1,8 +1,9 @@
 import { and, eq, inArray, sql } from 'drizzle-orm';
 import { getDb, type Database } from '@/db';
-import { demoPins, demoSnapshots, pageObjects } from '@/db/schema';
+import { demoPins, demoSnapshots } from '@/db/schema';
 import { DEMOS_DIR, demoRefKey, type DemoRef, type DemoSource } from '@/lib/demos';
 import { ApiError } from '../api/errors';
+import { pageRepo } from '../git/repo';
 import { demoBlockProblems, demoIds, demoRefs } from '../pages/markdown';
 import type { Writer } from '../pages/projections';
 import { readCommit, readFiles, readHead, readText, toBytes, type Reader } from '../pages/repo';
@@ -164,16 +165,6 @@ export interface DemoPin {
   snapshotId: string;
 }
 
-/** Each blob's size, without reading it. */
-async function blobSizes(db: Reader, paperId: string, oids: readonly string[]): Promise<Map<string, number>> {
-  if (oids.length === 0) return new Map();
-  const rows = await db
-    .select({ oid: pageObjects.oid, bytes: sql<number>`octet_length(${pageObjects.body})` })
-    .from(pageObjects)
-    .where(and(eq(pageObjects.paperId, paperId), inArray(pageObjects.oid, oids.map(toBytes))));
-  return new Map(rows.map((row) => [row.oid.toString('hex'), Number(row.bytes)]));
-}
-
 export interface DemoCheck {
   paperId: string;
   roles: Roles;
@@ -283,7 +274,7 @@ export async function checkDemos(tx: Reader, check: DemoCheck): Promise<string[]
     if (count > MAX_DEMOS_FILES) {
       throw new ApiError(422, 'validation_error', `a page's demos can have at most ${MAX_DEMOS_FILES} files`);
     }
-    for (const size of (await blobSizes(tx, check.paperId, stored)).values()) bytes += size;
+    for (const size of (await pageRepo(tx, check.paperId).sizes(stored)).values()) bytes += size;
     if (bytes > MAX_DEMOS_BYTES) {
       throw new ApiError(
         422,

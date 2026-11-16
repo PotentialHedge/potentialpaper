@@ -1,11 +1,11 @@
 import { and, eq } from 'drizzle-orm';
 import { getDb, type Database } from '@/db';
-import { pageObjects, paperIdentifiers } from '@/db/schema';
+import { paperIdentifiers } from '@/db/schema';
 import { canonicalPaperId, PAPER_SCHEMES, type PaperId, type PaperScheme, parsePaperId } from '@/lib/paper-ids';
 import { findPaper } from '../papers';
 import { gitSshUrl, siteUrl } from '../site';
 import { looseObject } from './git-objects';
-import { readHead, toBytes } from './repo';
+import { pageRepo, readHead } from '../git/repo';
 
 /**
  * Clone addresses, and git's dumb HTTP protocol, read-only (DESIGN.md §4.6), as answers for
@@ -85,21 +85,17 @@ export async function answerGitRequest(pathname: string, database: Database = ge
   if (!address || address.file.startsWith('git-') || address.file.startsWith('info/lfs/')) return { kind: 'missing' };
   const { id, scheme, raw, file } = address;
 
-  // Git asks for one object per request, so this is one query, and only ever one address's worth.
+  // Git asks for one object per request, so this reads one object, and only ever one address's worth.
   if (file.startsWith('objects/')) {
     if (id.scheme !== scheme || id.value !== raw) return { kind: 'missing' };
-    const [row] = await database
-      .select({ type: pageObjects.type, body: pageObjects.body })
+    const [identifier] = await database
+      .select({ paperId: paperIdentifiers.paperId })
       .from(paperIdentifiers)
-      .innerJoin(pageObjects, eq(pageObjects.paperId, paperIdentifiers.paperId))
-      .where(
-        and(
-          eq(paperIdentifiers.scheme, id.scheme),
-          eq(paperIdentifiers.value, id.value),
-          eq(pageObjects.oid, toBytes(file.slice('objects/'.length).replace('/', ''))),
-        ),
-      );
-    return row ? { kind: 'object', body: looseObject(row.type, row.body) } : { kind: 'missing' };
+      .where(and(eq(paperIdentifiers.scheme, id.scheme), eq(paperIdentifiers.value, id.value)));
+    if (!identifier) return { kind: 'missing' };
+    const oid = file.slice('objects/'.length).replace('/', '');
+    const object = (await pageRepo(database, identifier.paperId).read([oid])).get(oid);
+    return object ? { kind: 'object', body: looseObject(object.type, object.body) } : { kind: 'missing' };
   }
 
   const repo = await findRepo(address, database);

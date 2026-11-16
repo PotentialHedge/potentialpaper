@@ -213,8 +213,8 @@ export const commitIdentities = pgTable(
 
 /**
  * A page's git repository: real blobs, trees and commits as rows (DESIGN.md §4.1). `oid` is the SHA-1 git
- * would compute, and `body` the object without git's `<type> <size>\0` header. Written only by
- * `server/pages/commit.ts`.
+ * would compute, and `body` the object without git's `<type> <size>\0` header. Read and written only
+ * through `GitRepo` (`server/git/repo.ts`).
  */
 export const pageObjects = pgTable(
   'page_objects',

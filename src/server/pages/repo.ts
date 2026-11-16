@@ -1,27 +1,23 @@
 import { and, desc, eq, lt } from 'drizzle-orm';
 import { getDb, type Database } from '@/db';
-import { pageObjects, pageRefs, pageRevisions } from '@/db/schema';
+import { pageRevisions } from '@/db/schema';
+import { pageRepo } from '../git/repo';
 import { type Commit, type EditKind, type GitObjectType, parseCommit, parseTree } from './git-objects';
 import { diffFile, type FileDiff, type Version } from './merge';
 
-/** Reading a page repo out of Postgres. Anything that writes is in `commit.ts`. */
+/** Reading a page repo, through its `GitRepo` (`git/repo.ts`). Anything that writes is in `commit.ts`. */
 
 export type Reader = Pick<Database, 'select' | 'execute'>;
 
-export function toBytes(oid: string): Buffer {
-  return Buffer.from(oid, 'hex');
-}
+export { readHead, toBytes } from '../git/repo';
 
 export async function readObject(
   db: Reader,
   paperId: string,
   oid: string,
 ): Promise<{ type: GitObjectType; body: Buffer } | null> {
-  const [row] = await db
-    .select({ type: pageObjects.type, body: pageObjects.body })
-    .from(pageObjects)
-    .where(and(eq(pageObjects.paperId, paperId), eq(pageObjects.oid, toBytes(oid))));
-  return row ?? null;
+  const [found] = (await pageRepo(db, paperId).read([oid])).values();
+  return found ?? null;
 }
 
 async function mustRead(db: Reader, paperId: string, oid: string, type: GitObjectType): Promise<Buffer> {
@@ -59,11 +55,6 @@ export async function readFiles(db: Reader, paperId: string, tree: string, prefi
 export async function readText(db: Reader, paperId: string, blob: string | undefined): Promise<Version> {
   if (!blob) return null;
   return (await mustRead(db, paperId, blob, 'blob')).toString('utf8');
-}
-
-export async function readHead(db: Reader, paperId: string): Promise<string | null> {
-  const [row] = await db.select({ head: pageRefs.head }).from(pageRefs).where(eq(pageRefs.paperId, paperId));
-  return row ? row.head.toString('hex') : null;
 }
 
 export interface ChangedFile {
