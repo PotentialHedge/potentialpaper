@@ -20,6 +20,7 @@ import {
 import { AGENT_POST_KINDS } from '../lib/agent-posts';
 import { PAGE_KINDS } from '../lib/kinds';
 import { NOTE_KINDS, SUBMISSION_STATUSES, type FieldValue, type VenueForms } from '../lib/submissions';
+import type { Bins, ScoreGroup, StatOutcome } from '../lib/scope-stats';
 import type { TitleLink } from '../lib/paper-links';
 import type { PaperVersion } from '../lib/versions';
 import type { PdfPointer, ThumbnailPointer } from '@/server/pages/rules';
@@ -1237,4 +1238,56 @@ export const userPluginStorage = pgTable(
     updatedAt: timestamp('updated_at', { withTimezone: true, mode: 'date' }).notNull().defaultNow(),
   },
   (t) => [primaryKey({ columns: [t.accountId, t.pluginId] })],
+);
+
+/**
+ * Score statistics of every scope (`handoffs/plugins.md` Phase 4, data for plugins A), per `(scope, venue, field)`:
+ * every submission's mean over its reviews for a score field of the venue's review forms, sorted, with bins and the
+ * split by outcome (`lib/scope-stats.ts`). Rolled up like membership. Written only by `server/scope-stats.ts`, from
+ * `submissions`, `submission_notes` and `page_members`; `consumers:rebuild -- scope-stats` starts it over.
+ */
+export const scopeStats = pgTable(
+  'scope_stats',
+  {
+    scopePageId: uuid('scope_page_id')
+      .notNull()
+      .references(() => pages.id, { onDelete: 'cascade' }),
+    /** `<source>:<venue id>`, as `venues.id`. */
+    venueId: text('venue_id').notNull(),
+    /** The field's key in the venue's forms: `rating`. */
+    field: text('field').notNull(),
+    label: text('label').notNull(),
+    /** The field's place among the venue's: the form's summary first, then its order. */
+    position: integer('position').notNull(),
+    min: doublePrecision('min'),
+    max: doublePrecision('max'),
+    count: integer('count').notNull(),
+    values: doublePrecision('values').array().notNull(),
+    bins: jsonb('bins').$type<Bins>().notNull(),
+    byStatus: jsonb('by_status').$type<Record<StatOutcome, ScoreGroup>>().notNull(),
+    /** Whether the venue has decided on any submission yet, for `plugins.venueStats.hideUntil`. */
+    decisionsOut: boolean('decisions_out').notNull(),
+    computedAt: timestamp('computed_at', { withTimezone: true, mode: 'date' }).notNull(),
+  },
+  (t) => [primaryKey({ columns: [t.scopePageId, t.venueId, t.field] })],
+);
+
+/**
+ * Each scope's last change and its pending recomputation of `scope_stats`. A change to a member paper's reviews or to
+ * membership marks the scope and the scopes above it: `changed_at` moves (the bulk route's ETag), and `due_at` is set a
+ * few seconds ahead, pushed back by later changes but never past `dirty_since` plus a minute, so an import recomputes a
+ * scope now and then rather than on every paper.
+ */
+export const scopeState = pgTable(
+  'scope_state',
+  {
+    scopePageId: uuid('scope_page_id')
+      .primaryKey()
+      .references(() => pages.id, { onDelete: 'cascade' }),
+    changedAt: timestamp('changed_at', { withTimezone: true, mode: 'date' }).notNull(),
+    dirtySince: timestamp('dirty_since', { withTimezone: true, mode: 'date' }),
+    dueAt: timestamp('due_at', { withTimezone: true, mode: 'date' }),
+    computedAt: timestamp('computed_at', { withTimezone: true, mode: 'date' }),
+  },
+  (t) => [index('scope_state_due_idx').on(t.dueAt)],
 );

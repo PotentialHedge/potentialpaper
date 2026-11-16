@@ -7,7 +7,7 @@ import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it, vi } 
 import { getDb } from '@/db';
 import { accounts } from '@/db/schema';
 import { pluginBaseUrl } from '@/lib/plugins/origin';
-import { encodeReviewFile, noteFilePath, submissionFilePath, type NoteFile } from '@/lib/review-files';
+import { encodeReviewFile, formsFilePath, noteFilePath, submissionFilePath, type NoteFile } from '@/lib/review-files';
 import { ensureBot, grantBot, OPENREVIEW_BOT } from '@/server/bots';
 import { CONSUMERS } from '@/server/consumers';
 import { runConsumer } from '@/server/consumers/run';
@@ -16,6 +16,7 @@ import { savePaper } from '@/server/papers';
 import { servePlugin } from '@/server/plugins/serve';
 import { pinPlugin, pluginHostLabel, storePluginFiles } from '@/server/plugins/snapshot';
 import { forgetTags } from '@/server/plugins/tags';
+import { recomputeDueScopes } from '@/server/scope-stats';
 import { saveSiteSettings } from '@/server/settings';
 import { mintToken } from '@/server/tokens';
 import { api, closePool, resetDatabase, signUp } from './helpers';
@@ -321,6 +322,8 @@ describe('the page routes plugins read', () => {
     for (const consumer of CONSUMERS) {
       expect(await runConsumer(consumer, { retryNow: true })).toMatchObject({ status: 'caught-up' });
     }
+    // The scopes the consumers marked: their score statistics (`page.hasScores` on a venue).
+    await recomputeDueScopes({ all: true });
   }
 
   it('resolves any kind, with scopes and facts, and reads files, members and reviews', async () => {
@@ -366,6 +369,21 @@ describe('the page routes plugins read', () => {
             status: 'under_review',
             decision: null,
             url: 'https://openreview.net/forum?id=forum1',
+            license: 'CC-BY-4.0',
+          }),
+        },
+        {
+          // The venue's forms mark the rating a score, which is what its statistics count.
+          path: formsFilePath('openreview', 'forum1'),
+          content: encodeReviewFile({
+            schema: 'forms/1',
+            forms: {
+              Official_Review: {
+                label: 'Official review',
+                fields: [{ key: 'rating', label: 'Rating', type: 'score' }],
+              },
+            },
+            url: 'https://openreview.net/group?id=ICLR.cc/2027/Conference',
             license: 'CC-BY-4.0',
           }),
         },

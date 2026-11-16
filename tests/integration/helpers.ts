@@ -50,6 +50,9 @@ import * as pageMembersRoute from '@/app/api/v1/pages/[identifier]/members/route
 import * as pageSubmissions from '@/app/api/v1/pages/[identifier]/submissions/route';
 import * as pageClaim from '@/app/api/v1/pages/[identifier]/claim/route';
 import * as venuePapersRoute from '@/app/api/v1/pages/[identifier]/venue-papers/route';
+import * as pageScoresRoute from '@/app/api/v1/pages/[identifier]/scores/route';
+import * as pageScoreFieldRoute from '@/app/api/v1/pages/[identifier]/scores/[venue]/[field]/route';
+import * as pagePapersRoute from '@/app/api/v1/pages/[identifier]/papers/route';
 import { getDb, getPool } from '@/db';
 import { clearDevOutbox, devOutbox } from '@/server/mail';
 
@@ -57,7 +60,7 @@ export const ORIGIN = 'http://test.local';
 
 export async function resetDatabase(): Promise<void> {
   await getDb().execute(sql`
-    truncate table page_claims, plugin_refs, plugin_snapshots, user_plugin_grants, user_plugin_storage, site_settings, user_settings, page_links, page_members, page_member_sources, page_scope_names, page_parents, page_ancestors, pages, paper_follows, search_docs, bot_grants, comment_mentions, comment_aliases, comments, lfs_objects, ssh_keys, evidence_files, agent_posts, agent_files, api_tokens, agent_codes, author_claims, demo_pins, demo_snapshots, submission_notes, submissions, venues, pdf_documents, consumer_cursors, page_events, page_current, page_revisions, page_refs, page_objects, commit_identities, paper_lookup_misses, paper_identifiers, papers, institution_domains, affiliations, accounts, rate_limit_buckets,
+    truncate table scope_stats, scope_state, page_claims, plugin_refs, plugin_snapshots, user_plugin_grants, user_plugin_storage, site_settings, user_settings, page_links, page_members, page_member_sources, page_scope_names, page_parents, page_ancestors, pages, paper_follows, search_docs, bot_grants, comment_mentions, comment_aliases, comments, lfs_objects, ssh_keys, evidence_files, agent_posts, agent_files, api_tokens, agent_codes, author_claims, demo_pins, demo_snapshots, submission_notes, submissions, venues, pdf_documents, consumer_cursors, page_events, page_current, page_revisions, page_refs, page_objects, commit_identities, paper_lookup_misses, paper_identifiers, papers, institution_domains, affiliations, accounts, rate_limit_buckets,
       session, account, verification, "user"
     restart identity cascade
   `);
@@ -114,6 +117,9 @@ const ROUTES: [RegExp, any][] = [
   [/^\/pages\/(?<identifier>[^/?]+)\/submissions$/, pageSubmissions],
   [/^\/pages\/(?<identifier>[^/?]+)\/claim$/, pageClaim],
   [/^\/pages\/(?<identifier>[^/?]+)\/venue-papers(\?.*)?$/, venuePapersRoute],
+  [/^\/pages\/(?<identifier>[^/?]+)\/scores(\?.*)?$/, pageScoresRoute],
+  [/^\/pages\/(?<identifier>[^/?]+)\/scores\/(?<venue>[^/?]+)\/(?<field>[^/?]+)$/, pageScoreFieldRoute],
+  [/^\/pages\/(?<identifier>[^/?]+)\/papers(\?.*)?$/, pagePapersRoute],
   [/^\/pages\/(?<identifier>[^/?]+)$/, pageSummary],
   [/^\/settings$/, siteSettings],
   [/^\/me\/password$/, password],

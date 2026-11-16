@@ -1,4 +1,5 @@
 import { z } from 'zod';
+import { HIDE_UNTIL, type HideUntil } from '../scope-stats';
 import { KINDS } from '../kinds';
 import { PAGE_PANELS, PANEL_KINDS, panelIds, SLOT_TITLES, type PanelKind } from '../panels';
 import { PLUGIN_PANEL_ID_RE } from '../plugins/manifest';
@@ -171,6 +172,16 @@ const PLUGIN_SETTINGS: Record<string, CoreSetting> = {
     group: 'Plugins',
     siteOnly: true,
     sanitize: (raw) => (Array.isArray(raw) ? raw.filter((s): s is string => typeof s === 'string') : undefined),
+  },
+  'plugins.venueStats.hideUntil': {
+    schema: z.enum(HIDE_UNTIL) as z.ZodType,
+    default: 'never',
+    title: 'Hide venue statistics until',
+    description:
+      'Set by the site: "never" serves a venue\'s score statistics (GET /api/v1/pages/{identifier}/scores, scope.scores) as soon as there are reviews; "decisions" withholds them until the venue has decided on a submission, so nothing states a paper\'s rank while reviews are open.',
+    group: 'Plugins',
+    siteOnly: true,
+    sanitize: (raw) => (HIDE_UNTIL.includes(raw as HideUntil) ? raw : undefined),
   },
 };
 

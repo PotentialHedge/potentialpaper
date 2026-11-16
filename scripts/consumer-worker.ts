@@ -1,6 +1,6 @@
 import 'dotenv/config';
 import { getPool } from '@/db';
-import { CONSUMERS } from '@/server/consumers';
+import { CONSUMERS, WORKER_TASKS } from '@/server/consumers';
 import { runWorker } from '@/server/consumers/worker';
 
 /**
@@ -14,6 +14,7 @@ async function main() {
   console.log(`worker: consumers ${names}`);
   await runWorker({
     consumers: CONSUMERS,
+    tasks: WORKER_TASKS,
     listenUrl: process.env.DATABASE_URL,
     signal: controller.signal,
     log: (line) => console.log(line),

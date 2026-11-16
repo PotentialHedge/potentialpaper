@@ -12,6 +12,7 @@ import {
 import type { Consumer } from './consumers/types';
 import { pageRepo } from './git/repo';
 import { readCommit, readFolder } from './pages/repo';
+import { markPaperScopes } from './scope-stats';
 
 /**
  * The review projection (DESIGN.md §4.9): the `reviews` outbox consumer, which brings a page's rows in
@@ -207,6 +208,8 @@ export async function projectReviews(database: Database, paperId: string, head: 
       )
       .returning({ id: submissions.id });
     report.removed = gone.length;
+    // The paper's scopes' score statistics are due again (`scope-stats.ts`).
+    await markPaperScopes(tx, paperId);
     return report;
   });
 }

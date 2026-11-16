@@ -872,3 +872,76 @@ export const VenuePapers = z.object({
   ),
   nextOffset: z.number().int().nullable(),
 });
+
+const ScoreBins = z.object({
+  lo: z.number(),
+  hi: z.number(),
+  width: z.number(),
+  /** Means per bin, `[lo + i·width, lo + (i+1)·width)`, the last closed at `hi`. */
+  counts: z.array(z.number().int()),
+});
+
+const ScoreGroup = z.object({ count: z.number().int(), values: z.array(z.number()), bins: ScoreBins });
+
+const ScoreSummary = z.object({
+  /** `<source>:<venue id>`, as submissions name it: `openreview:ICLR.cc/2027/Conference`. */
+  venue: z.object({ id: z.string(), name: z.string() }),
+  /** The field's key in the venue's review forms: `rating`. */
+  field: z.string(),
+  label: z.string(),
+  /** Submissions with a mean for this field. */
+  count: z.number().int(),
+  /** The range the venue's form states, when it does. */
+  min: z.number().nullable(),
+  max: z.number().nullable(),
+  /** How many of each outcome: accepted, rejected (desk rejections too), withdrawn, pending. */
+  byStatus: z.record(z.string(), z.number().int()),
+  /** Whether the venue has decided on any submission yet. */
+  decisionsOut: z.boolean(),
+  /** Withheld until the venue's decisions are out (the site's `plugins.venueStats.hideUntil`): no values or bins. */
+  hidden: z.boolean(),
+  computedAt: z.string(),
+});
+
+/** `GET /pages/{identifier}/scores`: a scope's venues and score fields, with counts. */
+export const PageScores = z.object({
+  page: PageSummary,
+  /** The site's `plugins.venueStats.hideUntil`: `never` or `decisions`. */
+  hideUntil: z.enum(['never', 'decisions']),
+  scores: z.array(ScoreSummary),
+});
+
+/** `GET /pages/{identifier}/scores/{venue}/{field}`: one field's means, sorted, with bins and the split by outcome. */
+export const PageScoreField = ScoreSummary.extend({
+  page: PageSummary,
+  /** Each submission's mean over its reviews, ascending. */
+  values: z.array(z.number()),
+  bins: ScoreBins,
+  /** The same by outcome: `accepted`, `rejected`, `withdrawn`, `pending`. */
+  split: z.record(z.string(), ScoreGroup),
+});
+
+/** `GET /pages/{identifier}/papers`: which fields, and a chunk of them. */
+export const PagePapersQuery = z.object({
+  /** Comma-separated: `submissions`, `scores`, `status`. All three when left out; empty for the papers alone. */
+  fields: z
+    .string()
+    .max(100)
+    .optional()
+    .transform((text, ctx) => {
+      if (text === undefined) return ['submissions', 'scores', 'status'] as const;
+      const fields = text
+        .split(',')
+        .map((f) => f.trim())
+        .filter(Boolean);
+      const bad = fields.filter((f) => !['submissions', 'scores', 'status'].includes(f));
+      if (bad.length > 0) {
+        ctx.addIssue({ code: 'custom', message: `unknown field ${bad.join(', ')}: submissions, scores or status` });
+      }
+      return fields as ('submissions' | 'scores' | 'status')[];
+    }),
+  /** The cursor a previous chunk gave (`X-Next-Cursor`). */
+  after: z.uuid().optional(),
+  /** Papers in this chunk; left out, every paper in one stream. */
+  limit: z.coerce.number().int().min(1).max(5000).optional(),
+});

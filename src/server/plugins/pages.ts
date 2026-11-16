@@ -1,15 +1,6 @@
 import { and, eq, inArray, sql } from 'drizzle-orm';
 import { getDb, type Database } from '@/db';
-import {
-  pageAncestors,
-  pageCurrent,
-  pageMembers,
-  pages,
-  paperIdentifiers,
-  papers,
-  submissionNotes,
-  submissions,
-} from '@/db/schema';
+import { pageAncestors, pageCurrent, pageMembers, pages, paperIdentifiers, papers } from '@/db/schema';
 import { formatIdentifier, KINDS, pageName, pagePath, partsOf, type PageAddress } from '@/lib/kinds';
 import { canonicalPaperId } from '@/lib/paper-ids';
 import type { PageSummary } from '@/lib/plugins/protocol';
@@ -108,7 +99,7 @@ export function submissionsHaveScores(list: readonly Submission[]): boolean {
 
 /**
  * What `when` conditions test about a page: `page.hasSubmissions` (a paper with a submission, a scope with a paper
- * submitted to it) and `page.hasScores` (a paper whose reviews have scores; a scope whose papers have reviews).
+ * submitted to it) and `page.hasScores` (a paper whose reviews have scores; a scope with score statistics, `scope_stats`).
  */
 export async function pageFacts(
   page: PageRow,
@@ -120,20 +111,24 @@ export async function pageFacts(
   }
   if (!KINDS[page.kind].scope) return { hasScores: false, hasSubmissions: false };
   const [row] = await database
-    .execute<{ submissions: boolean; reviews: boolean }>(
+    .execute<{ submissions: boolean; scores: boolean }>(
       sql`
     select
       exists (select 1 from ${pageMembers} where ${rolledUp(page.id)} and ${pageMembers.via} = 'submission') as submissions,
-      exists (
-        select 1 from ${pageMembers}
-        join ${submissions} on ${submissions.paperId} = ${pageMembers.paperId}
-        join ${submissionNotes} on ${submissionNotes.submissionId} = ${submissions.id} and ${submissionNotes.kind} = 'review'
-        where ${rolledUp(page.id)}
-      ) as reviews
+      exists (select 1 from scope_stats where scope_page_id = ${page.id} and count > 0) as scores
   `,
     )
     .then((result) => result.rows);
-  return { hasSubmissions: Boolean(row?.submissions), hasScores: Boolean(row?.reviews) };
+  return { hasSubmissions: Boolean(row?.submissions), hasScores: Boolean(row?.scores) };
+}
+
+/** The scope an identifier names, or a 404, or a 422 for a page of a kind that has no papers. */
+export async function mustFindScope(identifier: string, database: Database = getDb()): Promise<PageRow> {
+  const page = await mustFindPage(identifier, database);
+  if (!KINDS[page.kind].scope) {
+    throw new ApiError(422, 'validation_error', `a ${KINDS[page.kind].title.toLowerCase()} page has no papers`);
+  }
+  return page;
 }
 
 /** `page.resolve`, `GET /pages/{identifier}`: a page's summary, its scopes and its facts. */

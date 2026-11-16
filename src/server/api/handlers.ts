@@ -52,11 +52,13 @@ import { canonicalPaperId, paperPath, parsePaperId } from '@/lib/paper-ids';
 import { findPaper, lookupPaper } from '../papers';
 import { searchPapers } from '../search';
 import { siteUrl } from '../site';
-import { saveUserSettings, settingsFor, siteSettingsView, type SettingsView } from '../settings';
+import { saveUserSettings, settingsFor, siteSettingsView, type SettingsView, venueStatsHideUntil } from '../settings';
 import { MAX_SETTINGS_BYTES } from '@/lib/settings';
 import { grantPlugin, installedPlugins, installPlugin, revokePlugin, uninstallPlugin } from '../plugins/installed';
 import {
   mustFindPage,
+  mustFindScope,
+  pageSummaries,
   pageMembersForPlugins,
   paperSubmissionsForPlugins,
   readPageForPlugins,
@@ -68,9 +70,21 @@ import { pluginUpdates, updatePlugin } from '../plugins/updates';
 import { findPage } from '../pages/kinds';
 import { isClaimable, ownPageClaim, requestPageClaim, withdrawPageClaim } from '../page-claims';
 import { presentVenuePapers } from '../venue-pages';
+import { scopeChangedAt, scopePaperChunk, scopeScoreField, scopeScoreList } from '../scope-stats';
 import { rolesOf } from '../pages/check';
 import { ApiError } from './errors';
-import { parseBody, parseParam, parseQuery, respond, route, toIso, toIsoOrNull } from './http';
+import {
+  etagOf,
+  notModified,
+  parseBody,
+  parseParam,
+  parseQuery,
+  respond,
+  respondCached,
+  route,
+  toIso,
+  toIsoOrNull,
+} from './http';
 import * as S from './schemas';
 
 /** The `/api/v1` handlers; the route files only re-export them. */
@@ -1012,4 +1026,104 @@ export const getVenuePapers = route(async (req, params) => {
   if (page.kind !== 'venue') throw new ApiError(422, 'validation_error', 'only a venue page lists submissions');
   const filter = parseQuery(req, S.VenuePapersQuery);
   return respond(S.VenuePapers, await presentVenuePapers(page.id, filter), { headers: PUBLIC_MINUTE });
+});
+
+/** A path parameter that is one URL-encoded segment: a venue id (`openreview%3AICLR.cc%2F2027%2FConference`). */
+function encodedParam(params: Record<string, string | string[]>, name: string): string {
+  const raw = params[name];
+  const text = Array.isArray(raw) ? raw.join('/') : raw;
+  try {
+    return decodeURIComponent(text ?? '');
+  } catch {
+    throw new ApiError(400, 'validation_error', `invalid path parameter "${name}"`);
+  }
+}
+
+async function scopeSummary(pageId: string) {
+  const summary = (await pageSummaries([pageId])).get(pageId);
+  if (!summary) throw new ApiError(404, 'not_found', 'no such page');
+  return summary;
+}
+
+/** A scope's venues and score fields with their counts (data for plugins A, `scope.scores`). Public, ETagged. */
+export const getPageScores = route(async (req, params) => {
+  const page = await mustFindScope(identifierParam(params));
+  const hideUntil = await venueStatsHideUntil();
+  const [summary, scores] = await Promise.all([scopeSummary(page.id), scopeScoreList(page.id, hideUntil)]);
+  return respondCached(req, S.PageScores, { page: summary, hideUntil, scores }, PUBLIC_MINUTE);
+});
+
+/** One field's statistics at one venue of a scope: sorted means, bins, the split by outcome. Public, ETagged. */
+export const getPageScoreField = route(async (req, params) => {
+  const page = await mustFindScope(identifierParam(params));
+  const venue = encodedParam(params, 'venue');
+  const field = encodedParam(params, 'field');
+  const [summary, detail] = await Promise.all([
+    scopeSummary(page.id),
+    scopeScoreField(page.id, venue, field, await venueStatsHideUntil()),
+  ]);
+  if (!detail) throw new ApiError(404, 'not_found', `no statistics of "${field}" at ${venue} here`);
+  return respondCached(req, S.PageScoreField, { ...detail, page: summary }, PUBLIC_MINUTE);
+});
+
+/** Chunks a stream reads at a time. */
+const PAPERS_CHUNK = 500;
+
+/**
+ * A scope's papers in bulk (data for plugins B, `scope.papers`), as NDJSON: one paper a line with its submissions,
+ * their statuses and every review's score vector. Public: the reviews are CC BY, and each carries its licence and
+ * source link. ETagged on the scope's last change, gzipped when the client takes it. With `limit`, one chunk, and the
+ * cursor for the next in `X-Next-Cursor`.
+ */
+export const getPagePapers = route(async (req, params) => {
+  const page = await mustFindScope(identifierParam(params));
+  const query = parseQuery(req, S.PagePapersQuery);
+  const fields = [...query.fields];
+  const changedAt = await scopeChangedAt(page.id);
+  const etag = etagOf(
+    JSON.stringify([page.id, changedAt?.toISOString() ?? null, fields, query.after ?? null, query.limit ?? null]),
+  );
+  const headers: Record<string, string> = {
+    ...PUBLIC_MINUTE,
+    ETag: etag,
+    Vary: 'Accept-Encoding',
+    Link: '<https://creativecommons.org/licenses/by/4.0/>; rel="license"',
+  };
+  if (notModified(req, etag)) return new Response(null, { status: 304, headers });
+
+  const encoder = new TextEncoder();
+  const lines = (rows: unknown[]) => encoder.encode(rows.map((row) => `${JSON.stringify(row)}\n`).join(''));
+  let body: ReadableStream<Uint8Array>;
+  if (query.limit !== undefined) {
+    const chunk = await scopePaperChunk(page.id, { after: query.after, limit: query.limit, fields });
+    if (chunk.next) headers['X-Next-Cursor'] = chunk.next;
+    const bytes = lines(chunk.rows);
+    body = new ReadableStream({
+      start(controller) {
+        controller.enqueue(bytes);
+        controller.close();
+      },
+    });
+  } else {
+    let after: string | null = query.after ?? null;
+    body = new ReadableStream({
+      async pull(controller) {
+        try {
+          const chunk = await scopePaperChunk(page.id, { after, limit: PAPERS_CHUNK, fields });
+          if (chunk.rows.length > 0) controller.enqueue(lines(chunk.rows));
+          after = chunk.next;
+          if (!after) controller.close();
+        } catch (err) {
+          console.error(err);
+          controller.error(err);
+        }
+      },
+    });
+  }
+  const gzip = /\bgzip\b/.test(req.headers.get('accept-encoding') ?? '');
+  if (gzip) {
+    body = body.pipeThrough(new CompressionStream('gzip') as unknown as TransformStream<Uint8Array, Uint8Array>);
+    headers['Content-Encoding'] = 'gzip';
+  }
+  return new Response(body, { status: 200, headers: { ...headers, 'Content-Type': 'application/x-ndjson' } });
 });

@@ -1,3 +1,4 @@
+import { createHash } from 'node:crypto';
 import { z } from 'zod';
 import { rateLimitHeaders } from '../ratelimit';
 import type { Principal } from '../auth';
@@ -79,6 +80,42 @@ export function respond<S extends z.ZodType>(
     status: init.status ?? 200,
     headers: { ...BASE_HEADERS, ...(rl ? rateLimitHeaders(rl) : {}), ...init.headers },
   });
+}
+
+/** A strong ETag for a body: its SHA-256, shortened. */
+export function etagOf(text: string): string {
+  return `"${createHash('sha256').update(text).digest('base64url').slice(0, 27)}"`;
+}
+
+/** Whether the request's `If-None-Match` names `etag` (or `*`). */
+export function notModified(req: Request, etag: string): boolean {
+  const header = req.headers.get('if-none-match');
+  if (!header) return false;
+  return header
+    .split(',')
+    .map((tag) => tag.trim().replace(/^W\//, ''))
+    .some((tag) => tag === '*' || tag === etag);
+}
+
+/**
+ * `respond`, for a public answer: with an ETag of its body, and a 304 without one when the request already has it.
+ */
+export function respondCached<S extends z.ZodType>(
+  req: Request,
+  schema: S,
+  body: z.input<S>,
+  headers: Record<string, string>,
+): Response {
+  const parsed = schema.safeParse(body);
+  if (!parsed.success) {
+    console.error('response failed its schema', zodDetails(parsed.error));
+    throw new ApiError(500, 'internal_error', 'response failed validation');
+  }
+  const text = JSON.stringify(parsed.data);
+  const etag = etagOf(text);
+  const all = { ...BASE_HEADERS, ...headers, ETag: etag };
+  if (notModified(req, etag)) return new Response(null, { status: 304, headers: all });
+  return new Response(text, { status: 200, headers: { ...all, 'Content-Type': 'application/json' } });
 }
 
 export async function parseBody<S extends z.ZodType>(req: Request, schema: S): Promise<z.output<S>> {

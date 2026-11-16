@@ -18,6 +18,7 @@ import { readPageLinks } from './page-links';
 import { mustPage, type PageRow } from './pages/kinds';
 import { readCommit, readFiles, readText, type Reader } from './pages/repo';
 import type { Writer } from './pages/projections';
+import { markPaperScopes, markScopes } from './scope-stats';
 
 /**
  * Membership of the pages above the paper (`handoffs/pages.md`): which papers a venue, topic or org has, kept by
@@ -124,11 +125,14 @@ export async function indexMembers(database: Database, pageId: string, head: str
   if (page.kind === 'paper') {
     const sources = await paperSources(database, page, files);
     await database.transaction(async (tx) => {
+      // The scopes it leaves and the scopes it joins: their statistics are due again (`scope-stats.ts`).
+      await markPaperScopes(tx, pageId);
       await tx.delete(pageMemberSources).where(eq(pageMemberSources.paperId, pageId));
       if (sources.length > 0) {
         await tx.insert(pageMemberSources).values(sources.map((s) => ({ paperId: pageId, ...s })));
       }
       await joinPaper(tx, pageId);
+      await markPaperScopes(tx, pageId);
     });
     return;
   }
@@ -143,6 +147,8 @@ export async function indexMembers(database: Database, pageId: string, head: str
   const names = [formatIdentifier({ kind: page.kind, key: page.key }), ...sourcesOf(page.kind, kindFile)];
   const parents = parentsOf(page.kind, page.key, kindFile);
   await database.transaction(async (tx) => {
+    // The scope and those above it, before and after: membership and roll-up may both move.
+    await markScopes(tx, sql`select ${pageId}::uuid`);
     await tx.delete(pageScopeNames).where(eq(pageScopeNames.pageId, pageId));
     await tx.insert(pageScopeNames).values([...new Set(names)].map((name) => ({ pageId, name })));
     await tx.delete(pageParents).where(eq(pageParents.pageId, pageId));
@@ -151,6 +157,7 @@ export async function indexMembers(database: Database, pageId: string, head: str
     // One writer at a time rebuilds the closure: the consumer runs once per lease, but a rebuild may overlap.
     await tx.execute(sql`select pg_advisory_xact_lock(hashtextextended('page-ancestors', 0))`);
     await closeAncestors(tx);
+    await markScopes(tx, sql`select ${pageId}::uuid`);
   });
 }
 

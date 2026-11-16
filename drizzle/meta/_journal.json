@@ -253,6 +253,13 @@
       "when": 1794861055128,
       "tag": "0035_venue_pages",
       "breakpoints": true
+    },
+    {
+      "idx": 36,
+      "version": "7",
+      "when": 1794864253067,
+      "tag": "0036_scope_stats",
+      "breakpoints": true
     }
   ]
 }

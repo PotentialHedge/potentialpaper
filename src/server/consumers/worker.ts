@@ -20,8 +20,18 @@ export interface WorkerOptions {
   pollMs?: number;
   signal?: AbortSignal;
   log?: (line: string) => void;
+  /**
+   * Work to do after every pass of the consumers, such as recomputing the scopes they marked (`scope-stats.ts`). Each
+   * may say how soon it wants to run again, which shortens the sleep.
+   */
+  tasks?: readonly WorkerTask[];
   /** Called after every pass, for tests. */
   onPass?: (reports: RunReport[]) => void;
+}
+
+export interface WorkerTask {
+  name: string;
+  run(database: Database): Promise<{ done: number; nextInMs: number | null }>;
 }
 
 /** A wake-up that can be waited for, and that remembers a ring that came while nobody was waiting. */
@@ -122,8 +132,18 @@ export async function runWorker(options: WorkerOptions): Promise<void> {
           log(`${consumer.name}: pass failed: ${err instanceof Error ? (err.stack ?? err.message) : String(err)}`);
         }
       }
+      let wait = pollMs;
+      for (const task of options.tasks ?? []) {
+        try {
+          const { done, nextInMs } = await task.run(database);
+          if (done > 0) log(`${task.name}: ${done} done`);
+          if (nextInMs !== null) wait = Math.min(wait, Math.max(250, nextInMs));
+        } catch (err) {
+          log(`${task.name}: failed: ${err instanceof Error ? (err.stack ?? err.message) : String(err)}`);
+        }
+      }
       options.onPass?.(reports);
-      await bell.wait(pollMs, signal);
+      await bell.wait(wait, signal);
     }
   } finally {
     await stopListening?.();

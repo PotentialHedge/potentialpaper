@@ -11,6 +11,7 @@ import {
   type ResolvedSettings,
   type SettingsProblem,
 } from '@/lib/settings';
+import type { HideUntil } from '@/lib/scope-stats';
 import { ApiError } from './api/errors';
 import { pluginSettingsOf } from './plugins/installed';
 
@@ -123,4 +124,10 @@ export async function saveSiteSettings(text: string): Promise<SettingsProblem[]>
     .onConflictDoUpdate({ target: siteSettings.id, set: { doc: text, updatedAt: sql`now()` } });
   siteCache = null;
   return problems;
+}
+
+/** The site's `plugins.venueStats.hideUntil`: whether score statistics wait for a venue's decisions. */
+export async function venueStatsHideUntil(): Promise<HideUntil> {
+  const values = resolveSettings({ site: parseSettings(await siteSettingsText()) }, []);
+  return values['plugins.venueStats.hideUntil'] === 'decisions' ? 'decisions' : 'never';
 }
