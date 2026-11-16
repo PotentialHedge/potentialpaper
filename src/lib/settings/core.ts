@@ -1,5 +1,5 @@
 import { z } from 'zod';
-import { PAGE_PANELS, PANEL_KINDS, panelIds, type PanelKind } from '../panels';
+import { PAGE_PANELS, PANEL_KINDS, panelIds, SLOT_TITLES, type PanelKind } from '../panels';
 
 /**
  * The site's own settings: one entry per key, with its schema, default and description. The settings form, the
@@ -25,7 +25,7 @@ export interface CoreSetting<T = unknown> {
   /** How the form draws a list of choices: `toggles` (a box each) or `order` (a list to arrange). */
   widget?: 'toggles' | 'order';
   /** The choices of a list setting, with their labels, for the form. */
-  choices?: { value: string; label: string }[];
+  choices?: { value: string; label: string; group?: string }[];
 }
 
 /** A list of a kind's panel ids, unique. Read leniently: ids that no longer exist are dropped. */
@@ -45,7 +45,7 @@ function panelList(
     description,
     group: `${kind[0].toUpperCase()}${kind.slice(1)} pages`,
     widget,
-    choices: PAGE_PANELS[kind].map((p) => ({ value: p.id, label: p.title })),
+    choices: PAGE_PANELS[kind].map((p) => ({ value: p.id, label: p.title, group: SLOT_TITLES[p.slot] ?? p.slot })),
     sanitize: (raw) => {
       if (!Array.isArray(raw)) return undefined;
       return [...new Set(raw.filter((id): id is string => typeof id === 'string' && ids.includes(id)))];

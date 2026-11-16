@@ -4,7 +4,9 @@ import Link from 'next/link';
 import { usePathname, useSearchParams } from 'next/navigation';
 import { Suspense, useEffect, useState } from 'react';
 import { authHref, VERIFY_EMAIL } from '@/lib/return-to';
+import { noteSignedIn } from '@/lib/settings/client';
 import { ConfirmBanner } from './ConfirmBanner';
+import { SettingsImport } from './SettingsImport';
 
 interface SeenViewer {
   handle: string;
@@ -32,7 +34,10 @@ export function NavUser() {
     fetch('/api/v1/viewer', { cache: 'no-store' })
       .then((res) => (res.ok ? res.json() : null))
       .then((body) => {
-        if (current) setViewer(body?.viewer ?? null);
+        if (!current) return;
+        setViewer(body?.viewer ?? null);
+        // Signing in or out changes whose settings.json applies.
+        noteSignedIn(!!body?.viewer);
       })
       .catch(() => {
         if (current) setViewer(null);
@@ -49,20 +54,25 @@ export function NavUser() {
           viewer.profileComplete ? (
             <>
               <Link href="/papers">my papers</Link>
+              <Link href="/settings">settings</Link>
               <Link href="/profile">@{viewer.handle}</Link>
             </>
           ) : (
             <Link href={authHref(VERIFY_EMAIL, pathname)}>finish your profile</Link>
           )
         ) : viewer === null ? (
-          <Suspense fallback={<Link href="/signin">sign in</Link>}>
-            <SignIn />
-          </Suspense>
+          <>
+            <Link href="/settings">settings</Link>
+            <Suspense fallback={<Link href="/signin">sign in</Link>}>
+              <SignIn />
+            </Suspense>
+          </>
         ) : null}
       </nav>
       {/* Out of the header's row, across the page. */}
       <div className="w-full empty:hidden">
         <ConfirmBanner signedIn={!!viewer} />
+        {viewer && <SettingsImport />}
       </div>
     </>
   );

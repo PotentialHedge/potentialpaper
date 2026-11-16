@@ -27,6 +27,13 @@ export const PAGE_PANELS = {
   ],
 } as const satisfies Record<string, readonly PanelInfo[]>;
 
+/** How the settings form names each slot. */
+export const SLOT_TITLES: Record<string, string> = {
+  'paper.main': 'Main column',
+  'paper.aside': 'Side column',
+  'paper.body': 'Below both',
+};
+
 export type PanelKind = keyof typeof PAGE_PANELS;
 export const PANEL_KINDS = Object.keys(PAGE_PANELS) as PanelKind[];
 

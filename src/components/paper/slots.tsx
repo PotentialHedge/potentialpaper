@@ -1,5 +1,7 @@
 import type { ComponentType } from 'react';
+import { ArrangedPanels } from '@/components/ArrangedPanels';
 import { ui } from '@/components/ui';
+import { PAGE_PANELS, type PanelId } from '@/lib/panels';
 import type { Paper } from '@/db/schema';
 import { paperPath, sourceLinks, sourceName, type PaperId } from '@/lib/paper-ids';
 import { Comments } from './Comments';
@@ -227,12 +229,26 @@ function Discussion({ canonical }: PanelProps) {
   return <Comments paper={canonical} path={paperPath(canonical)} />;
 }
 
-const PANELS: Record<PaperSlot, ComponentType<PanelProps>[]> = {
-  'paper.main': [Abstract, AuthorSection],
-  'paper.aside': [ReadThePaper, VersionsAside, SubmissionsAside],
-  'paper.body': [CommunitySection, Versions, Submissions, Discussion],
+/** Each built-in panel, by its id in `lib/panels.ts`, which also gives its slot and its default order. */
+const PANELS: Record<PanelId<'paper'>, ComponentType<PanelProps>> = {
+  abstract: Abstract,
+  author: AuthorSection,
+  read: ReadThePaper,
+  'versions-box': VersionsAside,
+  'submissions-box': SubmissionsAside,
+  community: CommunitySection,
+  versions: Versions,
+  submissions: Submissions,
+  discussion: Discussion,
 };
 
+/** A slot's panels, which the reader's settings may hide or reorder (`ArrangedPanels`). */
 export function Slot({ name, ...props }: PanelProps & { name: PaperSlot }) {
-  return PANELS[name].map((Panel, index) => <Panel key={index} {...props} />);
+  const panels = PAGE_PANELS.paper
+    .filter((p) => p.slot === name)
+    .map(({ id }) => {
+      const Panel = PANELS[id];
+      return { id, node: <Panel {...props} /> };
+    });
+  return <ArrangedPanels kind="paper" panels={panels} />;
 }
