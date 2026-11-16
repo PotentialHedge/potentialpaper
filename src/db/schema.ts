@@ -11,6 +11,7 @@ import {
   jsonb,
   pgTable,
   primaryKey,
+  smallint,
   text,
   timestamp,
   uniqueIndex,
@@ -939,4 +940,32 @@ export const paperFollows = pgTable(
     createdAt: createdAt(),
   },
   (t) => [primaryKey({ columns: [t.accountId, t.paperId] }), index('paper_follows_paper_idx').on(t.paperId)],
+);
+
+/**
+ * Each account's `settings.json` (`lib/settings/`, DESIGN.md §10): the user layer over the defaults and the site
+ * layer. The **text** is kept as written, JSONC with its comments and key order, and parsed when read; a value that
+ * doesn't fit its setting reads as the layer below. Holds only what differs from the layers below. Preferences
+ * only: anything the site merely remembers stays out of it. **Private.**
+ */
+export const userSettings = pgTable('user_settings', {
+  accountId: uuid('account_id')
+    .primaryKey()
+    .references(() => accounts.id, { onDelete: 'cascade' }),
+  doc: text('doc').notNull(),
+  updatedAt: timestamp('updated_at', { withTimezone: true, mode: 'date' }).notNull().defaultNow(),
+});
+
+/**
+ * The site layer of settings (`lib/settings/`): one row, `id = 1`, whose JSONC text sits between the defaults and
+ * every user's document. Admins edit it by script (`npm run settings:site`), so it changes without a deploy.
+ */
+export const siteSettings = pgTable(
+  'site_settings',
+  {
+    id: smallint('id').primaryKey().default(1),
+    doc: text('doc').notNull(),
+    updatedAt: timestamp('updated_at', { withTimezone: true, mode: 'date' }).notNull().defaultNow(),
+  },
+  (t) => [check('site_settings_one_row', sql`${t.id} = 1`)],
 );

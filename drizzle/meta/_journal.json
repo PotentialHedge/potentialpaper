@@ -218,6 +218,13 @@
       "when": 1794850865259,
       "tag": "0030_paper_follows",
       "breakpoints": true
+    },
+    {
+      "idx": 31,
+      "version": "7",
+      "when": 1794852562512,
+      "tag": "0031_settings",
+      "breakpoints": true
     }
   ]
 }
