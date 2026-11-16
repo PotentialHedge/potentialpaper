@@ -10,7 +10,8 @@ import {
   type SubmissionFile,
 } from '@/lib/review-files';
 import type { Consumer } from './consumers/types';
-import { readCommit, readFiles, readText } from './pages/repo';
+import { pageRepo } from './git/repo';
+import { readCommit, readFolder } from './pages/repo';
 
 /**
  * The review projection (DESIGN.md §4.9): the `reviews` outbox consumer, which brings a page's rows in
@@ -40,7 +41,6 @@ interface Folder {
 function reviewFolders(files: ReadonlyMap<string, string>): Map<string, Folder> {
   const folders = new Map<string, Folder>();
   for (const [path, blob] of files) {
-    if (!path.startsWith(`${REVIEWS_DIR}/`)) continue;
     const parsed = parseReviewPath(path);
     if (!parsed) continue;
     const dir = `${REVIEWS_DIR}/${parsed.source}/${parsed.submission}`;
@@ -94,26 +94,32 @@ async function changedAt(
 /** Brings `paperId`'s submissions, notes and their venues' forms up to commit `head`. */
 export async function projectReviews(database: Database, paperId: string, head: string): Promise<ProjectReport> {
   const commit = await readCommit(database, paperId, head);
-  const folders = reviewFolders(await readFiles(database, paperId, commit.tree));
+  const folders = reviewFolders(await readFolder(database, paperId, commit.tree, REVIEWS_DIR));
   const times = await changedAt(database, paperId, head, [...folders.keys()]);
   const fallback = commit.at;
+  // Every review file in one read.
+  const blobs = [...folders.values()].flatMap((f) =>
+    [f.submission, f.forms, ...f.notes].filter((b) => b !== undefined),
+  );
+  const bodies = blobs.length > 0 ? await pageRepo(database, paperId).read(blobs) : new Map();
+  const textOf = (blob: string | undefined) => (blob ? (bodies.get(blob)?.body.toString('utf8') ?? null) : null);
 
   const projected: Projected[] = [];
   for (const folder of folders.values()) {
     // The commit path checks every review file (`check.ts`), so a bad one here is from a schema this code no
     // longer reads; its folder is left out rather than stopping the consumer.
-    const text = await readText(database, paperId, folder.submission);
+    const text = textOf(folder.submission);
     if (text === null) continue;
     const submission = parseReviewFile('submission', text);
     if (!('file' in submission)) continue;
     let forms: FormsFile | null = null;
     if (folder.forms) {
-      const parsed = parseReviewFile('forms', (await readText(database, paperId, folder.forms)) ?? '');
+      const parsed = parseReviewFile('forms', textOf(folder.forms) ?? '');
       if ('file' in parsed) forms = parsed.file;
     }
     const notes: NoteFile[] = [];
     for (const blob of folder.notes) {
-      const parsed = parseReviewFile('note', (await readText(database, paperId, blob)) ?? '');
+      const parsed = parseReviewFile('note', textOf(blob) ?? '');
       if ('file' in parsed) notes.push(parsed.file);
     }
     projected.push({
