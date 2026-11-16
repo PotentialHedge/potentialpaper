@@ -12,7 +12,7 @@ import { htmlProblem } from './html';
  *
  *   .gitattributes                  the system's, always the same: which files are kept with Git LFS
  *   prek.toml                       the system's, always the same: checks to run before a commit
- *   .potentialpaper/metadata.json   the system's: identifiers, title, authors, abstract snapshot
+ *   .potentialpaper/metadata.json   the system's: the layout's version, identifiers, title, authors, abstract
  *   .potentialpaper/paper.pdf       the system's: the paper's PDF (Git LFS)
  *   .potentialpaper/pdf.json        the system's: where that PDF came from, and its license
  *   author/10-overview.md           the author section, a file per section (Markdown or HTML)
@@ -38,6 +38,45 @@ export const PAPER_PDF_PATH = `${SYSTEM_DIR}/paper.pdf`;
 /** Where `paper.pdf` came from and under what license, which the license requires us to say. */
 export const PDF_PATH = `${SYSTEM_DIR}/pdf.json`;
 const SYSTEM_PATHS = new Set([METADATA_PATH, PAPER_PDF_PATH, PDF_PATH]);
+
+/**
+ * The version of this layout, which `metadata.json` records as `"layout"`, so that after a breaking change
+ * we can tell which repos are laid out which way. Raise it with each change a repo has to be moved for,
+ * and have that move's plan (`layout-migration.ts`) record it.
+ *
+ *   1  the first layout: one `page.md` per part, `links.json`, `versions.jsonl`, the system's files at the
+ *      top. Its `metadata.json` has no `"layout"`.
+ *   2  files and folders: a file per section, link and version, the system's files in `.potentialpaper/`
+ *      (`planLayout`)
+ *   3  PDFs and pictures as Git LFS pointers, with `.gitattributes` (`planLfs`)
+ */
+export const LAYOUT_VERSION = 3;
+
+/** The layout a page's `metadata.json` says it has; `null` if it says none, as the first layout's doesn't. */
+export function layoutVersionOf(metadata: string | undefined): number | null {
+  try {
+    const value = JSON.parse(metadata ?? '') as unknown;
+    if (value === null || typeof value !== 'object' || Array.isArray(value)) return null;
+    const layout = (value as Record<string, unknown>).layout;
+    return typeof layout === 'number' && Number.isSafeInteger(layout) && layout > 0 ? layout : null;
+  } catch {
+    return null;
+  }
+}
+
+/** `metadata.json` saying it has layout `version`, first; or `null` if it isn't a JSON object to say it in. */
+export function withLayoutVersion(metadata: string, version: number): string | null {
+  let value: unknown;
+  try {
+    value = JSON.parse(metadata);
+  } catch {
+    return null;
+  }
+  if (value === null || typeof value !== 'object' || Array.isArray(value)) return null;
+  const { layout: _old, ...rest } = value as Record<string, unknown>;
+  void _old;
+  return `${JSON.stringify({ layout: version, ...rest }, null, 2)}\n`;
+}
 
 /**
  * Every page has this, and only this, so that `git lfs` keeps PDFs and pictures as pointers on a clone and
@@ -603,7 +642,15 @@ export function contentProblem(path: string, content: string): string | null {
   if (path.endsWith('.html') && (path.startsWith('author/') || path.startsWith('community/'))) {
     return htmlProblem(content);
   }
-  if (path.endsWith('.json')) return jsonProblem(content, path === METADATA_PATH);
+  if (path === METADATA_PATH) {
+    const problem = jsonProblem(content, true);
+    if (problem) return problem;
+    const { layout } = JSON.parse(content) as { layout?: unknown };
+    if (layout !== undefined && layoutVersionOf(content) === null)
+      return 'has a "layout" that is not a version (1, 2, …)';
+    return null;
+  }
+  if (path.endsWith('.json')) return jsonProblem(content, false);
   return null;
 }
 

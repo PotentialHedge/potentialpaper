@@ -187,7 +187,7 @@ big files. `src/server/pages/rules.ts` is the authority.
 
 ```
 .gitattributes                  system, always the same: which files are Git LFS
-.potentialpaper/metadata.json   system: identifiers, title, authors, abstract snapshot
+.potentialpaper/metadata.json   system: layout version, identifiers, title, authors, abstract snapshot
 .potentialpaper/paper.pdf       system: the paper's PDF (Git LFS)
 .potentialpaper/pdf.json        system: its source page, license and when it was fetched
 author/10-tl-dr.md              the author section, one file per section
@@ -211,6 +211,11 @@ They show in the order of their names, which is the order `ls` lists them in. A 
 `#` heading (or `<h1>`) its file starts with, and otherwise its slug. HTML is checked against an
 allowlist at commit (no scripts, styles, event handlers, ids or classes) and refused, not cleaned, so
 what is in the repo is what is shown. Links are numbered the same way.
+
+**The layout has a version**, `LAYOUT_VERSION` in `rules.ts`, which `metadata.json` records as
+`"layout"`: the first commit writes the current one, and each move to a new layout
+(`layout-migration.ts`) writes its own. A breaking change to the layout raises it, so that we can tell
+which repos are laid out which way. Repos from the first layout have no `"layout"`.
 
 **`.potentialpaper/`** is the one directory that may start with a dot, at the top and spelled exactly
 so, and `.gitattributes` at the top the one file; every other path rule stays. `.gitattributes` has fixed

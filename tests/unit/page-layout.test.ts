@@ -5,7 +5,9 @@ import { planLayout, planLfs } from '@/server/pages/layout-migration';
 import {
   contentProblem,
   GITATTRIBUTES,
+  LAYOUT_VERSION,
   layoutProblem,
+  layoutVersionOf,
   parseLfsPointer,
   normalizePath,
   pathDenied,
@@ -251,6 +253,7 @@ describe('moving a page to the layout', () => {
       'links/10-code.json',
       'versions/v_aaaaaaaa.json',
     ]);
+    expect(JSON.parse(written['.potentialpaper/metadata.json']!)).toEqual({ layout: 2 });
     expect(written['community/20-summary.md']).toBe('# Summary\nIt works.\n\n## Detail\nMore.\n');
     expect(written['community/30-critique.md']).toBe('# Critique\n```\n## code\n```\n');
     expect(
@@ -316,6 +319,8 @@ describe('the move to Git LFS', () => {
       else after.set(change.path, change.content);
     }
     expect(after.get('.gitattributes')).toBe(GITATTRIBUTES);
+    expect(after.get('.potentialpaper/metadata.json')).toBe('{\n  "layout": 3\n}\n');
+    expect(layoutVersionOf(after.get('.potentialpaper/metadata.json'))).toBe(LAYOUT_VERSION);
     expect(parseLfsPointer(after.get('.potentialpaper/paper.pdf')!)).toEqual({ sha256: sha('a'), bytes: 1000 });
     expect(JSON.parse(after.get('.potentialpaper/pdf.json')!)).toEqual({
       source: 'https://openreview.net/forum?id=x',
