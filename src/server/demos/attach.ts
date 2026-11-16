@@ -43,7 +43,7 @@ export async function demoSources(db: Reader, ids: readonly string[]): Promise<M
 }
 
 /** The snapshots the page's GitHub addresses are pinned to, by address. */
-async function pinnedSources(db: Reader, paperId: string, urls: readonly string[]): Promise<Map<string, DemoSource>> {
+async function pinnedSources(db: Reader, pageId: string, urls: readonly string[]): Promise<Map<string, DemoSource>> {
   if (urls.length === 0) return new Map();
   const rows = await db
     .select({
@@ -55,7 +55,7 @@ async function pinnedSources(db: Reader, paperId: string, urls: readonly string[
     })
     .from(demoPins)
     .innerJoin(demoSnapshots, eq(demoSnapshots.id, demoPins.snapshotId))
-    .where(and(eq(demoPins.paperId, paperId), inArray(demoPins.url, [...urls])));
+    .where(and(eq(demoPins.pageId, pageId), inArray(demoPins.url, [...urls])));
   return new Map(rows.map(({ url, ...source }) => [url, source]));
 }
 
@@ -65,7 +65,7 @@ async function pinnedSources(db: Reader, paperId: string, urls: readonly string[
  */
 export async function pageDemoSources(
   tx: Writer,
-  paperId: string,
+  pageId: string,
   commit: string,
   files: ReadonlyMap<string, string>,
   refs: readonly DemoRef[],
@@ -76,7 +76,7 @@ export async function pageDemoSources(
   );
   const pinned = await pinnedSources(
     tx,
-    paperId,
+    pageId,
     refs.flatMap((ref) => (ref.kind === 'github' ? [ref.url] : [])),
   );
   for (const [url, source] of pinned) found.set(url, source);
@@ -84,7 +84,7 @@ export async function pageDemoSources(
   for (const ref of refs) {
     const folder = ref.kind === 'repo' ? folders.get(ref.name) : undefined;
     if (ref.kind !== 'repo' || !folder) continue;
-    const source = await pageDemoSnapshot(tx, paperId, commit, ref.name, folder);
+    const source = await pageDemoSnapshot(tx, pageId, commit, ref.name, folder);
     if (source) found.set(demoRefKey(ref), source);
   }
   return found;
@@ -117,7 +117,7 @@ function githubUrls(refs: readonly DemoRef[]): string[] {
  */
 export async function newDemoUrls(
   database: Reader,
-  paperId: string,
+  pageId: string,
   changes: readonly { path: string; content: string | null }[],
 ): Promise<string[]> {
   const urls = new Set(
@@ -126,12 +126,12 @@ export async function newDemoUrls(
     ),
   );
   if (urls.size === 0) return [];
-  const head = await readHead(database, paperId);
+  const head = await readHead(database, pageId);
   if (head) {
-    const files = await readFiles(database, paperId, (await readCommit(database, paperId, head)).tree);
+    const files = await readFiles(database, pageId, (await readCommit(database, pageId, head)).tree);
     for (const [path, blob] of files) {
       if (!isMarkdownSection(path)) continue;
-      for (const url of githubUrls(demoRefs(await readText(database, paperId, blob)))) urls.delete(url);
+      for (const url of githubUrls(demoRefs(await readText(database, pageId, blob)))) urls.delete(url);
     }
   }
   if (urls.size > MAX_NEW_DEMO_URLS) throw tooManyDemoUrls();
@@ -166,7 +166,7 @@ export interface DemoPin {
 }
 
 export interface DemoCheck {
-  paperId: string;
+  pageId: string;
   roles: Roles;
   /** The paths the commit writes or deletes. */
   changed: readonly string[];
@@ -246,7 +246,7 @@ export async function checkDemos(tx: Reader, check: DemoCheck): Promise<string[]
     const { roles, migration } = check;
     for (const path of changed) {
       const demo = demoPath(path);
-      if (demo && authorFolders.has(demo.name) && !(roles.confirmedAuthor || roles.admin || migration)) {
+      if (demo && authorFolders.has(demo.name) && !(roles.owner || roles.admin || migration)) {
         throw new ApiError(
           403,
           'forbidden',
@@ -274,7 +274,7 @@ export async function checkDemos(tx: Reader, check: DemoCheck): Promise<string[]
     if (count > MAX_DEMOS_FILES) {
       throw new ApiError(422, 'validation_error', `a page's demos can have at most ${MAX_DEMOS_FILES} files`);
     }
-    for (const size of (await pageRepo(tx, check.paperId).sizes(stored)).values()) bytes += size;
+    for (const size of (await pageRepo(tx, check.pageId).sizes(stored)).values()) bytes += size;
     if (bytes > MAX_DEMOS_BYTES) {
       throw new ApiError(
         422,
@@ -301,13 +301,13 @@ export function pinsFor(added: readonly string[], snapshots: ReadonlyMap<string,
 }
 
 /** Pins each new address to its snapshot, for as long as it stays on the page. Added again, it is copied again. */
-export async function pinDemos(tx: Writer, paperId: string, commit: string, pins: readonly DemoPin[]): Promise<void> {
+export async function pinDemos(tx: Writer, pageId: string, commit: string, pins: readonly DemoPin[]): Promise<void> {
   for (const { url, snapshotId } of pins) {
     await tx
       .insert(demoPins)
-      .values({ paperId, url, snapshotId, commit: toBytes(commit) })
+      .values({ pageId, url, snapshotId, commit: toBytes(commit) })
       .onConflictDoUpdate({
-        target: [demoPins.paperId, demoPins.url],
+        target: [demoPins.pageId, demoPins.url],
         set: { snapshotId, commit: toBytes(commit), createdAt: sql`clock_timestamp()` },
       });
   }

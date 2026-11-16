@@ -107,7 +107,7 @@ async function newAccount(fields: Partial<typeof accounts.$inferInsert> = {}): P
 async function exportRepo(paperId: string): Promise<string> {
   const repo = workDir();
   git(['init', '-q', '--bare', '--initial-branch=main', repo]);
-  const objects = await getDb().select().from(pageObjects).where(eq(pageObjects.paperId, paperId));
+  const objects = await getDb().select().from(pageObjects).where(eq(pageObjects.pageId, paperId));
   for (const { oid, type, body } of objects) {
     const hex = oid.toString('hex');
     const file = join(repo, 'objects', hex.slice(0, 2), hex.slice(2));
@@ -138,8 +138,8 @@ function filesAt(repo: string, ref = 'main'): Map<string, string> {
 async function projections() {
   const db = getDb();
   return {
-    revisions: await db.select().from(pageRevisions).orderBy(asc(pageRevisions.paperId), asc(pageRevisions.seq)),
-    current: await db.select().from(pageCurrent).orderBy(asc(pageCurrent.paperId)),
+    revisions: await db.select().from(pageRevisions).orderBy(asc(pageRevisions.pageId), asc(pageRevisions.seq)),
+    current: await db.select().from(pageCurrent).orderBy(asc(pageCurrent.pageId)),
   };
 }
 
@@ -374,10 +374,10 @@ describe('concurrent commits', () => {
     expect(final).not.toContain('line ');
 
     const db = getDb();
-    const revisions = await db.select().from(pageRevisions).where(eq(pageRevisions.paperId, paperId));
+    const revisions = await db.select().from(pageRevisions).where(eq(pageRevisions.pageId, paperId));
     expect(revisions).toHaveLength(51);
-    expect(await db.select().from(pageEvents).where(eq(pageEvents.paperId, paperId))).toHaveLength(51);
-    const [current] = await db.select().from(pageCurrent).where(eq(pageCurrent.paperId, paperId));
+    expect(await db.select().from(pageEvents).where(eq(pageEvents.pageId, paperId))).toHaveLength(51);
+    const [current] = await db.select().from(pageCurrent).where(eq(pageCurrent.pageId, paperId));
     expect(current.communityMarkdown).toContain(`### Summary\n\n${final}`);
     expect(current.head.toString('hex')).toBe(await readHead(db, paperId));
   }, 60_000);
@@ -497,12 +497,12 @@ describe('rebuilding the projections', () => {
     expect(await db.select().from(pageEvents).orderBy(asc(pageEvents.id))).toEqual(events);
 
     // Running it over rows that are there changes nothing, and rows of a page with no repo go.
-    await db.delete(pageRefs).where(eq(pageRefs.paperId, p3));
-    await db.delete(pageObjects).where(eq(pageObjects.paperId, p3));
+    await db.delete(pageRefs).where(eq(pageRefs.pageId, p3));
+    await db.delete(pageObjects).where(eq(pageObjects.pageId, p3));
     await rebuildAllPages();
     const after = await projections();
-    expect(after.current.map((c) => c.paperId).sort()).toEqual([p1, p2].sort());
-    expect(after.revisions).toEqual(before.revisions.filter((r) => r.paperId !== p3));
+    expect(after.current.map((c) => c.pageId).sort()).toEqual([p1, p2].sort());
+    expect(after.revisions).toEqual(before.revisions.filter((r) => r.pageId !== p3));
   });
 
   it('keeps a deleted account deleted', async () => {
@@ -511,10 +511,10 @@ describe('rebuilding the projections', () => {
     await commitPage(paperId, null, person, [{ path: 'community/10-summary.md', content: 'x\n' }], 'Edit');
     const before = await pageHistory(paperId);
     await getDb().delete(accounts).where(eq(accounts.id, person.accountId));
-    const [row] = await getDb().select().from(pageRevisions).where(eq(pageRevisions.paperId, paperId));
+    const [row] = await getDb().select().from(pageRevisions).where(eq(pageRevisions.pageId, paperId));
     expect(row.accountId).toBeNull();
     await rebuildAllPages();
-    const [rebuilt] = await getDb().select().from(pageRevisions).where(eq(pageRevisions.paperId, paperId));
+    const [rebuilt] = await getDb().select().from(pageRevisions).where(eq(pageRevisions.pageId, paperId));
     expect(rebuilt).toEqual(row);
     expect(await pageHistory(paperId)).toEqual(before);
   });
@@ -701,7 +701,7 @@ describe('commitPage', () => {
       'Ours',
     );
     expect(merged).toMatchObject({ status: 'committed', merged: true });
-    const [current] = await getDb().select().from(pageCurrent).where(eq(pageCurrent.paperId, paperId));
+    const [current] = await getDb().select().from(pageCurrent).where(eq(pageCurrent.pageId, paperId));
     // Joined for agents, under a heading from the file's name.
     expect(current.communityMarkdown).toBe('### Summary\n\nA2\n\nB\n\nC3\n');
 
@@ -758,8 +758,8 @@ describe('commitPage', () => {
       .where(eq(commitIdentities.accountId, person.accountId));
     expect(identity.id).toMatch(/^u_[a-z2-9]{8}$/);
 
-    const objects = await getDb().select().from(pageObjects).where(eq(pageObjects.paperId, paperId));
-    const events = await getDb().select().from(pageEvents).where(eq(pageEvents.paperId, paperId));
+    const objects = await getDb().select().from(pageObjects).where(eq(pageObjects.pageId, paperId));
+    const events = await getDb().select().from(pageEvents).where(eq(pageEvents.pageId, paperId));
     const history = await pageHistory(paperId);
     const everything = [
       ...objects.map((o) => o.body.toString('latin1')),
@@ -1243,9 +1243,9 @@ describe('the PDF', () => {
     const id = await paper();
     await commitPage(id, null, SYSTEM_ACTOR, change(POINTER), 'Add the PDF');
     await rebuildAllPages();
-    const [current] = await getDb().select().from(pageCurrent).where(eq(pageCurrent.paperId, id));
+    const [current] = await getDb().select().from(pageCurrent).where(eq(pageCurrent.pageId, id));
     expect(current.pdf).toEqual(POINTER);
-    const [revision] = await getDb().select().from(pageRevisions).where(eq(pageRevisions.paperId, id));
+    const [revision] = await getDb().select().from(pageRevisions).where(eq(pageRevisions.pageId, id));
     expect(revision.paths.toSorted()).toEqual(
       ['.gitattributes', '.potentialpaper/metadata.json', PAPER_PDF_PATH, PDF_PATH, ...STARTER_PATHS].toSorted(),
     );
@@ -1332,7 +1332,7 @@ describe('the picture', () => {
       rateLimit: NO_LIMIT,
     });
     await rebuildAllPages();
-    const [current] = await getDb().select().from(pageCurrent).where(eq(pageCurrent.paperId, id));
+    const [current] = await getDb().select().from(pageCurrent).where(eq(pageCurrent.pageId, id));
     expect(current.thumbnail).toEqual(THUMBNAIL);
     const [paper] = await getDb().select().from(papers).where(eq(papers.id, id));
     const { hits } = await searchPapers({ q: paper.title.split(' ')[0] });

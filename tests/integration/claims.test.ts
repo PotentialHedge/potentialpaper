@@ -70,7 +70,7 @@ describe('claiming a paper', () => {
 
     const written = await authorEdit(ashish.cookie, '# TL;DR\nAttention.\n');
     expect(written.status).toBe(200);
-    const [current] = await getDb().select().from(pageCurrent).where(eq(pageCurrent.paperId, paperId));
+    const [current] = await getDb().select().from(pageCurrent).where(eq(pageCurrent.pageId, paperId));
     expect(current.authorHtml).toContain('Attention.');
 
     // Everything they do on their own paper is under the per-claim id, never their handle.
@@ -83,7 +83,7 @@ describe('claiming a paper', () => {
       expect(entry).toMatchObject({ authorId: row.identityId, authorName: 'Ashish Vaswani', handle: null });
     }
     // Nothing in the repo, which anyone can clone, carries the account's own u_ id.
-    const objects = await getDb().select().from(pageObjects).where(eq(pageObjects.paperId, paperId));
+    const objects = await getDb().select().from(pageObjects).where(eq(pageObjects.pageId, paperId));
     const repo = objects.map((o) => o.body.toString('latin1')).join('\n');
     const [identity] = await getDb()
       .select({ id: commitIdentities.id })
@@ -221,7 +221,7 @@ describe("a paper's picture and links", () => {
 
     const picture = await setThumbnail(paperId, actor, { image: PNG, alt: 'One pixel' });
     expect(picture.status).toBe('committed');
-    const [current] = await getDb().select().from(pageCurrent).where(eq(pageCurrent.paperId, paperId));
+    const [current] = await getDb().select().from(pageCurrent).where(eq(pageCurrent.pageId, paperId));
     expect(current.links).toEqual([
       { label: 'Code', url: 'https://github.com/tensorflow/tensor2tensor' },
       { label: 'PDF', url: 'https://example.org/attention.pdf' },
@@ -229,7 +229,7 @@ describe("a paper's picture and links", () => {
     expect(current.thumbnail).toMatchObject({ type: 'image/png', alt: 'One pixel', url: /^\/thumbnails\// });
     // New words keep the image.
     await setThumbnail(paperId, actor, { caption: 'A pixel.' });
-    const [worded] = await getDb().select().from(pageCurrent).where(eq(pageCurrent.paperId, paperId));
+    const [worded] = await getDb().select().from(pageCurrent).where(eq(pageCurrent.pageId, paperId));
     expect(worded.thumbnail).toMatchObject({ sha256: current.thumbnail!.sha256, caption: 'A pixel.' });
 
     await api('POST', '/claims', { cookie: ashish.cookie, body: { paper: PAPER, authorIndex: 0 } });

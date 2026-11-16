@@ -225,6 +225,13 @@
       "when": 1794852562512,
       "tag": "0031_settings",
       "breakpoints": true
+    },
+    {
+      "idx": 32,
+      "version": "7",
+      "when": 1794854374774,
+      "tag": "0032_pages",
+      "breakpoints": true
     }
   ]
 }

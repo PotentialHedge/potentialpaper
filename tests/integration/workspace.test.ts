@@ -44,7 +44,7 @@ async function fileAtHead(paperId: string, path: string): Promise<string | undef
 }
 
 async function current(paperId: string) {
-  const [row] = await getDb().select().from(pageCurrent).where(eq(pageCurrent.paperId, paperId));
+  const [row] = await getDb().select().from(pageCurrent).where(eq(pageCurrent.pageId, paperId));
   return row;
 }
 

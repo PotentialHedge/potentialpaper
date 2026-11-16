@@ -136,7 +136,7 @@ export async function postComment(
         parentId,
         body,
         anonymous,
-        head: sql`(select head from page_refs where paper_id = ${input.paperId}::uuid)`,
+        head: sql`(select head from page_refs where page_id = ${input.paperId}::uuid)`,
       })
       .returning({ id: comments.id });
     const recipients = [...new Set(mentioned.values())].filter((id) => id !== accountId);
@@ -238,8 +238,8 @@ const commentColumns = {
   replyCount: sql<number>`(select count(*)::int from comments r where r.parent_id = ${comments.id})`,
   head: comments.head,
   // Commits on the page after the one the comment was written against, by page_revisions' primary key.
-  editsSince: sql<number>`(select count(*)::int from page_revisions pr where pr.paper_id = ${comments.paperId}
-    and pr.seq > coalesce((select h.seq from page_revisions h where h.paper_id = ${comments.paperId}
+  editsSince: sql<number>`(select count(*)::int from page_revisions pr where pr.page_id = ${comments.paperId}
+    and pr.seq > coalesce((select h.seq from page_revisions h where h.page_id = ${comments.paperId}
       and h.oid = ${comments.head}), 0))`,
 };
 

@@ -45,7 +45,7 @@ const NOTE: NoteFile = {
   license: 'CC-BY-4.0',
 };
 
-const roles = { system: false, admin: false, verified: true, confirmedAuthor: false, claimed: false };
+const roles = { system: false, admin: false, verified: true, owner: false, claimed: false };
 
 describe('review paths', () => {
   it('knows the three files of a submission folder', () => {
@@ -82,7 +82,7 @@ describe('review paths', () => {
     expect(pathDenied(path, bot)).toBeNull();
     expect(pathDenied('reviews/jmlr/x/submission.json', bot)).toMatch(/reviews\/jmlr\//);
     expect(pathDenied(path, roles)).toMatch(/only the bot granted reviews\/openreview\//);
-    expect(pathDenied(path, { ...roles, confirmedAuthor: true, claimed: true })).not.toBeNull();
+    expect(pathDenied(path, { ...roles, owner: true, claimed: true })).not.toBeNull();
     expect(pathDenied(path, { ...roles, system: true, verified: false })).not.toBeNull();
     expect(pathDenied(path, { ...roles, admin: true })).toBeNull();
     // A grant is no wider than its folder.

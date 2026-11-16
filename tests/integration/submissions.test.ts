@@ -81,7 +81,7 @@ async function revisions(paper: string) {
   return getDb()
     .select({ summary: pageRevisions.summary, paths: pageRevisions.paths })
     .from(pageRevisions)
-    .where(eq(pageRevisions.paperId, paper))
+    .where(eq(pageRevisions.pageId, paper))
     .orderBy(pageRevisions.seq);
 }
 
@@ -180,7 +180,7 @@ describe('importing reviews', () => {
   it('says when a submission last changed, not when the page did', async () => {
     await importReviews(VENUE, [submission('forum1', [review('a', 3)])], OPTIONS);
     const paper = await paperId('forum1');
-    await getDb().execute(sql`update page_revisions set at = '2026-11-01T00:00:00Z' where paper_id = ${paper}`);
+    await getDb().execute(sql`update page_revisions set at = '2026-11-01T00:00:00Z' where page_id = ${paper}`);
     await project();
     const [found] = await submissionsOf(paper);
     expect(found.fetchedAt).toEqual(new Date('2026-11-01T00:00:00Z'));

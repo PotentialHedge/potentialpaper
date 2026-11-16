@@ -39,7 +39,7 @@ async function main() {
   const [current] = await getDb()
     .select({ pdf: pageCurrent.pdf })
     .from(pageCurrent)
-    .where(eq(pageCurrent.paperId, paperId));
+    .where(eq(pageCurrent.pageId, paperId));
   const known = new Map<string, VersionPdf>();
   if (current?.pdf) known.set(current.pdf.source, current.pdf);
   const lookup = await lookUpVersions({

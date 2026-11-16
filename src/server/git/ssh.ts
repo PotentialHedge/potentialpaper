@@ -328,7 +328,7 @@ async function serve(
   // exit status, so the client's ssh exits 255 and git reports the fetch as failed.
   const reader = new PktReader(channel.iterator({ destroyOnReturn: false }));
   if (service === 'git-upload-pack') {
-    output = uploadPackSession(pageRepo(ctx.database, repo.paperId), reader, protocolVersion(gitProtocol));
+    output = uploadPackSession(pageRepo(ctx.database, repo.pageId), reader, protocolVersion(gitProtocol));
   } else {
     // As `authenticateGitPush`: a person needs a confirmed address; a bot account is let through.
     if (!account.isBot && !account.verifiedAt) {

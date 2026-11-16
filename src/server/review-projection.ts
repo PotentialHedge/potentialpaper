@@ -82,9 +82,9 @@ async function changedAt(
   const { rows } = await database.execute<{ dir: string; at: Date | string }>(sql`
     select d.dir, max(r.at) as at
       from unnest(${sql.param(dirs)}::text[]) as d(dir)
-      join page_revisions r on r.paper_id = ${paperId}
+      join page_revisions r on r.page_id = ${paperId}
        and r.seq <= coalesce((select seq from page_revisions
-                               where paper_id = ${paperId} and oid = decode(${head}, 'hex')), 2147483647)
+                               where page_id = ${paperId} and oid = decode(${head}, 'hex')), 2147483647)
        and exists (select 1 from unnest(r.paths) as p(path) where starts_with(p.path, d.dir || '/'))
      group by d.dir
   `);
@@ -213,6 +213,8 @@ export async function projectReviews(database: Database, paperId: string, head: 
 
 export const reviewsConsumer: Consumer = {
   name: 'reviews',
+  // Submissions and their reviews are a paper's files.
+  kinds: ['paper'],
   async handle(paperId, head, { database }) {
     await projectReviews(database, paperId, head);
   },

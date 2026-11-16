@@ -89,7 +89,7 @@ function scopesOf(set: ReadonlySet<SearchScope>): Scopes {
 
 /** Papers with a file in scope whose words match `q`, through the GIN index on `search_docs.tsv`. */
 function inFiles(q: SQL, scopes: Scopes): SQL {
-  return sql`p.id in (select d.paper_id from search_docs d where d.scope = any(${sql.param(scopes.files)}::text[]) and d.tsv @@ ${q})`;
+  return sql`p.id in (select d.page_id from search_docs d where d.scope = any(${sql.param(scopes.files)}::text[]) and d.tsv @@ ${q})`;
 }
 
 /** Papers whose title and abstract, or files in scope, match `q`; `title` also lets a misspelled title in. */
@@ -173,17 +173,17 @@ function hasPlainWords(node: SearchNode | null): boolean {
 }
 
 /**
- * The best rank among each paper's matching files, as `fr(paper_id, rank)`, when files are searched by relevance.
+ * The best rank among each paper's matching files, as `fr(page_id, rank)`, when files are searched by relevance.
  * One pass over the matching documents, grouped, rather than a lookup per matching paper.
  */
 function fileRanks(sort: SearchSort, node: SearchNode | null, scopes: Scopes): SQL {
   const wanted = sort === 'relevance' && scopes.files.length > 0 ? wantedWords(node) : null;
   if (wanted === null) return sql``;
   return sql`left join (
-    select d.paper_id, max(ts_rank_cd(d.tsv, ${wanted})) as rank from search_docs d
+    select d.page_id, max(ts_rank_cd(d.tsv, ${wanted})) as rank from search_docs d
     where d.scope = any(${sql.param(scopes.files)}::text[]) and d.tsv @@ ${wanted}
-    group by d.paper_id
-  ) fr on fr.paper_id = p.id`;
+    group by d.page_id
+  ) fr on fr.page_id = p.id`;
 }
 
 /**
@@ -264,14 +264,14 @@ async function readPage(
              c.pdf ->> 'url' as pdf, coalesce(c.thumbnail ->> 'url', pd.cover_url) as cover
       from unnest(array(
         select p.id from papers p
-        left join page_current c on c.paper_id = p.id
+        left join page_current c on c.page_id = p.id
         ${fileRanks(sort, node, scopes)}
         where ${where}
         order by ${order}
         limit ${limit} offset ${(page - 1) * limit}
       )) with ordinality as shown(id, position)
       join papers p on p.id = shown.id
-      left join page_current c on c.paper_id = p.id
+      left join page_current c on c.page_id = p.id
       left join pdf_documents pd on pd.sha256 = c.pdf ->> 'sha256'
       cross join lateral (
         select scheme, value from paper_identifiers
@@ -315,19 +315,19 @@ async function withMatches(
     snippet: string;
     total: number;
   }>(sql`
-    select paper_id, path, kind, total::int,
+    select page_id as paper_id, path, kind, total::int,
            coalesce(fields ->> 'title', fields ->> 'label', fields ->> 'signature') as label,
            ts_headline('english', text, ${wanted}, ${HEADLINE}) as snippet
     from (
-      select d.*, row_number() over w as place, count(*) over (partition by d.paper_id) as total
+      select d.*, row_number() over w as place, count(*) over (partition by d.page_id) as total
       from search_docs d
-      where d.paper_id = any(${sql.param(found.map((hit) => hit.id))}::uuid[])
+      where d.page_id = any(${sql.param(found.map((hit) => hit.id))}::uuid[])
         and d.scope = any(${sql.param(scopes.files)}::text[])
         and d.tsv @@ ${wanted}
-      window w as (partition by d.paper_id order by ts_rank_cd(d.tsv, ${wanted}) desc, d.path, d.n)
+      window w as (partition by d.page_id order by ts_rank_cd(d.tsv, ${wanted}) desc, d.path, d.n)
     ) ranked
     where place <= ${MATCHES_PER_HIT}
-    order by paper_id, place
+    order by page_id, place
   `);
   const byPaper = new Map<string, { matches: SearchMatch[]; total: number }>();
   for (const row of rows) {

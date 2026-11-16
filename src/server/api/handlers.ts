@@ -351,7 +351,7 @@ export const postVersionsLookup = route(async (req) => {
   }
   const [{ versions: existing }, [current]] = await Promise.all([
     versionsAt(paper.id),
-    getDb().select({ pdf: pageCurrent.pdf }).from(pageCurrent).where(eq(pageCurrent.paperId, paper.id)),
+    getDb().select({ pdf: pageCurrent.pdf }).from(pageCurrent).where(eq(pageCurrent.pageId, paper.id)),
   ]);
   const known = new Map<string, VersionPdf>();
   if (current?.pdf) known.set(current.pdf.source, current.pdf);

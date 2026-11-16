@@ -18,6 +18,7 @@ import {
   uuid,
 } from 'drizzle-orm/pg-core';
 import { AGENT_POST_KINDS } from '../lib/agent-posts';
+import { PAGE_KINDS } from '../lib/kinds';
 import { NOTE_KINDS, SUBMISSION_STATUSES, type FieldValue, type VenueForms } from '../lib/submissions';
 import type { TitleLink } from '../lib/paper-links';
 import type { PaperVersion } from '../lib/versions';
@@ -88,13 +89,15 @@ export const botGrants = pgTable(
     accountId: uuid('account_id')
       .notNull()
       .references(() => accounts.id, { onDelete: 'cascade' }),
+    /** The kind of page the pattern applies to (`lib/kinds.ts`): `reviews/openreview/**` on papers, `venue.json` on venues. */
+    kind: text('kind', { enum: PAGE_KINDS }).notNull().default('paper'),
     pattern: text('pattern').notNull(),
     shown: boolean('shown').notNull().default(true),
     /** Who granted it: an admin's handle, or `system`. */
     grantedBy: text('granted_by').notNull(),
     createdAt: createdAt(),
   },
-  (t) => [primaryKey({ columns: [t.accountId, t.pattern] })],
+  (t) => [primaryKey({ columns: [t.accountId, t.kind, t.pattern] })],
 );
 
 /** The institutional addresses an account is verified through; written only by `server/affiliations.ts`. */
@@ -236,6 +239,31 @@ export const commitIdentities = pgTable(
 );
 
 /**
+ * Every page of every kind (`lib/kinds.ts`): a paper, a venue, a topic, an organisation or a person. A page is a
+ * repo (DESIGN.md §4), and every table of the page store is keyed by its id first (`page_objects`, `page_refs`,
+ * …, §4.11). **A paper's page id is its paper id**, and its row is made with the paper by a trigger
+ * (`papers_page_insert`, migration `0032`), so that it holds whatever wrote the paper; deleting the paper deletes
+ * it, and with it the repo. Other kinds' pages are made by `server/pages/kinds.ts`'s `createPage`. `key` is what
+ * the kind's address names (`iclr/2027`, a topic's slug, a handle); a paper's is its id, as its addresses are
+ * `paper_identifiers`.
+ */
+export const pages = pgTable(
+  'pages',
+  {
+    id: uuid('id').primaryKey().defaultRandom(),
+    kind: text('kind', { enum: PAGE_KINDS }).notNull(),
+    key: text('key').notNull(),
+    createdAt: createdAt(),
+  },
+  (t) => [
+    uniqueIndex('pages_kind_key').on(t.kind, t.key),
+    check('pages_kind_check', sql.raw(`kind in (${PAGE_KINDS.map((kind) => `'${kind}'`).join(', ')})`)),
+  ],
+);
+
+export type Page = typeof pages.$inferSelect;
+
+/**
  * A page's git repository: real blobs, trees and commits as rows (DESIGN.md §4.1). `oid` is the SHA-1 git
  * would compute, and `body` the object without git's `<type> <size>\0` header. Read and written only
  * through `GitRepo` (`server/git/repo.ts`).
@@ -243,24 +271,24 @@ export const commitIdentities = pgTable(
 export const pageObjects = pgTable(
   'page_objects',
   {
-    paperId: uuid('paper_id')
+    pageId: uuid('page_id')
       .notNull()
-      .references(() => papers.id, { onDelete: 'cascade' }),
+      .references(() => pages.id, { onDelete: 'cascade' }),
     oid: bytea('oid').notNull(),
     type: text('type', { enum: ['blob', 'tree', 'commit'] }).notNull(),
     body: bytea('body').notNull(),
   },
   (t) => [
-    primaryKey({ columns: [t.paperId, t.oid] }),
+    primaryKey({ columns: [t.pageId, t.oid] }),
     check('page_objects_type_check', sql`${t.type} in ('blob', 'tree', 'commit')`),
   ],
 );
 
 /** The only mutable part of a repo: `refs/heads/main`. A paper nobody has edited has no row (§4.2). */
 export const pageRefs = pgTable('page_refs', {
-  paperId: uuid('paper_id')
+  pageId: uuid('page_id')
     .primaryKey()
-    .references(() => papers.id, { onDelete: 'cascade' }),
+    .references(() => pages.id, { onDelete: 'cascade' }),
   head: bytea('head').notNull(),
 });
 
@@ -272,9 +300,9 @@ export const pageRefs = pgTable('page_refs', {
 export const pageRevisions = pgTable(
   'page_revisions',
   {
-    paperId: uuid('paper_id')
+    pageId: uuid('page_id')
       .notNull()
-      .references(() => papers.id, { onDelete: 'cascade' }),
+      .references(() => pages.id, { onDelete: 'cascade' }),
     seq: integer('seq').notNull(),
     oid: bytea('oid').notNull(),
     authorId: text('author_id').notNull(),
@@ -291,8 +319,8 @@ export const pageRevisions = pgTable(
     at: timestamp('at', { withTimezone: true, mode: 'date' }).notNull(),
   },
   (t) => [
-    primaryKey({ columns: [t.paperId, t.seq] }),
-    uniqueIndex('page_revisions_oid_key').on(t.paperId, t.oid),
+    primaryKey({ columns: [t.pageId, t.seq] }),
+    uniqueIndex('page_revisions_oid_key').on(t.pageId, t.oid),
     index('page_revisions_account_idx').on(t.accountId),
     check('page_revisions_kind_check', sql`${t.kind} in ('edit', 'revert')`),
   ],
@@ -303,11 +331,14 @@ export const pageRevisions = pgTable(
  * Markdown is stored as written: rendering it to sanitized HTML at commit comes with the editor (Milestone 3).
  */
 export const pageCurrent = pgTable('page_current', {
-  paperId: uuid('paper_id')
+  pageId: uuid('page_id')
     .primaryKey()
-    .references(() => papers.id, { onDelete: 'cascade' }),
+    .references(() => pages.id, { onDelete: 'cascade' }),
   head: bytea('head').notNull(),
-  /** Each part's section files joined, as an agent reads them (`pages/sections.ts`). */
+  /**
+   * Each part's section files joined, as an agent reads them (`pages/sections.ts`). `author_*` holds the owners'
+   * part of any kind (a paper's `author/`, a venue's `organizers/`, a user's `about/`; `lib/kinds.ts`).
+   */
   authorMarkdown: text('author_markdown'),
   communityMarkdown: text('community_markdown'),
   /** The two parts' sections, rendered at commit (`pages/sections.ts`), which is all a reader is sent. */
@@ -338,9 +369,9 @@ export const pageEvents = pgTable(
   'page_events',
   {
     id: bigint('id', { mode: 'number' }).primaryKey().generatedAlwaysAsIdentity(),
-    paperId: uuid('paper_id')
+    pageId: uuid('page_id')
       .notNull()
-      .references(() => papers.id, { onDelete: 'cascade' }),
+      .references(() => pages.id, { onDelete: 'cascade' }),
     seq: integer('seq').notNull(),
     type: text('type').notNull(),
     payload: jsonb('payload').$type<Record<string, unknown>>().notNull(),
@@ -349,10 +380,7 @@ export const pageEvents = pgTable(
       .default(sql`pg_current_xact_id()`),
     createdAt: createdAt(),
   },
-  (t) => [
-    uniqueIndex('page_events_paper_seq_key').on(t.paperId, t.seq),
-    index('page_events_xid_id_idx').on(t.xid, t.id),
-  ],
+  (t) => [uniqueIndex('page_events_page_seq_key').on(t.pageId, t.seq), index('page_events_xid_id_idx').on(t.xid, t.id)],
 );
 
 /**
@@ -381,9 +409,9 @@ export const consumerCursors = pgTable('consumer_cursors', {
 export const searchDocs = pgTable(
   'search_docs',
   {
-    paperId: uuid('paper_id')
+    pageId: uuid('page_id')
       .notNull()
-      .references(() => papers.id, { onDelete: 'cascade' }),
+      .references(() => pages.id, { onDelete: 'cascade' }),
     path: text('path').notNull(),
     n: integer('n').notNull().default(0),
     blobOid: bytea('blob_oid').notNull(),
@@ -396,7 +424,7 @@ export const searchDocs = pgTable(
       .generatedAlwaysAs(sql`to_tsvector('english', text)`),
   },
   (t) => [
-    primaryKey({ columns: [t.paperId, t.path, t.n] }),
+    primaryKey({ columns: [t.pageId, t.path, t.n] }),
     index('search_docs_tsv_idx').using('gin', t.tsv),
     check('search_docs_scope_check', sql`${t.scope} in ('page', 'reviews')`),
   ],
@@ -436,9 +464,9 @@ export const demoSnapshots = pgTable('demo_snapshots', {
 export const demoPins = pgTable(
   'demo_pins',
   {
-    paperId: uuid('paper_id')
+    pageId: uuid('page_id')
       .notNull()
-      .references(() => papers.id, { onDelete: 'cascade' }),
+      .references(() => pages.id, { onDelete: 'cascade' }),
     /** As written in the block. */
     url: text('url').notNull(),
     snapshotId: text('snapshot_id')
@@ -448,7 +476,7 @@ export const demoPins = pgTable(
     commit: bytea('commit').notNull(),
     createdAt: createdAt(),
   },
-  (t) => [primaryKey({ columns: [t.paperId, t.url] })],
+  (t) => [primaryKey({ columns: [t.pageId, t.url] })],
 );
 
 /** Where one ingest stage stands for one PDF (`server/pdfs/ingest.ts`). */

@@ -1,6 +1,7 @@
 import 'dotenv/config';
 import { parseArgs } from 'node:util';
 import { getPool } from '@/db';
+import { isPageKind } from '@/lib/kinds';
 import { ensureBot, grantBot, listGrants, revokeGrant } from '@/server/bots';
 
 const USAGE = `Grants a bot write access to a path pattern (DESIGN.md §10, "Bots"). Admins only, on the server.
@@ -8,8 +9,10 @@ const USAGE = `Grants a bot write access to a path pattern (DESIGN.md §10, "Bot
   npm run bots:grant                                            # lists every grant
   npm run bots:grant -- <handle> 'reviews/<source>/**' --by <admin handle> [--hidden] [--create]
   npm run bots:grant -- <handle> 'reviews/<source>/**' --revoke
+  npm run bots:grant -- <handle> venue.json --kind venue --by <admin handle>
 
---create makes the bot account if there is none. --hidden: what it writes isn't shown to everyone by default.`;
+--kind: the kind of page the pattern is on (paper, the default; venue; org). --create makes the bot account if
+there is none. --hidden: what it writes isn't shown to everyone by default.`;
 
 async function main() {
   const { values, positionals } = parseArgs({
@@ -19,6 +22,7 @@ async function main() {
       hidden: { type: 'boolean' },
       create: { type: 'boolean' },
       revoke: { type: 'boolean' },
+      kind: { type: 'string' },
       help: { type: 'boolean', short: 'h' },
     },
   });
@@ -31,20 +35,26 @@ async function main() {
     if (grants.length === 0) console.log('No grants.');
     for (const g of grants) {
       console.log(
-        `${g.handle}\t${g.pattern}\t${g.shown ? 'shown' : 'hidden'}\tby ${g.grantedBy}, ${g.createdAt.toISOString()}`,
+        `${g.handle}\t${g.kind}\t${g.pattern}\t${g.shown ? 'shown' : 'hidden'}\tby ${g.grantedBy}, ${g.createdAt.toISOString()}`,
       );
     }
     return;
   }
   const [handle, pattern] = positionals;
+  const kind = values.kind ?? 'paper';
+  if (!isPageKind(kind)) throw new Error(`no kind of page called ${kind}`);
   if (values.revoke) {
-    console.log((await revokeGrant(handle, pattern)) ? `${handle}: ${pattern} revoked` : `${handle} had no ${pattern}`);
+    console.log(
+      (await revokeGrant(handle, pattern, undefined, kind))
+        ? `${handle}: ${pattern} revoked`
+        : `${handle} had no ${pattern}`,
+    );
     return;
   }
   if (!values.by) throw new Error('say who grants it: --by <admin handle>');
   if (values.create) await ensureBot(handle);
-  await grantBot(handle, pattern, { grantedBy: values.by, shown: !values.hidden });
-  console.log(`${handle}: granted ${pattern}${values.hidden ? ' (hidden by default)' : ''}`);
+  await grantBot(handle, pattern, { grantedBy: values.by, shown: !values.hidden, kind });
+  console.log(`${handle}: granted ${pattern} on ${kind} pages${values.hidden ? ' (hidden by default)' : ''}`);
 }
 
 main()

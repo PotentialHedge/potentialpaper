@@ -131,7 +131,7 @@ describe('the exec command', () => {
 
   it('takes the page addresses the HTTP route takes', () => {
     const want = {
-      id: { scheme: 'arxiv', value: '1706.03762' },
+      page: { kind: 'paper', id: { scheme: 'arxiv', value: '1706.03762' } },
       scheme: 'arxiv',
       raw: '1706.03762',
       file: 'git-upload-pack',
@@ -148,15 +148,27 @@ describe('the exec command', () => {
     }
     // Another spelling of the same paper: `findRepo` then sends to the canonical address.
     expect(parseSshPath('abs/1706.03762v2.git', 'git-receive-pack')).toMatchObject({
-      id: { scheme: 'arxiv', value: '1706.03762' },
+      page: { id: { scheme: 'arxiv', value: '1706.03762' } },
       raw: '1706.03762v2',
       file: 'git-receive-pack',
     });
     expect(parseSshPath('/doi/10.1000/xyz123.git', 'git-upload-pack')).toMatchObject({
-      id: { scheme: 'doi', value: '10.1000/xyz123' },
+      page: { id: { scheme: 'doi', value: '10.1000/xyz123' } },
     });
+    // Pages of other kinds, by their own address or the HTTP clone address's.
+    for (const path of ['v/iclr/2027.git', '/venue/iclr/2027', 'git/venue/iclr/2027.git']) {
+      expect(parseSshPath(path, 'git-upload-pack'), path).toMatchObject({
+        page: { kind: 'venue', key: 'iclr/2027' },
+      });
+    }
+    expect(parseSshPath('t/linear-attention.git', 'git-receive-pack')).toMatchObject({
+      page: { kind: 'topic', key: 'linear-attention' },
+      scheme: 'topic',
+    });
+    expect(parseSshPath('t/Not A Slug.git', 'git-upload-pack')).toBeNull();
+    expect(parseSshPath('paper/x.git', 'git-upload-pack')).toBeNull();
     expect(parseSshPath('openreview/dskf2Ppd9o', 'git-upload-pack')).toMatchObject({
-      id: { scheme: 'openreview', value: 'dskf2Ppd9o' },
+      page: { id: { scheme: 'openreview', value: 'dskf2Ppd9o' } },
     });
     for (const bad of [
       '',

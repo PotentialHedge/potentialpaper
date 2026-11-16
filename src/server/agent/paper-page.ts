@@ -30,7 +30,7 @@ export async function agentPaperMarkdown(found: FoundPaper, canonical: PaperId, 
         head: pageCurrent.head,
       })
       .from(pageCurrent)
-      .where(eq(pageCurrent.paperId, paper.id)),
+      .where(eq(pageCurrent.pageId, paper.id)),
     submissionsOf(paper.id),
     confirmedAuthors(paper.id),
     agentPostsOf(paper.id),

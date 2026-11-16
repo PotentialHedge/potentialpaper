@@ -1,5 +1,6 @@
-import { PAPER_SCHEMES, PATH_PREFIX, type PaperScheme, parsePaperId } from '@/lib/paper-ids';
-import type { GitAddress } from '../pages/clone';
+import { KEYED_KINDS, KINDS } from '@/lib/kinds';
+import { PAPER_SCHEMES, PATH_PREFIX } from '@/lib/paper-ids';
+import { type GitAddress, gitPageAddress } from '../pages/clone';
 
 /**
  * What an SSH client asks the server to run, parsed strictly: git sends `git-upload-pack '<path>'` for a
@@ -44,15 +45,19 @@ export function sqDequote(arg: string): string | null {
   }
 }
 
-const PREFIXES = new Map<string, PaperScheme>([
+/** The first segment of a path, as a page's own address or the HTTP clone address spells it, to the clone scheme. */
+const PREFIXES = new Map<string, string>([
   ...PAPER_SCHEMES.map((s) => [PATH_PREFIX[s].slice(1), s] as const),
   ...PAPER_SCHEMES.map((s) => [s, s] as const),
+  ...KEYED_KINDS.map((kind) => [KINDS[kind].route.slice(1), kind] as const),
+  ...KEYED_KINDS.map((kind) => [kind, kind] as const),
 ]);
 
 /**
- * The page a path names, as a `GitAddress` for `findRepo`: the paper's own address (`/abs/1706.03762.git`, as
- * in `git@host:abs/1706.03762.git`), or the HTTP clone address's (`arxiv/1706.03762.git`, also under `/git/`),
- * with or without the leading slash and the `.git`. Not URL-encoded, unlike an HTTP address.
+ * The page a path names, as a `GitAddress` for `findRepo`: the page's own address (`/abs/1706.03762.git`, as in
+ * `git@host:abs/1706.03762.git`, or `v/iclr/2027.git`), or the HTTP clone address's (`arxiv/1706.03762.git`,
+ * `venue/iclr/2027.git`, also under `/git/`), with or without the leading slash and the `.git`. Not URL-encoded,
+ * unlike an HTTP address.
  */
 export function parseSshPath(path: string, service: GitService): GitAddress | null {
   if (path.length > 512 || /[\x00-\x1f\x7f\\]/.test(path)) return null;
@@ -64,6 +69,6 @@ export function parseSshPath(path: string, service: GitService): GitAddress | nu
   const scheme = PREFIXES.get(rest.slice(0, slash));
   const raw = rest.slice(slash + 1);
   if (!scheme || !raw || raw.endsWith('/') || raw.includes('//')) return null;
-  const id = parsePaperId(scheme, raw);
-  return id ? { id, scheme, raw, file: service } : null;
+  const page = gitPageAddress(scheme, raw);
+  return page ? { page, scheme, raw, file: service } : null;
 }

@@ -57,7 +57,7 @@ export async function gitGet(req: Request, database: Database = getDb()): Promis
     if (repo.kind === 'missing') return notFound();
     if (repo.kind === 'redirect') return redirect(repo.to, url.search);
     const version = protocolVersion(req.headers.get('git-protocol'));
-    const body = await advertisement(pageRepo(database, repo.paperId), version);
+    const body = await advertisement(pageRepo(database, repo.pageId), version);
     // Version 2 starts with its own `version 2` line; the older ones with the service, as http-backend does.
     const prefix = version === 2 ? [] : [pkt('# service=git-upload-pack\n'), FLUSH];
     return new Response(new Uint8Array(Buffer.concat([...prefix, body])), {
@@ -107,7 +107,7 @@ export async function gitPost(req: Request, database: Database = getDb()): Promi
   if (repo.kind === 'redirect') return redirect(repo.to, url.search);
 
   const version = protocolVersion(req.headers.get('git-protocol'));
-  const output = uploadPackRequest(pageRepo(database, repo.paperId), new PktReader(body), version);
+  const output = uploadPackRequest(pageRepo(database, repo.pageId), new PktReader(body), version);
   return new Response(streamOf(output), {
     headers: { ...SMART, 'Content-Type': 'application/x-git-upload-pack-result' },
   });
@@ -188,7 +188,7 @@ async function receivePackRefs(req: Request, address: GitAddress, database: Data
   if (actor instanceof Response) return actor;
   // Git has no push in protocol v2; a client asking for it gets v0, as from git's own receive-pack.
   const version = protocolVersion(req.headers.get('git-protocol')) === 1 ? 1 : 0;
-  const body = await receivePackAdvertisement(pageRepo(database, repo.paperId), version);
+  const body = await receivePackAdvertisement(pageRepo(database, repo.pageId), version);
   return new Response(new Uint8Array(Buffer.concat([pkt('# service=git-receive-pack\n'), FLUSH, body])), {
     headers: { ...SMART, 'Content-Type': 'application/x-git-receive-pack-advertisement' },
   });

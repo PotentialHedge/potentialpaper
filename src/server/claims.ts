@@ -103,7 +103,7 @@ function addressMatches(pairs: SQL, where: SQL = sql`true`): SQL {
   return sql`
     select distinct on (ac.account_id, ac.paper_id) ac.account_id, ac.paper_id, m.email, d.sha256
     from (${pairs}) ac
-    join page_current c on c.paper_id = ac.paper_id
+    join page_current c on c.page_id = ac.paper_id
     join pdf_documents d on d.sha256 = c.pdf ->> 'sha256'
     cross join lateral (
       select f.email from affiliations f
@@ -141,7 +141,7 @@ export async function ownAddressesOnPaper(
   const { rows } = await database.execute<{ email: string; on_paper: boolean; has_pdf_emails: boolean }>(sql`
     with pdf as (
       select d.emails from page_current c join pdf_documents d on d.sha256 = c.pdf ->> 'sha256'
-       where c.paper_id = ${paperId}
+       where c.page_id = ${paperId}
     ), own as (
       select f.email from affiliations f where f.account_id = ${accountId} and f.verified_at is not null
       union
@@ -308,8 +308,8 @@ export async function claimByEmail(
     first_page_raw: string | null;
     authors: string[];
   }>(sql`
-    select distinct on (a.id, c.paper_id, own.email)
-           a.id as account_id, c.paper_id, own.email, d.sha256, d.emails, d.first_page_raw, p.authors
+    select distinct on (a.id, c.page_id, own.email)
+           a.id as account_id, c.page_id as paper_id, own.email, d.sha256, d.emails, d.first_page_raw, p.authors
     from (
       select f.account_id, f.email from affiliations f where f.verified_at is not null
       union
@@ -318,9 +318,9 @@ export async function claimByEmail(
     join accounts a on a.id = own.account_id and a.verified_at is not null and not a.is_bot
     join pdf_documents d on own.email = any(d.emails)
     join page_current c on c.pdf ->> 'sha256' = d.sha256
-    join papers p on p.id = c.paper_id
+    join papers p on p.id = c.page_id
     where ${sql.join(filters, sql` and `)}
-      and not exists (select from author_claims ac where ac.paper_id = c.paper_id and ac.account_id = a.id)
+      and not exists (select from author_claims ac where ac.paper_id = c.page_id and ac.account_id = a.id)
   `);
   for (const row of rows) {
     const authorIndex = authorsForEmails(row.emails, row.authors, row.first_page_raw ?? '').get(row.email);
@@ -397,9 +397,8 @@ export async function addCoAuthor(
   target: CoAuthorTarget,
   database: Database = getDb(),
 ): Promise<{ accountId: string; authorIndex: number; authorName: string }> {
-  const { confirmedAuthor } = await claimRoles(paperId, voucher.id, database);
-  if (!confirmedAuthor)
-    throw new ApiError(403, 'forbidden', 'only a confirmed author of the paper can add a co-author');
+  const { owner } = await claimRoles(paperId, voucher.id, database);
+  if (!owner) throw new ApiError(403, 'forbidden', 'only a confirmed author of the paper can add a co-author');
   const [paper] = await database.select({ authors: papers.authors }).from(papers).where(eq(papers.id, paperId));
   if (!paper) throw new ApiError(404, 'not_found', 'no such paper');
 
@@ -540,10 +539,10 @@ export async function claimRoles(
   paperId: string,
   accountId: string | null,
   database: Database = getDb(),
-): Promise<{ claimed: boolean; confirmedAuthor: boolean }> {
+): Promise<{ claimed: boolean; owner: boolean }> {
   const rows = await database
     .select({ accountId: authorClaims.accountId })
     .from(authorClaims)
     .where(and(eq(authorClaims.paperId, paperId), eq(authorClaims.status, 'confirmed')));
-  return { claimed: rows.length > 0, confirmedAuthor: rows.some((row) => row.accountId === accountId) };
+  return { claimed: rows.length > 0, owner: rows.some((row) => row.accountId === accountId) };
 }

@@ -92,7 +92,7 @@ async function reviewFiles(forum: string, notes: [string, string][]): Promise<Fi
 
 async function docs(paper: string) {
   const { rows } = await getDb().execute<{ path: string; kind: string; scope: string; text: string }>(
-    sql`select path, kind, scope, text from search_docs where paper_id = ${paper} order by path, n`,
+    sql`select path, kind, scope, text from search_docs where page_id = ${paper} order by path, n`,
   );
   return rows;
 }

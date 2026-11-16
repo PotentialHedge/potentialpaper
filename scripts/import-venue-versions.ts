@@ -84,7 +84,7 @@ async function main() {
     `select p.id, p.title, p.abstract, pc.pdf,
        coalesce(array_agg(i.value) filter (where i.scheme = 'openreview'), '{}') as forums
      from papers p
-     left join page_current pc on pc.paper_id = p.id
+     left join page_current pc on pc.page_id = p.id
      left join paper_identifiers i on i.paper_id = p.id
      where p.merged_into is null ${values.paper ? 'and p.id = $1' : ''}
      group by p.id, pc.pdf`,

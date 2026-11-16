@@ -150,7 +150,7 @@ export async function currentVersions(paperId: string, database: Database = getD
   const [row] = await database
     .select({ versions: pageCurrent.versions })
     .from(pageCurrent)
-    .where(eq(pageCurrent.paperId, paperId));
+    .where(eq(pageCurrent.pageId, paperId));
   return sortVersions(row?.versions ?? []);
 }
 

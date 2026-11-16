@@ -1,4 +1,5 @@
 import { revalidatePath } from 'next/cache';
+import { type PageAddress, pagePath } from '@/lib/kinds';
 import { paperPath, type PaperId } from '@/lib/paper-ids';
 import { revalidateInApp } from '../internal';
 import { siteUrl } from '../site';
@@ -12,7 +13,15 @@ import { siteUrl } from '../site';
  * do it (`revalidateInApp`), when `APP_INTERNAL_URL` says where it is; tests have none.
  */
 export async function refreshPaperPages(identifiers: readonly PaperId[]): Promise<void> {
-  const paths = identifiers.map(paperPath);
+  await refreshPaths(identifiers.map(paperPath));
+}
+
+/** The same for a page of any kind: a paper's at each of its identifiers, any other at its address. */
+export async function refreshPages(address: PageAddress, identifiers: readonly PaperId[] = []): Promise<void> {
+  await refreshPaths(address.kind === 'paper' ? identifiers.map(paperPath) : [pagePath(address)]);
+}
+
+async function refreshPaths(paths: readonly string[]): Promise<void> {
   const outside: string[] = [];
   for (const path of paths) {
     try {

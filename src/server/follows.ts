@@ -122,7 +122,7 @@ export async function mailEditFollowers(
   const [last] = await database
     .select({ payload: pageEvents.payload })
     .from(pageEvents)
-    .where(and(eq(pageEvents.paperId, paperId), inArray(pageEvents.seq, [...seqs])))
+    .where(and(eq(pageEvents.pageId, paperId), inArray(pageEvents.seq, [...seqs])))
     .orderBy(desc(pageEvents.seq))
     .limit(1);
   const summary = typeof last?.payload.summary === 'string' ? last.payload.summary : '';

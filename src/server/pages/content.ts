@@ -57,14 +57,14 @@ export function versionsIn(texts: ReadonlyMap<string, string>, urlOf: UrlOf): Pa
 /** The text of each file of a tree that `pick` wants. */
 async function textsOf(
   db: Reader,
-  paperId: string,
+  pageId: string,
   files: ReadonlyMap<string, string>,
   pick: (path: string) => boolean,
 ): Promise<Map<string, string>> {
   const texts = new Map<string, string>();
   for (const [path, blob] of files) {
     if (!pick(path)) continue;
-    const text = await readText(db, paperId, blob);
+    const text = await readText(db, pageId, blob);
     if (text !== null) texts.set(path, text);
   }
   return texts;
@@ -80,10 +80,10 @@ async function urlsFor(db: Reader, texts: Iterable<string>): Promise<UrlOf> {
 /** The versions in a tree, oldest first, with their PDFs. */
 export async function readVersions(
   db: Reader,
-  paperId: string,
+  pageId: string,
   files: ReadonlyMap<string, string>,
 ): Promise<PaperVersion[]> {
-  const texts = await textsOf(db, paperId, files, (path) => path.startsWith('versions/'));
+  const texts = await textsOf(db, pageId, files, (path) => path.startsWith('versions/'));
   return versionsIn(texts, await urlsFor(db, texts.values()));
 }
 
@@ -111,11 +111,11 @@ export function versionChanges(before: readonly PaperVersion[], after: readonly 
 /** The paper's PDF, from `.potentialpaper/paper.pdf` and `pdf.json`, if both are there and its bytes are known. */
 export async function readPagePdf(
   db: Reader,
-  paperId: string,
+  pageId: string,
   files: ReadonlyMap<string, string>,
 ): Promise<PdfPointer | null> {
-  const pointer = parseLfsPointer((await readText(db, paperId, files.get(PAPER_PDF_PATH))) ?? '');
-  const source = parsePdfSource((await readText(db, paperId, files.get(PDF_PATH))) ?? '');
+  const pointer = parseLfsPointer((await readText(db, pageId, files.get(PAPER_PDF_PATH))) ?? '');
+  const source = parsePdfSource((await readText(db, pageId, files.get(PDF_PATH))) ?? '');
   if (!pointer || !source) return null;
   const url = (await findLfsObjects(db, [pointer.sha256])).get(pointer.sha256)?.url;
   return url ? { sha256: pointer.sha256, bytes: pointer.bytes, url, ...source } : null;
@@ -130,26 +130,24 @@ export function thumbnailImagePathIn(paths: Iterable<string>): string | null {
 /** The paper's picture, from `thumbnail.<ext>` and the words in `thumbnail.json`, if its bytes are known. */
 export async function readThumbnail(
   db: Reader,
-  paperId: string,
+  pageId: string,
   files: ReadonlyMap<string, string>,
 ): Promise<ThumbnailPointer | null> {
   const path = thumbnailImagePathIn(files.keys());
-  const pointer: LfsPointer | null = path
-    ? parseLfsPointer((await readText(db, paperId, files.get(path))) ?? '')
-    : null;
+  const pointer: LfsPointer | null = path ? parseLfsPointer((await readText(db, pageId, files.get(path))) ?? '') : null;
   if (!path || !pointer) return null;
   const object = (await findLfsObjects(db, [pointer.sha256])).get(pointer.sha256);
   if (!object) return null;
-  const words = parseThumbnailWords((await readText(db, paperId, files.get(THUMBNAIL_PATH))) ?? '{}') ?? {};
+  const words = parseThumbnailWords((await readText(db, pageId, files.get(THUMBNAIL_PATH))) ?? '{}') ?? {};
   return { sha256: pointer.sha256, bytes: pointer.bytes, type: thumbnailImageType(path)!, url: object.url, ...words };
 }
 
 /** The links in a tree, in the order of their files' names. */
-export async function readLinks(db: Reader, paperId: string, files: ReadonlyMap<string, string>): Promise<TitleLink[]> {
+export async function readLinks(db: Reader, pageId: string, files: ReadonlyMap<string, string>): Promise<TitleLink[]> {
   const links: TitleLink[] = [];
   const paths = [...files.keys()].filter(isLinkPath).sort(byBytes);
   for (const path of paths) {
-    const link = parseLinkFile((await readText(db, paperId, files.get(path))) ?? '');
+    const link = parseLinkFile((await readText(db, pageId, files.get(path))) ?? '');
     if (link) links.push(link);
   }
   return links;

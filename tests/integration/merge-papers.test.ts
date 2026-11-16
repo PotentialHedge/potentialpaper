@@ -82,7 +82,7 @@ describe('merging papers', () => {
     const [last] = await getDb()
       .select({ summary: pageRevisions.summary })
       .from(pageRevisions)
-      .where(eq(pageRevisions.paperId, newId))
+      .where(eq(pageRevisions.pageId, newId))
       .orderBy(desc(pageRevisions.seq))
       .limit(1);
     expect(last?.summary).toMatch(

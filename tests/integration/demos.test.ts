@@ -148,14 +148,14 @@ describe('a demo', () => {
     const content = `# Reproductions\n\n${demoBlockMarkdown({ ref: { kind: 'snapshot', id: first.body.id }, title: 'Attention, in 3D', description: 'Rotate it.' })}`;
     const edit = await commitFiles(cookie, PAPER, null, { 'community/10-reproductions.md': content });
     expect(edit.status).toBe(200);
-    const [before] = await getDb().select().from(pageCurrent).where(eq(pageCurrent.paperId, paperId));
+    const [before] = await getDb().select().from(pageCurrent).where(eq(pageCurrent.pageId, paperId));
     expect(before.communityHtml).toContain(`<figure class="demo" data-demo="${first.body.id}">`);
     expect(before.communityHtml).toContain(`data-src="${demoUrl(first.body.id)}"`);
     expect(before.communityHtml).toContain(`${OWNER}/${REPO}/dist@${MAIN.slice(0, 7)}`);
     expect(before.communityHtml).toContain('<b>Demo:</b> Attention, in 3D. Rotate it.');
 
     await rebuildAllPages();
-    const [after] = await getDb().select().from(pageCurrent).where(eq(pageCurrent.paperId, paperId));
+    const [after] = await getDb().select().from(pageCurrent).where(eq(pageCurrent.pageId, paperId));
     expect(after.communityHtml).toBe(before.communityHtml);
   });
 
@@ -202,7 +202,7 @@ async function account(): Promise<Actor & { kind: 'account' }> {
 }
 
 async function current(paperId: string) {
-  const [row] = await getDb().select().from(pageCurrent).where(eq(pageCurrent.paperId, paperId));
+  const [row] = await getDb().select().from(pageCurrent).where(eq(pageCurrent.pageId, paperId));
   return row;
 }
 
@@ -241,7 +241,7 @@ describe('a demo block naming a GitHub address', () => {
     const [snapshot] = await getDb().select().from(demoSnapshots);
     expect(snapshot).toMatchObject({ commit: MAIN, root: 'dist' });
     const [pin] = await getDb().select().from(demoPins);
-    expect(pin).toMatchObject({ paperId, url: `https://github.com/${OWNER}/${REPO}/tree/main/dist` });
+    expect(pin).toMatchObject({ pageId: paperId, url: `https://github.com/${OWNER}/${REPO}/tree/main/dist` });
     expect(pin.commit.toString('hex')).toBe(edit.body.head);
     const html = (await current(paperId)).communityHtml;
     expect(frameId(html)).toBe(snapshot.id);

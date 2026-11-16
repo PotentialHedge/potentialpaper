@@ -60,7 +60,7 @@ export async function PaperRoute({ scheme, segments }: { scheme: PaperScheme; se
       })
       .from(pageCurrent)
       .leftJoin(pdfDocuments, sql`${pdfDocuments.sha256} = ${pageCurrent.pdf} ->> 'sha256'`)
-      .where(eq(pageCurrent.paperId, paper.id)),
+      .where(eq(pageCurrent.pageId, paper.id)),
     submissionsOf(paper.id),
     confirmedAuthors(paper.id),
   ]);
