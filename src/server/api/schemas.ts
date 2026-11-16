@@ -25,6 +25,8 @@ export const Viewer = z.object({
       handle: z.string(),
       isAdmin: z.boolean(),
       profileComplete: z.boolean(),
+      /** Holds a live API token, so an agent already works for them. */
+      hasAgent: z.boolean(),
     })
     .nullable(),
 });

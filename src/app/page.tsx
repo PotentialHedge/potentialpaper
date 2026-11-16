@@ -1,5 +1,5 @@
 import Link from 'next/link';
-import { OnboardAgent } from '@/components/OnboardAgent';
+import { HomeNextStep } from '@/components/HomeNextStep';
 import { redirect } from 'next/navigation';
 import { FilterIcon, MoreIcon } from '@/components/icons';
 import { Pager } from '@/components/Pager';
@@ -96,12 +96,7 @@ export default async function Home({
         </h1>
         {!q && (
           <div className="mx-auto mt-5 max-w-[min(680px,85%)] text-[14px] leading-[1.55]">
-            <div className="mb-5 flex flex-wrap items-baseline justify-center gap-x-6 gap-y-1 font-sans">
-              <Link href="/welcome" className="text-base font-semibold text-accent">
-                [getting started]
-              </Link>
-              <OnboardAgent className={`text-[13px] ${ui.linkBtn}`} />
-            </div>
+            <HomeNextStep />
             <h2 className={`${ui.boxHeading} text-center`}>Abstract</h2>
             <p className="text-justify hyphens-auto">
               PotentialPaper gives each research paper one page that verified researchers can edit. Its authors keep a

@@ -81,6 +81,16 @@ export async function listTokens(accountId: string, database: Database = getDb()
     .orderBy(desc(apiTokens.createdAt));
 }
 
+/** Whether the account holds any live (unrevoked) token. */
+export async function hasLiveToken(accountId: string, database: Database = getDb()): Promise<boolean> {
+  const [row] = await database
+    .select({ id: apiTokens.id })
+    .from(apiTokens)
+    .where(and(eq(apiTokens.accountId, accountId), isNull(apiTokens.revokedAt)))
+    .limit(1);
+  return !!row;
+}
+
 /** Revoke a token. `false` if the account has no such live token. */
 export async function revokeToken(accountId: string, tokenId: string, database: Database = getDb()): Promise<boolean> {
   const updated = await database

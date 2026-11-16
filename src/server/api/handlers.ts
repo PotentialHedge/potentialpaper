@@ -19,7 +19,7 @@ import {
   type CommentView,
 } from '../comments';
 import { mailMentions } from '../mentions';
-import { listTokens, mintToken, revokeToken } from '../tokens';
+import { hasLiveToken, listTokens, mintToken, revokeToken } from '../tokens';
 import { addSshKey, listSshKeys, removeSshKey } from '../ssh-keys';
 import { previewDemoSources } from '../demos/attach';
 import { snapshotDemo } from '../demos/snapshot';
@@ -90,6 +90,7 @@ export const viewer = route(async () => {
       handle: seen.account.handle,
       isAdmin: seen.isAdmin,
       profileComplete: seen.account.profileCompletedAt !== null,
+      hasAgent: await hasLiveToken(seen.account.id),
     },
   });
 });
