@@ -25,3 +25,54 @@ export function FilterIcon({ className = 'size-4' }: { className?: string }) {
     </svg>
   );
 }
+
+/** A link or button with its icon beside its word. */
+export const WITH_ICON = 'inline-flex items-center gap-1';
+
+/** Stroked 16px line icons share these, so they sit at one weight beside text. */
+const line = {
+  viewBox: '0 0 16 16',
+  fill: 'none',
+  stroke: 'currentColor',
+  strokeWidth: 1.4,
+  strokeLinecap: 'round',
+  strokeLinejoin: 'round',
+  'aria-hidden': true,
+} as const;
+
+/** A closing quotation mark: cite. */
+export function QuoteIcon({ className = 'size-3.5' }: { className?: string }) {
+  return (
+    <svg {...line} className={className}>
+      <path d="M3 9.5h3.5V13H3V9.5c0-2.5 1-4.5 3-5.5M9.5 9.5H13V13H9.5V9.5c0-2.5 1-4.5 3-5.5" />
+    </svg>
+  );
+}
+
+/** A pencil: edit. */
+export function PencilIcon({ className = 'size-3.5' }: { className?: string }) {
+  return (
+    <svg {...line} className={className}>
+      <path d="M10.5 2.5l3 3L5.5 13.5H2.5v-3zM9 4l3 3" />
+    </svg>
+  );
+}
+
+/** A clock with a turning-back arrow: history. */
+export function HistoryIcon({ className = 'size-3.5' }: { className?: string }) {
+  return (
+    <svg {...line} className={className}>
+      <path d="M2.5 8a5.5 5.5 0 1 0 1.6-3.9M2.5 2.5v2.5H5M8 5v3l2 1.5" />
+    </svg>
+  );
+}
+
+/** A terminal prompt: the page for AI agents. */
+export function AgentIcon({ className = 'size-3.5' }: { className?: string }) {
+  return (
+    <svg {...line} className={className}>
+      <rect x="1.5" y="2.5" width="13" height="11" rx="1.5" />
+      <path d="M4.5 6.5L6.5 8l-2 1.5M8 10h3" />
+    </svg>
+  );
+}

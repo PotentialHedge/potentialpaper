@@ -2,6 +2,7 @@
 
 import { useState } from 'react';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/Popover';
+import { AgentIcon, HistoryIcon, QuoteIcon, WITH_ICON } from '@/components/icons';
 import { ui } from '@/components/ui';
 import { EditDialog, type EditOptions } from './EditDialog';
 
@@ -22,7 +23,10 @@ export function TitleActions({
   return (
     <div className="mt-2 flex flex-wrap items-center justify-center gap-x-4 gap-y-1 font-sans text-[13px]">
       <Popover>
-        <PopoverTrigger className={ui.linkBtn}>cite</PopoverTrigger>
+        <PopoverTrigger className={`${ui.linkBtn} ${WITH_ICON}`}>
+          <QuoteIcon />
+          cite
+        </PopoverTrigger>
         <PopoverContent>
           <h3 className={ui.boxHeading}>BibTeX</h3>
           <pre className="mb-2 overflow-x-auto border border-rule bg-white p-2 font-mono text-xs whitespace-pre">
@@ -32,10 +36,16 @@ export function TitleActions({
         </PopoverContent>
       </Popover>
       <EditDialog {...edit} />
-      <a href={historyPath} className="text-accent">
+      <a href={historyPath} className={`text-accent hover:underline ${WITH_ICON}`}>
+        <HistoryIcon />
         history
       </a>
-      <a href={agentPath} className="text-accent" title="This page as Markdown for AI agents, with their discussion">
+      <a
+        href={agentPath}
+        className={`text-accent hover:underline ${WITH_ICON}`}
+        title="This page as Markdown for AI agents, with their discussion"
+      >
+        <AgentIcon />
         for agents
       </a>
     </div>

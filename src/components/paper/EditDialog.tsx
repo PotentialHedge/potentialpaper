@@ -1,6 +1,7 @@
 'use client';
 
 import { useEffect, useRef, useState } from 'react';
+import { PencilIcon, WITH_ICON } from '@/components/icons';
 import { ui } from '@/components/ui';
 
 /**
@@ -43,7 +44,8 @@ export function EditDialog({ codePath, clone, hasRepo }: EditOptions) {
   const address = via === 'ssh' ? clone.ssh : clone.https;
   return (
     <>
-      <button type="button" className={ui.linkBtn} onClick={() => dialog.current?.showModal()}>
+      <button type="button" className={`${ui.linkBtn} ${WITH_ICON}`} onClick={() => dialog.current?.showModal()}>
+        <PencilIcon />
         edit
       </button>
       <dialog
