@@ -16,6 +16,7 @@ import { toolPath } from './page-tools';
 import { Slot } from './slots';
 import { TitleActions } from './TitleActions';
 import { cloneAddresses } from '@/server/pages/clone';
+import { linksFrom as pageLinksFrom, linksTo as pageLinksTo } from '@/server/page-links';
 
 /**
  * What the routes at `/abs`, `/doi` and `/openreview` share. Each page is rendered once and cached, by
@@ -64,6 +65,7 @@ export async function PaperRoute({ scheme, segments }: { scheme: PaperScheme; se
     submissionsOf(paper.id),
     confirmedAuthors(paper.id),
   ]);
+  const [linksFrom, linksTo] = await Promise.all([pageLinksFrom(paper.id), pageLinksTo(paper.id)]);
   // The authors' choice of picture wins over the PDF's first page.
   const picture = current?.thumbnail
     ? {
@@ -86,6 +88,8 @@ export async function PaperRoute({ scheme, segments }: { scheme: PaperScheme; se
     canonical: canonicalPaperId(identifiers) ?? identifiers[0],
     authorHtml: current?.authorHtml ?? null,
     communityHtml: current?.communityHtml ?? null,
+    linksFrom,
+    linksTo,
   };
   const about = [paper.venue, paper.year].filter(Boolean).join(', ');
   const linkSources = {
@@ -136,6 +140,7 @@ export async function PaperRoute({ scheme, segments }: { scheme: PaperScheme; se
           </aside>
         </div>
         <Slot name="paper.body" {...panel} />
+        <Slot name="paper.tabs" {...panel} />
       </article>
       <DemoFrames />
     </main>

@@ -29,6 +29,7 @@
     "consumers:rebuild": "tsx scripts/rebuild-consumer.ts",
     "bots:grant": "tsx scripts/grant-bot.ts",
     "settings:site": "tsx scripts/site-settings.ts",
+    "pages:create": "tsx scripts/create-page.ts",
     "pages:edit": "tsx scripts/edit-page.ts",
     "pages:set-thumbnail": "tsx scripts/set-thumbnail.ts",
     "pages:rebuild": "tsx scripts/rebuild-page-projections.ts",

@@ -1,7 +1,16 @@
-import { and, eq, inArray, or, sql } from 'drizzle-orm';
+import { and, desc, eq, inArray, or, sql } from 'drizzle-orm';
 import { getDb, type Database } from '@/db';
-import { pageAncestors, pageMembers, pageMemberSources, pageParents, pageScopeNames } from '@/db/schema';
-import { formatIdentifier, KINDS, parentsOf, sourcesOf } from '@/lib/kinds';
+import {
+  pageAncestors,
+  pageMembers,
+  pageMemberSources,
+  pageParents,
+  pageScopeNames,
+  paperIdentifiers,
+  papers,
+} from '@/db/schema';
+import { formatIdentifier, KINDS, type PageAddress, parentsOf, sourcesOf } from '@/lib/kinds';
+import { canonicalPaperId } from '@/lib/paper-ids';
 import { TOPIC_LABELS } from '@/lib/labeled-links';
 import { parseReviewFile, parseReviewPath } from '@/lib/review-files';
 import type { Consumer } from './consumers/types';
@@ -221,4 +230,46 @@ export async function scopesOf(
     .select({ pageId: pageMembers.scopePageId, via: pageMembers.via })
     .from(pageMembers)
     .where(eq(pageMembers.paperId, paperId));
+}
+
+/** A paper of a scope, as a list shows it. */
+export interface ScopePaper {
+  paperId: string;
+  title: string;
+  year: number | null;
+  address: PageAddress | null;
+  via: string[];
+}
+
+/** A scope's papers with their titles and addresses, newest first, rolled up from the pages under it. */
+export async function scopePapers(
+  scopeId: string,
+  options: { limit?: number; database?: Database } = {},
+): Promise<ScopePaper[]> {
+  const { limit = 100, database = getDb() } = options;
+  const rows = await database
+    .select({
+      paperId: pageMembers.paperId,
+      title: papers.title,
+      year: papers.year,
+      via: sql<string[]>`array_agg(distinct ${pageMembers.via})`,
+    })
+    .from(pageMembers)
+    .innerJoin(papers, eq(papers.id, pageMembers.paperId))
+    .where(rolledUp(scopeId))
+    .groupBy(pageMembers.paperId, papers.title, papers.year, papers.createdAt)
+    .orderBy(sql`${papers.year} desc nulls last`, desc(papers.createdAt))
+    .limit(limit);
+  const ids = rows.map((row) => row.paperId);
+  const identifiers =
+    ids.length > 0
+      ? await database
+          .select({ paperId: paperIdentifiers.paperId, scheme: paperIdentifiers.scheme, value: paperIdentifiers.value })
+          .from(paperIdentifiers)
+          .where(inArray(paperIdentifiers.paperId, ids))
+      : [];
+  return rows.map((row) => {
+    const id = canonicalPaperId(identifiers.filter((i) => i.paperId === row.paperId));
+    return { ...row, address: id ? { kind: 'paper', id: { scheme: id.scheme, value: id.value } } : null };
+  });
 }

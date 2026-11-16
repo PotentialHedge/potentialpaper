@@ -1,8 +1,11 @@
+import { PAGE_KINDS } from './kinds';
+
 /**
- * The built-in panels of each kind of page, by id, in their default order within their slot. Shared by the page
- * (`components/paper/slots.tsx` renders them) and by settings (`lib/settings/core.ts`), where a reader hides
- * (`<kind>.panels.hidden`) or reorders (`<kind>.panels.order`) them (DESIGN.md §4.8). Paper is the only kind so
- * far; the kinds of `handoffs/pages.md` add their entries here.
+ * The built-in panels of each kind of page (`lib/kinds.ts`), by id, in their default order within their slot. Shared
+ * by the pages (`components/paper/slots.tsx` and `components/pages/slots.tsx` render them) and by settings
+ * (`lib/settings/core.ts`), where a reader hides (`<kind>.panels.hidden`) or reorders (`<kind>.panels.order`) them
+ * (DESIGN.md §4.8). Every slot is one of its kind's (`KINDS[kind].slots`): `<kind>.main`, `<kind>.aside` and
+ * `<kind>.tabs` on every kind, which plugins' panels join too (`handoffs/plugins.md` Phase 2).
  *
  * **Ids are stable.** They are what people's settings name, so renaming one drops it from their files.
  */
@@ -20,22 +23,60 @@ export const PAGE_PANELS = {
     { id: 'read', slot: 'paper.aside', title: 'Picture, PDF and links' },
     { id: 'versions-box', slot: 'paper.aside', title: 'Versions (side box)' },
     { id: 'submissions-box', slot: 'paper.aside', title: 'Submissions (side box)' },
+    { id: 'links', slot: 'paper.aside', title: 'Labeled links' },
+    { id: 'backlinks', slot: 'paper.aside', title: 'What links here' },
     { id: 'community', slot: 'paper.body', title: 'Community section' },
     { id: 'versions', slot: 'paper.body', title: 'Versions' },
     { id: 'submissions', slot: 'paper.body', title: 'Submissions and reviews' },
     { id: 'discussion', slot: 'paper.body', title: 'Discussion' },
   ],
+  venue: [
+    { id: 'about', slot: 'venue.main', title: 'About the venue' },
+    { id: 'organizers', slot: 'venue.main', title: 'Organisers' },
+    { id: 'community', slot: 'venue.main', title: 'Community section' },
+    { id: 'links', slot: 'venue.aside', title: 'Labeled links' },
+    { id: 'backlinks', slot: 'venue.aside', title: 'What links here' },
+    { id: 'papers', slot: 'venue.tabs', title: 'Papers' },
+  ],
+  topic: [
+    { id: 'about', slot: 'topic.main', title: 'About the topic' },
+    { id: 'community', slot: 'topic.main', title: 'Article' },
+    { id: 'links', slot: 'topic.aside', title: 'Labeled links' },
+    { id: 'backlinks', slot: 'topic.aside', title: 'What links here' },
+    { id: 'papers', slot: 'topic.tabs', title: 'Papers' },
+  ],
+  org: [
+    { id: 'about', slot: 'org.main', title: 'About the organisation' },
+    { id: 'members', slot: 'org.main', title: 'Members section' },
+    { id: 'community', slot: 'org.main', title: 'Community section' },
+    { id: 'links', slot: 'org.aside', title: 'Labeled links' },
+    { id: 'backlinks', slot: 'org.aside', title: 'What links here' },
+    { id: 'papers', slot: 'org.tabs', title: 'Papers' },
+  ],
+  user: [
+    { id: 'about', slot: 'user.main', title: 'About' },
+    { id: 'links', slot: 'user.aside', title: 'Labeled links' },
+    { id: 'backlinks', slot: 'user.aside', title: 'What links here' },
+  ],
 } as const satisfies Record<string, readonly PanelInfo[]>;
 
 /** How the settings form names each slot. */
-export const SLOT_TITLES: Record<string, string> = {
-  'paper.main': 'Main column',
-  'paper.aside': 'Side column',
-  'paper.body': 'Below both',
-};
+export const SLOT_TITLES: Record<string, string> = Object.fromEntries([
+  ...PAGE_KINDS.flatMap((kind) => [
+    [`${kind}.main`, 'Main column'],
+    [`${kind}.aside`, 'Side column'],
+    [`${kind}.tabs`, 'Tabs'],
+  ]),
+  ['paper.body', 'Below both'],
+]);
 
 export type PanelKind = keyof typeof PAGE_PANELS;
 export const PANEL_KINDS = Object.keys(PAGE_PANELS) as PanelKind[];
+
+/** A slot's panels, in their default order. */
+export function slotPanels<K extends PanelKind>(kind: K, slot: string): (typeof PAGE_PANELS)[K][number][] {
+  return (PAGE_PANELS[kind] as readonly (typeof PAGE_PANELS)[K][number][]).filter((p) => p.slot === slot);
+}
 
 export type PanelId<K extends PanelKind = PanelKind> = (typeof PAGE_PANELS)[K][number]['id'];
 

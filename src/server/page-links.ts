@@ -6,6 +6,7 @@ import { type LabeledLink, LINKS_FILE, type LinkLabelName, parseLabeledLinks } f
 import { canonicalPaperId } from '@/lib/paper-ids';
 import type { Consumer } from './consumers/types';
 import { findPageByAddress, mustPage, type PageRow } from './pages/kinds';
+import { refreshPageIds } from './pages/refresh';
 import { readCommit, readFiles, readText, type Reader } from './pages/repo';
 
 /**
@@ -45,6 +46,10 @@ export async function indexPageLinks(database: Database, pageId: string, head: s
     const address = parseIdentifier(link.target);
     targets.set(link.target, address ? ((await findPageByAddress(database, address))?.id ?? null) : null);
   }
+  const before = await database
+    .select({ target: pageLinks.targetPageId })
+    .from(pageLinks)
+    .where(eq(pageLinks.pageId, pageId));
   await database.transaction(async (tx) => {
     await tx.delete(pageLinks).where(eq(pageLinks.pageId, pageId));
     if (links.length === 0) return;
@@ -66,6 +71,9 @@ export async function indexPageLinks(database: Database, pageId: string, head: s
       })),
     );
   });
+  // The pages these links name, before and after, show what links to them: they are refreshed as the page is.
+  const touched = [...before.map((row) => row.target), ...targets.values()].filter((id) => id !== null);
+  await refreshPageIds(database, touched).catch((err) => console.error('refreshing link targets failed', err));
   return links.length;
 }
 

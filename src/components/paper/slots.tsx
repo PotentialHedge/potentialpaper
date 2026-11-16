@@ -1,7 +1,10 @@
 import type { ComponentType } from 'react';
 import { ArrangedPanels } from '@/components/ArrangedPanels';
+import { ArrangedTabs } from '@/components/ArrangedTabs';
+import { LinksBox } from '@/components/pages/LinkLists';
 import { ui } from '@/components/ui';
-import { PAGE_PANELS, type PanelId } from '@/lib/panels';
+import { type PanelId, slotPanels } from '@/lib/panels';
+import type { PageLink } from '@/server/page-links';
 import type { Paper } from '@/db/schema';
 import { paperPath, sourceLinks, sourceName, type PaperId } from '@/lib/paper-ids';
 import { Comments } from './Comments';
@@ -15,7 +18,9 @@ import type { PaperVersion } from '@/lib/versions';
 /**
  * A paper page is assembled from named slots, so that built-in panels can later become the first
  * extensions (DESIGN.md §10). Panels render the same HTML for every reader, because the edge caches the
- * page: anything about the viewer belongs in a client island.
+ * page: anything about the viewer belongs in a client island. The paper is the first kind of page
+ * (`lib/kinds.ts`): its slots are every kind's `paper.main`, `paper.aside` and `paper.tabs`, and its own
+ * `paper.body` (and the title's links). Other kinds' panels are in `components/pages/slots.tsx`.
  */
 
 export interface PanelProps {
@@ -36,10 +41,13 @@ export interface PanelProps {
   /** The two Markdown sections, as rendered at their last commit. */
   authorHtml: string | null;
   communityHtml: string | null;
+  /** Its labeled links, and the links to it ("what links here"), on pages of any kind (`server/page-links.ts`). */
+  linksFrom: PageLink[];
+  linksTo: PageLink[];
 }
 
-/** `paper.main` sits beside `paper.aside`; `paper.body` follows both, across the page. */
-export type PaperSlot = 'paper.main' | 'paper.aside' | 'paper.body';
+/** `paper.main` sits beside `paper.aside`; `paper.body` follows both, across the page, then `paper.tabs`. */
+export type PaperSlot = 'paper.main' | 'paper.aside' | 'paper.body' | 'paper.tabs';
 
 function Abstract({ paper }: PanelProps) {
   return (
@@ -229,6 +237,14 @@ function Discussion({ canonical }: PanelProps) {
   return <Comments paper={canonical} path={paperPath(canonical)} />;
 }
 
+function Links({ linksFrom }: PanelProps) {
+  return <LinksBox links={linksFrom} direction="from" />;
+}
+
+function Backlinks({ linksTo }: PanelProps) {
+  return <LinksBox links={linksTo} direction="to" />;
+}
+
 /** Each built-in panel, by its id in `lib/panels.ts`, which also gives its slot and its default order. */
 const PANELS: Record<PanelId<'paper'>, ComponentType<PanelProps>> = {
   abstract: Abstract,
@@ -236,6 +252,8 @@ const PANELS: Record<PanelId<'paper'>, ComponentType<PanelProps>> = {
   read: ReadThePaper,
   'versions-box': VersionsAside,
   'submissions-box': SubmissionsAside,
+  links: Links,
+  backlinks: Backlinks,
   community: CommunitySection,
   versions: Versions,
   submissions: Submissions,
@@ -244,11 +262,10 @@ const PANELS: Record<PanelId<'paper'>, ComponentType<PanelProps>> = {
 
 /** A slot's panels, which the reader's settings may hide or reorder (`ArrangedPanels`). */
 export function Slot({ name, ...props }: PanelProps & { name: PaperSlot }) {
-  const panels = PAGE_PANELS.paper
-    .filter((p) => p.slot === name)
-    .map(({ id }) => {
-      const Panel = PANELS[id];
-      return { id, node: <Panel {...props} /> };
-    });
+  const panels = slotPanels('paper', name).map(({ id, title }) => {
+    const Panel = PANELS[id];
+    return { id, title, node: <Panel {...props} /> };
+  });
+  if (name === 'paper.tabs') return <ArrangedTabs kind="paper" panels={panels} />;
   return <ArrangedPanels kind="paper" panels={panels} />;
 }

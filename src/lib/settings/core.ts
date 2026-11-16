@@ -1,4 +1,5 @@
 import { z } from 'zod';
+import { KINDS } from '../kinds';
 import { PAGE_PANELS, PANEL_KINDS, panelIds, SLOT_TITLES, type PanelKind } from '../panels';
 
 /**
@@ -43,7 +44,7 @@ function panelList(
     default: [],
     title,
     description,
-    group: `${kind[0].toUpperCase()}${kind.slice(1)} pages`,
+    group: `${KINDS[kind].title} pages`,
     widget,
     choices: PAGE_PANELS[kind].map((p) => ({ value: p.id, label: p.title, group: SLOT_TITLES[p.slot] ?? p.slot })),
     sanitize: (raw) => {

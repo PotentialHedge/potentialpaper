@@ -1,8 +1,12 @@
+import { eq } from 'drizzle-orm';
 import { revalidatePath } from 'next/cache';
+import { paperIdentifiers } from '@/db/schema';
 import { type PageAddress, pagePath } from '@/lib/kinds';
 import { paperPath, type PaperId } from '@/lib/paper-ids';
 import { revalidateInApp } from '../internal';
 import { siteUrl } from '../site';
+import { pageOf } from './kinds';
+import type { Reader } from './repo';
 
 /**
  * After a commit, makes the paper's pages show it: Next renders them again on their next request, and
@@ -19,6 +23,25 @@ export async function refreshPaperPages(identifiers: readonly PaperId[]): Promis
 /** The same for a page of any kind: a paper's at each of its identifiers, any other at its address. */
 export async function refreshPages(address: PageAddress, identifiers: readonly PaperId[] = []): Promise<void> {
   await refreshPaths(address.kind === 'paper' ? identifiers.map(paperPath) : [pagePath(address)]);
+}
+
+/** The same for pages by id, of any kind: what a commit elsewhere changed, such as the links to them. */
+export async function refreshPageIds(db: Reader, ids: Iterable<string>): Promise<void> {
+  const paths: string[] = [];
+  for (const id of new Set(ids)) {
+    const page = await pageOf(db, id);
+    if (!page) continue;
+    if (page.kind !== 'paper') {
+      paths.push(pagePath({ kind: page.kind, key: page.key }));
+      continue;
+    }
+    const identifiers = await db
+      .select({ scheme: paperIdentifiers.scheme, value: paperIdentifiers.value })
+      .from(paperIdentifiers)
+      .where(eq(paperIdentifiers.paperId, id));
+    paths.push(...identifiers.map(paperPath));
+  }
+  if (paths.length > 0) await refreshPaths(paths);
 }
 
 async function refreshPaths(paths: readonly string[]): Promise<void> {

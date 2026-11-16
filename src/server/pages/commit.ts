@@ -36,6 +36,7 @@ import {
   PREK_PATH,
 } from './rules';
 import { insertPage, mustPage, type PageRow } from './kinds';
+import { refreshPages } from './refresh';
 import { starterFiles } from './starter';
 
 export { type Actor, COMMIT_RATE_LIMIT, newIdentity, SYSTEM_ACTOR } from './check';
@@ -348,6 +349,8 @@ export async function createPage(
   const head = await readHead(database, page.id);
   if (head) return { ...page, head };
   const result = await commitPage(page.id, null, SYSTEM_ACTOR, [], `Start the ${kind} page ${key}`, { database });
+  // Its address may have been answered "not found" and cached.
+  await refreshPages({ kind, key });
   return { ...page, head: result.oid! };
 }
 
