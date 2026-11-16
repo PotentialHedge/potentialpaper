@@ -173,8 +173,22 @@ function hasPlainWords(node: SearchNode | null): boolean {
 }
 
 /**
+ * The best rank among each paper's matching files, as `fr(paper_id, rank)`, when files are searched by relevance.
+ * One pass over the matching documents, grouped, rather than a lookup per matching paper.
+ */
+function fileRanks(sort: SearchSort, node: SearchNode | null, scopes: Scopes): SQL {
+  const wanted = sort === 'relevance' && scopes.files.length > 0 ? wantedWords(node) : null;
+  if (wanted === null) return sql``;
+  return sql`left join (
+    select d.paper_id, max(ts_rank_cd(d.tsv, ${wanted})) as rank from search_docs d
+    where d.scope = any(${sql.param(scopes.files)}::text[]) and d.tsv @@ ${wanted}
+    group by d.paper_id
+  ) fr on fr.paper_id = p.id`;
+}
+
+/**
  * Relevance is still the title and abstract's (`papers.search`) when they are searched; a search in files adds
- * the best rank among the paper's matching files, so that alone it ranks by them.
+ * the best rank among the paper's matching files (`fileRanks`), so that alone it ranks by them.
  */
 function ordering(sort: SearchSort, node: SearchNode | null, scopes: Scopes): SQL[] {
   const activity = [sql`c.updated_at desc nulls last`, sql`p.year desc nulls last`];
@@ -190,12 +204,7 @@ function ordering(sort: SearchSort, node: SearchNode | null, scopes: Scopes): SQ
           sql`ts_rank_cd(p.search, ${tsquery(websearchOf(words))}) + similarity(p.title, ${words.include.join(' ')})`,
         );
       }
-      if (wanted) {
-        ranks.push(sql`coalesce((
-          select max(ts_rank_cd(d.tsv, ${wanted})) from search_docs d
-          where d.paper_id = p.id and d.scope = any(${sql.param(scopes.files)}::text[]) and d.tsv @@ ${wanted}
-        ), 0)`);
-      }
+      if (wanted) ranks.push(sql`coalesce(fr.rank, 0)`);
       return [sql`${sql.join(ranks, sql` + `)} desc`];
     }
     case 'activity':
@@ -256,6 +265,7 @@ async function readPage(
       from unnest(array(
         select p.id from papers p
         left join page_current c on c.paper_id = p.id
+        ${fileRanks(sort, node, scopes)}
         where ${where}
         order by ${order}
         limit ${limit} offset ${(page - 1) * limit}
