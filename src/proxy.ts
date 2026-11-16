@@ -1,5 +1,5 @@
 import { NextResponse, type NextRequest } from 'next/server';
-import { WEBVIEW_PRE_PATH } from '@/editors/vscode/csp';
+import { WEBVIEW_PRE_PATH, webviewCsp } from '@/editors/vscode/csp';
 import { VSCODE_BASE } from '@/editors/vscode';
 import { demoOfHost, isContentHost } from '@/lib/demos';
 import { serveDemo } from '@/server/demos/serve';
@@ -20,7 +20,9 @@ export async function proxy(req: NextRequest) {
   if (isContentHost(host)) {
     const snapshot = demoOfHost(host);
     if (snapshot) return serveDemo(req, snapshot);
-    if (req.nextUrl.pathname.startsWith(`${VSCODE_BASE}${WEBVIEW_PRE_PATH}`)) return NextResponse.next();
+    if (req.nextUrl.pathname.startsWith(`${VSCODE_BASE}${WEBVIEW_PRE_PATH}`)) {
+      return NextResponse.next({ headers: { 'Content-Security-Policy': webviewCsp() } });
+    }
     return new NextResponse('Not found\n', { status: 404, headers: { 'Cache-Control': 'no-store' } });
   }
   const { pathname } = req.nextUrl;

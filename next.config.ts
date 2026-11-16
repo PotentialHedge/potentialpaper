@@ -1,6 +1,6 @@
 import type { NextConfig } from 'next';
-import { editorCsp, WEBVIEW_PRE_PATH, webviewCsp } from './src/editors/vscode/csp';
-import { CONTENT_SOURCE, DEMO_HOST_PATTERN } from './src/lib/demos';
+import { editorCsp } from './src/editors/vscode/csp';
+import { CONTENT_HOST_PATTERN, CONTENT_SOURCE } from './src/lib/demos';
 import { HOME_LIST_PARAMS, PRIVATE_PAGES } from './src/lib/private-paths';
 
 const dev = process.env.NODE_ENV !== 'production';
@@ -49,8 +49,8 @@ const nextConfig: NextConfig = {
       {
         // Everything but the web editor, which has a policy of its own (`src/editors/vscode/csp.ts`).
         source: '/:path((?!editor/).*)',
-        // A demo's host sends its own headers (`server/demos/serve.ts`).
-        missing: [{ type: 'host' as const, value: DEMO_HOST_PATTERN }],
+        // The content domain sends its own (`proxy.ts`, `server/demos/serve.ts`).
+        missing: [{ type: 'host' as const, value: CONTENT_HOST_PATTERN }],
         headers: [
           { key: 'Content-Security-Policy', value: CSP },
           { key: 'X-Content-Type-Options', value: 'nosniff' },
@@ -60,24 +60,23 @@ const nextConfig: NextConfig = {
       {
         // The editor's files. Its page (`app/editor/vscode/route.ts`) sends the same policy itself.
         source: '/editor/vscode/:version/:path*',
-        missing: [{ type: 'host' as const, value: DEMO_HOST_PATTERN }],
         headers: [
-          { key: 'Content-Security-Policy', value: editorCsp() },
           { key: 'X-Content-Type-Options', value: 'nosniff' },
           { key: 'Cache-Control', value: 'public, max-age=86400' },
         ],
+      },
+      {
+        // Not on the content domain, where a webview's pages get theirs from `proxy.ts` (`webviewCsp`), at run time:
+        // it names the site, whose address isn't known when this is built.
+        source: '/editor/vscode/:version/:path*',
+        missing: [{ type: 'host' as const, value: CONTENT_HOST_PATTERN }],
+        headers: [{ key: 'Content-Security-Policy', value: editorCsp() }],
       },
       {
         // The site's extension, which changes without VS Code's version (the path) changing: checked with the
         // server on every load, which answers 304 while it is the same. After the rule above, so this replaces it.
         source: '/editor/vscode/:version/potentialpaper/:path*',
         headers: [{ key: 'Cache-Control', value: 'no-cache' }],
-      },
-      {
-        // A webview's own pages, on the webview's origin, framed by the editor (`webviewCsp`). After the rule
-        // above, so its policy replaces the editor's.
-        source: `/editor/vscode/:version${WEBVIEW_PRE_PATH}:path*`,
-        headers: [{ key: 'Content-Security-Policy', value: webviewCsp() }],
       },
       ...PRIVATE_PAGES.map((source) => ({
         source,

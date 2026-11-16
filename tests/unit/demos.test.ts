@@ -4,8 +4,8 @@ import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { describe, expect, it } from 'vitest';
 import {
+  CONTENT_HOST_PATTERN,
   CONTENT_HOSTNAME,
-  DEMO_HOST_PATTERN,
   demoBlockMarkdown,
   demoBlockText,
   demoOfHost,
@@ -182,8 +182,9 @@ describe('a snapshot', () => {
     expect(isContentHost(webview)).toBe(true);
     expect(isContentHost(CONTENT_HOSTNAME)).toBe(false);
     expect(demoOfHost(`${id}.evil.${CONTENT_HOSTNAME}`)).toBeNull();
-    expect(new RegExp(`^${DEMO_HOST_PATTERN}$`).test(host)).toBe(true);
-    expect(new RegExp(`^${DEMO_HOST_PATTERN}$`).test(webview)).toBe(false);
+    const pattern = new RegExp(`^${CONTENT_HOST_PATTERN}$`);
+    expect(pattern.test(host) && pattern.test(webview)).toBe(true);
+    expect(pattern.test(CONTENT_HOSTNAME)).toBe(false);
   });
 });
 

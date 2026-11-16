@@ -41,8 +41,8 @@ export function demoOfHost(hostname: string): string | null {
   return isSnapshotId(label) ? label : null;
 }
 
-/** A demo's host names, as a regular expression for `next.config.ts`'s `has`/`missing` (matched whole). */
-export const DEMO_HOST_PATTERN = `[0-9a-f]{32}\\.${CONTENT_HOSTNAME.replaceAll('.', '\\.')}`;
+/** The content domain's host names, as a regular expression for `next.config.ts`'s `has`/`missing` (matched whole). */
+export const CONTENT_HOST_PATTERN = `.+\\.${CONTENT_HOSTNAME.replaceAll('.', '\\.')}`;
 
 export function demoOrigin(snapshot: string): string {
   return `${content.protocol}//${snapshot}.${content.host}`;
