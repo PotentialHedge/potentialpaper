@@ -12,6 +12,8 @@ import {
   type HostMethod,
   isEnvelope,
   MAX_FRAME_HEIGHT,
+  MAX_PAPERS_CHUNK,
+  PAPER_FIELDS,
   PROTOCOL_VERSION,
   resultOf,
   STORAGE_KEY_RE,
@@ -46,6 +48,11 @@ export interface HostServices {
   storageSet(key: string, value: unknown): Promise<void>;
   /** A GET of the site's public API: `/pages/<identifier>/files`, …; rejects with a `HostError`. */
   api(path: string): Promise<unknown>;
+  /**
+   * A GET of one of the API's NDJSON routes (`/pages/<identifier>/papers?limit=…`): its lines, parsed, and the cursor of
+   * the chunk after (`X-Next-Cursor`), `null` at the end.
+   */
+  apiLines(path: string): Promise<{ rows: unknown[]; next: string | null }>;
   setHeight(height: number): void;
   openUrl(url: string): void;
 }
@@ -68,6 +75,15 @@ const PARAMS: Partial<Record<HostMethod, z.ZodType>> = {
   }),
   'page.resolve': z.object({ identifier }),
   'reviews.forPaper': z.object({ identifier }),
+  'scope.scores': z
+    .object({ identifier, venue: z.string().min(1).max(300).optional(), field: z.string().min(1).max(200).optional() })
+    .refine((p) => !p.field || p.venue, { message: 'a field needs its venue', path: ['field'] }),
+  'scope.papers': z.object({
+    identifier,
+    fields: z.array(z.enum(PAPER_FIELDS)).max(PAPER_FIELDS.length).optional(),
+    after: z.uuid().optional(),
+    limit: z.number().int().min(1).max(MAX_PAPERS_CHUNK).optional(),
+  }),
   'ui.setHeight': z.object({ height: z.number().finite().min(0) }),
   'ui.openUrl': z.object({ url: z.url({ protocol: /^https?$/ }).max(2000) }),
 };
@@ -103,6 +119,18 @@ const HANDLERS: Record<HostMethod, Handler> = {
   },
   'page.resolve': (s, { identifier }) => s.api(`/pages/${enc(identifier as string)}`),
   'reviews.forPaper': (s, { identifier }) => s.api(`/pages/${enc(identifier as string)}/submissions`),
+  'scope.scores': async (s, { identifier, venue, field }) => {
+    const base = `/pages/${enc(identifier as string)}/scores`;
+    if (field) return s.api(`${base}/${enc(venue as string)}/${enc(field as string)}`);
+    const list = (await s.api(base)) as { scores: { venue: { id: string } }[] };
+    return venue ? { ...list, scores: list.scores.filter((score) => score.venue.id === venue) } : list;
+  },
+  'scope.papers': (s, { identifier, fields, after, limit }) => {
+    const query = new URLSearchParams({ limit: String(limit ?? 500) });
+    if (fields !== undefined) query.set('fields', (fields as string[]).join(','));
+    if (after !== undefined) query.set('after', after as string);
+    return s.apiLines(`/pages/${enc(identifier as string)}/papers?${query}`);
+  },
   'ui.setHeight': (s, { height }) => s.setHeight(Math.min(MAX_FRAME_HEIGHT, Math.round(height as number))),
   'ui.openUrl': (s, { url }) => s.openUrl(url as string),
 };

@@ -230,6 +230,34 @@
         return call('page.resolve', { identifier: identifier });
       },
     },
+    scope: {
+      scores: function (identifier, venue, field) {
+        return ready.then(function () {
+          var params = { identifier: page(identifier) };
+          if (venue) params.venue = venue;
+          if (field) params.field = field;
+          return call('scope.scores', params);
+        });
+      },
+      papers: function (identifier, options) {
+        var opts = options || {};
+        var rows = [];
+        return ready.then(function () {
+          var id = page(identifier);
+          function step(after) {
+            var params = { identifier: id, limit: opts.chunkSize || 500 };
+            if (opts.fields) params.fields = opts.fields;
+            if (after) params.after = after;
+            return call('scope.papers', params).then(function (chunk) {
+              if (opts.onChunk) opts.onChunk(chunk.rows);
+              else Array.prototype.push.apply(rows, chunk.rows);
+              return chunk.next ? step(chunk.next) : rows;
+            });
+          }
+          return step(opts.after || null);
+        });
+      },
+    },
     reviews: {
       forPaper: function (identifier) {
         return ready.then(function () {

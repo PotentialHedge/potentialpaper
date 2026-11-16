@@ -7,6 +7,7 @@ declare namespace PP {
   type PageKind = 'paper' | 'venue' | 'topic' | 'org' | 'user';
 
   type Permission = 'page.read' | 'scope.read' | 'reviews.read';
+  type Outcome = 'accepted' | 'rejected' | 'withdrawn' | 'pending';
 
   type ErrorCode = 'MethodNotFound' | 'PermissionDenied' | 'InvalidParams' | 'Unavailable' | 'Internal';
 
@@ -113,6 +114,69 @@ declare namespace PP {
     notes: Note[];
   }
 
+  /** Fixed-width bins: `counts[i]` holds the means in `[lo + i·width, lo + (i+1)·width)`, the last closed at `hi`. */
+  interface Bins {
+    lo: number;
+    hi: number;
+    width: number;
+    counts: number[];
+  }
+
+  /** A score field at one venue of a scope, with counts. */
+  interface ScoreSummary {
+    /** `<source>:<venue id>`: `openreview:ICLR.cc/2027/Conference`. A 6 at one venue is no 6 at another. */
+    venue: { id: string; name: string };
+    /** The field's key in the venue's review forms (`rating`), and its label. */
+    field: string;
+    label: string;
+    /** Submissions with a mean for it. */
+    count: number;
+    /** The range the venue's form states, when it does. */
+    min: number | null;
+    max: number | null;
+    byStatus: Record<Outcome, number>;
+    decisionsOut: boolean;
+    /** Withheld by the site until the venue's decisions are out: no values, empty bins. */
+    hidden: boolean;
+    computedAt: string;
+  }
+
+  interface ScoreList {
+    page: PageSummary;
+    hideUntil: 'never' | 'decisions';
+    /** Venues with the most submissions first; each venue's fields in its forms' order (the overall rating first). */
+    scores: ScoreSummary[];
+  }
+
+  interface ScoreField extends ScoreSummary {
+    page: PageSummary;
+    /** Each submission's mean over its reviews, ascending. */
+    values: number[];
+    bins: Bins;
+    /** The same by outcome. */
+    split: Record<Outcome, { count: number; values: number[]; bins: Bins }>;
+  }
+
+  /** A paper of a scope, as `scope.papers` gives it. */
+  interface BulkPaper {
+    identifier: string | null;
+    address: string | null;
+    title: string;
+    year: number | null;
+    /** Every submission of the paper, not only the scope's (with `fields` naming `submissions`, `scores` or `status`). */
+    submissions?: {
+      venue: { id: string; name: string };
+      externalId: string;
+      number: number | null;
+      url: string | null;
+      /** With `status`. */
+      status?: Submission['status'];
+      decision?: string | null;
+      /** With `scores`: each review's score fields, by key. CC BY: keep `license` and `url` with them. */
+      reviews?: { id: string; signature: string; scores: Record<string, number>; url: string | null; license: string }[];
+    }[];
+  }
+
   interface SDK {
     readonly apiVersion: 1;
     /** Resolves with the context once the page has answered; every call waits for it. */
@@ -152,6 +216,27 @@ declare namespace PP {
       resolve(identifier: string): Promise<
         PageSummary & { scopes: PageSummary[]; facts: { hasScores: boolean; hasSubmissions: boolean } }
       >;
+    };
+    scope: {
+      /**
+       * Needs `scope.read`: a venue's, topic's or org's score statistics, the current page by default. Without `venue`
+       * and `field`, the list of venues and fields; with both, that field's sorted means, bins and split by outcome.
+       */
+      scores(identifier?: string): Promise<ScoreList>;
+      scores(identifier: string | undefined, venue: string): Promise<ScoreList>;
+      scores(identifier: string | undefined, venue: string, field: string): Promise<ScoreField>;
+      /**
+       * Needs `scope.read`: every paper of a scope, rolled up, fetched in chunks. Resolves with them all, or with `[]`
+       * when `onChunk` takes each chunk as it comes. `fields` defaults to all three.
+       */
+      papers(
+        identifier?: string,
+        options?: {
+          fields?: ('submissions' | 'scores' | 'status')[];
+          chunkSize?: number;
+          onChunk?: (rows: BulkPaper[]) => void;
+        },
+      ): Promise<BulkPaper[]>;
     };
     reviews: {
       /** Needs `reviews.read`: a paper's submissions, notes and venue forms. The current paper by default. */

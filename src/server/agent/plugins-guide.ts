@@ -44,6 +44,14 @@ export const METHOD_DOCS: Record<keyof typeof HOST_METHODS, { call: string; does
     call: 'pp.reviews.forPaper([identifier])',
     does: "A paper's submissions, with their reviews, decisions and the venue's forms.",
   },
+  'scope.scores': {
+    call: 'pp.scope.scores([identifier], [venue], [field])',
+    does: "A scope's score statistics: its venues and fields with counts, or one field's sorted means, bins and split by outcome.",
+  },
+  'scope.papers': {
+    call: 'pp.scope.papers([identifier], { fields, onChunk })',
+    does: "Every paper of a scope with its submissions, statuses and each review's scores, in chunks, for your own statistics.",
+  },
   'ui.setHeight': {
     call: 'pp.ui.setHeight(px)',
     does: `Size your frame yourself (at most ${MAX_FRAME_HEIGHT}px). By default the SDK sizes it to your body.`,
@@ -281,6 +289,20 @@ segment (\`venue%3Aiclr%2F2027\`). Each answer is cached a minute.
 - \`GET ${origin}/api/v1/pages/<identifier>/members?offset=&limit=&rollUp=\`: a scope's papers (\`page.members\`)
 - \`GET ${origin}/api/v1/pages/<identifier>/submissions\`: a paper's submissions and reviews (\`reviews.forPaper\`)
 - \`GET ${origin}/api/v1/pages/<identifier>/venue-papers?status=&decision=&q=\`: a venue's submissions by status
+- \`GET ${origin}/api/v1/pages/<identifier>/scores\`: a scope's score statistics, the venues and score fields with
+  counts (\`scope.scores\`)
+- \`GET ${origin}/api/v1/pages/<identifier>/scores/<venue>/<field>\`: one field at one venue (the venue's id,
+  \`openreview:ICLR.cc/2027/Conference\`, URL-encoded): every submission's mean over its reviews, sorted, fixed-width
+  bins, and the same split by outcome (\`accepted\`, \`rejected\`, \`withdrawn\`, \`pending\`)
+- \`GET ${origin}/api/v1/pages/<identifier>/papers?fields=submissions,scores,status&limit=&after=\`: a scope's papers
+  as NDJSON, one a line, with every submission, its status and each review's score vector (\`scope.papers\`). Without
+  \`limit\`, all of them in one stream; with it, one chunk and the next cursor in \`X-Next-Cursor\`. Gzipped when asked.
+
+The score and paper routes send an \`ETag\` and answer \`If-None-Match\` with a 304: cache what you fetch (in your
+origin's IndexedDB) and ask again with the tag. Statistics are recomputed a few seconds after a change; curve-fitting
+and percentiles are yours to do from \`values\`. A site may withhold a venue's statistics until its decisions are out
+(\`hidden: true\`, with no values). Reviews are CC BY 4.0: show each one's licence and link with what you draw from
+it. The OpenAPI description of these routes is at ${origin}/openapi.json.
 
 A plugin with its own backend lists that backend's origin in \`network\`; it never gets the reader's session.
 

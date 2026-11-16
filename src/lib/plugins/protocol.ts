@@ -84,6 +84,8 @@ export const HOST_METHODS = {
   'page.members': 'scope.read',
   'page.resolve': null,
   'reviews.forPaper': 'reviews.read',
+  'scope.scores': 'scope.read',
+  'scope.papers': 'scope.read',
   'ui.setHeight': null,
   'ui.openUrl': null,
 } as const satisfies Record<string, PluginPermission | null>;
@@ -99,6 +101,11 @@ export type FrameMethod = 'commands.run';
 export const MAX_STORAGE_BYTES = 64 * 1024;
 /** A storage key. */
 export const STORAGE_KEY_RE = /^[A-Za-z0-9_.:-]{1,100}$/;
+
+/** The most papers one `scope.papers` call returns; the SDK asks for chunks of this size until the end. */
+export const MAX_PAPERS_CHUNK = 2000;
+/** The fields `scope.papers` can give each paper (`GET /pages/{identifier}/papers?fields=`). */
+export const PAPER_FIELDS = ['submissions', 'scores', 'status'] as const;
 
 /** The tallest a frame may make itself. */
 export const MAX_FRAME_HEIGHT = 4000;

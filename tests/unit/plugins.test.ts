@@ -255,6 +255,10 @@ function services(
       calls.push(path);
       return { path };
     },
+    apiLines: async (path) => {
+      calls.push(path);
+      return { rows: [{ path }], next: null };
+    },
     setHeight: (h) => calls.push(`height ${h}`),
     openUrl: (url) => calls.push(`open ${url}`),
     ...overrides,
@@ -381,6 +385,76 @@ describe('the SDK, against the host', () => {
     expect(await connection.call('commands.run', { command: 'reset' })).toBe('done');
     expect(changes).toEqual([{ greeting: 'Hi', showScopes: false }]);
     expect(pp.context.settings).toEqual({ greeting: 'Hi', showScopes: false });
+    connection.close();
+  });
+});
+
+describe('data for plugins over the RPC (scope.scores, scope.papers)', () => {
+  it('asks the score routes, by scope, venue and field, behind scope.read', async () => {
+    const venue = 'openreview:ICLR.cc/2027/Conference';
+    const s = services({
+      permissions: ['scope.read'],
+      api: async (path) => {
+        s.calls.push(path);
+        return path.endsWith('/scores')
+          ? { scores: [{ venue: { id: venue } }, { venue: { id: 'openreview:other' } }] }
+          : { path };
+      },
+    });
+    expect(await dispatch(services(), call('scope.scores', { identifier: 'venue:iclr/2027' }))).toMatchObject({
+      error: { code: 'PermissionDenied' },
+    });
+    expect(await dispatch(s, call('scope.scores', { identifier: 'venue:iclr/2027' }))).toMatchObject({
+      result: { scores: [{}, {}] },
+    });
+    expect(await dispatch(s, call('scope.scores', { identifier: 'venue:iclr/2027', venue }))).toMatchObject({
+      result: { scores: [{ venue: { id: venue } }] },
+    });
+    expect(
+      await dispatch(s, call('scope.scores', { identifier: 'venue:iclr/2027', venue, field: 'rating' })),
+    ).toMatchObject({
+      result: { path: '/pages/venue%3Aiclr%2F2027/scores/openreview%3AICLR.cc%2F2027%2FConference/rating' },
+    });
+    expect(await dispatch(s, call('scope.scores', { identifier: 'venue:iclr/2027', field: 'rating' }))).toMatchObject({
+      error: { code: 'InvalidParams', message: expect.stringContaining('venue') },
+    });
+  });
+
+  it('reads papers in chunks: the SDK follows the cursor to the end', async () => {
+    const { win, listeners, parent } = sdkWindow();
+    const chunks = new Map<string | null, { rows: unknown[]; next: string | null }>([
+      [null, { rows: [{ title: 'A' }, { title: 'B' }], next: '00000000-0000-4000-8000-000000000001' }],
+      ['00000000-0000-4000-8000-000000000001', { rows: [{ title: 'C' }], next: null }],
+    ]);
+    const s = services({
+      permissions: ['scope.read'],
+      apiLines: async (path) => {
+        s.calls.push(path);
+        return chunks.get(new URL(path, 'http://x').searchParams.get('after'))!;
+      },
+    });
+    const channel = new MessageChannel();
+    open.push(channel.port1, channel.port2);
+    const connection = connect(channel.port1, s);
+    for (const listener of listeners) {
+      listener({ source: parent, data: { type: BOOT_MESSAGE, protocol: 1, context: CONTEXT }, ports: [channel.port2] });
+    }
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any -- the SDK as the page sees it
+    const pp = win.pp as any;
+    await pp.ready;
+    expect(
+      (await pp.scope.papers(undefined, { fields: ['scores'], chunkSize: 2 })).map((r: { title: string }) => r.title),
+    ).toEqual(['A', 'B', 'C']);
+    expect(s.calls).toEqual([
+      '/pages/venue%3Aiclr%2F2027/papers?limit=2&fields=scores',
+      '/pages/venue%3Aiclr%2F2027/papers?limit=2&fields=scores&after=00000000-0000-4000-8000-000000000001',
+    ]);
+    const seen: unknown[][] = [];
+    expect(await pp.scope.papers('venue:iclr/2027', { onChunk: (rows: unknown[]) => seen.push(rows) })).toEqual([]);
+    expect(seen.map((rows) => rows.length)).toEqual([2, 1]);
+    await expect(pp.scope.papers('venue:iclr/2027', { fields: ['votes'] })).rejects.toMatchObject({
+      code: 'InvalidParams',
+    });
     connection.close();
   });
 });

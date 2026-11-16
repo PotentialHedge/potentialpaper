@@ -84,6 +84,22 @@ async function apiGet(path: string): Promise<unknown> {
   throw new HostError(res.status === 404 ? 'Unavailable' : res.status < 500 ? 'InvalidParams' : 'Internal', message);
 }
 
+/** An NDJSON route of the site's API: its rows, and the cursor of the chunk after. */
+async function apiLines(path: string): Promise<{ rows: unknown[]; next: string | null }> {
+  const res = await fetch(`/api/v1${path}`);
+  if (!res.ok) {
+    const body = await res.json().catch(() => null);
+    const message = body?.error?.message ?? `HTTP ${res.status}`;
+    throw new HostError(res.status === 404 ? 'Unavailable' : res.status < 500 ? 'InvalidParams' : 'Internal', message);
+  }
+  const text = await res.text();
+  const rows = text
+    .split('\n')
+    .filter((line) => line.trim() !== '')
+    .map((line) => JSON.parse(line) as unknown);
+  return { rows, next: res.headers.get('x-next-cursor') };
+}
+
 interface Latest {
   plugin: ReadyPlugin;
   page: PluginPageData | null;
@@ -224,6 +240,7 @@ export function PluginFrame({
         }
       },
       api: apiGet,
+      apiLines,
       setHeight: (h) => setHeight(Math.max(0, h)),
       openUrl: (url) => {
         window.open(url, '_blank', 'noopener,noreferrer');
