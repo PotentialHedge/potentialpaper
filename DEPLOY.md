@@ -64,6 +64,20 @@ The consumers are:
   type's indexer, which `in:page` and `in:reviews` searches read. The first deploy with it replays every page's
   events from zero; that is expected, and the home page's plain search (titles and abstracts) works meanwhile.
   After changing an indexer in `src/server/pages/schemas.ts`, rebuild it: `consumers:rebuild -- search`.
+- **`reviews`** (`src/server/review-projection.ts`) projects the `reviews/<source>/<submission>/` files bots commit
+  into `submissions`, `submission_notes` and the venues' forms, which the Submissions panel reads. A page with no
+  review files loses any rows it had, so on the first deploy with it, run the review import (below) right away;
+  until it and the worker are through, some pages show no submissions.
+
+### Importing OpenReview reviews
+
+`npm run papers:import-reviews -- <scrape.sqlite> ICLR.cc/2027/Conference "ICLR 2027" [--concurrency 4] [--from
+<forum id>]` (`scripts/import-openreview-reviews.ts`) commits each submission's files as the `openreview` bot, one
+commit per submission that changed (with `IMPORT_RATE_LIMIT`, not the people's limit). Re-running commits only what
+changed, so a stopped run is resumed by running it again. In dev the first full run (42,430 submissions) took about
+25 minutes at concurrency 4. Run it as a unit that outlives the shell (`systemd-run --user`, or `dc run -d`), then,
+once the worker has caught up, reclaim space: `REPACK (CONCURRENTLY)` (Postgres 19) or `VACUUM (ANALYZE)` on
+`page_objects`, `page_revisions`, `page_events`, `search_docs`, `submission_notes`.
 
 In dev the worker is the transient user unit `papertrail-worker` (log `data/worker.log`), started beside
 `papertrail-dev`: `systemd-run --user --unit=papertrail-worker --working-directory=$PWD --setenv=PATH=$PATH
