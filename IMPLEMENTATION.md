@@ -102,6 +102,9 @@ Most of the risk is here, so it comes before the editor.
 - Move two built-in panels onto the extension API to prove it works. The Submissions panel, a renderer
   for `reviews/**` files (DESIGN.md §4.8), is a natural first.
 - Start with a small set of slots. An acceptodds odds panel makes a good first extension.
+- Planned in `handoffs/plugins.md`, brought forward. Built 2026-11-16 (its Phase 1): settings.json, layered
+  defaults ← site ← user, with `/settings`, `GET`/`PUT /api/v1/me/settings` and `/schemas/settings.json`
+  (DESIGN.md §10).
 
 ## Main risks
 

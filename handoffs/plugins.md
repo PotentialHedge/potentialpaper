@@ -1,6 +1,6 @@
 # Handoff: settings.json, plugins from GitHub, data for plugins, and the score-standing plugin
 
-Status: plan, 2026-11-16. Nothing here is built yet.
+Status: plan, 2026-11-16. Phase 1 (settings.json) is built; see the Log.
 
 ## Goal
 
@@ -248,3 +248,81 @@ those kinds' pages (`handoffs/pages.md` Phases 2 and 4). The paper view can ship
 
 Suggested order: plugins 1 → pages 1 → plugins 2 → pages 2 (venues) → plugins 3, 4 → plugins 6 (paper and venue
 views) → pages 3, 4, 5 alongside plugins 5 → the org view of score standing.
+
+### Phase 1: settings.json (2026-11-16, branch `plugins-phase-1`)
+
+Built:
+
+- **Tables** (`drizzle/0031_settings.sql`): `user_settings(account_id pk → accounts, doc text, updated_at)` and
+  `site_settings(id = 1, doc text, updated_at)`. Texts are stored as written (JSONC) and parsed when read.
+- **`lib/settings/`**, shared by server and browser: `core.ts` (the core settings, zod, each with default, title,
+  description, group and a form widget), `spec.ts` (Presio's `SettingSpec` and `sanitizeSettingValue`, plus
+  `settingValueProblem`, `PLUGIN_ID_RE`, `qualify`/`splitQualified`), `document.ts` (parse, `checkSettings`,
+  `resolveSettings` for defaults ← site ← user and plugins' specs, `setInSettings` that edits one key and keeps
+  comments and order), `schema.ts` (JSON Schema) and `client.ts` (the browser store, `useSetting`).
+- **Routes:** `GET`/`PUT /api/v1/me/settings` (the PUT body is the file itself; a 422 `validation_error` says
+  `settings.json has N problems:` and then one line per error naming its key, with `details.problems` carrying
+  severity, key, line and message; warnings come back in `problems` on success; a `read` token can GET but not
+  PUT). `GET /api/v1/settings` (public: the site layer and what it resolves to, for signed-out readers).
+  `/schemas/settings.json` (private, per account, beside `PAGE_SCHEMAS` in `app/schemas/[file]`).
+- **`npm run settings:site`**: print the site layer, `set <file|->` to replace it, `put <key> [json]` to set or
+  remove one key keeping the rest. Checked as a user's file is; nothing is saved with errors.
+- **`/settings`** (linked in the navbar for everyone): a form made from `CORE_SETTINGS` (a "toggles" widget for
+  hidden panels, an "order" widget with up/down per slot, and "reset" per key), "Edit settings.json" (a textarea
+  checked live by the shared validator, problems listed by line and clickable), Export (downloads the file) and
+  Import (loads a file into the raw editor to look over and save).
+- **First core keys:** `paper.panels.hidden` and `paper.panels.order`, made per kind from `lib/panels.ts`
+  (`PAGE_PANELS`: each built-in panel's stable id, slot and title). `components/paper/slots.tsx` renders each slot's
+  panels on the server and hands them to `components/ArrangedPanels.tsx`, which hides and orders them in the
+  browser. `order` puts the named panels first within their own slot, the rest after in their usual order.
+- **Signed out:** the file lives in localStorage (`pp.settings`). After sign-in, `components/SettingsImport.tsx`
+  (under the navbar) offers to import it, key by key over the account's file, or discard it; either clears it.
+  `NavUser` tells the store when the reader signs in or out, so it refetches.
+- Agents: a line in `llms.txt` and a dated notice in `/agent/updates`.
+- DESIGN.md §10 rewritten to match this plan (settings.json, the model, own origin per plugin, consent outside
+  settings, data A/B/D not C, `plugins.default` and `plugins.blocked`); IMPLEMENTATION.md Milestone 8 notes it.
+
+Calls I made where the plan left room:
+
+- `user_settings` is keyed by **`account_id`**, not `user_id`: the account is the identity here
+  (`paper_follows` and the rest key on it), and `user_id` would read as Better Auth's `user` table.
+- **Site layer as a row, not `config/settings.json`**: Phase 2's kill switch (`plugins.blocked`) must act without
+  a deploy, and a row does. Cached for 10 s per process.
+- **`feed.showBots` is not added.** There is no activity feed yet (`/changes`, DESIGN.md §7), and a page's history
+  isn't one: a setting that nothing reads is what the plan says not to add. Add it with the feed. **`theme`** waits
+  for a theme switch, which doesn't exist. The mail preferences (`mentionMail`, `followMail`) stay account columns:
+  the server's mailers read them, and moving them wasn't asked for.
+- **No Monaco.** The web editor is a whole VS Code workbench (`public/editor/vscode`), with no standalone Monaco
+  to embed cheaply, so the raw editor is a textarea with the shared validator running as you type and the server
+  checking again on save. It has no completion; the schema at `/schemas/settings.json` is there for editors that do.
+- **Panels apply after load.** Paper pages are the same HTML for every reader (the edge caches them), so hidden and
+  reordered panels are applied in the browser. The last resolved values are cached in localStorage
+  (`pp.settings.resolved`, state rather than settings) so a returning reader's arrangement applies on the first
+  client render rather than after a fetch; a first visit shows the defaults for a moment.
+- **Panel ids are strict on write, lenient on read:** a PUT naming an unknown panel is an error; when reading, an
+  id that no longer exists is dropped and the rest still applies. Unknown keys, and keys of plugins not installed,
+  are warnings and kept.
+- **Removing a key keeps the comments around it.** jsonc-parser's own removal drops a comment on the next line,
+  so `setInSettings(…, undefined)` removes only the property's own line(s), its comma and a comment on its line.
+- `GET /api/v1/settings` is new (not in the plan), so signed-out readers get the site layer.
+
+For Phase 2:
+
+- `server/settings.ts`'s `installedPluginSettings(account)` returns `[]`; make it read the `plugins` key and the
+  installed manifests' `contributes.settings`. Everything downstream (resolve, check, the JSON Schema, the GET)
+  already takes that list. The browser store (`lib/settings/client.ts`) resolves signed-out readers' files against
+  core settings only; it needs the plugin list too.
+- Add `plugins` (with a sanitizer, as Presio's `sanitizePluginList`), `plugins.default` and `plugins.blocked` to
+  `CORE_SETTINGS`. The form shows a key only if it has a widget; give these one or leave them to Phase 3's
+  `/settings/plugins`.
+- Plugin panels join slots in `ArrangedPanels`. `<kind>.panels.hidden`/`order` only accept built-in ids for now;
+  widen them to plugin panel ids (`<plugin id>.<panel id>`) there.
+- When `handoffs/pages.md` Phase 1 adds kinds, add their panels to `PAGE_PANELS` (or derive it from the kind
+  registry) and their settings appear on their own.
+
+Checks: `npm run typecheck`, `npm run lint` and `next build` pass. Unit tests: 339 pass (9 new in
+`tests/unit/settings.test.ts`). Integration: 247 of 254 pass, 5 new in `tests/integration/settings.test.ts`. The 7
+failures are the same on the untouched branch: six in `pdf-ingest.test.ts` (no poppler on this host) and one in
+`follows.test.ts` (its setup's `PATCH /me` returns 422). This worktree ran them against its own database,
+`potentialpaper_test_plugins1`, through an untracked `.env`, so as not to migrate the shared test database under
+other threads.

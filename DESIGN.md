@@ -758,40 +758,66 @@ Wikipedia talk page.
 
 ## 10. Extensions (later, but shaped from day one)
 
-**Goal:** anyone can add a feature with nothing more than a public GitHub repo.
+**Goal:** anyone can add a feature with nothing more than a public GitHub repo. A plugin adds panels to any kind of
+page (a paper, a venue, a topic, an org, a person: `handoffs/pages.md`), readers find and install the ones they
+want, and each reader's site and plugin preferences live in one `settings.json`. Decided with Benedict on
+2026-11-16; `handoffs/plugins.md` is the plan and its phases, and where it and this section differ, it wins.
+
+### settings.json
+
+Built 2026-11-16 (`handoffs/plugins.md` Phase 1). One document per account, layered as in VS Code:
+
+- **Layers:** defaults ← site ← user. Defaults come from the core settings (`lib/settings/core.ts`, zod, one
+  entry per key with its default and description) and from each installed plugin's `contributes.settings`. The
+  site layer is one `site_settings` row, set by admins with `npm run settings:site`, so it changes without a deploy.
+  The user layer is the account's `user_settings` row. A signed-out reader's document lives in localStorage and is
+  offered for import when they sign in.
+- **Keys are dotted** (`paper.panels.hidden`); a plugin's are namespaced by its id
+  (`benedict-armstrong/score-standing.view`). The document holds only what differs from the layer below.
+- **The text is kept as written** (JSONC, so comments and key order survive) and parsed when read. Values are
+  checked when read and never trusted when written: a bad value reads as the layer below, so a hand-edited file
+  never breaks a page. `PUT /api/v1/me/settings` takes the file itself and reports every problem, each on a line
+  naming its key; unknown keys are kept, with a warning, so a file can name a plugin's settings before the plugin
+  is installed. Agents and scripts use the same route.
+- `/schemas/settings.json` is its JSON Schema: the core keys and the requesting account's installed plugins' keys.
+  `/settings` has a form made from the schema, the raw file with the same checks, and Export and Import.
+- **Settings are preferences.** Remembered state (dismissed prompts, a plugin's cache) stays out of the document,
+  and so does consent (below).
+- The first core keys are `<kind>.panels.hidden` and `<kind>.panels.order`: a reader turns built-in panels off or
+  reorders them within their slots (§4.8). Pages stay the same HTML for every reader, so these apply in the
+  browser after load.
 
 ### The model
 
-A repo has a manifest and built files at a commit:
+A plugin is a public repo with a `potentialpaper-plugin.json` manifest and built files committed to it. We never
+run a build. The manifest names an `id`, `name`, `version`, `apiVersion`, `main` (an HTML file), `permissions`,
+`network` (https origins its own backend lives at) and what it `contributes`: panels (`{ id, title, kinds, slot,
+when? }`, in a kind's `main`, `aside` or `tab` slot), whole pages (`/x/<plugin>/…`), settings and commands.
+`when` conditions (`page.hasScores`, `signedIn`, …) decide whether a panel shows at all, so a page doesn't start a
+frame per installed plugin.
 
-```json
-{
-  "id": "ben.replication-tracker",
-  "name": "Replication tracker",
-  "version": "0.3.0",
-  "entry": "dist/index.html",
-  "permissions": ["paper.read", "links.read", "repo.extensionData.write"],
-  "contributes": {
-    "paperPanels": [{ "title": "Replications", "slot": "paper.aside" }],
-    "fenceRenderers": ["replication-table"],
-    "fileRenderers": [{ "glob": "reviews/*/*/**", "slot": "paper.tabs" }],
-    "linkLabels": [{ "id": "formalizes", "reads": "formalizes", "inverse": "formalized by" }],
-    "pages": [{ "path": "/x/replications", "title": "Replications" }]
-  }
-}
-```
-
-Registering means giving us a repo URL. We pin the **commit SHA**, snapshot those files to R2, and
-never run a build. Updates are explicit, and new permissions need new consent.
+Installing resolves a tag or branch to a **commit SHA**, and the server copies the files at that SHA once, to R2,
+as demos are copied. Updates are explicit, and new permissions need new consent.
 
 ### Security is what shapes everything
 
 Arbitrary JavaScript on the main origin could act as any signed-in user. So:
 
-- Extensions run in **`<iframe sandbox="allow-scripts">`** on a **separate registrable domain** we
-  own, with no cookies from the main site and a strict CSP.
-- The **only** bridge is a typed `postMessage` RPC, and each call is checked against the permissions
-  the user granted.
+- **Each plugin runs on its own origin**, `<host>.ppusercontent.com/<sha>/…`, where the host label is a stable
+  hash of the plugin id, on a different site from the app. Its frame is `sandbox="allow-scripts
+allow-same-origin"`: the same-origin flag is safe only because the origin is the plugin's own, and it lets a
+  plugin keep its own IndexedDB cache across versions. Its CSP is `default-src 'self'`, with `connect-src` adding
+  the manifest's `network` origins.
+- The **only** bridge is a typed, versioned `postMessage` RPC, and each call is checked against the permissions
+  the user granted. A plugin never touches the host's DOM or session; it declares what it adds, and the host draws
+  it.
+- **Consent is not in settings.json.** The document lists installed plugins (the `plugins` key), and a hand-edited
+  file can add one, but a grant row (`user_plugin_grants`: plugin id, SHA, permissions) records what was approved.
+  A plugin with no matching grant shows an approval prompt instead of running.
+- **Plugins never write state other users share.** Shared state that clients can write can be poisoned by anyone.
+  Data comes three ways: aggregates the site computes per scope (a `scope_stats` consumer, §4.9), generic bulk
+  reads of a scope's papers with ETags, and a plugin's own backend (its `network` origins, or a bot, below).
+  Per-user plugin storage is fine.
 - Writes go through `commitPage` like any others and record the extension in a trailer.
 
 VS Code makes the same trade: extensions get APIs and webviews, not the host's DOM. So "almost
@@ -800,8 +826,9 @@ restyling the host page or reading its session. That limit is what makes it safe
 
 ### Trust levels
 
-Each user installs what they want, and it affects only them. Admins can review specific versions and
-make them default for everyone, by script. A kill switch disables any extension site-wide.
+Each user installs what they want, and it affects only them. Discovery lists public repos with the GitHub topic
+`potentialpaper-plugin`. The site layer of settings.json holds `plugins.default` (sources installed for everyone,
+which a user can turn off) and `plugins.blocked`, the kill switch (ids, or ids at a SHA).
 
 ### Server-side extensions: bots
 
@@ -840,6 +867,7 @@ the route honest. The activity feed hides bot commits by default.
 | Bot grants on path patterns, as data                                     | Third-party bots need no code from us       |
 | Labels stored as data                                                    | Namespaced labels need no schema change     |
 | Strict CSP from the start                                                | Retrofitting CSP is painful                 |
+| Built-in panels by stable id (`lib/panels.ts`), arranged by settings     | Plugin panels join the same slots and order |
 
 ## 11. Attribution, licensing, legal
 

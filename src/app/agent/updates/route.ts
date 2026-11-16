@@ -9,6 +9,10 @@ export const dynamic = 'force-dynamic';
  */
 const UPDATES: { date: string; text: string }[] = [
   {
+    date: '2026-11-16',
+    text: "A person's preferences are one file, settings.json (JSONC; comments allowed), which holds only what they changed. Read it with `GET /api/v1/me/settings` (the text as written, and every setting's value) and, when they ask you to change a setting, replace it with `PUT /api/v1/me/settings`, the file itself as the body. Keep their comments and other keys. A 422 lists every problem, one per line, each naming its key; unknown keys are kept with a warning. The settings and their meanings are in `/schemas/settings.json`. The first ones hide and reorder the panels on paper pages.",
+  },
+  {
     date: '2026-11-13',
     text: 'Papers have versions: its preprints, the workshops and conferences it went to and what they decided, the camera-ready, each with its PDF and evidence. Read them with `GET /api/v1/pages/versions`, and with the person\'s go-ahead add or correct them with `POST /api/v1/pages/versions`, backing each with evidence. Upload a PDF or another file as evidence to `POST /api/v1/files`. Any edit now takes `evidence`, addresses that back it up. Two versions are compared at `/versions/<paper>?a=<id>&b=<id>`. See "Record a paper\'s versions" in `/agent/start`.',
   },
