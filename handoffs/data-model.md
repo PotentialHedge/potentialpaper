@@ -167,3 +167,50 @@ leased_until, last_error, failed_at, updated_at)`. A consumer reads only events 
 - Not done: no dev systemd unit for the worker (no consumers yet). Phase 4 should add one, or run
   `npm run consumers:work` beside the dev server. Production needs `dc --profile tools up -d worker` on the next
   deploy (migration `0026` first).
+
+### Phase 3 (2026-11-16, branch `data-model-phase-3`)
+
+- **Registry:** `PAGE_SCHEMAS` (`src/server/pages/schemas.ts`) is the file type registry. Each entry keeps its zod
+  schema, `glob`, `filesRegex` and `writable`, and gains `index(file, path) → IndexedDoc[]` (`{ kind, text,
+  fields }`, the shape Phase 4's `search_docs` rows can take) and `render: { panel, slots }`, naming the built-in
+  panel that shows the type and its slots. That is data only for now: `slots.tsx` doesn't read it yet.
+  `fileTypeOf(path)` and `indexFile(path, text)` are the entry points for the search consumer. Indexers exist for
+  link, version, thumbnail (`picture`), submission and note. pdf and forms have none.
+- **Review types** (`src/lib/review-files.ts`, pure): `submission.json` (`"schema": "submission/1"`: id, venue
+  `{id,name,url}`, number, status, decision, optional `version` (a `v_` id), url, license), `forms.json`
+  (`forms/1`: `forms` as `VenueForms`, url, license) and `notes/<id>.json` (`review/1`: id, replyTo, kind
+  (`NOTE_KINDS`), invitation, signature, content (`FieldValue`s), createdAt, optional modifiedAt, url, license).
+  URLs must be https. Folder and file names are the source's ids **lower-cased** (DESIGN.md says lower-case slugs,
+  and OpenReview ids are mixed case). The exact id is inside the file, and the name isn't checked against it.
+  `fetchedAt` is deliberately **not** in the files, so a re-import that finds nothing changes nothing.
+  Helpers: `submissionFilePath`, `formsFilePath`, `noteFilePath`, `encodeReviewFile`, `parseReviewFile`,
+  `noteFromFile`.
+- **Rules** (`rules.ts`, `check.ts`, so web edits and pushes alike): the layout takes only those three files under
+  `reviews/<source>/<submission>/`. `pathDenied` lets through admins and a role whose `grants` cover the path
+  (`grantCovers`), so not the system, people or authors. A forms or note file needs its folder's
+  `submission.json`. Review files have their own limits (`MAX_REVIEW_CHANGES` 1000 a commit,
+  `MAX_REVIEW_FILES` 3000 a page) besides the 50/1000 for everything else. `receive.ts`'s tree walk is capped at
+  the sum.
+- **Bots:** a bot is an account with `is_bot` (as bot accounts already were), and its grants are rows in
+  `bot_grants(account_id, pattern, shown, granted_by, created_at)`. `rolesOf` loads them for bot accounts. For
+  now a grant can only be `reviews/<source>/**` (`grantProblem`). Migration `0027_bot_grants` creates the
+  **`openreview` bot account** and grants it `reviews/openreview/**` (shown). `openreview` is added to the
+  reserved handles. `src/server/bots.ts` has `OPENREVIEW_BOT`, `botActor`, `ensureBot`, `grantBot`, `revokeGrant`
+  and `listGrants`. `npm run bots:grant` is the admin script (DEPLOY.md, "Bots and their grants").
+- **Schemas served:** `/schemas/submission.json`, `/schemas/forms.json` and `/schemas/note.json` (the route reads
+  the registry), and the editor extension's `jsonValidation` picks them up from `write-page-schemas.ts`. Its
+  skeletons now prefill a `const` (`"schema": "review/1"`) and start objects as `{}`. `prek.toml` doesn't check them
+  (`writable: false`), so it is unchanged and pages need no `pages:add-starter`.
+- **Tests:** `tests/unit/review-files.test.ts` (paths, grants, validation messages, registry, JSON Schema) and
+  `tests/integration/review-files.test.ts` (the bot commits through `commitPage`, a raised score is a one-file
+  commit, re-committing the same is `unchanged`; people, other bots, the ungranted bot and the system are refused;
+  an orphan note and an unknown schema version are refused; admins may; revoking stops the bot). Checks: lint,
+  format, typecheck pass, and 539 of 545 tests pass. The 6 failures are the known poppler ones.
+- **Changed from the plan:** "the system's openreview grant" is an `openreview` **bot account** with a grant row,
+  not the system actor, so our importer goes through exactly the route an outside bot will. Its commits carry
+  `Bot: true` and its `u_` id as author. No separate bot-id trailer was added, since the author id already names
+  it. The registry stays JSON-only: sections, the picture, the PDF and demos aren't entries yet.
+- **Left for Phase 4/5:** sections need an indexer (they aren't JSON; add a non-JSON entry or index them in the
+  consumer). `slots.tsx` doesn't read `render` yet. Per-bot rate limits aren't built: a backfill must pass
+  `rateLimit` to `commitPage`, since `COMMIT_RATE_LIMIT` (burst 30, 0.2/s) applies to bot accounts. Production
+  needs migration `0027` on the next deploy.
