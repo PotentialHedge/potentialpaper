@@ -113,7 +113,7 @@ Milestones 0, 1 and 2 are built, merged into `main` and deployed, and Milestone 
   - In Safari, a stale VS Code: Develop → Empty Caches, plus clearing service workers and Cache Storage from
     the console; the site's extension itself is `no-cache`.
 
-## Direction: the repo is the data, bots write it, plugins show it (decided 2026-11-16; built in `data-model-phase-0`…`5`, not merged yet)
+## Direction: the repo is the data, bots write it, plugins show it (decided 2026-11-16; built in `data-model-phase-0`…`5`, merged into `main` and deployed at 3bc1b18)
 
 Future work should follow this. The plan, in phases, is `handoffs/data-model.md`; the design is `DESIGN.md` §3,
 §4.3, §4.4, §4.8–4.11 and §10.
@@ -137,6 +137,22 @@ Future work should follow this. The plan, in phases, is `handoffs/data-model.md`
 
 Order: Phase 0 Postgres 19, 1 object store interface, 2 outbox consumers, 3 file types and the review layout, 4
 search, 5 the OpenReview importer as a bot with the backfill of ~126k notes.
+
+**Deployed** 3bc1b18 on 2026-11-16, from a clean worktree, Postgres still 16, `ssh` still off:
+
+- Migrations `0026`–`0028` applied; `0027` made the `openreview` bot with its `reviews/openreview/**` grant.
+- Worker (`search`, `reviews`) started 15:58 UTC; backfill (`dc run -d`, container `pp-reviews-backfill`) 15:59–16:19
+  UTC, 20 min: 42,425 submissions committed, **288,509 notes** (the scrape grew since dev's 286,227), 5 without a
+  paper, 0 refused. `page_events` 171,097 → 213,522.
+- `search` caught up at 16:30 (213,522 events), `reviews` at 16:58 (~25 min of its own). Submission rows dipped to
+  ~100 while `reviews` replayed pre-import events, then came back to 42,425 / 288,509, matching the import.
+  No `last_error`.
+- `VACUUM (ANALYZE)` on the page, search and review tables: 11 s. Database 4.9 GB (`search_docs` 1.9 GB,
+  `page_objects` 1.3 GB, `submission_notes` 0.7 GB). Edge cache purged.
+- Checked: `/api/v1/search?q=in:reviews%20diffusion` 6,306 hits in 1.2–1.4 s, with note matches;
+  `/openreview/7fUtu1156H` shows its submission and ratings.
+- Snag: the scrape is WAL-mode SQLite, so a `:ro` mount fails ("unable to open database file"). The import used a
+  copy in `~/backups/scrapes/`, mounted writable; DEPLOY.md now says so.
 
 ## Preview and PDFs inside VS Code, desktop extension (2026-11-15, merged into `main` and deployed at dd7eb99)
 

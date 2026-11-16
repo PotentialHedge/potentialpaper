@@ -7,7 +7,10 @@ maintenance window and no rollback plan. Just fix forward. This changes once the
 ## Recipe
 
 Run from the repo root on this host, with `main` checked out and committed (the image is tagged with HEAD's
-commit, so uncommitted changes would ship under the wrong name):
+commit, so uncommitted changes would ship under the wrong name). The shared checkout can hold other sessions'
+uncommitted work, which `COPY . .` would ship, so a clean worktree is safer: `git worktree add --detach
+../papertrail-deploy-<commit> <commit>`, copy `.env.production` into it (it's gitignored), and run the recipe there.
+The compose project name is fixed (`potentialpaper`), so it drives the same containers.
 
 ```sh
 git checkout main && git pull --ff-only
@@ -75,7 +78,12 @@ The consumers are:
 <forum id>]` (`scripts/import-openreview-reviews.ts`) commits each submission's files as the `openreview` bot, one
 commit per submission that changed (with `IMPORT_RATE_LIMIT`, not the people's limit). Re-running commits only what
 changed, so a stopped run is resumed by running it again. In dev the first full run (42,430 submissions) took about
-25 minutes at concurrency 4. Run it as a unit that outlives the shell (`systemd-run --user`, or `dc run -d`), then,
+25 minutes at concurrency 4. The scrape is a WAL-mode SQLite file, so its folder must be mounted **writable**
+(SQLite makes a `-shm` file beside it even to read; a `:ro` mount fails with "unable to open database file"). Copy
+it out of the scraper's folder first, so a running scrape isn't read mid-write: in production it is
+`~/backups/scrapes/iclr2027.sqlite`, run as `dc --profile tools run -d --name pp-reviews-backfill -v
+~/backups/scrapes:/scrape tools npm run papers:import-reviews -- /scrape/iclr2027.sqlite …` (`docker logs -f
+pp-reviews-backfill` for progress). Run it as a unit that outlives the shell (`systemd-run --user`, or `dc run -d`), then,
 once the worker has caught up, reclaim space: `REPACK (CONCURRENTLY)` (Postgres 19) or `VACUUM (ANALYZE)` on
 `page_objects`, `page_revisions`, `page_events`, `search_docs`, `submission_notes`.
 
