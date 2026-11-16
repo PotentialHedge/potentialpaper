@@ -1,6 +1,7 @@
 # Handoff: settings.json, plugins from GitHub, data for plugins, and the score-standing plugin
 
-Status: plan, 2026-11-16. Phases 1 (settings.json) and 2 (the plugin host) are built; see the Log.
+Status: plan, 2026-11-16. Phases 1 (settings.json), 2 (the plugin host) and 3 (discovery and the plugin pages) are
+built; see the Log.
 
 ## Goal
 
@@ -460,3 +461,87 @@ For later phases:
 
 Checks: typecheck, lint and `next build` pass. Unit tests: 367 pass (20 new in `tests/unit/plugins.test.ts`, among them the real SDK file against the real host over a `MessageChannel`). Integration: 265 of 272 pass, 7 new in `tests/integration/plugins.test.ts`. The 7 failures are the same as before this phase: six in `pdf-ingest.test.ts` (no poppler) and one in `follows.test.ts`. A smoke test on `next start` showed that a URL-encoded identifier (`/api/v1/pages/venue%3Aiclr%2F2027`) reaches the route and decodes, and that `/sdk/v1/pp.js`, `/schemas/plugin-manifest.json` and `/x/…` are served. These ran
 against this worktree's own database, `potentialpaper_test_plugins2`, through an untracked `.env`.
+
+### Phase 3: discovery and the plugin pages (2026-11-16, branch `plugins-phase-3`)
+
+Built:
+
+- **Discovery**, `server/plugins/discover.ts` (Presio's `server/routes/plugins.ts`, ported): GitHub's repository
+  search for `topic:potentialpaper-plugin archived:false is:public`, most starred first, 100 at most. One search
+  per five minutes per process, one at a time; after a failure, the last list is served (`stale: true`) and GitHub
+  isn't asked again for a minute; with no list at all, a 502. `GITHUB_TOKEN` is sent when set. Each entry is keyed as
+  a source (`github:<owner>/<repo>`), with description, stars, last push, link and topics. Route:
+  `GET /api/v1/plugins/discover`, public, `Cache-Control: public, max-age=300`.
+- **Releases and updates**:
+  - `lib/plugins/versions.ts` (pure): versions as manifests and tags write them (`v1.2.0` or `1.2.0`), semver order,
+    the newest release, and `updateFor(tags, runningVersion)`. Prereleases are never offered.
+  - `server/plugins/tags.ts`: a repo's tags through git's ref listing (`listTags` in `demos/github.ts`, annotated
+    tags peeled), cached ten minutes per repo, failures too.
+  - `server/plugins/updates.ts`: `pluginUpdates` (each installed plugin whose newest release is newer than the
+    `version` its running manifest says) and `updatePlugin` (copy the new ref first, check it is the same plugin id,
+    compare its permissions and network with the reader's grant; switch, or answer `consent` with what's missing).
+  - Routes: `GET /api/v1/me/plugins/updates`, and `POST` it `{ source, ref?, approve? }` (`ref` defaults to the newest
+    release). `approve` needs a browser session; without it, an update that asks for nothing new still switches.
+  - Installing with no ref now takes the newest release (`installPlugin`), or the default branch if there is none.
+- **`/settings/plugins`** (`app/settings/plugins/`):
+  - Installed: each plugin with an on/off box, name, version, ref and commit (linked to its folder on GitHub at that
+    commit), status, id, author, where it came from, description and error; "Update" when a newer release is out,
+    which shows what the new version asks for, with "Approve and update" or "Keep"; "What it may do" (each
+    permission in the consent prompt's words and each network origin, marked when not approved yet, with Approve or
+    Withdraw approval, and its panels, `when` conditions and pages); its settings as a form drawn from its
+    `contributes.settings` (box, list, text and number fields, reset per key); Remove.
+  - Discover (stars, description, last push, Install or "Installed"), Add by source, and Load from localhost.
+  - The line for agents with the site's address: "Read <origin>/plugins.md and build me a PotentialPaper plugin."
+  - Browser calls in `lib/plugins/client.ts`: `uninstallPlugin`, `revokePlugin`, `setPluginEnabled`,
+    `fetchDiscovered`, `fetchUpdates`, `updatePluginTo`.
+- **`/settings`**: its Plugins section is now a summary and a link to `/settings/plugins`. The `<kind>.panels.hidden`
+  and `.order` widgets also list installed plugins' panels for that kind (`pluginPanelChoices` in
+  `lib/plugins/installed.ts`), grouped by the slot each takes, and unticking keeps ids the form doesn't show.
+- **`/plugins.md`** (`server/agent/plugins-guide.ts`): build one (repo, topic, files, try, tag, install), what a
+  plugin is (id, source, pin, origin, CSP, file limits), the manifest field by field with an example, `when` keys
+  per kind, permissions, the SDK's methods, events, theme tokens and identifiers, the data routes, the dev loop and
+  publishing. The permission, method, `when`-key and theme-token tables are made from the code, and a unit test
+  fails if a host method has no line. Linked from `llms.txt` (which also names the new routes), an `/agent/updates`
+  notice, and the hello example's README.
+- DESIGN.md §10 ("The model": releases and updates, `/settings/plugins`, `/plugins.md`; "Trust levels": discovery)
+  and IMPLEMENTATION.md Milestone 8 updated.
+
+Calls I made where the plan left room:
+
+- **An update moves the reader alone.** It sets their entry's `ref` to the new tag. `snapshotPlugin(…, { update:
+  true })`, which re-resolves a ref site-wide, stays unused: moving a shared pin would change the code other readers
+  run without their asking.
+- **"Newer" is against the running manifest's `version`**, not the ref, so a plugin installed from a branch or a
+  commit is offered a newer release too. Only tags are offered (the plan's "a newer tag"). A reader tracking a branch
+  gets new commits only by re-pinning; there is no "pull the branch again" button.
+- **Updating a site default** re-pins it for that reader, which makes it theirs (`from: user`), so it needs their
+  approval even if it asks for nothing new.
+- **Discovery lists repos, not plugins.** It shows no id or permissions: those come from the manifest, which is read
+  when the plugin is installed, and the reader approves them before it runs. A repo in the list whose manifest is
+  wrong fails at install with every problem listed.
+- **Plugin settings are edited on `/settings/plugins` only**, next to their plugin. `/settings` hides the `Plugins`
+  group (`plugins`, and the site-only `plugins.default` and `plugins.blocked`), which had no widget anyway; the raw
+  file still has them.
+- **Signed out**, the page shows the site's defaults and Discover, and loads dev plugins; installing and turning a
+  default off need an account (Phase 2: grants are rows).
+- **The README line**: the repo has no top-level README, so the line heads `/plugins.md`, shows on
+  `/settings/plugins` with the site's own address, and closes the hello example's README (with `<the site>`, as the
+  domain isn't final).
+- **No `check.mjs`** like Presio's: a manifest is checked, every problem listed, when it is installed and when it is
+  loaded from localhost, which the guide's dev loop does before any release.
+
+For later phases:
+
+- Phase 4: add `scope.scores` and `scope.papers` to `METHOD_DOCS` in `server/agent/plugins-guide.ts` (its unit test
+  fails until every `HOST_METHODS` entry has a line), and the score and bulk routes to the guide's "Data routes".
+- Phase 5: a new permission (`identity`) appears in the guide's table and `/settings/plugins` by itself; the guide's
+  last paragraph of "Data routes" is where the backend pattern and its example go.
+- Phase 6: score standing is published by tagging `v0.1.0` and adding the topic; it then shows under Discover.
+
+Checks: typecheck, lint and `next build` pass. Unit tests: 379 pass (7 new in `tests/unit/plugin-discovery.test.ts`:
+versions and releases, discovery's search, cache, stale list and token, and the guide). Integration: 274 of 281
+pass, 3 new in `tests/integration/plugins.test.ts` (installing the newest release, updates with and without new
+permissions and an agent refused `approve`, re-pinning a site default for one reader, and the discover route). The 7
+failures are the same as before this phase: six in `pdf-ingest.test.ts` (no poppler) and one in `follows.test.ts`.
+`page-git.test.ts`'s fast-check merge property failed once in a full unit run and passed on rerun, as in pages
+Phase 1. These ran against this worktree's own database, `potentialpaper_test_plugins3`, through an untracked `.env`.

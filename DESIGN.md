@@ -850,6 +850,20 @@ Built 2026-11-16 (`handoffs/plugins.md` Phase 2). A plugin is a public repo (or 
   runs and its status: `ready`, `consent`, `blocked`, `disabled` or `error`.
 - **Dev mode:** a source of `http://localhost:<port>/` (kept in that browser's localStorage, `pp.plugins.dev`) runs
   unpinned from the author's dev server, in their browser only, with what it asks for.
+- **Releases and updates** (built 2026-11-16, `handoffs/plugins.md` Phase 3): a plugin is released by tagging its
+  repo `v` + its manifest's `version`. Installing by `owner/repo` with no ref takes the newest release (the default
+  branch if it has none). A reader whose plugin runs an older version than the newest release (prereleases are never
+  offered) sees "Update" on `/settings/plugins` (`GET /api/v1/me/plugins/updates`, tags from git's ref listing,
+  cached ten minutes per repo). Updating sets that reader's entry's `ref` to the new tag, so it moves them alone; the
+  site-wide pin of a ref never moves. The new commit is copied first, so a broken release changes nothing. If it asks
+  for a permission or network origin their grant lacks, the update only describes it (`consent`) until they approve
+  it in a browser, which switches and grants at once.
+- **`/settings/plugins`**: the installed plugins (on and off, version and commit, update, what each may do with
+  approve and withdraw, its settings as a form drawn from its `SettingSpec`s, remove), Discover, add by source, and
+  load from localhost. `/settings` links there, and its hidden/order lists offer installed plugins' panels too.
+- **`/plugins.md`**, linked from `llms.txt`, is the guide for agents: the manifest, the SDK (its method, permission
+  and `when` tables are made from the code), the data routes, the dev loop and publishing. A README says "Read
+  https://…/plugins.md and build me a PotentialPaper plugin."
 
 ### Security is what shapes everything
 
@@ -891,8 +905,10 @@ restyling the host page or reading its session. That limit is what makes it safe
 
 ### Trust levels
 
-Each user installs what they want, and it affects only them. Discovery lists public repos with the GitHub topic
-`potentialpaper-plugin`. The site layer of settings.json holds `plugins.default` (sources installed for everyone,
+Each user installs what they want, and it affects only them. Discovery (`GET /api/v1/plugins/discover`, ported from
+Presio) lists public, unarchived repos with the GitHub topic `potentialpaper-plugin`, most starred first; the server
+asks GitHub's search once per five minutes for everyone (with `GITHUB_TOKEN` when set) and serves the last list
+while GitHub fails. Being listed is no endorsement: every plugin still asks before it runs. The site layer of settings.json holds `plugins.default` (sources installed for everyone,
 which a user can turn off) and `plugins.blocked`, the kill switch (ids, or ids at a SHA). Both are read from the
 site layer only (`siteOnly` in `lib/settings/core.ts`): a user's file naming them changes nothing, with a warning.
 

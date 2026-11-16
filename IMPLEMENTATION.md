@@ -114,8 +114,12 @@ grouped display, stances and the graph are still to come.
   `postMessage` RPC checked against granted permissions, the SDK (`/sdk/v1/pp.js`), consent (`user_plugin_grants`),
   per-user install (the `plugins` key, `POST /api/v1/me/plugins`), `plugins.default` and the kill switch
   (`plugins.blocked`), per-user plugin storage, plugin panels in every kind's slots by `when` conditions, plugin
-  pages at `/x/…`, dev plugins from localhost, and `examples/plugins/hello/`. Discovery and `/settings/plugins`
-  are its Phase 3; moving built-in panels onto the API waits for the data routes of Phase 4.
+  pages at `/x/…`, dev plugins from localhost, and `examples/plugins/hello/`. Moving built-in panels onto the API
+  waits for the data routes of Phase 4.
+- Built 2026-11-16 (its Phase 3), discovery and the plugin pages: `GET /api/v1/plugins/discover` (repos with the
+  topic `potentialpaper-plugin`), releases as tags with updates that ask again for new permissions
+  (`/api/v1/me/plugins/updates`), `/settings/plugins` (installed, discover, add by source, load from localhost, each
+  plugin's settings as a form), and `/plugins.md`, the guide for agents building one.
 
 ## Pages above the paper
 
