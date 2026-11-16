@@ -172,7 +172,7 @@ leased_until, last_error, failed_at, updated_at)`. A consumer reads only events 
 
 - **Registry:** `PAGE_SCHEMAS` (`src/server/pages/schemas.ts`) is the file type registry. Each entry keeps its zod
   schema, `glob`, `filesRegex` and `writable`, and gains `index(file, path) → IndexedDoc[]` (`{ kind, text,
-  fields }`, the shape Phase 4's `search_docs` rows can take) and `render: { panel, slots }`, naming the built-in
+fields }`, the shape Phase 4's `search_docs` rows can take) and `render: { panel, slots }`, naming the built-in
   panel that shows the type and its slots. That is data only for now: `slots.tsx` doesn't read it yet.
   `fileTypeOf(path)` and `indexFile(path, text)` are the entry points for the search consumer. Indexers exist for
   link, version, thumbnail (`picture`), submission and note. pdf and forms have none.
