@@ -112,3 +112,22 @@ below and launch the next phase's thread pointing at this file. Merging into `ma
   related to this work; running them needs poppler on the host, or the tools image.
 - **Left: production**, once 19.0 is tagged (2026-11-19 or later). The steps are in DEPLOY.md, "Postgres 19".
   It doesn't block Phases 1 to 5.
+
+### Phase 1 (2026-11-16, branch `data-model-phase-1`)
+
+- `src/server/git/repo.ts` is now the only code that touches `page_objects`. `GitRepo` gained `sizes(oids)` (byte
+  sizes without reading bodies, for the demo limits); `WritableGitRepo` adds `write(objects)` (insert, ignoring
+  objects already there). `pageRepo(tx, paperId)` is writable when handed a `Writer`, read-only for a `Reader`
+  (overloads); `memoryRepo` is writable too, and keeps writes apart from the map it was given, since the
+  protocol tests mutate that map and expect the repo to see it.
+- Moved onto it: `readObject` (`pages/repo.ts`, so every `readCommit`/`readFiles`/`readText` caller), the dumb
+  protocol's loose objects (`pages/clone.ts`), `recordCommit`'s object writes (`pages/commit.ts`) and the demo size
+  check (`demos/attach.ts`). Nothing else in `src/` or `scripts/` queried the table. `readHead` and `toBytes` moved
+  into `git/repo.ts` (re-exported from `pages/repo.ts`), which also removes the runtime import cycle between them.
+- Changed from the plan: nothing in substance. The dumb protocol's object request is now two queries (identifier,
+  then the object) instead of one join. Refs are still written by `moveHead` in `commit.ts` directly; the plan keeps
+  refs in `page_refs`, so that is left as is.
+- Tests: `tests/integration/git-repo.test.ts` runs the same checks on `memoryRepo` and Postgres. Integration tests
+  still read `page_objects` directly to assert on storage; that's deliberate. Checks: lint, format, typecheck pass;
+  521 of 527 tests pass, the 6 failures being the known poppler ones in `pdf-ingest.test.ts`.
+- Left: nothing for Phase 1.
