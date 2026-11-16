@@ -10,6 +10,10 @@ export const dynamic = 'force-dynamic';
 const UPDATES: { date: string; text: string }[] = [
   {
     date: '2026-11-16',
+    text: "Score statistics and bulk reads for any venue, topic or organisation: `GET /api/v1/pages/<identifier>/scores` lists the venues and review score fields with counts, and `…/scores/<venue>/<field>` gives every submission's mean over its reviews (sorted), bins, and the split by outcome. `GET /api/v1/pages/<identifier>/papers` streams the papers as NDJSON with their submissions, statuses and each review's scores (`?limit=` for chunks, the next cursor in `X-Next-Cursor`). All public, with ETags; reviews are CC BY 4.0, so keep their licence and link with what you show. OpenAPI: `/openapi.json`. Plugins read the same through `pp.scope.scores` and `pp.scope.papers` (permission `scope.read`).",
+  },
+  {
+    date: '2026-11-16',
     text: 'Building plugins: when a person asks you to build a PotentialPaper plugin, read `/plugins.md`: the manifest, the SDK, permissions, the data routes, trying it from localhost and publishing (tag a release, add the GitHub topic `potentialpaper-plugin`). Published plugins are listed at `GET /api/v1/plugins/discover`. Installing by `owner/repo` with no tag now takes the newest release. `GET /api/v1/me/plugins/updates` lists a person\'s plugins that have a newer release; `POST` it `{ "source" }` to move one. An update asking for new permissions comes back as `consent` and changes nothing: the person approves it on `/settings/plugins`.',
   },
   {

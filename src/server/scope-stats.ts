@@ -160,17 +160,24 @@ export async function computeScopeStats(scopeId: string, database: Reader = getD
     with subs as (${subs}),
     fields as (select * from jsonb_to_recordset(${JSON.stringify(fields.map((f) => ({ venue: f.venue, key: f.key })))}::jsonb)
                 as f(venue text, key text)),
-    means as (
-      select s.id, s.venue_id, s.status, f.key,
-             avg((regexp_match(n.content ->> f.key, ${SCORE_RE}))[1]::float8) as mean
+    -- Each review's score first, so what is grouped and sorted is narrow (not the notes' content). A JSON number is
+    -- read as it is; text such as "6: marginally above" by its leading number.
+    scores as materialized (
+      select s.id, f.key,
+             case when jsonb_typeof(n.content -> f.key) = 'number' then (n.content ->> f.key)::float8
+                  else (regexp_match(n.content ->> f.key, ${SCORE_RE}))[1]::float8 end as score
         from subs s
         join fields f on f.venue = s.venue_id
         join submission_notes n on n.submission_id = s.id and n.kind = 'review'
-       group by s.id, s.venue_id, s.status, f.key
+    ),
+    means as (
+      select id, key, avg(score) as mean from scores where score is not null group by id, key
     )
-    select venue_id, key as field, array_agg(mean order by mean) as means, array_agg(status order by mean) as statuses
-      from means where mean is not null
-     group by venue_id, key
+    select s.venue_id, m.key as field, array_agg(m.mean order by m.mean) as means,
+           array_agg(s.status order by m.mean) as statuses
+      from means m
+      join subs s on s.id = m.id
+     group by s.venue_id, m.key
   `);
   const found = new Map(rows.map((row) => [`${row.venue_id}\n${row.field}`, row]));
   const decided = new Map(venueRows.map((row) => [row.venue_id, row.decided]));
@@ -195,6 +202,8 @@ export async function computeScopeStats(scopeId: string, database: Reader = getD
 export async function recomputeScope(scopeId: string, database: Database = getDb()): Promise<number> {
   return database.transaction(async (tx) => {
     await tx.execute(sql`select pg_advisory_xact_lock(hashtextextended(${`scope-stats:${scopeId}`}, 0))`);
+    // A venue the size of ICLR is a million review scores to group and sort: in memory, not on disk.
+    await tx.execute(sql`set local work_mem = '128MB'`);
     const computed = await computeScopeStats(scopeId, tx);
     await tx.delete(scopeStats).where(eq(scopeStats.scopePageId, scopeId));
     const computedAt = new Date();
