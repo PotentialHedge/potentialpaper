@@ -35,6 +35,7 @@ import * as commentPreview from '@/app/api/v1/comments/preview/route';
 import * as myMentions from '@/app/api/v1/me/mentions/route';
 import * as myPapers from '@/app/api/v1/me/papers/route';
 import * as myCoAuthors from '@/app/api/v1/me/papers/co-authors/route';
+import * as follows from '@/app/api/v1/follows/route';
 import { getDb, getPool } from '@/db';
 import { clearDevOutbox, devOutbox } from '@/server/mail';
 
@@ -42,7 +43,7 @@ export const ORIGIN = 'http://test.local';
 
 export async function resetDatabase(): Promise<void> {
   await getDb().execute(sql`
-    truncate table search_docs, bot_grants, comment_mentions, comment_aliases, comments, lfs_objects, ssh_keys, evidence_files, agent_posts, agent_files, api_tokens, agent_codes, author_claims, demo_pins, demo_snapshots, submission_notes, submissions, venues, pdf_documents, consumer_cursors, page_events, page_current, page_revisions, page_refs, page_objects, commit_identities, paper_lookup_misses, paper_identifiers, papers, institution_domains, affiliations, accounts, rate_limit_buckets,
+    truncate table paper_follows, search_docs, bot_grants, comment_mentions, comment_aliases, comments, lfs_objects, ssh_keys, evidence_files, agent_posts, agent_files, api_tokens, agent_codes, author_claims, demo_pins, demo_snapshots, submission_notes, submissions, venues, pdf_documents, consumer_cursors, page_events, page_current, page_revisions, page_refs, page_objects, commit_identities, paper_lookup_misses, paper_identifiers, papers, institution_domains, affiliations, accounts, rate_limit_buckets,
       session, account, verification, "user"
     restart identity cascade
   `);
@@ -86,6 +87,7 @@ const ROUTES: [RegExp, any][] = [
   [/^\/me\/mentions(\?.*)?$/, myMentions],
   [/^\/me\/papers$/, myPapers],
   [/^\/me\/papers\/co-authors$/, myCoAuthors],
+  [/^\/follows(\?.*)?$/, follows],
   [/^\/me\/password$/, password],
   [/^\/me\/affiliations$/, affiliations],
   [/^\/me\/affiliations\/(?<id>[^/]+)$/, affiliation],

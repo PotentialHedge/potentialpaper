@@ -67,6 +67,15 @@ export function HistoryIcon({ className = 'size-3.5' }: { className?: string }) 
   );
 }
 
+/** A star: follow a paper. Filled when followed. */
+export function StarIcon({ className = 'size-3.5', filled = false }: { className?: string; filled?: boolean }) {
+  return (
+    <svg {...line} fill={filled ? 'currentColor' : 'none'} className={className}>
+      <path d="M8 1.8l1.9 3.9 4.3.6-3.1 3 .7 4.3L8 11.6l-3.8 2 .7-4.3-3.1-3 4.3-.6z" />
+    </svg>
+  );
+}
+
 /** A terminal prompt: the page for AI agents. */
 export function AgentIcon({ className = 'size-3.5' }: { className?: string }) {
   return (

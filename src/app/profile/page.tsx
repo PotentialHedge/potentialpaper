@@ -11,7 +11,7 @@ import { listSshKeys } from '@/server/ssh-keys';
 import { listTokens } from '@/server/tokens';
 import { ApiKeys } from './ApiKeys';
 import { Affiliations } from './Affiliations';
-import { MentionMail } from './MentionMail';
+import { MailSettings } from './MailSettings';
 import { ProfileForm } from './ProfileForm';
 import { SshKeys } from './SshKeys';
 
@@ -61,7 +61,7 @@ export default async function Profile() {
       <h2 className={ui.groupHeading} id="email">
         Email
       </h2>
-      <MentionMail initial={account.mentionMail} />
+      <MailSettings mentionMail={account.mentionMail} followMail={account.followMail} />
       <h2 className={ui.groupHeading} id="agents">
         API keys and agents
       </h2>

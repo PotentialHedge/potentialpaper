@@ -4,6 +4,7 @@ import { pgErrorCode } from '@/db/errors';
 import {
   accounts,
   authorClaims,
+  paperFollows,
   paperIdentifiers,
   papers,
   type Account,
@@ -47,6 +48,11 @@ async function refreshPaper(paperId: string, database: Database): Promise<void> 
     .from(paperIdentifiers)
     .where(eq(paperIdentifiers.paperId, paperId));
   await refreshPaperPages(identifiers);
+}
+
+/** Authors follow their own papers (`server/follows.ts`): called wherever a claim becomes confirmed. */
+async function followAsAuthor(paperId: string, accountId: string, database: Database): Promise<void> {
+  await database.insert(paperFollows).values({ paperId, accountId }).onConflictDoNothing();
 }
 
 /** A paper's confirmed authors, by their printed names, in the paper's order. **Public:** no account ids. */
@@ -222,7 +228,10 @@ export async function requestClaim(
       throw new ApiError(409, 'claim_taken', `${authorName} is already a confirmed author of this paper`);
     throw new ApiError(503, 'page_busy', 'could not record the claim; try again');
   }
-  if (verification) await refreshPaper(paperId, database);
+  if (verification) {
+    await followAsAuthor(paperId, account.id, database);
+    await refreshPaper(paperId, database);
+  }
   return { authorIndex: input.authorIndex, authorName, status: decision.status, method: decision.method, evidence };
 }
 
@@ -265,7 +274,10 @@ export async function recheckPendingClaims(
         )
         .returning({ id: authorClaims.id });
       confirmed += updated.length;
-      if (updated.length > 0) await refreshPaper(row.paper_id, database);
+      if (updated.length > 0) {
+        await followAsAuthor(row.paper_id, row.account_id, database);
+        await refreshPaper(row.paper_id, database);
+      }
     } catch (err) {
       if (pgErrorCode(err) !== '23505') throw err;
     }
@@ -331,6 +343,7 @@ export async function claimByEmail(
         .returning({ id: authorClaims.id });
       if (made.length > 0) {
         count += 1;
+        await followAsAuthor(row.paper_id, row.account_id, database);
         await refreshPaper(row.paper_id, database);
       }
     } catch (err) {
@@ -383,7 +396,7 @@ export async function addCoAuthor(
   voucher: Account,
   target: CoAuthorTarget,
   database: Database = getDb(),
-): Promise<{ authorIndex: number; authorName: string }> {
+): Promise<{ accountId: string; authorIndex: number; authorName: string }> {
   const { confirmedAuthor } = await claimRoles(paperId, voucher.id, database);
   if (!confirmedAuthor)
     throw new ApiError(403, 'forbidden', 'only a confirmed author of the paper can add a co-author');
@@ -461,8 +474,9 @@ export async function addCoAuthor(
     if (pgErrorCode(err) !== '23505') throw err;
     throw new ApiError(409, 'claim_taken', `someone is already confirmed as ${authorName}, or claimed meanwhile`);
   }
+  await followAsAuthor(paperId, accountId, database);
   await refreshPaper(paperId, database);
-  return { authorIndex, authorName };
+  return { accountId, authorIndex, authorName };
 }
 
 /** An admin's decision (`method: 'manual'`). Confirming fails if someone else is already confirmed as that author. */
@@ -479,6 +493,7 @@ export async function decideClaim(
       .where(eq(authorClaims.id, claimId))
       .returning();
     if (!row) throw new ApiError(404, 'not_found', 'no such claim');
+    if (row.status === 'confirmed') await followAsAuthor(row.paperId, row.accountId, database);
     return row;
   } catch (err) {
     if (pgErrorCode(err) === '23505') {

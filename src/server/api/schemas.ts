@@ -40,6 +40,7 @@ export const Me = z.object({
   verified: z.boolean(),
   profileComplete: z.boolean(),
   mentionMail: z.boolean(),
+  followMail: z.boolean(),
 });
 
 export const MePatch = z
@@ -49,6 +50,8 @@ export const MePatch = z
     showInstitution: z.boolean().optional(),
     /** Whether a `@` mention in a comment is mailed. */
     mentionMail: z.boolean().optional(),
+    /** Whether edits and comments on followed papers are mailed. */
+    followMail: z.boolean().optional(),
   })
   .refine((v) => Object.keys(v).length > 0, { message: 'nothing to change' });
 
@@ -346,8 +349,22 @@ export const CoAuthorBody = z.union([
 ]);
 export const CoAuthorAdded = z.object({ authorIndex: z.number().int(), authorName: z.string() });
 
-/** The signed-in account's papers (`server/my-papers.ts`). */
+/** Whether the viewer follows a paper (`null` when nobody is signed in), and how many do. */
+export const FollowState = z.object({ following: z.boolean().nullable(), followers: z.number().int() });
+export const FollowBody = z.object({ paper: PaperIdentifier });
+
+/** The signed-in account's papers (`server/my-papers.ts`, `server/follows.ts`). */
 export const MyPapers = z.object({
+  following: z.array(
+    z.object({
+      title: z.string(),
+      year: z.number().int().nullable(),
+      venue: z.string().nullable(),
+      paper: PaperIdentifier,
+      path: z.string(),
+      followedAt: z.string(),
+    }),
+  ),
   authored: z.array(
     z.object({
       title: z.string(),

@@ -44,7 +44,7 @@ export interface AuthoredPaper extends PaperSummary {
 }
 
 /** Each paper's summary, keyed by id, for papers not merged into another. */
-async function summaries(paperIds: readonly string[], database: Database): Promise<Map<string, PaperSummary>> {
+export async function summaries(paperIds: readonly string[], database: Database): Promise<Map<string, PaperSummary>> {
   if (paperIds.length === 0) return new Map();
   const [rows, ids] = await Promise.all([
     database

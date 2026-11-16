@@ -61,6 +61,8 @@ export const accounts = pgTable(
     isBot: boolean('is_bot').notNull().default(false),
     /** Whether a `@` mention in a comment may be mailed (`server/mentions.ts`). On by default. */
     mentionMail: boolean('mention_mail').notNull().default(true),
+    /** Whether edits and comments on followed papers may be mailed (`server/follows.ts`). On by default. */
+    followMail: boolean('follow_mail').notNull().default(true),
     createdAt: createdAt(),
   },
   (t) => [
@@ -918,4 +920,23 @@ export const commentMentions = pgTable(
       .references(() => accounts.id, { onDelete: 'cascade' }),
   },
   (t) => [primaryKey({ columns: [t.commentId, t.accountId] }), index('comment_mentions_account_idx').on(t.accountId)],
+);
+
+/**
+ * Who follows (stars) which paper (`server/follows.ts`): followers are mailed when the paper's page is edited or
+ * someone comments on it. A confirmed author follows their paper from the moment their claim is confirmed, and can
+ * unfollow it like anyone else. **Private:** only the count is public, never who.
+ */
+export const paperFollows = pgTable(
+  'paper_follows',
+  {
+    accountId: uuid('account_id')
+      .notNull()
+      .references(() => accounts.id, { onDelete: 'cascade' }),
+    paperId: uuid('paper_id')
+      .notNull()
+      .references(() => papers.id, { onDelete: 'cascade' }),
+    createdAt: createdAt(),
+  },
+  (t) => [primaryKey({ columns: [t.accountId, t.paperId] }), index('paper_follows_paper_idx').on(t.paperId)],
 );

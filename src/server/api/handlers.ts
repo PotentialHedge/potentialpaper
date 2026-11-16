@@ -26,6 +26,15 @@ import { snapshotDemo } from '../demos/snapshot';
 import { demoUrl } from '@/lib/demos';
 import { addCoAuthor, ownClaim, requestClaim, withdrawClaim } from '../claims';
 import { authoredPapers } from '../my-papers';
+import {
+  followedPapers,
+  followPaper,
+  followState,
+  mailAddedCoAuthor,
+  mailCommentFollowers,
+  mailEditFollowers,
+  unfollowPaper,
+} from '../follows';
 import { revertCommit, type Actor, type CommitResult } from '../pages/commit';
 import { renderHtml } from '../pages/html';
 import { renderMarkdown } from '../pages/markdown';
@@ -59,6 +68,7 @@ function presentMe(a: Account) {
     verified: a.verifiedAt !== null,
     profileComplete: a.profileCompletedAt !== null,
     mentionMail: a.mentionMail,
+    followMail: a.followMail,
   };
 }
 
@@ -227,6 +237,14 @@ export const postDemoSnapshot = route(async (req) => {
   );
 });
 
+/** Mails the paper's followers about a commit, after it, never holding up or failing the request. */
+function notifyEdit(paperId: string, principal: Principal, result: CommitResult): void {
+  if (result.status !== 'committed') return;
+  void mailEditFollowers(paperId, principal.account.id, [result.seq]).catch((err) =>
+    console.error('follow mail failed', err),
+  );
+}
+
 function committed(result: CommitResult) {
   return result.status === 'committed'
     ? { head: result.oid, merged: result.merged, changed: true }
@@ -249,6 +267,7 @@ export const postRevert = route(async (req) => {
   const { paper, identifiers } = await knownPaper(id.scheme, id.value);
   const result = await revertCommit(paper.id, oid, actorOf(principal), summary?.trim() || undefined, { evidence });
   if (result.status === 'committed') await refreshPaperPages(identifiers);
+  notifyEdit(paper.id, principal, result);
   return respond(S.PageCommitted, committed(result), { principal });
 });
 
@@ -279,6 +298,7 @@ export const postVersions = route(async (req) => {
     })),
   });
   if (result.status === 'committed') await refreshPaperPages(identifiers);
+  notifyEdit(paper.id, principal, result);
   return respond(S.PageCommitted, committed(result), { principal });
 });
 
@@ -376,10 +396,18 @@ export const deleteClaim = route(async (req) => {
 /** The papers the viewer is an author of, or has claimed (`/papers`). */
 export const getMyPapers = route(async (req) => {
   const principal = await requireAuth(req);
-  const authored = await authoredPapers(principal.account.id);
+  const [authored, following] = await Promise.all([
+    authoredPapers(principal.account.id),
+    followedPapers(principal.account.id),
+  ]);
   return respond(
     S.MyPapers,
     {
+      following: following.map(({ canonical, followedAt, ...row }) => ({
+        ...row,
+        paper: canonical,
+        followedAt: toIso(followedAt),
+      })),
       // The schema drops the internal `paperId`.
       authored: authored.map(({ canonical, waiting, ...row }) => ({
         ...row,
@@ -396,12 +424,43 @@ export const postCoAuthor = route(async (req) => {
   const principal = await requireVerified(req);
   const body = await parseBody(req, S.CoAuthorBody);
   const { paper } = await knownPaper(body.paper.scheme, body.paper.value);
-  const added = await addCoAuthor(
+  const { accountId, ...added } = await addCoAuthor(
     paper.id,
     principal.account,
     'claim' in body ? { claimId: body.claim } : { handle: body.handle, authorIndex: body.authorIndex },
   );
+  void mailAddedCoAuthor(paper.id, { accountId, authorName: added.authorName }, principal.account.handle).catch((err) =>
+    console.error('co-author mail failed', err),
+  );
   return respond(S.CoAuthorAdded, added, { status: 201, principal });
+});
+
+/** Whether the viewer follows the paper, and how many do. Public; `following` is `null` for nobody signed in. */
+export const getFollow = route(async (req) => {
+  const { scheme, value } = parseQuery(req, S.PaperQuery);
+  const { paper } = await knownPaper(scheme, value);
+  const principal = await authenticate(req);
+  return respond(S.FollowState, await followState(paper.id, principal?.account.id ?? null), {
+    principal,
+    headers: { 'Cache-Control': 'private, no-store' },
+  });
+});
+
+/** Follows (stars) the paper: its edits and comments are mailed (`server/follows.ts`). */
+export const postFollow = route(async (req) => {
+  const principal = await requireAuth(req);
+  const { paper: id } = await parseBody(req, S.FollowBody);
+  const { paper } = await knownPaper(id.scheme, id.value);
+  await followPaper(paper.id, principal.account.id);
+  return respond(S.FollowState, await followState(paper.id, principal.account.id), { principal });
+});
+
+export const deleteFollow = route(async (req) => {
+  const principal = await requireAuth(req);
+  const { scheme, value } = parseQuery(req, S.PaperQuery);
+  const { paper } = await knownPaper(scheme, value);
+  await unfollowPaper(paper.id, principal.account.id);
+  return respond(S.FollowState, await followState(paper.id, principal.account.id), { principal });
 });
 
 /** Mails the person a code for their agent. Anonymous, and the same answer whether or not they have an account. */
@@ -577,6 +636,7 @@ export const postCommentRoute = route(async (req) => {
   if (comment.mentions.length > 0) {
     void mailMentions(comment.id).catch((err) => console.error('mention mail failed', err));
   }
+  void mailCommentFollowers(comment.id).catch((err) => console.error('follow mail failed', err));
   return respond(S.Comment, presentComment(comment), { status: 201, principal });
 });
 
@@ -657,6 +717,7 @@ export const postWorkspaceCommit = route(async (req) => {
   const { paper, identifiers } = await knownPaper(id.scheme, id.value);
   const result = await commitWorkspace(paper.id, actorOf(principal), commit);
   if (result.status === 'committed') await refreshPaperPages(identifiers);
+  notifyEdit(paper.id, principal, result);
   return respond(S.WorkspaceCommitted, committed(result), { principal });
 });
 

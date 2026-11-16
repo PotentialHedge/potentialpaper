@@ -206,6 +206,12 @@ export async function mergePapers(
       { database: tx as unknown as Database, evidence: input.evidence, recordEmpty: true },
     );
     await tx.update(papers).set({ mergedInto: survivorId }).where(eq(papers.id, duplicateId));
+    // Whoever followed the duplicate follows the survivor.
+    await tx.execute(sql`
+      insert into paper_follows (account_id, paper_id, created_at)
+      select account_id, ${survivorId}, created_at from paper_follows where paper_id = ${duplicateId}
+      on conflict do nothing
+    `);
     return result;
   });
 }
