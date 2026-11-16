@@ -38,6 +38,14 @@ import * as myCoAuthors from '@/app/api/v1/me/papers/co-authors/route';
 import * as follows from '@/app/api/v1/follows/route';
 import * as mySettings from '@/app/api/v1/me/settings/route';
 import * as siteSettings from '@/app/api/v1/settings/route';
+import * as installedPlugins from '@/app/api/v1/plugins/installed/route';
+import * as myPlugins from '@/app/api/v1/me/plugins/route';
+import * as pluginGrants from '@/app/api/v1/me/plugins/grants/route';
+import * as pluginStorage from '@/app/api/v1/me/plugins/storage/route';
+import * as pageSummary from '@/app/api/v1/pages/[identifier]/route';
+import * as pageFiles from '@/app/api/v1/pages/[identifier]/files/route';
+import * as pageMembersRoute from '@/app/api/v1/pages/[identifier]/members/route';
+import * as pageSubmissions from '@/app/api/v1/pages/[identifier]/submissions/route';
 import { getDb, getPool } from '@/db';
 import { clearDevOutbox, devOutbox } from '@/server/mail';
 
@@ -45,7 +53,7 @@ export const ORIGIN = 'http://test.local';
 
 export async function resetDatabase(): Promise<void> {
   await getDb().execute(sql`
-    truncate table site_settings, user_settings, page_links, page_members, page_member_sources, page_scope_names, page_parents, page_ancestors, pages, paper_follows, search_docs, bot_grants, comment_mentions, comment_aliases, comments, lfs_objects, ssh_keys, evidence_files, agent_posts, agent_files, api_tokens, agent_codes, author_claims, demo_pins, demo_snapshots, submission_notes, submissions, venues, pdf_documents, consumer_cursors, page_events, page_current, page_revisions, page_refs, page_objects, commit_identities, paper_lookup_misses, paper_identifiers, papers, institution_domains, affiliations, accounts, rate_limit_buckets,
+    truncate table plugin_refs, plugin_snapshots, user_plugin_grants, user_plugin_storage, site_settings, user_settings, page_links, page_members, page_member_sources, page_scope_names, page_parents, page_ancestors, pages, paper_follows, search_docs, bot_grants, comment_mentions, comment_aliases, comments, lfs_objects, ssh_keys, evidence_files, agent_posts, agent_files, api_tokens, agent_codes, author_claims, demo_pins, demo_snapshots, submission_notes, submissions, venues, pdf_documents, consumer_cursors, page_events, page_current, page_revisions, page_refs, page_objects, commit_identities, paper_lookup_misses, paper_identifiers, papers, institution_domains, affiliations, accounts, rate_limit_buckets,
       session, account, verification, "user"
     restart identity cascade
   `);
@@ -91,6 +99,14 @@ const ROUTES: [RegExp, any][] = [
   [/^\/me\/papers\/co-authors$/, myCoAuthors],
   [/^\/follows(\?.*)?$/, follows],
   [/^\/me\/settings$/, mySettings],
+  [/^\/plugins\/installed(\?.*)?$/, installedPlugins],
+  [/^\/me\/plugins(\?.*)?$/, myPlugins],
+  [/^\/me\/plugins\/grants(\?.*)?$/, pluginGrants],
+  [/^\/me\/plugins\/storage(\?.*)?$/, pluginStorage],
+  [/^\/pages\/(?<identifier>[^/?]+)\/files$/, pageFiles],
+  [/^\/pages\/(?<identifier>[^/?]+)\/members(\?.*)?$/, pageMembersRoute],
+  [/^\/pages\/(?<identifier>[^/?]+)\/submissions$/, pageSubmissions],
+  [/^\/pages\/(?<identifier>[^/?]+)$/, pageSummary],
   [/^\/settings$/, siteSettings],
   [/^\/me\/password$/, password],
   [/^\/me\/affiliations$/, affiliations],

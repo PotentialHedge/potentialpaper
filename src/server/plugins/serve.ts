@@ -2,7 +2,7 @@ import { and, eq } from 'drizzle-orm';
 import { getDb } from '@/db';
 import { pluginSnapshots, type DemoFile } from '@/db/schema';
 import type { PluginManifest } from '@/lib/plugins/manifest';
-import { SDK_BASE } from '@/lib/plugins/origin';
+import { PUBLIC_SDK_BASE, SDK_BASE } from '@/lib/plugins/origin';
 import { getBlob } from '../demos/store';
 import { findFile } from '../demos/serve';
 import { siteUrl } from '../site';
@@ -44,7 +44,7 @@ export function pluginCsp(network: readonly string[]): string {
   return [
     "default-src 'self'",
     // WebAssembly is among the files a plugin may ship, and compiling it needs this; `eval` stays off.
-    `script-src 'self' 'wasm-unsafe-eval' ${SDK_BASE}`,
+    `script-src 'self' 'wasm-unsafe-eval' ${[...new Set([SDK_BASE, PUBLIC_SDK_BASE])].join(' ')}`,
     // Libraries set inline styles; styles can't reach anything outside the frame.
     "style-src 'self' 'unsafe-inline'",
     "img-src 'self' data: blob:",

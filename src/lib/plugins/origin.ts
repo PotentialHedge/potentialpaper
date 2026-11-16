@@ -31,3 +31,5 @@ export function pluginBaseUrl(label: string, commit: string): string {
 /** The SDK's folder, as a CSP source, and the SDK itself: one file, no build step needed to use it. */
 export const SDK_BASE = `${content.protocol}//${content.host}/sdk/`;
 export const SDK_URL = `${SDK_BASE}v1/pp.js`;
+/** Where plugins load the SDK from, whichever site runs them: the production copy, allowed by every plugin's CSP. */
+export const PUBLIC_SDK_BASE = 'https://ppusercontent.com/sdk/';

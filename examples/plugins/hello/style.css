@@ -1,0 +1,21 @@
+/* The page's tokens arrive as --pp-<name> on :root (pp.d.ts, Theme), so the plugin matches it in light and dark. */
+body {
+  margin: 0;
+  background: transparent;
+  color: var(--pp-ink, #1d1d1d);
+  font: 14px/1.5 var(--pp-font-sans, sans-serif);
+}
+p {
+  margin: 0 0 4px;
+}
+ul {
+  margin: 0 0 4px;
+  padding-left: 18px;
+}
+.fine {
+  color: var(--pp-muted, #777);
+  font-size: 12px;
+}
+a {
+  color: var(--pp-accent, #b31b1b);
+}
