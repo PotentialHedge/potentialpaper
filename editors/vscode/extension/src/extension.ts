@@ -42,26 +42,52 @@ type HostMessage =
   | { type: 'active'; path: string | null; text: string | null }
   | { type: 'committed'; head: string | null };
 
+/** Each path and the folders above it: what the explorer has been told exists. */
+function withFolders(paths: string[]): Set<string> {
+  const all = new Set<string>();
+  for (const path of paths) {
+    const parts = path.split('/');
+    for (let i = 1; i <= parts.length; i++) all.add(parts.slice(0, i).join('/'));
+  }
+  return all;
+}
+
 class FileSystem implements vscode.FileSystemProvider {
   private readonly emitter = new vscode.EventEmitter<vscode.FileChangeEvent[]>();
   readonly onDidChangeFile = this.emitter.event;
+  private known = new Set<string>();
 
-  constructor(private readonly store: Store) {
-    store.onDidChange((paths) =>
-      this.emitter.fire(
-        paths.map((path) => ({
-          type: store.exists(path) ? vscode.FileChangeType.Changed : vscode.FileChangeType.Deleted,
-          uri: uriOf(path),
-        })),
-      ),
-    );
+  /**
+   * `loaded` settles once the page's files are in (or failed to come): VS Code asks for the folder and the files it
+   * had open as soon as the extension starts, and an answer from before then would be an empty folder it keeps.
+   */
+  constructor(
+    private readonly store: Store,
+    private readonly loaded: Promise<unknown>,
+  ) {
+    // A path the explorer hasn't been told of is new, or it ignores it (a change to something it doesn't have).
+    store.onDidChange((paths) => {
+      const now = withFolders(store.paths());
+      const events: vscode.FileChangeEvent[] = [];
+      for (const path of withFolders(paths)) {
+        const type = !now.has(path)
+          ? vscode.FileChangeType.Deleted
+          : this.known.has(path)
+            ? vscode.FileChangeType.Changed
+            : vscode.FileChangeType.Created;
+        if (type !== vscode.FileChangeType.Changed || paths.includes(path)) events.push({ type, uri: uriOf(path) });
+      }
+      this.known = now;
+      this.emitter.fire(events);
+    });
   }
 
   watch(): vscode.Disposable {
     return new vscode.Disposable(() => {});
   }
 
-  stat(uri: vscode.Uri): vscode.FileStat {
+  async stat(uri: vscode.Uri): Promise<vscode.FileStat> {
+    await this.loaded;
     const path = pathOf(uri);
     if (this.store.exists(path)) {
       const reason = this.store.readonlyReason(path);
@@ -77,7 +103,8 @@ class FileSystem implements vscode.FileSystemProvider {
     throw vscode.FileSystemError.FileNotFound(uri);
   }
 
-  readDirectory(uri: vscode.Uri): [string, vscode.FileType][] {
+  async readDirectory(uri: vscode.Uri): Promise<[string, vscode.FileType][]> {
+    await this.loaded;
     const path = pathOf(uri);
     if (!this.store.isDir(path)) throw vscode.FileSystemError.FileNotADirectory(uri);
     return this.store.children(path);
@@ -87,7 +114,8 @@ class FileSystem implements vscode.FileSystemProvider {
     this.store.mkdir(pathOf(uri));
   }
 
-  readFile(uri: vscode.Uri): Promise<Uint8Array> {
+  async readFile(uri: vscode.Uri): Promise<Uint8Array> {
+    await this.loaded;
     return this.store.read(pathOf(uri));
   }
 
@@ -255,7 +283,12 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
 
   const api = new Api(origin, paper);
   const store = new Store(api, context.workspaceState, `pending:${paper.scheme}:${paper.value}`);
-  const fs = new FileSystem(store);
+  // Loading starts at once, so the file system can wait for it (`FileSystem`); its failure is shown below.
+  const loading = store.load();
+  const fs = new FileSystem(
+    store,
+    loading.catch(() => {}),
+  );
   context.subscriptions.push(
     vscode.workspace.registerFileSystemProvider(SCHEME, fs, { isCaseSensitive: true }),
     vscode.workspace.registerTextDocumentContentProvider(ORIGINAL_SCHEME, {
@@ -500,7 +533,7 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
   };
 
   try {
-    await store.load();
+    await loading;
   } catch (err) {
     void vscode.window.showErrorMessage(`The page could not be loaded: ${describe(err)}`);
     // Ready all the same, so the host page uncovers the frame and the message shows.
@@ -520,13 +553,15 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
   await repos.refresh();
   sendActive();
 
-  // Open the first community section, or the folder's first file, so there is something to start from.
-  if (!vscode.window.activeTextEditor) {
+  // Open the first community section, so there is something to start from, unless VS Code is bringing back the
+  // editors of the last visit. Not awaited: those wait for this activation to finish before they can read their
+  // files, and opening one meanwhile would wait for them.
+  if (vscode.window.tabGroups.all.every((g) => g.tabs.length === 0)) {
     const first = store
       .paths()
       .filter((p) => p.startsWith('community/'))
       .sort()[0];
-    if (first) await vscode.window.showTextDocument(uriOf(first), { preview: true });
+    if (first) void vscode.window.showTextDocument(uriOf(first), { preview: true });
   }
 }
 
