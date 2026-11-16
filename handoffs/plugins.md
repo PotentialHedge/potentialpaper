@@ -508,9 +508,9 @@ Built:
 
 Calls I made where the plan left room:
 
-- **An update moves the reader alone.** It sets their entry's `ref` to the new tag. `snapshotPlugin(…, { update:
-true })`, which re-resolves a ref site-wide, stays unused: moving a shared pin would change the code other readers
-  run without their asking.
+- **An update moves the reader alone.** It sets their entry's `ref` to the new tag. Re-resolving a ref site-wide
+  (`snapshotPlugin` with `update: true`) stays unused: moving a shared pin would change the code other readers run
+  without their asking.
 - **"Newer" is against the running manifest's `version`**, not the ref, so a plugin installed from a branch or a
   commit is offered a newer release too. Only tags are offered (the plan's "a newer tag"). A reader tracking a branch
   gets new commits only by re-pinning; there is no "pull the branch again" button.
