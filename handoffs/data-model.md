@@ -255,3 +255,62 @@ fields }`, the shape Phase 4's `search_docs` rows can take) and `render: { panel
   then replays every page's events into the index once. Score filters (`rating>=8`) are still "Later". With ~126k
   notes after Phase 5, check `in:reviews` timing on the relevance sort (a correlated `max(ts_rank_cd)` per matching
   paper); a `kind:` filter would be easy to add on the `kind` column. `slots.tsx` still doesn't read `render`.
+
+### Phase 5 (2026-11-16, branch `data-model-phase-5`)
+
+- **The importer is the `openreview` bot** (`src/server/import-reviews.ts`): for each submission it builds the
+  folder's files (`submissionFiles`: `submission.json`, `forms.json`, `notes/<id>.json`), compares their blob ids
+  with what the head holds under that folder (`readFolder`, new in `pages/repo.ts`, which reads only the trees on
+  the way), and commits the difference through `commitPage` as the bot, deleting notes the source no longer
+  lists. Nothing differs, nothing is committed (and no rate-limit token is spent). One commit per submission,
+  summary `Import ICLR 2027 submission <id>: 3 notes` / `Update …: 1 note, 1 removed`, with the forum as evidence.
+  It runs at `IMPORT_RATE_LIMIT` (passed as `rateLimit`), `concurrency` pages at once, retries `page_busy`, follows
+  merges (`findPaper`), and reports refusals instead of stopping. The importer no longer writes `submissions`,
+  `submission_notes` or `venues` at all.
+- **`npm run papers:import-reviews -- <scrape> <group> <name> [--concurrency 4] [--from <forum>]`**: resumable by
+  running it again (unchanged folders are skipped by blob id, ~1,000 a few seconds); `--from` skips ahead.
+  `fetchedAt`/`meta` are no longer read.
+- **The `reviews` consumer** (`src/server/review-projection.ts`, second in `CONSUMERS`): reads the head's
+  `reviews/` folders, every review blob in one query, and per page (advisory lock) upserts the venue
+  (`<source>:<venue id>`, forms from `forms.json`), upserts each submission, replaces its notes, and deletes the
+  page's submissions whose folder is gone. `fetched_at` is now when the folder last changed (newest
+  `page_revisions` row up to the head touching it), since a re-import that finds nothing commits nothing; the
+  panel's "Updated" means that. `reset` truncates `submissions` and `submission_notes` (venues stay).
+  `submissionsOf` and the Submissions panel are unchanged.
+- **Backfill in dev** (user unit `pp-reviews-backfill`, log `data/reviews-backfill.log`): the dev DB had no
+  submission rows and 501 repos. 42,430 submissions from `../papermarket/research/data/iclr2027.sqlite` in 1,230 s
+  at concurrency 4: 42,425 with a paper (40,775 commits; 1,650 were already there from a trial run), 5 without,
+  0 refused, **286,227 notes** (the plan's ~126k was low: the scrape has ~285k public replies). Repos went
+  501 → 42,438. Then the worker: `search` indexed everything (328k review documents in `search_docs`, ~20 min),
+  and `reviews` projected 42,425 submissions and 286,227 notes (matching the import exactly; one venue with its
+  forms; ~50 min at ~15 pages/s on a host busy with other work). Then `REPACK (CONCURRENTLY)` and
+  `VACUUM (ANALYZE)` on the page, search and review tables (`data/repack.log`); little to reclaim, since
+  everything was inserted, not rewritten.
+- **`in:reviews` timing:** the relevance sort's correlated `max(ts_rank_cd)` per matching paper took 2–4 s for
+  common words. Now `fileRanks` joins one grouped pass over the matching documents (`server/search.ts`): `in:reviews
+diffusion` (6k papers) ~1 s, `transformer attention` ~0.5 s, `novelty -diffusion` (19k papers) ~1.6 s, on a
+  loaded dev host with the worker running. Words in nearly every review stay slow-ish; a `kind:` filter or
+  capping candidates would be next if it matters.
+- **Sizes (dev, after):** `search_docs` 1.9 GB (text 615 MB, tsv 811 MB, GIN 255 MB): the note text is kept for
+  snippets. `page_objects` 1.2 GB, `submission_notes` 0.8 GB; the database 4.4 GB. Production grows by about the
+  same (it already holds the notes once, in the old rows).
+- **Tests:** `tests/integration/submissions.test.ts` rewritten: files committed as the bot and projected; a
+  re-import commits nothing; a change commits only the changed files and deletes a dropped note; lower-cased
+  folder names with ids kept inside; `fetched_at` from the folder's last change; a folder taken down removes its
+  rows; rebuild; merges. Checks: lint, format, typecheck pass; 561 of 567 tests pass, the 6 failures being the
+  known poppler ones. Two things seen on the way: (1) running the suite while a backfill commits into the same
+  Postgres cluster fails the consumer tests, since the watermark (`pg_snapshot_xmin`) is cluster-wide and keeps
+  moving; run tests on a quiet cluster. (2) `tests/unit/page-git.test.ts` "does not depend on which side is
+  ours" is a fast-check property that failed once with `mergeFile('\na', '', '\n')` ≠ `mergeFile('\na', '\n', '')`
+  (`''` vs `'\n'`): a real, rare asymmetry in `merge.ts`, unchanged since before this plan, not fixed here.
+- **Changed from the plan:** `import-submissions.ts` still only creates `papers` rows: a paper's identity isn't
+  review data, and the files need the submission's number and status, which the reviews import has. The order
+  "write files, then stop writing tables" became one step, since the dev tables were empty and nothing is live.
+- **Left / production on deploy** (in order): migrations `0026`–`0028` (no new migration in Phase 5); the
+  `worker` service (`dc --profile tools up -d worker`); the backfill as a detached job,
+  `dc run -d tools npm run papers:import-reviews -- <scrape> ICLR.cc/2027/Conference "ICLR 2027"` (the scrape has
+  to be on the server; ~20 min), during which pages with events but no review files yet show no submissions
+  until it and the worker are through; then `VACUUM (ANALYZE)` (and `REPACK` once on 19). Postgres 19 itself
+  once 19.0 is tagged (DEPLOY.md, "Postgres 19"). Not built: ICLR 2026 reviews (forms ready, scrape exists), the
+  per-bot rate limits as rows, `slots.tsx` reading `render`, and the worker running pages of one consumer in
+  parallel (the projection does ~15–40 pages/s, so a full rebuild of 42k pages is 20–50 min).

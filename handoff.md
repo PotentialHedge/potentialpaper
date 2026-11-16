@@ -113,15 +113,16 @@ Milestones 0, 1 and 2 are built, merged into `main` and deployed, and Milestone 
   - In Safari, a stale VS Code: Develop → Empty Caches, plus clearing service workers and Cache Storage from
     the console; the site's extension itself is `no-cache`.
 
-## Direction: the repo is the data, bots write it, plugins show it (decided 2026-11-16, not built yet)
+## Direction: the repo is the data, bots write it, plugins show it (decided 2026-11-16; built in `data-model-phase-0`…`5`, not merged yet)
 
 Future work should follow this. The plan, in phases, is `handoffs/data-model.md`; the design is `DESIGN.md` §3,
 §4.3, §4.4, §4.8–4.11 and §10.
 
 - **Submissions and reviews move into the page repo**, `reviews/<source>/<submission>/` (`submission.json`,
   `forms.json`, `notes/<id>.json`), written only by the bot granted that source. Score changes get history, and
-  anyone's bot can import a journal's reviews the same way. Today they are still only in `submissions`,
-  `submission_notes` and `venues.forms`, which become a projection.
+  anyone's bot can import a journal's reviews the same way. Built (Phase 5): the `openreview` bot commits them
+  (`npm run papers:import-reviews`), and `submissions`, `submission_notes` and `venues.forms` are the `reviews`
+  consumer's projection of the files.
 - **File types** (path pattern, schema versioned in the file, indexer, renderer) are the contract between bots and
   plugins; they grow out of `PAGE_SCHEMAS` (`server/pages/schemas.ts`).
 - **Bots work like GitHub Apps:** path grants as rows, short-lived tokens, webhooks with delivery ids. Our OpenReview
