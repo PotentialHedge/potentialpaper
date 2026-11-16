@@ -796,6 +796,43 @@ export const authorClaims = pgTable(
 
 export type AuthorClaim = typeof authorClaims.$inferSelect;
 
+/** What a page claim's status can be: waiting, confirmed or turned down. Stepping down removes the row. */
+export const PAGE_CLAIM_STATUSES = ['pending', 'confirmed', 'rejected'] as const;
+export type PageClaimStatus = (typeof PAGE_CLAIM_STATUSES)[number];
+
+/**
+ * An account's claim to be one of the owners of a page above the paper (`handoffs/pages.md`): for now a venue's
+ * organisers, who write its `organizers/` and its `venue.json`. Built on the author claim flow (`server/claims.ts`),
+ * with the page as what is claimed, and confirmed by an admin (`npm run claims:decide`). An organiser of a series
+ * also organises its editions (`server/page-claims.ts`). Organising is a public role, so an organiser's commits carry
+ * their own `u_` identity, not a per-claim one.
+ */
+export const pageClaims = pgTable(
+  'page_claims',
+  {
+    id: uuid('id').primaryKey().defaultRandom(),
+    pageId: uuid('page_id')
+      .notNull()
+      .references(() => pages.id, { onDelete: 'cascade' }),
+    accountId: uuid('account_id')
+      .notNull()
+      .references(() => accounts.id, { onDelete: 'cascade' }),
+    /** Their own words: who they are at the venue, and where that can be checked. */
+    evidence: text('evidence').notNull().default(''),
+    status: text('status', { enum: PAGE_CLAIM_STATUSES }).notNull().default('pending'),
+    decidedBy: uuid('decided_by').references(() => accounts.id, { onDelete: 'set null' }),
+    decidedAt: timestamp('decided_at', { withTimezone: true, mode: 'date' }),
+    createdAt: createdAt(),
+  },
+  (t) => [
+    uniqueIndex('page_claims_account_key').on(t.pageId, t.accountId),
+    index('page_claims_status_idx').on(t.status),
+    check('page_claims_status_check', sql.raw(`status in (${PAGE_CLAIM_STATUSES.map((s) => `'${s}'`).join(', ')})`)),
+  ],
+);
+
+export type PageClaim = typeof pageClaims.$inferSelect;
+
 /**
  * What an API token may do: `read` the viewer's own data, `write` as them (posts and edits, `git push`
  * included), `push` to pages with git and nothing else (what a git credential helper keeps on disk).

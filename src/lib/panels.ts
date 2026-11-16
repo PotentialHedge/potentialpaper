@@ -32,6 +32,7 @@ export const PAGE_PANELS = {
   ],
   venue: [
     { id: 'about', slot: 'venue.main', title: 'About the venue' },
+    { id: 'editions', slot: 'venue.main', title: 'Editions' },
     { id: 'organizers', slot: 'venue.main', title: 'Organisers' },
     { id: 'community', slot: 'venue.main', title: 'Community section' },
     { id: 'links', slot: 'venue.aside', title: 'Labeled links' },

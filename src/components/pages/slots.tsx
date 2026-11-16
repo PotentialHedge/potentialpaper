@@ -2,22 +2,24 @@ import type { ComponentType, ReactNode } from 'react';
 import { ArrangedPanels } from '@/components/ArrangedPanels';
 import { ArrangedTabs } from '@/components/ArrangedTabs';
 import { ui } from '@/components/ui';
-import { type KeyedKind, KINDS, type OrgFile, pagePath, type VenueFile } from '@/lib/kinds';
+import { type KeyedKind, KINDS, type OrgFile, pagePath } from '@/lib/kinds';
 import { slotPanels } from '@/lib/panels';
 import type { PageLink } from '@/server/page-links';
 import type { ScopePaper } from '@/server/page-members';
 import { LinksBox } from './LinkLists';
+import { VenueAbout, VenueEditions, VenueOrganizers, VenuePapers } from './venue-panels';
 
 /**
  * The panels of the kinds of page other than a paper (`lib/kinds.ts`), by id in `lib/panels.ts`, rendered into a
  * kind's slots: `<kind>.main` beside `<kind>.aside`, then `<kind>.tabs`. A paper's are `components/paper/slots.tsx`.
- * What each kind shows beyond these generic panels (a venue's editions and statistics, a topic's suggestions, …)
- * comes with its phase of `handoffs/pages.md`. As on a paper, panels are the same HTML for every reader.
+ * What each kind shows beyond these generic panels comes with its phase of `handoffs/pages.md`: a venue's are in
+ * `venue-panels.tsx`. As on a paper, panels are the same HTML for every reader.
  */
 
 export interface KindPanelProps {
   kind: KeyedKind;
-  key: string;
+  /** The page's key (`iclr/2027`); not `key`, which React keeps to itself. */
+  pageKey: string;
   pageId: string;
   name: string;
   /** Its kind file as it parses, or `null`. */
@@ -43,13 +45,7 @@ function OwnersSection({ kind, ownersHtml }: KindPanelProps) {
       {kind !== 'user' && <h2 className={ui.groupHeading}>{owners.title}</h2>}
       <Html
         html={ownersHtml}
-        empty={
-          kind === 'venue' ? (
-            <p className={ui.empty}>Organise this venue? Claiming it comes with organiser claims.</p>
-          ) : kind === 'user' ? null : (
-            <p className={ui.empty}>Nobody has written anything here yet.</p>
-          )
-        }
+        empty={kind === 'user' ? null : <p className={ui.empty}>Nobody has written anything here yet.</p>}
       />
     </section>
   );
@@ -65,16 +61,10 @@ function CommunitySection({ kind, communityHtml }: KindPanelProps) {
   );
 }
 
-/** What the kind file says, in a line or two: a venue's dates and site, an org's ROR id, a topic's other names. */
+/** What the kind file says, in a line or two: an org's ROR id, a topic's other names. A venue's is `VenueAbout`. */
 function About({ kind, kindFile }: KindPanelProps) {
   if (!kindFile) return null;
   const facts: ReactNode[] = [];
-  if (kind === 'venue') {
-    const venue = kindFile as VenueFile;
-    const dates = [venue.dates?.start, venue.dates?.end].filter(Boolean).join(' to ');
-    if (dates) facts.push(dates);
-    if (venue.url) facts.push(<a href={venue.url}>{new URL(venue.url).host}</a>);
-  }
   if (kind === 'topic') {
     const aliases = (kindFile.aliases as string[] | undefined) ?? [];
     if (aliases.length > 0) facts.push(`Also called ${aliases.join(', ')}`);
@@ -140,10 +130,24 @@ const PANELS: Record<string, ComponentType<KindPanelProps>> = {
 /** A user page's `about` is its owners' part: the person's own words. */
 const USER_PANELS: Record<string, ComponentType<KindPanelProps>> = { ...PANELS, about: OwnersSection };
 
+/** A venue's own panels (`venue-panels.tsx`): its editions, its organisers' claim, its submissions by status. */
+const VENUE_PANELS: Record<string, ComponentType<KindPanelProps>> = {
+  ...PANELS,
+  about: VenueAbout,
+  editions: VenueEditions,
+  organizers: VenueOrganizers,
+  papers: VenuePapers,
+};
+
+const KIND_PANELS: Partial<Record<KeyedKind, Record<string, ComponentType<KindPanelProps>>>> = {
+  user: USER_PANELS,
+  venue: VENUE_PANELS,
+};
+
 /** A slot's panels, which the reader's settings may hide or reorder (`ArrangedPanels`, `ArrangedTabs`). */
 export function KindSlot({ slot, ...props }: KindPanelProps & { slot: 'main' | 'aside' | 'tabs' }) {
   const panels = slotPanels(props.kind, `${props.kind}.${slot}`).map(({ id, title }) => {
-    const Panel = (props.kind === 'user' ? USER_PANELS : PANELS)[id];
+    const Panel = (KIND_PANELS[props.kind] ?? PANELS)[id];
     return { id, title, node: <Panel {...props} /> };
   });
   const name = `${props.kind}.${slot}`;

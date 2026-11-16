@@ -46,6 +46,7 @@ import {
   versionPdfIdOf,
 } from './rules';
 import { prekProblem } from './starter';
+import { pageClaimRoles } from '../page-claims';
 
 /**
  * Whether a change to a page's tree is allowed: who is making it, what it writes, and what the whole tree
@@ -66,10 +67,13 @@ export const SYSTEM_ACTOR: Actor = { kind: 'system' };
 
 export type ActorRoles = Roles & { bot: boolean; claimIdentity: string | null; kind: PageKind };
 
-/** Who the actor is on a page of a kind other than a paper. Owners there come with each kind's phase. */
+/** Who the actor is on a page of a kind other than a paper: a user page's account, a venue's organisers. */
 async function keyedRoles(db: Reader, actor: Actor, page: PageRow): Promise<ActorRoles> {
   const none = { owner: false, claimed: false, claimIdentity: null, kind: page.kind };
-  if (actor.kind === 'system') return { ...none, system: true, admin: false, verified: false, bot: false };
+  if (actor.kind === 'system') {
+    const { claimed } = await pageClaimRoles(db, page, null);
+    return { ...none, claimed, system: true, admin: false, verified: false, bot: false };
+  }
   const [account] = await db
     .select({ isBot: accounts.isBot, verifiedAt: accounts.verifiedAt, handle: accounts.handle })
     .from(accounts)
@@ -83,14 +87,17 @@ async function keyedRoles(db: Reader, actor: Actor, page: PageRow): Promise<Acto
           .where(and(eq(botGrants.accountId, actor.accountId), eq(botGrants.kind, page.kind)))
       ).map((row) => row.pattern)
     : [];
+  // A venue's confirmed organisers, here or on the series above it (`page-claims.ts`).
+  const claims = await pageClaimRoles(db, page, account.isBot ? null : actor.accountId);
   return {
     ...none,
     system: false,
     admin: actor.isAdmin,
     verified: account.isBot || account.verifiedAt !== null,
-    // A user page is its account's, and its agents' tokens act as the account. A venue's organisers (claims) and an
-    // org's members (affiliations) are owners from `handoffs/pages.md` Phases 2 and 4.
-    owner: page.kind === 'user' && !account.isBot && account.handle === page.key,
+    // A user page is its account's, and its agents' tokens act as the account. An org's members (affiliations) are
+    // owners from `handoffs/pages.md` Phase 4.
+    owner: (page.kind === 'user' && !account.isBot && account.handle === page.key) || claims.owner,
+    claimed: claims.claimed,
     bot: account.isBot,
     grants,
   };

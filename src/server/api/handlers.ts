@@ -55,9 +55,17 @@ import { siteUrl } from '../site';
 import { saveUserSettings, settingsFor, siteSettingsView, type SettingsView } from '../settings';
 import { MAX_SETTINGS_BYTES } from '@/lib/settings';
 import { grantPlugin, installedPlugins, installPlugin, revokePlugin, uninstallPlugin } from '../plugins/installed';
-import { pageMembersForPlugins, paperSubmissionsForPlugins, readPageForPlugins, resolvePage } from '../plugins/pages';
+import {
+  mustFindPage,
+  pageMembersForPlugins,
+  paperSubmissionsForPlugins,
+  readPageForPlugins,
+  resolvePage,
+} from '../plugins/pages';
 import { pluginStorage, setPluginStorage, storageBytes } from '../plugins/storage';
 import { findPage } from '../pages/kinds';
+import { isClaimable, ownPageClaim, requestPageClaim, withdrawPageClaim } from '../page-claims';
+import { presentVenuePapers } from '../venue-pages';
 import { rolesOf } from '../pages/check';
 import { ApiError } from './errors';
 import { parseBody, parseParam, parseQuery, respond, route, toIso, toIsoOrNull } from './http';
@@ -914,4 +922,43 @@ export const getPageSubmissions = route(async (_req, params) => {
   return respond(S.PageSubmissions, await paperSubmissionsForPlugins(identifierParam(params)), {
     headers: PUBLIC_MINUTE,
   });
+});
+
+/** The keyed page an identifier names, for the routes about owning one: a venue's organisers. */
+async function claimablePage(params: Record<string, string | string[]>) {
+  const page = await mustFindPage(identifierParam(params));
+  if (!isClaimable(page.kind)) throw new ApiError(422, 'validation_error', 'only a venue can be claimed');
+  return page;
+}
+
+/** The viewer's claim to organise a venue. */
+export const getPageClaim = route(async (req, params) => {
+  const principal = await requireAuth(req);
+  const page = await claimablePage(params);
+  return respond(S.OwnPageClaim, { claim: await ownPageClaim(page, principal.account.id) }, { principal });
+});
+
+/** Asks to be confirmed as one of a venue's organisers. An admin decides. */
+export const postPageClaim = route(async (req, params) => {
+  const principal = await requireVerified(req);
+  const page = await claimablePage(params);
+  const { evidence } = await parseBody(req, S.PageClaimBody);
+  const claim = await requestPageClaim(page, principal.account, { evidence });
+  return respond(S.OwnPageClaim, { claim }, { status: 201, principal });
+});
+
+/** Takes back a claim to organise a venue, or steps down as its organiser. */
+export const deletePageClaim = route(async (req, params) => {
+  const principal = await requireAuth(req);
+  const page = await claimablePage(params);
+  await withdrawPageClaim(page, principal.account.id);
+  return respond(S.OwnPageClaim, { claim: null }, { principal });
+});
+
+/** A venue's submissions by status, decision and title, rolled up from its editions. Public. */
+export const getVenuePapers = route(async (req, params) => {
+  const page = await mustFindPage(identifierParam(params));
+  if (page.kind !== 'venue') throw new ApiError(422, 'validation_error', 'only a venue page lists submissions');
+  const filter = parseQuery(req, S.VenuePapersQuery);
+  return respond(S.VenuePapers, await presentVenuePapers(page.id, filter), { headers: PUBLIC_MINUTE });
 });

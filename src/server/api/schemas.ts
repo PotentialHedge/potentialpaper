@@ -775,3 +775,47 @@ export const PageMembers = z.object({
 
 /** `GET /pages/{identifier}/submissions`: a paper's submissions with their notes and their venues' forms. */
 export const PageSubmissions = z.object({ submissions: z.array(z.record(z.string(), z.unknown())) });
+
+/** `POST /pages/{identifier}/claim`: asking to be confirmed as one of a venue's organisers. */
+export const PageClaimBody = z.object({ evidence: z.string().max(5000) });
+
+/** `GET`/`POST`/`DELETE /pages/{identifier}/claim`: the viewer's claim to organise a venue, if any. */
+export const OwnPageClaim = z.object({
+  claim: z
+    .object({
+      status: z.enum(['pending', 'confirmed', 'rejected']),
+      evidence: z.string(),
+      /** Confirmed through a claim on the venue above it: a series' organiser on an edition. */
+      inherited: z.boolean(),
+    })
+    .nullable(),
+});
+
+export const VenuePapersQuery = z.object({
+  status: z.enum(['accepted', 'under_review', 'rejected', 'desk_rejected', 'withdrawn', 'unknown']).optional(),
+  decision: z.string().min(1).max(200).optional(),
+  q: z.string().max(200).optional(),
+  offset: z.coerce.number().int().min(0).max(1_000_000).default(0),
+  limit: z.coerce.number().int().min(1).max(200).default(50),
+});
+
+/** `GET /pages/{identifier}/venue-papers`: a venue's submissions, rolled up from its editions, by status. */
+export const VenuePapers = z.object({
+  total: z.number().int(),
+  papers: z.array(
+    z.object({
+      title: z.string(),
+      /** The paper's identifier and address here; `null` for a paper with no identifier. */
+      identifier: z.string().nullable(),
+      address: z.string().nullable(),
+      status: z.string(),
+      decision: z.string().nullable(),
+      number: z.number().int().nullable(),
+      /** The submission at its source: OpenReview's forum. */
+      url: z.string().nullable(),
+      /** The edition it was submitted to, on a series' page. */
+      venue: z.object({ identifier: z.string(), address: z.string(), name: z.string() }).nullable(),
+    }),
+  ),
+  nextOffset: z.number().int().nullable(),
+});

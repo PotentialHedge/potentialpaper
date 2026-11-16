@@ -2,6 +2,7 @@ import 'dotenv/config';
 import { DatabaseSync } from 'node:sqlite';
 import { getPool } from '@/db';
 import { IMPORT_RATE_LIMIT, importReviews, type ImportResult, type SubmissionInput } from '@/server/import-reviews';
+import { syncVenuePages } from '@/server/venue-pages';
 import { openReviewForms } from '@/server/venue-sources/iclr-forms';
 import {
   forumUrl,
@@ -23,7 +24,8 @@ import {
  * as JSON. Submissions attach to papers by their OpenReview id, so import the papers first
  * (`papers:import-iclr`). Re-running commits only what changed, so a run that stopped is resumed by running it
  * again (`--from` skips the forums before one, in id order, to get there sooner). The worker's `reviews`
- * consumer then projects the files into the tables the page reads.
+ * consumer then projects the files into the tables the page reads. At the end the `venues` bot makes the venue's
+ * series and edition pages (`/v/iclr`, `/v/iclr/2027`), if they aren't there yet.
  */
 
 const BATCH = 1_000;
@@ -115,6 +117,15 @@ async function main() {
       `${totals.private} notes not public`,
   );
   sqlite.close();
+  // The venue's pages, series and edition, as the `venues` bot makes them (`server/venue-pages.ts`).
+  const pages = await syncVenuePages({ venues: [{ id: `${venue.source}:${venue.id}`, name: venue.name }] });
+  console.log(
+    pages.written.length > 0
+      ? `venue pages written: ${pages.written.join(', ')}`
+      : pages.skipped.length > 0
+        ? `no venue page for ${pages.skipped.join(', ')} (only a conference's main edition has one yet)`
+        : 'venue pages up to date',
+  );
   await getPool().end();
 }
 

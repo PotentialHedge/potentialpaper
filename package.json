@@ -37,6 +37,7 @@
     "pages:migrate-lfs": "tsx scripts/migrate-page-lfs.ts",
     "pages:add-starter": "tsx scripts/add-page-starter.ts",
     "claims:decide": "tsx scripts/decide-claim.ts",
+    "venues:sync": "tsx scripts/sync-venue-pages.ts",
     "institutions:build": "NODE_OPTIONS=--max-old-space-size=4096 tsx scripts/build-institution-domains.ts",
     "editor:build": "scripts/build-web-editor.sh",
     "editor:extension": "node scripts/build-editor-extension.mjs",

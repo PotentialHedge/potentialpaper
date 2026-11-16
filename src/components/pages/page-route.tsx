@@ -58,7 +58,8 @@ export async function KeyedPageRoute({ kind, segments }: { kind: KeyedKind; segm
     linksFrom(page.id),
     linksTo(page.id),
     scope ? scopeMemberCount(page.id) : Promise.resolve(0),
-    scope ? scopePapers(page.id) : Promise.resolve([]),
+    // A venue lists its submissions by status itself (`venue-panels.tsx`).
+    scope && kind !== 'venue' ? scopePapers(page.id) : Promise.resolve([]),
     pageSummaries([page.id]),
     scopesOfPage(page),
     pageFacts(page),
@@ -66,7 +67,7 @@ export async function KeyedPageRoute({ kind, segments }: { kind: KeyedKind; segm
   const summary = summaries.get(page.id)!;
   const props = {
     kind,
-    key,
+    pageKey: key,
     pageId: page.id,
     name: current?.name ?? pageName(kind, key, null),
     kindFile: current?.kindFile ?? null,
