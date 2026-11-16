@@ -10,6 +10,10 @@ export const dynamic = 'force-dynamic';
 const UPDATES: { date: string; text: string }[] = [
   {
     date: '2026-11-16',
+    text: 'Plugins: anyone can add panels to pages from a public GitHub repo with a `potentialpaper-plugin.json` (schema at `/schemas/plugin-manifest.json`). When a person asks you to install one, `POST /api/v1/me/plugins` with `{ "source": "github:<owner>/<repo>[/<folder>][@<tag>]" }`: it is copied at the commit the tag names and added to the `plugins` key of their settings.json. It runs only once they approve its permissions on a page, in their browser; you can\'t approve it for them. Pages of every kind are readable by identifier, URL-encoded as one segment: `GET /api/v1/pages/<identifier>`, and `/files`, `/members`, `/submissions` under it.',
+  },
+  {
+    date: '2026-11-16',
     text: "A person's preferences are one file, settings.json (JSONC; comments allowed), which holds only what they changed. Read it with `GET /api/v1/me/settings` (the text as written, and every setting's value) and, when they ask you to change a setting, replace it with `PUT /api/v1/me/settings`, the file itself as the body. Keep their comments and other keys. A 422 lists every problem, one per line, each naming its key; unknown keys are kept with a warning. The settings and their meanings are in `/schemas/settings.json`. The first ones hide and reorder the panels on paper pages.",
   },
   {

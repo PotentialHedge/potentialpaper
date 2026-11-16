@@ -804,37 +804,69 @@ Built 2026-11-16 (`handoffs/plugins.md` Phase 1). One document per account, laye
   `/settings` has a form made from the schema, the raw file with the same checks, and Export and Import.
 - **Settings are preferences.** Remembered state (dismissed prompts, a plugin's cache) stays out of the document,
   and so does consent (below).
-- The first core keys are `<kind>.panels.hidden` and `<kind>.panels.order`: a reader turns built-in panels off or
-  reorders them within their slots (§4.8). Pages stay the same HTML for every reader, so these apply in the
-  browser after load.
+- The first core keys are `<kind>.panels.hidden` and `<kind>.panels.order`: a reader turns panels off or reorders
+  them within their slots (§4.8), built-in ones by id and plugins' as `<plugin id>.<panel id>`. Pages stay the same
+  HTML for every reader, so these apply in the browser after load. Then `plugins`, `plugins.default` and
+  `plugins.blocked` (below).
 
 ### The model
 
-A plugin is a public repo with a `potentialpaper-plugin.json` manifest and built files committed to it. We never
-run a build. The manifest names an `id`, `name`, `version`, `apiVersion`, `main` (an HTML file), `permissions`,
-`network` (https origins its own backend lives at) and what it `contributes`: panels (`{ id, title, kinds, slot,
-when? }`, in a kind's `main`, `aside` or `tab` slot), whole pages (`/x/<plugin>/…`), settings and commands.
-`when` conditions (`page.hasScores`, `signedIn`, …) decide whether a panel shows at all, so a page doesn't start a
-frame per installed plugin.
+Built 2026-11-16 (`handoffs/plugins.md` Phase 2). A plugin is a public repo (or a folder of one) with a
+`potentialpaper-plugin.json` manifest and built files committed to it. We never run a build.
 
-Installing resolves a tag or branch to a **commit SHA**, and the server copies the files at that SHA once, to R2,
-as demos are copied. Updates are explicit, and new permissions need new consent.
+- **The manifest** (`lib/plugins/manifest.ts`, zod; JSON Schema at `/schemas/plugin-manifest.json`) names an `id`
+  (`<GitHub owner>/<name>`, and the owner must be the repo's), `name`, `version` (semver), `apiVersion` (1), `main`
+  (an HTML file), `permissions` (`page.read`, `scope.read`, `reviews.read`), `network` (https origins its own backend
+  lives at) and what it `contributes`: `panels` (`{ id, title, kinds, slot, when? }`; `slot` is `main`, `aside` or
+  `tab`, one for every kind or one per kind, `{ "paper": "aside", "*": "main" }`), `pages` (whole pages at
+  `/x/<owner>/<name>/<page>`), `settings` (`SettingSpec`s, keyed `<plugin id>.<name>` in settings.json) and
+  `commands` (in each of its panels' menus). The validator reports every problem in one pass, each on a line naming
+  its field; unknown fields are warnings, so a newer manifest still loads on an older host.
+- **`when` conditions** (`lib/plugins/when.ts`), VS Code's clauses cut down: `page.hasScores`,
+  `page.kind == venue && signedIn`. Each kind offers its context keys in the kind registry (`KindInfo.contextKeys`:
+  `page.kind`, `signedIn`, `viewer.isOwner`, and `page.hasScores`/`page.hasSubmissions` where they mean something). A
+  panel whose condition is false starts no frame.
+- **Sources** (`lib/plugins/sources.ts`): `github:<owner>/<repo>[/<folder>][@<ref>]`, also typed as `owner/repo` or a
+  GitHub link. Installing resolves the ref to a **commit** (git's ref listing, as demos do: no token, no rate limit),
+  copies the kept files at that commit once into the demos' store (R2), and pins the ref (`plugin_refs`), so a moving
+  branch changes nothing: updates are explicit. Kept are files of the content domain's types (the demos' list, which
+  has `png`, `woff2` and `wasm`), outside dot-folders and `node_modules`; at most 500 files, 20 MB, 10 MB each. The
+  manifest is checked when the copy is taken (`plugin_snapshots`), and a copy with errors is refused.
+- **Installed plugins** (`lib/plugins/installed.ts`) are the site's `plugins.default` and the reader's `plugins`
+  key (`{ "<source>": { "enabled": true, "ref": "v1.0.0" } }`). `POST /api/v1/me/plugins` installs by source and edits
+  the key, keeping the rest of the file; `GET /api/v1/plugins/installed` lists them for a page, each with the commit it
+  runs and its status: `ready`, `consent`, `blocked`, `disabled` or `error`.
+- **Dev mode:** a source of `http://localhost:<port>/` (kept in that browser's localStorage, `pp.plugins.dev`) runs
+  unpinned from the author's dev server, in their browser only, with what it asks for.
 
 ### Security is what shapes everything
 
 Arbitrary JavaScript on the main origin could act as any signed-in user. So:
 
-- **Each plugin runs on its own origin**, `<host>.ppusercontent.com/<sha>/…`, where the host label is a stable
-  hash of the plugin id, on a different site from the app. Its frame is `sandbox="allow-scripts
-allow-same-origin"`: the same-origin flag is safe only because the origin is the plugin's own, and it lets a
-  plugin keep its own IndexedDB cache across versions. Its CSP is `default-src 'self'`, with `connect-src` adding
-  the manifest's `network` origins.
-- The **only** bridge is a typed, versioned `postMessage` RPC, and each call is checked against the permissions
-  the user granted. A plugin never touches the host's DOM or session; it declares what it adds, and the host draws
-  it.
+- **Each plugin runs on its own origin**, `plugin-<hash>.ppusercontent.com/<commit>/…`, where the label is a
+  stable hash of the plugin id, on a different site from the app (`server/plugins/serve.ts`, beside the demos'). Its
+  frame is `sandbox="allow-scripts allow-same-origin"`: the same-origin flag is safe only because the origin is the
+  plugin's own, and it lets a plugin keep its own IndexedDB cache across versions. Its CSP is `default-src 'self'`,
+  scripts from itself and the SDK (and `'wasm-unsafe-eval'`), inline styles, `connect-src 'self'` plus the
+  manifest's `network` origins, and `frame-ancestors` the site. Files are cached for good: a commit never changes.
+- The **only** bridge is a typed, versioned `postMessage` RPC (`lib/plugins/protocol.ts`, Presio's envelopes over a
+  `MessagePort`): the frame says hello, the page checks the message's window and origin and answers with a port and
+  the context. Each call is checked against the permissions the user granted (`lib/plugins/host.ts`). A plugin never
+  touches the host's DOM or session; it declares what it adds, and the host draws it (`components/plugins/`).
+  Methods: `context.get` (the page, its scopes, the viewer, the theme), `settings.get`/`set` (own keys only) and a
+  `settings.change` event, `storage.get`/`set` (64 KB per account and plugin, in Postgres; localStorage when signed
+  out), `page.read`, `page.members`, `page.resolve`, `reviews.forPaper`, `ui.setHeight` and `ui.openUrl`; theme
+  tokens are sent at boot and on change. Frames start when scrolled near. The SDK is one file,
+  `https://ppusercontent.com/sdk/v1/pp.js`, with `pp.d.ts` beside it; `examples/plugins/hello/` uses it.
+- The reads go through public routes anyone can call, `GET /api/v1/pages/<identifier>` and its `/files`, `/members`
+  and `/submissions`, so a plugin's own backend reads the same data; they give only what the page shows the public
+  (a user page's `about/` and links, §5.3).
 - **Consent is not in settings.json.** The document lists installed plugins (the `plugins` key), and a hand-edited
-  file can add one, but a grant row (`user_plugin_grants`: plugin id, SHA, permissions) records what was approved.
-  A plugin with no matching grant shows an approval prompt instead of running.
+  file can add one, but a grant row (`user_plugin_grants`: plugin id, SHA, permissions, network origins) records
+  what was approved. A plugin whose manifest asks for anything its grant lacks shows an approval prompt instead of
+  running, listing its permissions and network origins in plain words, so an update that asks for more asks again.
+  Only a browser session can approve, never an agent's token. A site default runs with what it asks for: the admin
+  who added it approved it.
 - **Plugins never write state other users share.** Shared state that clients can write can be poisoned by anyone.
   Data comes three ways: aggregates the site computes per scope (a `scope_stats` consumer, §4.9), generic bulk
   reads of a scope's papers with ETags, and a plugin's own backend (its `network` origins, or a bot, below).
@@ -849,7 +881,8 @@ restyling the host page or reading its session. That limit is what makes it safe
 
 Each user installs what they want, and it affects only them. Discovery lists public repos with the GitHub topic
 `potentialpaper-plugin`. The site layer of settings.json holds `plugins.default` (sources installed for everyone,
-which a user can turn off) and `plugins.blocked`, the kill switch (ids, or ids at a SHA).
+which a user can turn off) and `plugins.blocked`, the kill switch (ids, or ids at a SHA). Both are read from the
+site layer only (`siteOnly` in `lib/settings/core.ts`): a user's file naming them changes nothing, with a warning.
 
 ### Server-side extensions: bots
 
@@ -877,18 +910,18 @@ the route honest. The activity feed hides bot commits by default.
 
 ### What to do now, so this stays cheap
 
-| Build now                                                                | Why                                         |
-| ------------------------------------------------------------------------ | ------------------------------------------- |
-| API first; the UI uses `/api/v1` with OpenAPI                            | The extension API is mostly this            |
-| Event outbox written by every commit                                     | Feeds, webhooks and extensions share it     |
-| Paper page assembled from named slots (`paper.aside`, `paper.tabs`, ...) | Built-in panels become the first extensions |
-| Fence renderer registry in Markdown                                      | Rendered output has somewhere to attach     |
-| Path permissions, with `extensions/` reserved                            | Extension data has a defined, safe home     |
-| File types with schema, indexer and renderer (§4.8)                      | Renderers from extensions plug in by path   |
-| Bot grants on path patterns, as data                                     | Third-party bots need no code from us       |
-| Labels stored as data                                                    | Namespaced labels need no schema change     |
-| Strict CSP from the start                                                | Retrofitting CSP is painful                 |
-| Built-in panels by stable id (`lib/panels.ts`), arranged by settings     | Plugin panels join the same slots and order |
+| Build now                                                                | Why                                                            |
+| ------------------------------------------------------------------------ | -------------------------------------------------------------- |
+| API first; the UI uses `/api/v1` with OpenAPI                            | The extension API is mostly this                               |
+| Event outbox written by every commit                                     | Feeds, webhooks and extensions share it                        |
+| Paper page assembled from named slots (`paper.aside`, `paper.tabs`, ...) | Built-in panels become the first extensions                    |
+| Fence renderer registry in Markdown                                      | Rendered output has somewhere to attach                        |
+| Path permissions, with `extensions/` reserved                            | Extension data has a defined, safe home                        |
+| File types with schema, indexer and renderer (§4.8)                      | Renderers from extensions plug in by path                      |
+| Bot grants on path patterns, as data                                     | Third-party bots need no code from us                          |
+| Labels stored as data                                                    | Namespaced labels need no schema change                        |
+| Strict CSP from the start                                                | Retrofitting CSP is painful                                    |
+| Built-in panels by stable id (`lib/panels.ts`), arranged by settings     | Plugin panels join the same slots and order (built 2026-11-16) |
 
 ## 11. Attribution, licensing, legal
 

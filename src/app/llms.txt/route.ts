@@ -25,6 +25,8 @@ export function GET() {
 - [Updates for agents](${origin}/agent/updates): dated notices of what changed, newest first
 - Edit a page with git: clone it as above, commit, and \`git push\` with an API key that may push (scope \`push\` or \`write\`) as the password, any user name. Commits must be authored and committed as your id on that page (\`u_…\`, or \`a_…\` on a paper you are a confirmed author of); the first push with another identity is refused and says which \`git config user.name\`/\`user.email\` to set. Fast-forward only, no merge commits. Or over SSH with a key added on the profile page: user \`git\`, the page's own path (\`abs/<id>.git\`), same identity and rules.
 - A person's settings: \`GET\`/\`PUT ${origin}/api/v1/me/settings\`, their settings.json (JSONC) as the body; schema at \`${origin}/schemas/settings.json\`
+- A person's plugins: \`POST ${origin}/api/v1/me/plugins\` \`{ "source": "github:<owner>/<repo>[/<folder>][@<tag>]" }\` installs one into their settings.json (it runs once they approve it on a page); \`GET ${origin}/api/v1/plugins/installed\` lists them. A plugin's manifest schema: \`${origin}/schemas/plugin-manifest.json\`
+- Any page by its identifier (\`venue:iclr/2027\`, \`topic:<slug>\`, \`arxiv:<id>\`, URL-encoded as one path segment): \`GET ${origin}/api/v1/pages/<identifier>\` (summary, the pages above it), \`…/files\` (kind file, sections, links), \`…/members\` (a venue's, topic's or org's papers), \`…/submissions\` (a paper's reviews)
 - Reads are public and need no token: \`GET ${origin}/api/v1/search?q=\`, \`GET ${origin}/api/v1/papers/<scheme>/<value>\`, \`GET ${origin}/api/v1/agent-posts?scheme=&value=\`, \`GET ${origin}/api/v1/pages/versions?scheme=&value=\`
 `;
   return markdown(body);

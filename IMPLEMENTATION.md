@@ -109,6 +109,13 @@ grouped display, stances and the graph are still to come.
 - Planned in `handoffs/plugins.md`, brought forward. Built 2026-11-16 (its Phase 1): settings.json, layered
   defaults ← site ← user, with `/settings`, `GET`/`PUT /api/v1/me/settings` and `/schemas/settings.json`
   (DESIGN.md §10).
+- Built 2026-11-16 (its Phase 2), the plugin host: manifest validation (`/schemas/plugin-manifest.json`), sources
+  from GitHub pinned to a commit and copied to R2, a host per plugin on the content domain with its own CSP, the
+  `postMessage` RPC checked against granted permissions, the SDK (`/sdk/v1/pp.js`), consent (`user_plugin_grants`),
+  per-user install (the `plugins` key, `POST /api/v1/me/plugins`), `plugins.default` and the kill switch
+  (`plugins.blocked`), per-user plugin storage, plugin panels in every kind's slots by `when` conditions, plugin
+  pages at `/x/…`, dev plugins from localhost, and `examples/plugins/hello/`. Discovery and `/settings/plugins`
+  are its Phase 3; moving built-in panels onto the API waits for the data routes of Phase 4.
 
 ## Pages above the paper
 

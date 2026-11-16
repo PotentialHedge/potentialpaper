@@ -1,6 +1,6 @@
 # Handoff: settings.json, plugins from GitHub, data for plugins, and the score-standing plugin
 
-Status: plan, 2026-11-16. Phase 1 (settings.json) is built; see the Log.
+Status: plan, 2026-11-16. Phases 1 (settings.json) and 2 (the plugin host) are built; see the Log.
 
 ## Goal
 
@@ -326,3 +326,137 @@ failures are the same on the untouched branch: six in `pdf-ingest.test.ts` (no p
 `follows.test.ts` (its setup's `PATCH /me` returns 422). This worktree ran them against its own database,
 `potentialpaper_test_plugins1`, through an untracked `.env`, so as not to migrate the shared test database under
 other threads.
+
+### Phase 2: the plugin host (2026-11-16, branch `plugins-phase-2`)
+
+Built:
+
+- **`lib/plugins/`**, shared by server and browser:
+  - `manifest.ts`: the manifest in zod (`id`, `name`, `version`, `apiVersion: 1`, `main`, `permissions`,
+    `network`, `contributes.{panels,pages,settings,commands}`), its JSON Schema at `/schemas/plugin-manifest.json`,
+    and `validateManifest`, which reports every problem in one pass, each naming its field. Unknown fields are
+    warnings, and so is a `when` key one of the panel's kinds doesn't offer. `PERMISSIONS` (`page.read`, `scope.read`,
+    `reviews.read`) carries the consent prompt's words.
+  - `when.ts`: the `when` grammar (`&&`, `||`, `!`, `==`, `!=`, parentheses) over the context keys each kind
+    declares in `KindInfo.contextKeys`.
+  - `sources.ts`: `github:<owner>/<repo>[/<folder>][@<ref>]`, also `owner/repo` and GitHub links, and
+    `http://localhost:<port>/` for dev. A source's key is canonical and lower-cased, without the ref.
+  - `protocol.ts`: Presio's envelopes over a `MessagePort`, booted by a hello/boot handshake. Also `HOST_METHODS`
+    with the permission each needs, `FrameContext` and the theme tokens.
+  - `host.ts`: the page's side of the RPC, pure (no React, no fetch). It checks the method, the permission and the
+    params, then answers through the `HostServices` the page gives it.
+  - `installed.ts`: which plugins a reader has (`installedEntries`), `isBlocked`, `missingConsent`.
+  - `origin.ts`: plugin hosts, `plugin-<20 hex>.<content domain>`, and the SDK's address.
+  - `client.ts`: the browser's plugin store, and dev plugins.
+- **Tables** (`drizzle/0034_plugins.sql`):
+  - `plugin_snapshots(source, commit)`, with the plugin id, host label, checked manifest, warnings and files.
+  - `plugin_refs(source, ref) → commit`, the pin.
+  - `user_plugin_grants(account_id, plugin_id, sha, permissions, network)`.
+  - `user_plugin_storage(account_id, plugin_id, data)`.
+- **`server/plugins/`**:
+  - `snapshot.ts`: the demos pipeline. Git's ref listing resolves the ref, codeload's tarball brings the folder's
+    files, and the demos' store (R2) keeps them by SHA-256. Kept are files of the content domain's types, outside
+    dot-folders and `node_modules`. Limits: 500 files, 20 MB, 10 MB a file. The manifest is checked, and the id's
+    owner must be the repo's owner. A refused copy lists every problem.
+  - `serve.ts`: `/<commit>/<path>` on the plugin's host. The plugin's CSP (`pluginCsp`), immutable caching, and
+    `frame-ancestors` the site.
+  - `installed.ts`: the list a page runs, with each plugin's status (`ready`, `consent`, `blocked`, `disabled` or
+    `error`). Also `pluginSettingsOf` (behind `installedPluginSettings`, which no longer returns `[]`), grants,
+    install and uninstall.
+  - `pages.ts`: `pageSummaries`, `scopesOfPage`, `pageFacts`, and the reads behind `page.read`, `page.members`,
+    `page.resolve` and `reviews.forPaper`.
+  - `storage.ts`: storage, 64 KB per account and plugin.
+- **Routes:**
+  - `GET /api/v1/plugins/installed[?page=<identifier>]`: auth optional. It gives `viewer.isOwner` for `when`, and
+    copies a plugin that hasn't been copied yet.
+  - `POST`/`DELETE /api/v1/me/plugins` installs or removes a plugin by source, editing settings.json's `plugins`
+    and keeping the rest of the file.
+  - `PUT`/`DELETE /api/v1/me/plugins/grants` grants or withdraws consent. PUT needs a browser session.
+  - `GET`/`PUT /api/v1/me/plugins/storage`.
+  - `GET /api/v1/pages/{identifier}` and its `/files`, `/members` and `/submissions`. The identifier is one
+    URL-encoded segment. These are public and cached a minute.
+  - `proxy.ts` sends plugin hosts to `servePlugin`, and the bare content domain serves only `/sdk/`.
+- **Settings:** `plugins` (`{ "<source>": { enabled, ref } }`, read leniently by `sanitizePlugins`),
+  `plugins.default` and `plugins.blocked`. The last two are `siteOnly`: they are resolved from the site layer only,
+  and a user's file gets a warning. `<kind>.panels.hidden`/`order` accept `<plugin id>.<panel id>`.
+  `setInSettings` takes a key path, so one source can be edited inside `plugins`. `GET /api/v1/settings` and
+  `/me/settings` return the plugins' setting specs (`plugins`), and the browser store resolves and checks with
+  them.
+- **The host in the page** (`components/plugins/`):
+  - `PluginPageProvider` is set by the paper route and the keyed-page route with the page's summary, scopes and
+    facts.
+  - `usePluginPanels(slot)` feeds `ArrangedPanels` and `ArrangedTabs` (both gained a `slot` prop) for every kind's
+    `main`, `aside` and `tabs`.
+  - `PluginPanel` shows the consent prompt or `PluginFrame`, with a commands menu. `PluginFrame` is lazy (it starts
+    within 200px of the screen), sandboxed `allow-scripts allow-same-origin`, and sized by `ui.setHeight`. It sends
+    theme tokens at boot and on change, plus `settings.change` and `context.change`.
+  - `/x/<owner>/<name>/<page>/…` holds plugin pages (`PluginPageView`).
+- **The SDK:** `public/sdk/v1/pp.js` (no build; it auto-sizes the frame, sets `--pp-<token>` CSS variables, and
+  queues calls until boot) and `public/sdk/v1/pp.d.ts`.
+- **`/settings`** gained a small Plugins section: the list with statuses, install by source, and load from
+  localhost.
+- **`examples/plugins/hello/`**: it reads its context and the `greeting` setting, counts visits in storage, reads
+  the page (`page.read`), offers a `reset` command, and has an `about` page. It shows on every kind (aside on
+  papers, main elsewhere).
+- **Agents:** `llms.txt` lines and an `/agent/updates` notice (installing for a person; the page routes).
+- DESIGN.md §10 and IMPLEMENTATION.md Milestone 8 updated.
+
+Calls I made where the plan left room:
+
+- **The manifest's `id` is checked against the source:** it must be `<repo owner>/<name>`, so nobody publishes
+  under someone else's id. Presio derives the id from the source; the plan has an `id` field, and this keeps both.
+- **`slot` can be per kind** (`{ "paper": "aside", "*": "main" }`), because Phase 6's figure is `aside` on papers and
+  `main` elsewhere.
+- **No `GITHUB_TOKEN`.** Refs resolve through git's ref listing, which needs no token and has no hourly limit, as
+  demos do. Phase 3's discovery (the search API) will need the token.
+- **The pin is per (source, ref), site-wide** (`plugin_refs`). The first install of a ref pins its commit, and
+  nothing moves it until an explicit update (`snapshotPlugin(…, { update: true })`, unused until Phase 3). A
+  reader moves to a new version by changing the ref.
+- **Consent matches by coverage, not by commit.** A plugin runs if its grant covers the running manifest's
+  permissions and network origins, so an update that asks for nothing new keeps running. The grant row keeps the
+  commit that was approved.
+- **Site defaults need no per-user consent.** They run with what they ask for, and the admin who adds one approves
+  it. If a reader re-pins a default to another ref, it becomes theirs and needs their consent. Signed-out readers
+  get the site's defaults only: installing needs an account, since grants are rows.
+- **Approving needs a browser session** (`requireSession`), so an agent can install for a person but never consent
+  for them.
+- **Checks happen on the host's side, in the page:** permissions in `host.ts`, and status from the server's list.
+  The data behind every permission is public anyway (the routes are public), so permissions say what a plugin
+  takes an interest in. They don't guard secrets.
+- **Dev plugins** live in localStorage (`pp.plugins.dev`), run unpinned with what they ask for, and need no
+  consent, since the author added them on their own machine. The app's CSP gained `http://localhost:*` and
+  `http://127.0.0.1:*` in `frame-src` and `connect-src`, so the browser can read a dev server's manifest. That
+  server must send CORS headers. A dev plugin replaces an installed one with the same id.
+- **The plugin CSP** adds to the plan's `default-src 'self'`: `'wasm-unsafe-eval'` (wasm is an allowed file type),
+  `'unsafe-inline'` styles, `data:`/`blob:` images, `object-src 'none'` and `form-action 'none'`. Scripts may also
+  come from the SDK's folder, both the site's own and `https://ppusercontent.com/sdk/`, so the same `index.html`
+  works against a local site.
+- **The SDK is cached for a day, not forever.** v1 only grows, and a fix to it should reach every plugin.
+- **`page.hasScores`** on a paper is "a review has a score field" (`scoreTable`). On a scope it is "a member paper
+  has a review", one `EXISTS` query; Phase 4's `scope_stats` can make that exact.
+- **`page.members` and the other reads take an identifier**, so a plugin can read any page, not only its own. The
+  data is public.
+- **Commands** run in the panel whose menu they were picked from (`commands.run` to that frame). There is no global
+  palette.
+- **Storage when signed out** goes to localStorage on the app's origin (`pp.plugin-storage.<id>`), with the same
+  64 KB cap.
+- **`paper.body`** is the paper's own slot, which no plugin names, so plugin panels never join it.
+
+For later phases:
+
+- Phase 3:
+  - `/settings/plugins` can grow out of `app/settings/PluginsSection.tsx`.
+  - Updates: call `snapshotPlugin(source, { update: true })` to re-resolve a ref, or set a newer tag as the
+    entry's `ref`. The listing's `missing` says what the consent prompt must ask.
+  - The settings form shows no widget for `plugins*` and lists only built-in panels in the hidden/order widgets;
+    plugin panels and settings need their own form there.
+  - `/plugins.md` should document the RPC from `public/sdk/v1/pp.d.ts`, and the dev loop from
+    `examples/plugins/hello/README.md`.
+- Phase 4: add `scope.scores`/`scope.papers` to `HOST_METHODS` (permission `scope.read`) and handlers in `host.ts`,
+  and routes beside `app/api/v1/pages/[identifier]/`.
+- Phase 5: `network` already flows into the CSP and the consent prompt, and a new origin asks again. Add
+  `identity` to `PERMISSIONS`.
+- There is no OpenAPI document in the repo yet; the page routes are described in `llms.txt` and here.
+
+Checks: typecheck, lint and `next build` pass. Unit tests: 367 pass (20 new in `tests/unit/plugins.test.ts`, among them the real SDK file against the real host over a `MessageChannel`). Integration: 265 of 272 pass, 7 new in `tests/integration/plugins.test.ts`. The 7 failures are the same as before this phase: six in `pdf-ingest.test.ts` (no poppler) and one in `follows.test.ts`. A smoke test on `next start` showed that a URL-encoded identifier (`/api/v1/pages/venue%3Aiclr%2F2027`) reaches the route and decodes, and that `/sdk/v1/pp.js`, `/schemas/plugin-manifest.json` and `/x/…` are served. These ran
+against this worktree's own database, `potentialpaper_test_plugins2`, through an untracked `.env`.
