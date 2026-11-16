@@ -306,7 +306,7 @@ diffusion` (6k papers) ~1 s, `transformer attention` ~0.5 s, `novelty -diffusion
 - **Changed from the plan:** `import-submissions.ts` still only creates `papers` rows: a paper's identity isn't
   review data, and the files need the submission's number and status, which the reviews import has. The order
   "write files, then stop writing tables" became one step, since the dev tables were empty and nothing is live.
-- **Left / production on deploy** (in order): migrations `0026`–`0028` (no new migration in Phase 5); the
+- **Left / production on deploy** (done 2026-11-16, see "Production deploy" below) (in order): migrations `0026`–`0028` (no new migration in Phase 5); the
   `worker` service (`dc --profile tools up -d worker`); the backfill as a detached job,
   `dc run -d tools npm run papers:import-reviews -- <scrape> ICLR.cc/2027/Conference "ICLR 2027"` (the scrape has
   to be on the server; ~20 min), during which pages with events but no review files yet show no submissions
@@ -314,3 +314,17 @@ diffusion` (6k papers) ~1 s, `transformer attention` ~0.5 s, `novelty -diffusion
   once 19.0 is tagged (DEPLOY.md, "Postgres 19"). Not built: ICLR 2026 reviews (forms ready, scrape exists), the
   per-bot rate limits as rows, `slots.tsx` reading `render`, and the worker running pages of one consumer in
   parallel (the projection does ~15–40 pages/s, so a full rebuild of 42k pages is 20–50 min).
+
+### Production deploy (2026-11-16, `main` at 3bc1b18)
+
+- Phases 0–5 deployed from a clean worktree; production stays on Postgres 16 (Phase 0's prod half waits for 19.0),
+  `ssh` still off. Migrations `0026`–`0028` applied; `0027`'s `openreview` grant present.
+- Worker started 15:58 UTC. Backfill 15:59–16:19 (20 min, concurrency 4): 42,425 submissions committed,
+  **288,509 notes**, 5 without a paper, 0 refused; `page_events` 171,097 → 213,522. `search` caught up at 16:30,
+  `reviews` at 16:58; final counts match the import, no `last_error`. Submission rows dipped to ~100 while `reviews`
+  replayed pre-import events (the gap the plan warned of: ~40 min).
+- `VACUUM (ANALYZE)` 11 s. Database 4.9 GB (`search_docs` 1.9 GB, `page_objects` 1.3 GB, `submission_notes` 0.7 GB).
+- `in:reviews diffusion`: 6,306 hits in 1.2–1.4 s over the edge.
+- The scrape is WAL-mode SQLite: a `:ro` mount fails ("unable to open database file"). Used a copy in
+  `~/backups/scrapes/`, mounted writable (DEPLOY.md, "Importing OpenReview reviews").
+- Left: the Postgres 19 upgrade (then `REPACK`), and everything under Phase 5's "Not built".

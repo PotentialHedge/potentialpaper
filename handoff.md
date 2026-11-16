@@ -37,7 +37,9 @@ Milestones 0, 1 and 2 are built, merged into `main` and deployed, and Milestone 
   Phase 7), with the batch API at each clone address's `info/lfs/`
   (DEPLOY.md, TODO.md).
 - **ICLR:** 42,425 ICLR 2027 and 19,804 ICLR 2026 papers are imported. ICLR 2027 also has its submissions,
-  reviews and decisions from OpenReview, and the forms for importing ICLR 2026's are ready. ICLR 2027 PDFs are hosted in R2 through a `.potentialpaper/pdf.json` in each page repo. Each paper shows a picture
+  reviews and decisions from OpenReview (288,509 notes, as files under `reviews/openreview/` committed by the
+  `openreview` bot and projected into `submissions`/`submission_notes` by the `reviews` consumer; deployed
+  2026-11-16 at 3bc1b18), and the forms for importing ICLR 2026's are ready. ICLR 2027 PDFs are hosted in R2 through a `.potentialpaper/pdf.json` in each page repo. Each paper shows a picture
   of its first page, or a thumbnail set with `pages:set-thumbnail`.
 - **Licenses:** each paper records its source and the licenses of its metadata and abstract.
 - **Demos:** a demo is a ` ```demo <name> ` block (title on the first line, description after) in a Markdown
@@ -136,7 +138,8 @@ Future work should follow this. The plan, in phases, is `handoffs/data-model.md`
 - **Postgres 19** (GA 2026-11-19): note the volume mount moves to `/var/lib/postgresql`.
 
 Order: Phase 0 Postgres 19, 1 object store interface, 2 outbox consumers, 3 file types and the review layout, 4
-search, 5 the OpenReview importer as a bot with the backfill of ~126k notes.
+search, 5 the OpenReview importer as a bot with the backfill of ~126k notes (288,509 in
+the end).
 
 **Deployed** 3bc1b18 on 2026-11-16, from a clean worktree, Postgres still 16, `ssh` still off:
 
