@@ -3,9 +3,21 @@ import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { describe, expect, it } from 'vitest';
-import { demoBlockMarkdown, demoBlockText, parseDemoInfo, sourceAt, sourceLabel, type DemoSource } from '@/lib/demos';
+import {
+  CONTENT_HOSTNAME,
+  DEMO_HOST_PATTERN,
+  demoBlockMarkdown,
+  demoBlockText,
+  demoOfHost,
+  demoUrl,
+  isContentHost,
+  parseDemoInfo,
+  sourceAt,
+  sourceLabel,
+  type DemoSource,
+} from '@/lib/demos';
 import { parseRefAdvertisement, parseSourceUrl, resolveRest } from '@/server/demos/github';
-import { findFile, HEIGHT_REPORTER, splitDemoPath, withHeightReporter } from '@/server/demos/serve';
+import { findFile, HEIGHT_REPORTER, withHeightReporter } from '@/server/demos/serve';
 import { chooseRoot, contentType, selectFiles, snapshotId } from '@/server/demos/snapshot';
 import { readTar } from '@/server/demos/tar';
 import { demoBlockProblems, demoIds, demoRefs, renderMarkdown } from '@/server/pages/markdown';
@@ -159,11 +171,19 @@ describe('a snapshot', () => {
     expect(findFile(files, 'b.js')).toBeNull();
   });
 
-  it('is addressed as /d/<id>/<path>', () => {
-    expect(splitDemoPath(`/d/${'f'.repeat(32)}/assets/a.js`)).toEqual({ id: 'f'.repeat(32), rest: 'assets/a.js' });
-    expect(splitDemoPath(`/d/${'f'.repeat(32)}`)).toEqual({ id: 'f'.repeat(32), rest: '' });
-    expect(splitDemoPath('/d/short/x')).toBeNull();
-    expect(splitDemoPath('/assets/a.js')).toBeNull();
+  it("has a host of its own on the content domain, which a webview's host is not", () => {
+    const id = 'f'.repeat(32);
+    const host = new URL(demoUrl(id)).hostname;
+    expect(host).toBe(`${id}.${CONTENT_HOSTNAME}`);
+    expect(demoOfHost(host)).toBe(id);
+    expect(isContentHost(host)).toBe(true);
+    const webview = `0c8f5b9e-3c1d-4b8a-9e2f-6a7b8c9d0e1f.${CONTENT_HOSTNAME}`;
+    expect(demoOfHost(webview)).toBeNull();
+    expect(isContentHost(webview)).toBe(true);
+    expect(isContentHost(CONTENT_HOSTNAME)).toBe(false);
+    expect(demoOfHost(`${id}.evil.${CONTENT_HOSTNAME}`)).toBeNull();
+    expect(new RegExp(`^${DEMO_HOST_PATTERN}$`).test(host)).toBe(true);
+    expect(new RegExp(`^${DEMO_HOST_PATTERN}$`).test(webview)).toBe(false);
   });
 });
 
@@ -187,7 +207,7 @@ describe('a demo block', () => {
     const md = `## Demos\n\n${demoBlockMarkdown({ ref: { kind: 'snapshot', id: DEMO.id }, title: 'A <b>' })}\n${demoBlockMarkdown({ ref: { kind: 'snapshot', id: DEMO.id }, title: 'Again' })}\n\`\`\`js\nx\n\`\`\`\n`;
     expect(demoIds(md)).toEqual([DEMO.id]);
     const html = renderMarkdown(md, 'community', { demos: new Map([[DEMO.id, DEMO]]) });
-    expect(html).toContain(`<iframe class="demo-frame" data-src="http://127.0.0.1:3000/d/${DEMO.id}/"`);
+    expect(html).toContain(`<iframe class="demo-frame" data-src="http://${DEMO.id}.localhost:3000/"`);
     expect(html).not.toMatch(/<iframe[^>]* src=/);
     expect(html).toContain('sandbox="allow-scripts');
     expect(html).toContain('<b>Demo:</b> A &lt;b&gt;');
@@ -239,7 +259,7 @@ describe('the demo a block names', () => {
     const html = renderMarkdown('```demo demos/local\nHere\n```\n', 'community', {
       demos: new Map([['demos/local', local]]),
     });
-    expect(html).toContain(`data-src="http://127.0.0.1:3000/d/${local.id}/"`);
+    expect(html).toContain(`data-src="http://${local.id}.localhost:3000/"`);
     expect(html).toContain('<span class="demo-source">demos/local in this page\'s repo</span>');
   });
 });

@@ -11,17 +11,13 @@ Things only you can do or decide, most urgent first. Milestones 1 and 2 and the 
       Cloudflare, and the app needs a token. Until it has one, the editor sees its own edit (it reloads with
       `?v=`), but other readers get the edge's copy until it expires. I'd make one limited to cache purge on this zone, and put it in
       `.env.production`. Production doesn't have one yet.
-- [ ] **Buy the domains and move demos onto their own.** Demos (sandboxed user code from GitHub repos)
-      are served from `papers-content.potentialhedge.com` for now, one path per demo. That host shares a
-      site with the app, so it isn't a real sandbox. Before anyone outside tries demos, buy a separate
-      domain (`ppusercontent.com`, $11.17/yr on Cloudflare, was available on 2026-11-07), give each demo its
-      own subdomain with wildcard DNS, set `DEMO_ORIGIN`, and harden it: `__Host-` auth cookies, Origin
-      checks on writes, and a strict CSP on the demo host. The web editor needs the same kind of domain for VS Code's
-      own Markdown and image previews (webviews): one name per webview, `{{uuid}}.<domain>`, with wildcard DNS and
-      TLS, set as `WEB_EDITOR_WEBVIEW_URL` (docs/web-editor.md). Until then the editor's preview panel, PDF viewer and
-      image preview don't open in production (the page beside the editor shows its own preview instead). Quicker
-      alternative: a proxied `*.potentialhedge.com` wildcard, free today, but it catches every undefined subdomain. `potentialpaper.com` was also available at the
-      same price.
+- [ ] **Put `ppusercontent.com` on the Public Suffix List.** Demos (`<snapshot>.ppusercontent.com`) and the
+      editor's webviews (`<uuid>.ppusercontent.com`) now each have their own origin on that domain (bought
+      2026-11-16; DNS, TLS and Traefik set up, DEPLOY.md "User content"). Browsers still count them as one site,
+      so a demo can set cookies for `.ppusercontent.com` that the others get. Nothing there uses cookies, so this
+      is hygiene, not a hole: listing the domain (a PR to https://github.com/publicsuffix/list, with a
+      `_psl.ppusercontent.com` TXT record pointing at it) makes each host a site of its own, as GitHub's
+      `githubusercontent.com` is. It takes weeks to be merged and reach browsers.
 - [ ] **Mail and final domain.** Sign-up fails on the live site until production has `RESEND_API_KEY` and
       `MAIL_FROM`, and watchlist digests will need them too. Set up the domain (`potentialpaper.com` is the
       candidate) and a Resend key.

@@ -1,5 +1,7 @@
 import { NextResponse, type NextRequest } from 'next/server';
-import { DEMO_HOSTNAME } from '@/lib/demos';
+import { WEBVIEW_PRE_PATH } from '@/editors/vscode/csp';
+import { VSCODE_BASE } from '@/editors/vscode';
+import { demoOfHost, isContentHost } from '@/lib/demos';
 import { serveDemo } from '@/server/demos/serve';
 import { paperGate } from '@/server/paper-gate';
 import { siteUrl } from '@/server/site';
@@ -11,10 +13,16 @@ const PAPER_PATH = /^\/(abs|doi|openreview)(\/|$)/;
  * answer that must not be cached to a dynamic route, which tells Next and Cloudflare not to keep it.
  */
 export async function proxy(req: NextRequest) {
-  // Demos have a host of their own, and nothing of the app is served there, `_next` included. The Host header,
+  // User content has a domain of its own (`lib/demos.ts`), and nothing of the app is served there, `_next`
+  // included: a demo's host serves its files, and a webview's only the webview's own pages. The Host header,
   // since Next gives `nextUrl` the host it was started on.
-  const host = (req.headers.get('host') ?? '').replace(/:\d+$/, '');
-  if (host === DEMO_HOSTNAME) return serveDemo(req);
+  const host = (req.headers.get('host') ?? '').replace(/:\d+$/, '').toLowerCase();
+  if (isContentHost(host)) {
+    const snapshot = demoOfHost(host);
+    if (snapshot) return serveDemo(req, snapshot);
+    if (req.nextUrl.pathname.startsWith(`${VSCODE_BASE}${WEBVIEW_PRE_PATH}`)) return NextResponse.next();
+    return new NextResponse('Not found\n', { status: 404, headers: { 'Cache-Control': 'no-store' } });
+  }
   const { pathname } = req.nextUrl;
   if (pathname.length > 1 && pathname.endsWith('/')) {
     // Built by hand, since `nextUrl` would put the slash back.
@@ -40,10 +48,10 @@ export async function proxy(req: NextRequest) {
   }
 }
 
-// Every path, since any path on the demo host can be a demo's file, and the app's own paths return at once; but not a
+// Every path, since any path on a demo's host can be one of its files, and the app's own paths return at once; but not a
 // push (`POST /git/…/git-receive-pack`) or Git LFS (`/git/…/info/lfs/…`, whose uploads are PDFs). Next buffers a
 // request body for the proxy, and past `proxyClientMaxBodySize` (10 MB) cuts it off, which would break a large pack
-// or PDF. `server/git/http.ts` refuses both on the demo host itself.
+// or PDF. `server/git/http.ts` refuses both on the content domain itself.
 export const config = {
   matcher: ['/((?!git/.+/git-receive-pack$|git/.+/info/lfs/).*)'],
 };

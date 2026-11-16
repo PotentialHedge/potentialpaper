@@ -21,7 +21,6 @@ export function workbenchHtml(paper: PaperId & { title: string }): string {
   const site = siteUrl();
   const origin = new URL(site);
   const base = `${site}${VSCODE_BASE}`;
-  const webview = webviewTemplate();
   const config = {
     folderUri: { scheme: 'potentialpaper', authority: 'page', path: '/' },
     additionalBuiltinExtensions: [
@@ -33,15 +32,14 @@ export function workbenchHtml(paper: PaperId & { title: string }): string {
       enableTelemetry: false,
       // The Commit button in Source Control (the extension's `actionButton`), a proposed API.
       extensionEnabledApiProposals: { 'potentialpaper.potentialpaper': ['scmActionButton'] },
-      ...(webview ? { webviewContentExternalBaseUrlTemplate: webview } : {}),
+      webviewContentExternalBaseUrlTemplate: webviewTemplate(),
     },
     windowIndicator: { label: `$(book) ${paper.title.slice(0, 60)}`, tooltip: paper.title },
     configurationDefaults: {
       'potentialpaper.paper': { scheme: paper.scheme, value: paper.value },
       'potentialpaper.origin': site,
-      // The section preview and the PDF viewer are webviews, which need an origin each (`csp.ts`). Where there is
-      // none, the host page shows its own preview, and a PDF opens as VS Code shows any file it can't read.
-      'potentialpaper.webviews': Boolean(webview),
+      // The section preview and the PDF viewer are webviews, which have an origin each (`csp.ts`).
+      'potentialpaper.webviews': true,
       'workbench.colorTheme': 'Default Light Modern',
       'workbench.startupEditor': 'none',
       'workbench.tips.enabled': false,
@@ -60,10 +58,7 @@ export function workbenchHtml(paper: PaperId & { title: string }): string {
       // One way to see a section: as text, with the page's preview beside it (the extension's). VS Code's own
       // Markdown preview and Markdown editor are left out of the editor-type picker, which then isn't shown.
       'workbench.editor.hiddenEditorTypes': ['vscode.markdown.preview.editor', 'vscode.markdown.editor'],
-      'workbench.editorAssociations': {
-        '*.md': 'default',
-        ...(webview ? {} : { '*.pdf': 'default' }),
-      },
+      'workbench.editorAssociations': { '*.md': 'default' },
       // Each JSON file is checked against its schema, which the extension carries (scripts/write-page-schemas.ts),
       // for errors, completion and hovers as people type. A commit is refused while one has an error.
       'json.schemaDownload.trustedDomains': { [`${site}/`]: true },

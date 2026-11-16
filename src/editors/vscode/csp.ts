@@ -1,3 +1,4 @@
+import { CONTENT_ORIGIN, CONTENT_SOURCE } from '../../lib/demos';
 import { siteUrl } from '../../server/site';
 import { VSCODE_BASE } from './index';
 
@@ -10,24 +11,12 @@ import { VSCODE_BASE } from './index';
 /** Where a webview's own pages are, under the build (`VSCODE_BASE`). */
 export const WEBVIEW_PRE_PATH = '/out/vs/workbench/contrib/webview/browser/pre/';
 
-/** Where webviews (Markdown and image previews) are served from, `{{uuid}}` being one name per webview. */
-export function webviewTemplate(): string | undefined {
-  const configured = process.env.WEB_EDITOR_WEBVIEW_URL;
-  if (configured) return configured;
-  const origin = new URL(siteUrl());
-  // Browsers resolve every name under `localhost` to this machine, so in development each webview gets one. Not in
-  // a production build, whose headers are fixed at build time, when `APP_URL` may not be set yet.
-  if (origin.hostname === 'localhost' && process.env.NODE_ENV !== 'production') {
-    return `${origin.protocol}//{{uuid}}.localhost${origin.port ? `:${origin.port}` : ''}${VSCODE_BASE}${WEBVIEW_PRE_PATH}`;
-  }
-  return undefined;
-}
-
-function webviewSource(): string | null {
-  const template = webviewTemplate();
-  if (!template) return null;
-  const url = new URL(template.replace('{{uuid}}', 'x'));
-  return `${url.protocol}//*.${url.host.replace(/^x\./, '')}`;
+/**
+ * Where webviews (the preview, the PDF viewer, image previews) are served from: a host each on the user content
+ * domain (`lib/demos.ts`), `{{uuid}}` being one name per webview, which `proxy.ts` answers with these pages only.
+ */
+export function webviewTemplate(): string {
+  return `${CONTENT_ORIGIN.replace('://', '://{{uuid}}.')}${VSCODE_BASE}${WEBVIEW_PRE_PATH}`;
 }
 
 /**
@@ -37,12 +26,10 @@ function webviewSource(): string | null {
  * refuse them, and `'self'` on that origin would refuse the site framing them.
  */
 export function webviewCsp(): string {
-  const webview = webviewSource();
-  return `frame-ancestors ${new URL(siteUrl()).origin}${webview ? ` ${webview}` : ''}`;
+  return `frame-ancestors ${new URL(siteUrl()).origin} ${CONTENT_SOURCE}`;
 }
 
 export function editorCsp(): string {
-  const webview = webviewSource();
   const media = process.env.PDF_BASE_URL ?? 'https://pdfs.potentialhedge.com';
   return [
     "default-src 'self'",
@@ -52,7 +39,7 @@ export function editorCsp(): string {
     "img-src 'self' data: blob: https:",
     "font-src 'self' data:",
     `connect-src 'self' ${new URL(media).origin}`,
-    `frame-src 'self'${webview ? ` ${webview}` : ''}`,
+    `frame-src 'self' ${CONTENT_SOURCE}`,
     "object-src 'none'",
     "base-uri 'self'",
     "form-action 'self'",

@@ -1,6 +1,6 @@
 import { gunzipSync } from 'node:zlib';
 import { getDb, type Database } from '@/db';
-import { DEMO_ORIGIN } from '@/lib/demos';
+import { isContentHost } from '@/lib/demos';
 import { ApiError } from '../api/errors';
 import { authenticateGitPush, GIT_REALM } from '../auth';
 import { answerGitRequest, findRepo, type GitAddress, parseGitAddress } from '../pages/clone';
@@ -48,7 +48,7 @@ export async function gitGet(req: Request, database: Database = getDb()): Promis
   const service = url.searchParams.get('service');
   const address = parseGitAddress(url.pathname);
   if (address?.file.startsWith('info/lfs/')) {
-    return onDemoHost(req) ? notFound() : lfsLocks();
+    return onContentHost(req) ? notFound() : lfsLocks();
   }
   if (address?.file === 'info/refs' && service !== null) {
     if (service === 'git-receive-pack') return receivePackRefs(req, address, database);
@@ -90,7 +90,7 @@ export async function gitPost(req: Request, database: Database = getDb()): Promi
   const address = parseGitAddress(url.pathname);
   if (address?.file === 'git-receive-pack') return receivePack(req, address, database);
   if (address?.file.startsWith('info/lfs/')) {
-    if (onDemoHost(req)) return notFound();
+    if (onContentHost(req)) return notFound();
     if (address.file === 'info/lfs/objects/batch') return lfsBatch(req, address, database);
     if (address.file.startsWith('info/lfs/locks')) return lfsLocks();
   }
@@ -158,9 +158,9 @@ function streamOf(output: AsyncGenerator<Buffer>): ReadableStream<Uint8Array> {
 
 // ------------------------------------------------------------------------------------------- push
 
-/** Not on the demo host, which `proxy.ts` would otherwise have answered (it skips pushes, see there). */
-const DEMO_HOST = new URL(DEMO_ORIGIN).host;
-const onDemoHost = (req: Request) => req.headers.get('host') === DEMO_HOST;
+/** Not on the user content domain, which `proxy.ts` would otherwise have answered (it skips pushes, see there). */
+const onContentHost = (req: Request) =>
+  isContentHost((req.headers.get('host') ?? '').replace(/:\d+$/, '').toLowerCase());
 
 /**
  * Who is pushing, or the answer that refuses them. A 401 carries `WWW-Authenticate`, which is what makes git
@@ -180,7 +180,7 @@ async function pusher(req: Request) {
 
 /** `GET info/refs?service=git-receive-pack`: the refs to push to, for a signed-in pusher only. */
 async function receivePackRefs(req: Request, address: GitAddress, database: Database): Promise<Response> {
-  if (req.headers.get('host') === DEMO_HOST) return notFound();
+  if (onContentHost(req)) return notFound();
   const repo = await findRepo(address, database);
   if (repo.kind === 'missing') return notFound();
   if (repo.kind === 'redirect') return redirect(repo.to, new URL(req.url).search);
@@ -196,7 +196,7 @@ async function receivePackRefs(req: Request, address: GitAddress, database: Data
 
 /** `POST git-receive-pack`: the commands and the pack, answered with the status report. */
 async function receivePack(req: Request, address: GitAddress, database: Database): Promise<Response> {
-  if (req.headers.get('host') === DEMO_HOST) return notFound();
+  if (onContentHost(req)) return notFound();
   if (req.headers.get('content-type') !== 'application/x-git-receive-pack-request') {
     return text(415, 'Expected application/x-git-receive-pack-request\n');
   }
@@ -216,7 +216,7 @@ async function receivePack(req: Request, address: GitAddress, database: Database
 /** `PUT`: only Git LFS uploads (`lfs.ts`). */
 export async function gitPut(req: Request, database: Database = getDb()): Promise<Response> {
   const address = parseGitAddress(new URL(req.url).pathname);
-  if (onDemoHost(req)) return notFound();
+  if (onContentHost(req)) return notFound();
   if (!address || !/^info\/lfs\/objects\/[0-9a-f]{64}$/.test(address.file)) {
     return text(405, 'Method not allowed\n', { ...NOT_CACHED, Allow: 'GET, POST' });
   }

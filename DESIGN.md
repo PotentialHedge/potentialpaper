@@ -254,7 +254,8 @@ The name is one of:
   through `POST /api/v1/demos`. A block naming an id the site doesn't have is refused.
 
 These rules are checked inside `commitPage` (`server/demos/attach.ts`), so they hold for any writer.
-The demo host shares a site with the app, so it is not yet a real sandbox (`TODO.md`).
+Each demo is served from a host of its own on a separate domain, `<snapshot>.ppusercontent.com` (`lib/demos.ts`),
+so it shares no site with the app and no origin with another demo.
 
 **Media is Git LFS.** PDFs and the picture don't go in git: their bytes go to R2, keyed by SHA-256, and
 the repo has a Git LFS pointer (`version …`, `oid sha256:…`, `size …`), so a clone with `git lfs`
@@ -383,7 +384,7 @@ may not push or an unconfirmed account gets `403` and a sentence git prints. The
   and the status report says `ng refs/heads/main <short reason>`. After a push the paper's pages are refreshed
   as after a web edit (`refreshPaperPages`).
 - `proxy.ts` skips `POST …/git-receive-pack` (its `matcher`), since Next buffers a body for the proxy and cuts
-  it off past 10 MB; the route refuses the demo host itself. Cloudflare's own limit on a request (100 MB) is
+  it off past 10 MB; the route refuses the user content domain itself. Cloudflare's own limit on a request (100 MB) is
   above the pack cap.
 
 **SSH.** The same sessions on an SSH channel, as GitHub serves them (`server/git/ssh.ts`, `ssh2`): user `git`,

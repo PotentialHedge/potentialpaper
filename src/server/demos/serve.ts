@@ -1,15 +1,13 @@
 import { eq } from 'drizzle-orm';
 import { getDb } from '@/db';
 import { demoSnapshots, type DemoFile } from '@/db/schema';
-import { DEMO_HEIGHT_MESSAGE, DEMO_ORIGIN, DEMO_PREFIX, isSnapshotId } from '@/lib/demos';
+import { CONTENT_SOURCE, DEMO_HEIGHT_MESSAGE } from '@/lib/demos';
 import { siteUrl } from '../site';
 import { getBlob } from './store';
 
 /**
- * Answers every request to the demo host. `/d/<snapshot>/<path>` is a file of a snapshot. Anything else is a
- * build that asks for its files from the root, as Vite's do by default (`/assets/index.js`): the page that
- * asked is in the `Referer`, so the request is sent on to the same path inside that page's snapshot. The
- * redirect matters: the module it reaches then imports with its new address as the base.
+ * Answers every request to a demo's host, `<snapshot>.<content domain>` (`lib/demos.ts`): each path is a file of
+ * that snapshot, so a build that asks for its files from the root (`/assets/index.js`, as Vite's do) finds them.
  */
 
 /** A snapshot's file list never changes, so it can be kept for as long as the process runs. */
@@ -59,8 +57,8 @@ function headers(type: string): Record<string, string> {
     // The snapshot id is a hash of its files, so an address always means the same bytes. Except a page,
     // which has the reporter added and may get a newer one.
     'Cache-Control': type.startsWith('text/html') ? 'public, max-age=300' : 'public, max-age=31536000, immutable',
-    // Only the paper pages may frame a demo.
-    'Content-Security-Policy': `frame-ancestors ${new URL(siteUrl()).origin}`,
+    // Only the paper pages may frame a demo, and the web editor's preview, a webview on the content domain.
+    'Content-Security-Policy': `frame-ancestors ${new URL(siteUrl()).origin} ${CONTENT_SOURCE}`,
     'Access-Control-Allow-Origin': '*',
     'Cross-Origin-Resource-Policy': 'cross-origin',
     'X-Content-Type-Options': 'nosniff',
@@ -83,58 +81,18 @@ export function findFile(files: Record<string, DemoFile>, path: string): string 
   return null;
 }
 
-/** `/d/<id>/<rest>` split, or `null`. */
-export function splitDemoPath(pathname: string): { id: string; rest: string } | null {
-  if (!pathname.startsWith(DEMO_PREFIX)) return null;
-  const after = pathname.slice(DEMO_PREFIX.length);
-  const slash = after.indexOf('/');
-  const id = slash === -1 ? after : after.slice(0, slash);
-  if (!isSnapshotId(id)) return null;
-  return { id, rest: slash === -1 ? '' : after.slice(slash + 1) };
-}
-
-export async function serveDemo(req: Request): Promise<Response> {
+export async function serveDemo(req: Request, snapshot: string): Promise<Response> {
   if (req.method !== 'GET' && req.method !== 'HEAD') {
     return new Response(null, { status: 405, headers: { Allow: 'GET, HEAD' } });
   }
-  const url = new URL(req.url);
-  const pathname = decodeURIComponent(url.pathname);
-  const inside = splitDemoPath(pathname);
-
-  if (!inside) {
-    const referer = URL.parse(req.headers.get('referer') ?? '');
-    // The Host header, not `url`, whose host a proxy in front may have rewritten.
-    const host = req.headers.get('host') ?? url.host;
-    const from = referer && referer.host === host ? splitDemoPath(referer.pathname) : null;
-    if (!from) return NOT_FOUND();
-    return new Response(null, {
-      status: 302,
-      headers: {
-        Location: `${DEMO_ORIGIN}${DEMO_PREFIX}${from.id}${url.pathname}${url.search}`,
-        'Cache-Control': 'no-store',
-      },
-    });
-  }
-
-  // Without the slash, the demo's relative addresses would resolve against `/d/`.
-  if (pathname === `${DEMO_PREFIX}${inside.id}`) {
-    return new Response(null, {
-      status: 308,
-      headers: {
-        Location: `${DEMO_ORIGIN}${DEMO_PREFIX}${inside.id}/${url.search}`,
-        'Cache-Control': 'public, max-age=86400',
-      },
-    });
-  }
-
-  const files = await manifest(inside.id);
+  const files = await manifest(snapshot);
   if (!files) return NOT_FOUND();
-  const path = findFile(files, inside.rest);
+  const path = findFile(files, decodeURIComponent(new URL(req.url).pathname));
   if (!path) return NOT_FOUND();
   const file = files[path];
   const body = await getBlob(file.sha256);
   if (!body) {
-    console.error(`demo ${inside.id}: ${path} (${file.sha256}) is not in the store`);
+    console.error(`demo ${snapshot}: ${path} (${file.sha256}) is not in the store`);
     return new Response('The file is missing\n', { status: 502, headers: { 'Cache-Control': 'no-store' } });
   }
   if (file.type.startsWith('text/html')) {

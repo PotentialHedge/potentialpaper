@@ -99,12 +99,29 @@ The compose file mounts `secrets/ssh_host_ed25519_key` read-only at `/run/secret
 serves at start (`dc logs ssh`). Check it from outside: `ssh -T -p 2222 git@git.papers.potentialhedge.com` prints
 "Hi <handle>! You've authenticated, …" once a key is on your profile.
 
-## Demos
+## User content
 
-Demos are served from `papers-content.potentialhedge.com`: a proxied A record (added 2026-11-07) in the `potentialhedge.com` zone,
-pointing at this host, with the Traefik router in `docker-compose.prod.yml`. Their files are in R2, through the `R2_*`
-keys in `.env.production`: an account token limited to objects in `papertrail-pdfs` (id `3b0d7789…`, minted
-2026-11-07). Without the keys, attaching a demo fails rather than storing it on the container's disk.
+Demos and the web editor's webviews are served from `ppusercontent.com`, a domain of its own so they share no
+site with the app (`src/lib/demos.ts`): each demo at `<snapshot>.ppusercontent.com`, each webview (the preview,
+the PDF viewer) at `<uuid>.ppusercontent.com`. `proxy.ts` answers every subdomain: a demo's files on a demo's
+host, VS Code's webview pages on any other, and a 404 for everything else; nothing is served at the domain itself.
+Set up 2026-11-16, outside this repo:
+
+- **Cloudflare zone** `ppusercontent.com` (account `c5c3512236b6994f91a383719eeb05be`, Free plan): a proxied
+  wildcard A record `*` → `77.244.248.196`, SSL Full (strict), Always Use HTTPS, TLS 1.2 minimum. Universal SSL
+  covers `*.ppusercontent.com`, one level only, so names stay one label deep.
+- **Origin certificate:** a Cloudflare Origin CA certificate for `ppusercontent.com` and `*.ppusercontent.com`
+  (valid to 2041-11-12) in `~/proxy/certs/ppusercontent.com.{pem,key}`, loaded by Traefik from
+  `~/proxy/certs/dynamic/ppusercontent-com.yml`. The key was made on this host and never left it.
+- **Traefik:** the `-demos` router in `docker-compose.prod.yml` (`HostRegexp` on the domain's subdomains).
+
+To move to another domain: `NEXT_PUBLIC_CONTENT_ORIGIN` (built into the app, so a rebuild) and
+`CONTENT_HOST_PATTERN` (Traefik) in `.env.production`, and the same three steps for the new zone.
+
+Demo files are in R2, through the `R2_*` keys in `.env.production`: an account token limited to objects in
+`papertrail-pdfs` (id `3b0d7789…`, minted 2026-11-07). Without the keys, attaching a demo fails rather than
+storing it on the container's disk. A page's rendered HTML names its demos' addresses, so after moving the
+domain run `dc run --rm tools npm run pages:rebuild`.
 
 ## When it goes wrong
 

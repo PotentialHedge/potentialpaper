@@ -171,8 +171,8 @@ export class Preview implements vscode.Disposable {
       `style-src ${webview.cspSource} 'unsafe-inline'`,
       `font-src ${webview.cspSource} data:`,
       `script-src 'nonce-${n}'`,
-      // Demos, which run on the site's demo host.
-      'frame-src https:',
+      // Demos, which run on a host each of the site's content domain (`*.localhost` in development).
+      'frame-src https: http://*.localhost:*',
     ].join('; ');
     return `<!DOCTYPE html>
 <html lang="en">

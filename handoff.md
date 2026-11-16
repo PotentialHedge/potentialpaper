@@ -50,8 +50,8 @@ Milestones 0, 1 and 2 are built, merged into `main` and deployed, and Milestone 
   written (`server/demos/repo.ts`). All the rules are checked in `commitPage` (`server/demos/attach.ts`; DESIGN.md
   §4.3). The renderer writes a sandboxed iframe with `data-src`, and
   `DemoFrames` (client) loads it near the screen, fits its height and runs full screen. `proxy.ts` answers the
-  demo host (`lib/demos.ts`, `papers-content.potentialhedge.com` in production, `127.0.0.1:3000` in dev) at
-  `/d/<snapshot>/<path>`. That host shares a site with the app, so it is not a real sandbox yet: see `TODO.md`.
+  user content domain (`lib/demos.ts`): each demo at `<snapshot>.ppusercontent.com` in production,
+  `<snapshot>.localhost:3000` in dev, beside the editor's webviews (DEPLOY.md, "User content").
 - **The card:** `thumbnail.json` (the picture, uploaded from the page's `#edit-picture` editor through
   `POST /api/v1/pages/thumbnail`, multipart) and `links/NN-slug.json` (extra links under the title, a file each; one named like a
   built-in link replaces it, `POST /api/v1/pages/links`). Any verified account may change them while the paper
@@ -96,12 +96,8 @@ All in `docs/web-editor.md` ("VS Code for the Web", "VS Code on the desktop"); t
   `media/pdf/`. Webview bundles are IIFE, not modules (a module script would need CORS across the webview origin).
 - **Webviews need an origin each.** Dev: `{{uuid}}.localhost:<port>` (works in Chrome; Safari unverified). Pre
   pages get their own CSP (`webviewCsp`, `frame-ancestors` the site and the webview wildcard), set after the
-  editor's rule in `next.config.ts`. **Production has none yet**, so there `potentialpaper.webviews` is false: no
-  panel or PDF viewer, PDFs open as binary, and the host page keeps its side preview (`EditorHost` shows it only
-  when the editor's `ready` says `previews: false`). Open decision for Benedict (TODO.md): a proxied
-  `*.potentialhedge.com` wildcard (free today, Universal SSL covers it) or a separate domain such as
-  `ppusercontent.com` (also needed for demos; recommended). Then set `WEB_EDITOR_WEBVIEW_URL`, route that host to
-  the app in Traefik, and redeploy.
+  editor's rule in `next.config.ts`. Production: `{{uuid}}.ppusercontent.com` since 2026-11-16 (below), and the
+  host page's own side preview is gone.
 - **R2 CORS** (Cloudflare, not in the repo): bucket `papertrail-pdfs` has a GET/HEAD any-origin CORS rule, and the
   zone has a response-header transform rule setting `Access-Control-Allow-Origin: *` on `pdfs.potentialhedge.com`
   (the edge cache ignores `Origin`, so it served header-less copies). Before this the editor only ever got LFS

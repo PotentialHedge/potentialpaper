@@ -7,7 +7,7 @@ import { eq } from 'drizzle-orm';
 import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it, vi } from 'vitest';
 import { getDb } from '@/db';
 import { accounts, authorClaims, demoPins, demoSnapshots, pageCurrent } from '@/db/schema';
-import { DEMO_ORIGIN, demoBlockMarkdown } from '@/lib/demos';
+import { demoBlockMarkdown, demoUrl } from '@/lib/demos';
 import { ApiError } from '@/server/api/errors';
 import { serveDemo } from '@/server/demos/serve';
 import { type Actor, commitPage, type FileChange } from '@/server/pages/commit';
@@ -71,10 +71,9 @@ function fakeGitHub(files: Record<string, string> = FILES) {
   });
 }
 
-function demoRequest(path: string, referer?: string): Request {
-  return new Request(new URL(path, DEMO_ORIGIN), {
-    headers: referer ? { referer: new URL(referer, DEMO_ORIGIN).href } : {},
-  });
+/** A request to a demo's own host, as `proxy.ts` hands it on. */
+function demo(id: string, path = ''): Promise<Response> {
+  return serveDemo(new Request(demoUrl(id, path)), id);
 }
 
 let store: string;
@@ -116,7 +115,7 @@ describe('a demo', () => {
     const id: string = res.body.id;
     expect(await pageHistory(paperId, { limit: 1 })).toEqual([]);
 
-    const index = await serveDemo(demoRequest(`/d/${id}/`));
+    const index = await demo(id);
     expect(index.status).toBe(200);
     expect(index.headers.get('content-type')).toMatch(/^text\/html/);
     // A page has the height reporter added, so it isn't kept as long as the files are.
@@ -126,20 +125,15 @@ describe('a demo', () => {
     expect(page).toMatch(/^<!doctype html><script data-potentialpaper>/);
     expect(Number(index.headers.get('content-length'))).toBe(Buffer.byteLength(page));
 
-    // The build asks from the root; the page that asked says which demo it belongs to.
-    const fromRoot = await serveDemo(demoRequest('/assets/index.js', `/d/${id}/`));
-    expect(fromRoot.status).toBe(302);
-    expect(fromRoot.headers.get('location')).toBe(`${DEMO_ORIGIN}/d/${id}/assets/index.js`);
-    const chained = await serveDemo(demoRequest('/assets/chunk.js', `/d/${id}/assets/index.js`));
-    expect(chained.headers.get('location')).toBe(`${DEMO_ORIGIN}/d/${id}/assets/chunk.js`);
-    const script = await serveDemo(demoRequest(`/d/${id}/assets/chunk.js`));
+    // The build asks from the root, which is the demo's own.
+    expect((await demo(id, 'assets/index.js')).status).toBe(200);
+    const script = await demo(id, 'assets/chunk.js');
     expect(script.headers.get('content-type')).toMatch(/^text\/javascript/);
     expect(script.headers.get('cache-control')).toContain('immutable');
     expect(await script.text()).toBe('document.title = "ok";');
 
-    expect((await serveDemo(demoRequest(`/d/${id}`))).headers.get('location')).toBe(`${DEMO_ORIGIN}/d/${id}/`);
-    expect((await serveDemo(demoRequest(`/d/${id}/README.md`))).status).toBe(404);
-    expect((await serveDemo(demoRequest('/assets/index.js'))).status).toBe(404);
+    expect((await demo(id, 'README.md')).status).toBe(404);
+    expect((await demo('f'.repeat(32), 'assets/index.js')).status).toBe(404);
   });
 
   it('goes into a section as a block, renders as a frame, and survives a rebuild', async () => {
@@ -156,7 +150,7 @@ describe('a demo', () => {
     expect(edit.status).toBe(200);
     const [before] = await getDb().select().from(pageCurrent).where(eq(pageCurrent.paperId, paperId));
     expect(before.communityHtml).toContain(`<figure class="demo" data-demo="${first.body.id}">`);
-    expect(before.communityHtml).toContain(`data-src="${DEMO_ORIGIN}/d/${first.body.id}/"`);
+    expect(before.communityHtml).toContain(`data-src="${demoUrl(first.body.id)}"`);
     expect(before.communityHtml).toContain(`${OWNER}/${REPO}/dist@${MAIN.slice(0, 7)}`);
     expect(before.communityHtml).toContain('<b>Demo:</b> Attention, in 3D. Rotate it.');
 
@@ -322,10 +316,10 @@ describe("a demo in the page's own repo", () => {
       totalBytes: expect.any(Number),
     });
 
-    const page = await serveDemo(demoRequest(`/d/${id}/`));
+    const page = await demo(id);
     expect(page.status).toBe(200);
     expect(await page.text()).toContain('<head><script data-potentialpaper>');
-    const script = await serveDemo(demoRequest(`/d/${id}/app.js`));
+    const script = await demo(id, 'app.js');
     expect(script.headers.get('content-type')).toMatch(/^text\/javascript/);
     expect(await script.text()).toBe('document.title = "spun";\n');
 

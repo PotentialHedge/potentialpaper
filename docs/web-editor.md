@@ -78,7 +78,7 @@ Code.
 - **The extension** (`editors/vscode/extension/`): a file system for the page repo (`store.ts`), which keeps saved
   changes in the browser until they are committed, with the commit they started from; Source Control, whose
   message box and ✓ commit; a 409 rebases the changes with conflict markers to settle. It posts the open file to
-  the host page, for its preview where the extension can't show one.
+  the host page.
 - **The preview** (`preview.ts`): a panel beside the section in front, as the page will show it, following the
   section being edited and updating as it is typed (the editor title's button, Ctrl/Cmd+Shift+V, in place of VS
   Code's Markdown preview on sections). The site renders it (`/api/v1/pages/render`); its stylesheet is the
@@ -96,12 +96,10 @@ Code.
   **PotentialPaper: New Link** writes `links/NN-<slug>.json`.
 - **CSP:** the editor's frame and files have their own policy (`src/editors/vscode/csp.ts`), since VS Code runs
   workers from `blob:` and frames its extension host from this origin. The site's policy leaves `/editor/` out.
-- **Webviews** (the preview, the PDF viewer, VS Code's image preview) need an origin per webview: `{{uuid}}.<host>` with
-  wildcard DNS and TLS (`WEB_EDITOR_WEBVIEW_URL`, a URL template ending in
-  `/editor/vscode/<version>/out/vs/workbench/contrib/webview/browser/pre/`). Development uses
-  `{{uuid}}.localhost`, which browsers resolve to the machine. Production has none yet (TODO.md), so those
-  previews don't open there: the workbench sets `potentialpaper.webviews` off, so the extension shows neither, PDFs
-  open as VS Code shows a file it can't read, and the host page shows its own preview beside the frame instead.
+- **Webviews** (the preview, the PDF viewer, VS Code's image preview) need an origin per webview: `{{uuid}}.<domain>`
+  on the user content domain (`ppusercontent.com`, `http://*.localhost:3000` in development; `src/lib/demos.ts`,
+  `webviewTemplate` in `csp.ts`), where `proxy.ts` serves only the build's
+  `out/vs/workbench/contrib/webview/browser/pre/` pages. DEPLOY.md, "User content", has its DNS and TLS.
 
 ## VS Code on the desktop
 

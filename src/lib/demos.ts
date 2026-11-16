@@ -6,17 +6,21 @@
  */
 
 /**
- * Where demos are served. For now a host beside the app's, one path per demo (TODO.md has the move to
- * a separate domain with a subdomain per demo). Read at build time too, by `next.config.ts`.
+ * Where user content is served: a domain of its own, never a site the app's cookies or pages share, with a host
+ * per demo (`<snapshot>.<domain>`) and per web editor webview (`<uuid>.<domain>`, `editors/vscode/csp.ts`), so
+ * none can reach another's storage. Nothing is served at the domain itself. In development, `*.localhost`, which
+ * browsers resolve to the machine. Read at build time too, by `next.config.ts`.
  */
-export const DEMO_ORIGIN =
-  process.env.NEXT_PUBLIC_DEMO_ORIGIN ??
-  (process.env.NODE_ENV === 'production' ? 'https://papers-content.potentialhedge.com' : 'http://127.0.0.1:3000');
+export const CONTENT_ORIGIN =
+  process.env.NEXT_PUBLIC_CONTENT_ORIGIN ??
+  (process.env.NODE_ENV === 'production' ? 'https://ppusercontent.com' : 'http://localhost:3000');
 
-export const DEMO_HOSTNAME = new URL(DEMO_ORIGIN).hostname;
+const content = new URL(CONTENT_ORIGIN);
 
-/** Every demo's files are under this, then the snapshot's id. */
-export const DEMO_PREFIX = '/d/';
+export const CONTENT_HOSTNAME = content.hostname;
+
+/** Every host under the content domain, as a CSP source. */
+export const CONTENT_SOURCE = `${content.protocol}//*.${content.host}`;
 
 /** A snapshot's id: a hash of its file list, so the same files always get the same address. */
 const SNAPSHOT_ID = /^[0-9a-f]{32}$/;
@@ -25,8 +29,27 @@ export function isSnapshotId(value: unknown): value is string {
   return typeof value === 'string' && SNAPSHOT_ID.test(value);
 }
 
+/** A host name under the content domain (not the domain itself), which only user content is served from. */
+export function isContentHost(hostname: string): boolean {
+  return hostname.endsWith(`.${CONTENT_HOSTNAME}`);
+}
+
+/** The snapshot a demo's host name serves, or `null`: a webview's, or not on the content domain. */
+export function demoOfHost(hostname: string): string | null {
+  if (!isContentHost(hostname)) return null;
+  const label = hostname.slice(0, -CONTENT_HOSTNAME.length - 1);
+  return isSnapshotId(label) ? label : null;
+}
+
+/** A demo's host names, as a regular expression for `next.config.ts`'s `has`/`missing` (matched whole). */
+export const DEMO_HOST_PATTERN = `[0-9a-f]{32}\\.${CONTENT_HOSTNAME.replaceAll('.', '\\.')}`;
+
+export function demoOrigin(snapshot: string): string {
+  return `${content.protocol}//${snapshot}.${content.host}`;
+}
+
 export function demoUrl(snapshot: string, path = ''): string {
-  return `${DEMO_ORIGIN}${DEMO_PREFIX}${snapshot}/${path}`;
+  return `${demoOrigin(snapshot)}/${path}`;
 }
 
 /**

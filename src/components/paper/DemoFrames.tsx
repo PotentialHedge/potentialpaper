@@ -1,17 +1,15 @@
 'use client';
 
 import { useEffect } from 'react';
-import { DEMO_HEIGHT_MESSAGE, DEMO_ORIGIN, MAX_DEMO_HEIGHT, MIN_DEMO_HEIGHT } from '@/lib/demos';
+import { DEMO_HEIGHT_MESSAGE, demoOfHost, MAX_DEMO_HEIGHT, MIN_DEMO_HEIGHT } from '@/lib/demos';
 
 /**
  * Runs the demos in rendered Markdown (`server/pages/markdown.ts` writes each as a frame without a `src`).
  * Each is loaded once it is about to come on screen, and kept from then on: the browser's own
  * `loading="lazy"` starts a frame more than a screen away, which is every demo on a short page. Each
  * frame then takes the height its page reports, and the caption's button puts it full screen.
- *
- * `watch` is anything that changes when the HTML does, such as a preview's, so new frames are found.
  */
-export function DemoFrames({ watch }: { watch?: unknown }) {
+export function DemoFrames() {
   useEffect(() => {
     const frames = [...document.querySelectorAll<HTMLIFrameElement>('iframe.demo-frame[data-src]')];
     if (frames.length === 0) return;
@@ -34,9 +32,10 @@ export function DemoFrames({ watch }: { watch?: unknown }) {
     // its height, so the frame goes back to it and stops following.
     const state = new Map<HTMLIFrameElement, { last: { from: number; to: number } | null; frozen: boolean }>();
     function onMessage(event: MessageEvent) {
-      if (event.origin !== DEMO_ORIGIN) return;
+      // From the frame's own demo: each has a host of its own (`lib/demos.ts`).
       const frame = frames.find((f) => f.contentWindow === event.source);
-      if (!frame) return;
+      if (!frame || !demoOfHost(URL.parse(event.origin)?.hostname ?? '') || !frame.src.startsWith(`${event.origin}/`))
+        return;
       const s = state.get(frame) ?? { last: null, frozen: false };
       state.set(frame, s);
       const data = event.data as { type?: unknown; height?: unknown } | null;
@@ -76,6 +75,6 @@ export function DemoFrames({ watch }: { watch?: unknown }) {
       window.removeEventListener('message', onMessage);
       document.removeEventListener('click', onClick);
     };
-  }, [watch]);
+  }, []);
   return null;
 }

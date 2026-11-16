@@ -1,6 +1,6 @@
 import type { NextConfig } from 'next';
 import { editorCsp, WEBVIEW_PRE_PATH, webviewCsp } from './src/editors/vscode/csp';
-import { DEMO_HOSTNAME, DEMO_ORIGIN } from './src/lib/demos';
+import { CONTENT_SOURCE, DEMO_HOST_PATTERN } from './src/lib/demos';
 import { HOME_LIST_PARAMS, PRIVATE_PAGES } from './src/lib/private-paths';
 
 const dev = process.env.NODE_ENV !== 'production';
@@ -9,7 +9,7 @@ const dev = process.env.NODE_ENV !== 'production';
  * The content security policy, on every response. Scripts keep `'unsafe-inline'` because Next's inline
  * bootstrap scripts otherwise need a per-request nonce, and a nonce makes every page dynamic, which
  * rules out caching pages at the edge (DESIGN.md §2). Everything else is closed: scripts only from this
- * origin, inline and the analytics host, frames only from the demo host, nothing fetched elsewhere but analytics, and no plugin, base or form tricks. User
+ * origin, inline and the analytics host, frames only from the content domain, nothing fetched elsewhere but analytics, and no plugin, base or form tricks. User
  * content is sanitized when committed, so this is the second lock, not the first.
  */
 // Page analytics (`lib/analytics.ts`): the tracker script and the beacons it sends back to its own origin.
@@ -22,8 +22,8 @@ const CSP = [
   "img-src 'self' data: https:",
   "font-src 'self'",
   `connect-src 'self' ${ANALYTICS}${dev ? ' ws:' : ''}`,
-  // Demos, which run on a host of their own (`lib/demos.ts`), and the web editor's frame (`app/code`).
-  `frame-src 'self' ${DEMO_ORIGIN}`,
+  // Demos, which run on a host each of the content domain (`lib/demos.ts`), and the web editor's frame (`app/code`).
+  `frame-src 'self' ${CONTENT_SOURCE}`,
   "object-src 'none'",
   "base-uri 'self'",
   "form-action 'self'",
@@ -49,8 +49,8 @@ const nextConfig: NextConfig = {
       {
         // Everything but the web editor, which has a policy of its own (`src/editors/vscode/csp.ts`).
         source: '/:path((?!editor/).*)',
-        // The demo host sends its own headers (`server/demos/serve.ts`).
-        missing: [{ type: 'host' as const, value: DEMO_HOSTNAME.replaceAll('.', '\\.') }],
+        // A demo's host sends its own headers (`server/demos/serve.ts`).
+        missing: [{ type: 'host' as const, value: DEMO_HOST_PATTERN }],
         headers: [
           { key: 'Content-Security-Policy', value: CSP },
           { key: 'X-Content-Type-Options', value: 'nosniff' },
@@ -60,7 +60,7 @@ const nextConfig: NextConfig = {
       {
         // The editor's files. Its page (`app/editor/vscode/route.ts`) sends the same policy itself.
         source: '/editor/vscode/:version/:path*',
-        missing: [{ type: 'host' as const, value: DEMO_HOSTNAME.replaceAll('.', '\\.') }],
+        missing: [{ type: 'host' as const, value: DEMO_HOST_PATTERN }],
         headers: [
           { key: 'Content-Security-Policy', value: editorCsp() },
           { key: 'X-Content-Type-Options', value: 'nosniff' },
