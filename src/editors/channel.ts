@@ -10,7 +10,7 @@ export function editorChannelName({ scheme, value }: PaperId): string {
 
 /** From the editor. */
 export type EditorMessage =
-  /** The editor has loaded the page; `previews` if it shows sections as the page does itself, beside the file. */
+  /** The editor has loaded the page; `previews` if it shows sections as the page does itself (webviews on). */
   | { type: 'ready'; previews?: boolean }
   /** The file in front, and its text as typed (saved or not), or `null` for none of the page's files. */
   | { type: 'active'; path: string | null; text: string | null }
