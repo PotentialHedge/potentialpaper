@@ -68,7 +68,8 @@ describe('starter files', () => {
     for (const name of ['link', 'version', 'thumbnail']) {
       expect(config).toContain(`https://papers.example.org/schemas/${name}.json`);
     }
-    expect(config).not.toContain('schemas/pdf.json');
+    // Files only the system or a bot writes aren't people's to check.
+    for (const name of ['pdf', 'submission', 'forms', 'note']) expect(config).not.toContain(`schemas/${name}.json`);
     expect(prekProblem(prekConfig())).toBeNull();
     expect(prekProblem(`${prekConfig()}\n[[repos]]\nrepo = "local"\n`)).toMatch(/fixed/);
     expect(pathDenied('prek.toml', roles)).toMatch(/system/);

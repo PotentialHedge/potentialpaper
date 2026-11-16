@@ -25,7 +25,10 @@ function defaultSnippets(schema: Record<string, unknown>, title: string) {
   const body: Record<string, unknown> = {};
   required.forEach((key, i) => {
     const p = properties[key] ?? {};
-    if (p.enum?.every((v) => typeof v === 'string')) body[key] = `\${${i + 1}|${p.enum.join(',')}|}`;
+    // A file's own shape (`"schema": "review/1"`) is the one value it can have.
+    if (p.const !== undefined) body[key] = p.const;
+    else if (p.type === 'object') body[key] = {};
+    else if (p.enum?.every((v) => typeof v === 'string')) body[key] = `\${${i + 1}|${p.enum.join(',')}|}`;
     else if (p.type === 'number' || p.type === 'integer') body[key] = `^\${${i + 1}:0}`;
     else if (p.type === 'boolean') body[key] = `^\${${i + 1}|false,true|}`;
     else body[key] = `\${${i + 1}}`;

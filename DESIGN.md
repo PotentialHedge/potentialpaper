@@ -802,7 +802,9 @@ Decided 2026-11-16: bots are how data gets onto pages, and they work like GitHub
 - **A bot is a registration** with an id, an owner and **write grants on path patterns**, such as
   `reviews/openreview/**`. It starts with none. Admins grant them, by script, and the grant also says
   whether what it writes is shown to everyone by default. Grants are rows, checked by the same path rules
-  as everyone (`rules.ts`), and a wider grant needs an admin again.
+  as everyone (`rules.ts`), and a wider grant needs an admin again. Built 2026-11-16: a bot is an account with `is_bot`,
+  its grants are `bot_grants` rows (`npm run bots:grant`), and for now a grant can only be a source's folder,
+  `reviews/<source>/**` (`grantProblem`).
 - **It commits through the same API** (`commitPage`), one page per commit, with `Bot: true` and its id in
   the trailers, under its own rate limits. Re-running an import that finds nothing new commits nothing.
 - **Its tokens are short-lived**, made from a long-lived secret, as GitHub Apps' installation tokens are.

@@ -14,6 +14,7 @@ const RESERVED = new Set([
   'editor',
   'mod',
   'moderator',
+  'openreview',
   'potentialpaper',
   'root',
   'staff',

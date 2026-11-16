@@ -73,6 +73,27 @@ export const accounts = pgTable(
 
 export type Account = typeof accounts.$inferSelect;
 
+/**
+ * What a bot may write (DESIGN.md §10, "Bots"): a path pattern per row, such as `reviews/openreview/**`, checked by
+ * the same path rules as everyone's roles (`rules.ts`, `grantProblem`/`grantCovers`). A bot starts with none;
+ * admins grant them by script (`npm run bots:grant`). `shown`: whether what it writes is shown to everyone by
+ * default. Our OpenReview importer is the bot `openreview`, granted its folder by migration `0027`.
+ */
+export const botGrants = pgTable(
+  'bot_grants',
+  {
+    accountId: uuid('account_id')
+      .notNull()
+      .references(() => accounts.id, { onDelete: 'cascade' }),
+    pattern: text('pattern').notNull(),
+    shown: boolean('shown').notNull().default(true),
+    /** Who granted it: an admin's handle, or `system`. */
+    grantedBy: text('granted_by').notNull(),
+    createdAt: createdAt(),
+  },
+  (t) => [primaryKey({ columns: [t.accountId, t.pattern] })],
+);
+
 /** The institutional addresses an account is verified through; written only by `server/affiliations.ts`. */
 export const affiliations = pgTable(
   'affiliations',

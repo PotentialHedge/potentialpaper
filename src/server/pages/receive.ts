@@ -29,7 +29,7 @@ import {
 } from './git-objects';
 import { lockPage, writeCurrent, type Writer } from './projections';
 import { readCommit, readFiles, readHead, readObject, type Reader } from './repo';
-import { cleanSummary, MAX_FILES, MAX_SUMMARY_LENGTH } from './rules';
+import { cleanSummary, MAX_FILES, MAX_REVIEW_FILES, MAX_SUMMARY_LENGTH } from './rules';
 
 /**
  * Commits a git client made, stored verbatim: their ids don't change, so the pusher's clone stays in step
@@ -198,7 +198,10 @@ async function treeFiles(objects: Objects, tree: string): Promise<Map<string, st
         await walk(entry, `${path}/`, depth + 1);
       } else if (mode === '100644') {
         files.set(path, entry);
-        if (files.size > MAX_FILES) throw refuse(`a page can have at most ${MAX_FILES} files`);
+        // A cap on the walk only; `checkTree` holds each kind of file to its own limit.
+        if (files.size > MAX_FILES + MAX_REVIEW_FILES) {
+          throw refuse(`a page can have at most ${MAX_FILES + MAX_REVIEW_FILES} files`);
+        }
       } else {
         throw refuse(`${path} ${MODE_PROBLEMS[mode] ?? `has the mode ${mode}; pages hold plain files`}`, { path });
       }

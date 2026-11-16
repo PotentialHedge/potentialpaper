@@ -1,6 +1,7 @@
 import { randomBytes } from 'node:crypto';
 import { and, eq } from 'drizzle-orm';
-import { accounts, authorClaims, commitIdentities, papers } from '@/db/schema';
+import { accounts, authorClaims, botGrants, commitIdentities, papers } from '@/db/schema';
+import { parseReviewPath, SUBMISSION_FILE } from '@/lib/review-files';
 import { cleanEvidence } from '@/lib/evidence';
 import { MAX_LINKS, parseLinkFile } from '@/lib/paper-links';
 import { MAX_VERSIONS } from '@/lib/versions';
@@ -15,12 +16,15 @@ import {
   contentProblem,
   isDemoPath,
   isLinkPath,
+  isReviewPath,
   layoutProblem,
   LFS_NEEDED,
   lfsKindOf,
   MAX_CHANGES,
   MAX_DEMOS_FILES,
   MAX_FILES,
+  MAX_REVIEW_CHANGES,
+  MAX_REVIEW_FILES,
   MAX_SECTIONS,
   METADATA_PATH,
   normalizePath,
@@ -84,6 +88,12 @@ export async function rolesOf(db: Reader, actor: Actor, paperId: string): Promis
     .from(accounts)
     .where(eq(accounts.id, actor.accountId));
   if (!account) throw new ApiError(404, 'not_found', 'no such account');
+  // A bot's grants are rows (DESIGN.md §10), checked by the same path rules as everyone's roles.
+  const grants = account.isBot
+    ? (
+        await db.select({ pattern: botGrants.pattern }).from(botGrants).where(eq(botGrants.accountId, actor.accountId))
+      ).map((row) => row.pattern)
+    : [];
   return {
     system: false,
     admin: actor.isAdmin,
@@ -91,6 +101,7 @@ export async function rolesOf(db: Reader, actor: Actor, paperId: string): Promis
     confirmedAuthor: claim !== undefined,
     claimed,
     bot: account.isBot,
+    grants,
     // On their own paper an author is always named, never their handle (DESIGN.md §5.3).
     claimIdentity: claim?.identityId ?? null,
   };
@@ -197,11 +208,18 @@ export function invalidContent(path: string, problem: string): ApiError {
   return new ApiError(422, 'validation_error', `${path} ${problem}`, { path });
 }
 
-/** At most `MAX_CHANGES` files a commit, besides up to `MAX_DEMOS_FILES` of demos, which go in together. */
+/**
+ * At most `MAX_CHANGES` files a commit, besides up to `MAX_DEMOS_FILES` of demos, which go in together, and
+ * `MAX_REVIEW_CHANGES` of a bot's imported reviews.
+ */
 export function checkChangeCount(paths: readonly string[]): void {
   const demoFiles = paths.filter(isDemoPath).length;
-  if (paths.length - demoFiles > MAX_CHANGES) {
+  const reviewFiles = paths.filter(isReviewPath).length;
+  if (paths.length - demoFiles - reviewFiles > MAX_CHANGES) {
     throw new ApiError(422, 'validation_error', `a commit can change at most ${MAX_CHANGES} files`);
+  }
+  if (reviewFiles > MAX_REVIEW_CHANGES) {
+    throw new ApiError(422, 'validation_error', `a commit can change at most ${MAX_REVIEW_CHANGES} review files`);
   }
   if (demoFiles > MAX_DEMOS_FILES) {
     throw new ApiError(422, 'validation_error', `a commit can change at most ${MAX_DEMOS_FILES} demo files`);
@@ -216,8 +234,25 @@ function checkTreeShape(files: FileTree): void {
   if (!files.has(METADATA_PATH)) {
     throw new ApiError(422, 'validation_error', `a page keeps its ${METADATA_PATH}`, { path: METADATA_PATH });
   }
-  if (files.size > MAX_FILES) throw new ApiError(422, 'validation_error', `a page can have at most ${MAX_FILES} files`);
   const paths = [...files.keys()];
+  const reviewFiles = paths.filter(isReviewPath);
+  if (files.size - reviewFiles.length > MAX_FILES) {
+    throw new ApiError(422, 'validation_error', `a page can have at most ${MAX_FILES} files`);
+  }
+  if (reviewFiles.length > MAX_REVIEW_FILES) {
+    throw new ApiError(422, 'validation_error', `a page can have at most ${MAX_REVIEW_FILES} review files`);
+  }
+  // A submission's forms and notes are read with it, so its folder has its submission.json.
+  for (const path of reviewFiles) {
+    const review = parseReviewPath(path);
+    if (!review || review.kind === 'submission') continue;
+    const submission = `reviews/${review.source}/${review.submission}/${SUBMISSION_FILE}`;
+    if (!files.has(submission)) {
+      throw new ApiError(422, 'validation_error', `${path} belongs to a submission, so it needs ${submission}`, {
+        path,
+      });
+    }
+  }
   if (paths.filter(isLinkPath).length > MAX_LINKS) {
     throw new ApiError(422, 'validation_error', `a page can have at most ${MAX_LINKS} links`);
   }

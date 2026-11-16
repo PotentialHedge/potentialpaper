@@ -58,6 +58,14 @@ page_events` or 15 seconds. Each keeps its cursor in `consumer_cursors`; `last_e
 stopped one (it retries every minute). `dc logs -f worker` shows progress. To start one over, which clears what it
 holds and replays every event: `dc run --rm tools npm run consumers:rebuild -- <name>` (no name lists them).
 
+## Bots and their grants
+
+A bot is an account with `is_bot`; what it may write is rows in `bot_grants` (DESIGN.md §10), checked on every
+commit and push like everyone's roles (`src/server/pages/rules.ts`). Migration `0027_bot_grants` makes our own
+importer, the bot `openreview`, and grants it `reviews/openreview/**`. Grant or take back others by script:
+`dc run --rm tools npm run bots:grant -- <handle> 'reviews/<source>/**' --by <admin handle> [--create]`
+(`--revoke` takes it back; no arguments lists every grant).
+
 ## Git over SSH
 
 **Not set up in production yet: Benedict decides the name and the port (below).** Until then leave `ssh` out of

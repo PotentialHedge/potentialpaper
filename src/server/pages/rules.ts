@@ -1,6 +1,7 @@
 import { z } from 'zod';
 import { DEMO_NAME, DEMOS_DIR, MAX_DEMO_NAME } from '@/lib/demos';
 import { parseLinkFile } from '@/lib/paper-links';
+import { parseReviewPath, parseReviewFile, REVIEWS_DIR, reviewSourceOf } from '@/lib/review-files';
 import { parseVersionFile, VERSION_ID } from '@/lib/versions';
 import { htmlProblem } from './html';
 
@@ -22,6 +23,7 @@ import { htmlProblem } from './html';
  *   thumbnail.png                   the paper's picture (Git LFS), or .jpg, .gif, .webp, .avif
  *   thumbnail.json                  its alt text and caption
  *   demos/<name>/index.html         a demo, with its other files beside it
+ *   reviews/<source>/<submission>/  a bot's import of a submission and its notes (`lib/review-files.ts`)
  *   extensions/<id>/…               reserved
  *
  * PDFs and pictures are Git LFS pointers (`parseLfsPointer`): the repo holds their hash and size, the bytes
@@ -228,7 +230,12 @@ export function encodeLfsPointer({ sha256, bytes }: LfsPointer): string {
 const LAYOUT =
   'pages hold .gitattributes, prek.toml, .potentialpaper/ (metadata.json, paper.pdf, pdf.json), author/ and community/ ' +
   '(sections named like 10-summary.md or 20-results.html), versions/<id>.json and <id>.pdf, links/ (named like ' +
-  '10-code.json), thumbnail.png (or .jpg, .gif, .webp, .avif) and thumbnail.json, demos/<name>/ and extensions/';
+  '10-code.json), thumbnail.png (or .jpg, .gif, .webp, .avif) and thumbnail.json, demos/<name>/, ' +
+  'reviews/<source>/<submission>/ and extensions/';
+
+const REVIEWS_LAYOUT =
+  'reviews/<source>/<submission>/ holds submission.json, forms.json and notes/<id>.json, each name a lower-case ' +
+  'slug (letters, digits, - and _)';
 
 /** Why nothing can be written at this path, or `null`. Deleting a file needs no such check. */
 export function layoutProblem(path: string): string | null {
@@ -237,6 +244,7 @@ export function layoutProblem(path: string): string | null {
   }
   if (thumbnailImageType(path)) return null;
   if (path.startsWith('extensions/')) return null;
+  if (path.startsWith(`${REVIEWS_DIR}/`)) return parseReviewPath(path) ? null : REVIEWS_LAYOUT;
   for (const part of PAGE_PARTS) {
     if (path.startsWith(`${part}/`)) {
       return sectionName(path, part)
@@ -270,6 +278,16 @@ export function layoutProblem(path: string): string | null {
 export const MAX_FILE_BYTES = 256 * 1024;
 export const MAX_CHANGES = 50;
 export const MAX_FILES = 1000;
+/**
+ * A bot's import of a busy forum can be hundreds of notes, so files under `reviews/` have limits of their own,
+ * besides the others': per commit and per page.
+ */
+export const MAX_REVIEW_CHANGES = 1000;
+export const MAX_REVIEW_FILES = 3000;
+
+export function isReviewPath(path: string): boolean {
+  return path.startsWith(`${REVIEWS_DIR}/`);
+}
 export const MAX_SUMMARY_LENGTH = 300;
 const MAX_PATH_BYTES = 1024;
 const MAX_NAME_BYTES = 255;
@@ -322,6 +340,28 @@ export interface Roles {
   confirmedAuthor: boolean;
   /** The paper has a confirmed author, who then owns its picture and links. */
   claimed: boolean;
+  /** A bot's write grants (`bot_grants`): path patterns such as `reviews/openreview/**`. */
+  grants?: readonly string[];
+}
+
+/**
+ * Whether a grant's pattern covers a path: `<folder>/**` covers everything under the folder, and any other
+ * pattern only the path it spells.
+ */
+export function grantCovers(pattern: string, path: string): boolean {
+  return pattern.endsWith('/**') ? path.startsWith(pattern.slice(0, -2)) : pattern === path;
+}
+
+/**
+ * Why a bot can't be granted this pattern, or `null`. For now only a source's folder of imported reviews,
+ * `reviews/<source>/**`; extensions' folders come with them (DESIGN.md §10).
+ */
+export function grantProblem(pattern: string): string | null {
+  const match = /^reviews\/([^/]+)\/\*\*$/.exec(pattern);
+  if (!match || !/^[a-z0-9]+(?:-[a-z0-9]+)*$/.test(match[1]) || match[1].length > 40) {
+    return "a grant is a source's folder of reviews, like reviews/openreview/** (the source a lower-case slug)";
+  }
+  return null;
 }
 
 /** Why these roles cannot write this path, or `null`. Checked for each path of a commit. */
@@ -353,6 +393,14 @@ export function pathDenied(path: string, roles: Roles): string | null {
   if (isDemoPath(path)) {
     if (roles.system) return 'the system only writes the metadata';
     return roles.verified || roles.admin ? null : 'confirm an institutional email address first';
+  }
+  // A source's imported submissions and reviews: only the bot granted the source writes them (DESIGN.md §4.3),
+  // so what a page shows as a venue's reviews is what the venue published.
+  if (path.startsWith(`${REVIEWS_DIR}/`)) {
+    if (roles.admin) return null;
+    if (roles.grants?.some((pattern) => grantCovers(pattern, path))) return null;
+    const source = reviewSourceOf(path);
+    return `only the bot granted ${source ? `reviews/${source}/` : 'a source'} can change it, and admins`;
   }
   // Data owned by one extension (DESIGN.md §10). Nobody can act as one until extensions exist.
   if (path.startsWith('extensions/')) return 'this path is reserved for extensions';
@@ -542,6 +590,11 @@ export function contentProblem(path: string, content: string): string | null {
     return parseThumbnailWords(content) ? null : 'is not { "alt": "…", "caption": "…" } (both optional)';
   }
   if (isLinkPath(path)) return parseLinkFile(content) ? null : 'is not a link: { "label": "Code", "url": "https://…" }';
+  const review = parseReviewPath(path);
+  if (review) {
+    const parsed = parseReviewFile(review.kind, content);
+    return 'problem' in parsed ? parsed.problem : null;
+  }
   const versionId = versionIdOf(path);
   if (versionId) {
     const parsed = parseVersionFile(versionId, content);
