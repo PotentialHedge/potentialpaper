@@ -63,6 +63,8 @@ import {
   resolvePage,
 } from '../plugins/pages';
 import { pluginStorage, setPluginStorage, storageBytes } from '../plugins/storage';
+import { DISCOVER_CACHE_MS, discoverPlugins } from '../plugins/discover';
+import { pluginUpdates, updatePlugin } from '../plugins/updates';
 import { findPage } from '../pages/kinds';
 import { isClaimable, ownPageClaim, requestPageClaim, withdrawPageClaim } from '../page-claims';
 import { presentVenuePapers } from '../venue-pages';
@@ -865,6 +867,55 @@ export const deletePluginGrant = route(async (req) => {
   const { plugin } = parseQuery(req, S.PluginIdQuery);
   await revokePlugin(principal.account, plugin);
   return respond(S.Ok, { status: 'ok' }, { principal });
+});
+
+/**
+ * Plugins people can find: public GitHub repos with the topic `potentialpaper-plugin`, most starred first. Public,
+ * cached five minutes; while GitHub fails, the last list is served (`stale`).
+ */
+export const getDiscoveredPlugins = route(async () => {
+  let directory;
+  try {
+    directory = await discoverPlugins();
+  } catch (err) {
+    throw new ApiError(502, 'source_unavailable', (err as Error).message);
+  }
+  return respond(S.DiscoveredPlugins, directory, {
+    headers: { 'Cache-Control': `public, max-age=${DISCOVER_CACHE_MS / 1000}` },
+  });
+});
+
+/** The reader's installed plugins with a newer release than the version they run. */
+export const getPluginUpdates = route(async (req) => {
+  const principal = await requireAuth(req);
+  return respond(S.PluginUpdates, { updates: await pluginUpdates(principal.account) }, { principal });
+});
+
+/**
+ * Move a plugin to its newest release (or `ref`). An update that asks for new permissions or network origins
+ * switches only with `approve`, which only a browser session may send; otherwise it comes back as `consent`, saying
+ * what the new version asks for, and nothing changes.
+ */
+export const postPluginUpdate = route(async (req) => {
+  const body = await parseBody(req, S.PluginUpdateBody);
+  const principal = body.approve ? await requireSession(req) : await requireAuth(req);
+  const result = await updatePlugin(principal.account, body);
+  return respond(
+    S.PluginUpdateResult,
+    result.status === 'updated'
+      ? {
+          ...result,
+          plugin: {
+            ...result.plugin,
+            plugin: result.plugin.plugin && {
+              ...result.plugin.plugin,
+              manifest: result.plugin.plugin.manifest as never,
+            },
+          },
+        }
+      : result,
+    { principal },
+  );
 });
 
 /** A plugin's storage for the account (`storage.get`). */

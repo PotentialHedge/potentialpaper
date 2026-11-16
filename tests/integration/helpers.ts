@@ -42,6 +42,8 @@ import * as installedPlugins from '@/app/api/v1/plugins/installed/route';
 import * as myPlugins from '@/app/api/v1/me/plugins/route';
 import * as pluginGrants from '@/app/api/v1/me/plugins/grants/route';
 import * as pluginStorage from '@/app/api/v1/me/plugins/storage/route';
+import * as pluginUpdates from '@/app/api/v1/me/plugins/updates/route';
+import * as discoverPlugins from '@/app/api/v1/plugins/discover/route';
 import * as pageSummary from '@/app/api/v1/pages/[identifier]/route';
 import * as pageFiles from '@/app/api/v1/pages/[identifier]/files/route';
 import * as pageMembersRoute from '@/app/api/v1/pages/[identifier]/members/route';
@@ -105,6 +107,8 @@ const ROUTES: [RegExp, any][] = [
   [/^\/me\/plugins(\?.*)?$/, myPlugins],
   [/^\/me\/plugins\/grants(\?.*)?$/, pluginGrants],
   [/^\/me\/plugins\/storage(\?.*)?$/, pluginStorage],
+  [/^\/me\/plugins\/updates(\?.*)?$/, pluginUpdates],
+  [/^\/plugins\/discover(\?.*)?$/, discoverPlugins],
   [/^\/pages\/(?<identifier>[^/?]+)\/files$/, pageFiles],
   [/^\/pages\/(?<identifier>[^/?]+)\/members(\?.*)?$/, pageMembersRoute],
   [/^\/pages\/(?<identifier>[^/?]+)\/submissions$/, pageSubmissions],

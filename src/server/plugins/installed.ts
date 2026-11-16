@@ -21,6 +21,7 @@ import {
 import { ApiError } from '../api/errors';
 import { saveUserSettings, siteSettingsText, userSettingsRow } from '../settings';
 import { baseUrlOf, pinnedSnapshot, type PluginSnapshot, snapshotPlugin } from './snapshot';
+import { newestReleaseTag } from './tags';
 
 /**
  * The plugins a reader has installed, as pages run them (`handoffs/plugins.md` Phase 2): the entries their settings
@@ -195,6 +196,8 @@ export async function installPlugin(account: Account, text: string): Promise<Ins
   if (source.kind !== 'github') {
     throw new ApiError(422, 'validation_error', 'a localhost plugin runs in your browser only; load it from there');
   }
+  // No ref named: the newest release, as plugins are published by tagging one; the default branch without any.
+  if (source.ref === null) source.ref = await newestReleaseTag(source);
   await snapshotPlugin(source);
   const key = sourceKey(source);
   const { text: current } = await userSettingsRow(account.id);

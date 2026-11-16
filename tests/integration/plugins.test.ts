@@ -15,7 +15,9 @@ import { commitPage, createPage } from '@/server/pages/commit';
 import { savePaper } from '@/server/papers';
 import { servePlugin } from '@/server/plugins/serve';
 import { pinPlugin, pluginHostLabel, storePluginFiles } from '@/server/plugins/snapshot';
+import { forgetTags } from '@/server/plugins/tags';
 import { saveSiteSettings } from '@/server/settings';
+import { mintToken } from '@/server/tokens';
 import { api, closePool, resetDatabase, signUp } from './helpers';
 
 /**
@@ -437,5 +439,134 @@ describe('the page routes plugins read', () => {
     await createPage('user', me);
     expect((await installed(cookie, `user:${me}`)).viewer).toEqual({ signedIn: true, isOwner: true });
     expect((await installed(cookie, 'venue:iclr/2027')).viewer).toEqual({ signedIn: true, isOwner: false });
+  });
+});
+
+describe('releases and updates', () => {
+  const V3 = '3'.repeat(40);
+  const bump =
+    (version: string, more: string[] = []) =>
+    (m: Record<string, unknown>) => {
+      m.version = version;
+      m.permissions = ['page.read', ...more];
+    };
+  beforeEach(forgetTags);
+
+  it('installs the newest release when no ref is named, and moves to a newer one, asking first for new permissions', async () => {
+    const cookie = await signUp('ada@ethz.ch');
+    const [account] = await getDb().select().from(accounts);
+    const { token } = await mintToken({ account, name: 'agent', scopes: ['write'] });
+    vi.stubGlobal('fetch', fakeGitHub({ [V1]: repoAt() }, { 'v0.9.0': V1, 'v1.0.0': V1, 'v2.0.0-rc.1': V1 }));
+    const res = await api('POST', '/me/plugins', { cookie, body: { source: SOURCE } });
+    expect(res.body).toMatchObject({ ref: 'v1.0.0', plugin: { commit: V1 } });
+    expect((await api('GET', '/me/plugins/updates', { cookie })).body).toEqual({ updates: [] });
+    await api('PUT', '/me/plugins/grants', { cookie, body: { plugin: 'potentialhedge/hello', commit: V1 } });
+
+    // v1.1.0 asks for nothing new: it is offered, and switches at once, for an agent too.
+    vi.stubGlobal('fetch', fakeGitHub({ [V1]: repoAt(), [V2]: repoAt(bump('1.1.0')) }, { 'v1.0.0': V1, 'v1.1.0': V2 }));
+    forgetTags();
+    expect((await api('GET', '/me/plugins/updates', { cookie })).body.updates).toEqual([
+      {
+        source: SOURCE,
+        pluginId: 'potentialhedge/hello',
+        current: { ref: 'v1.0.0', commit: V1, version: '1.0.0' },
+        latest: { tag: 'v1.1.0', commit: V2, version: '1.1.0' },
+      },
+    ]);
+    const updated = await api('POST', '/me/plugins/updates', { token, body: { source: SOURCE } });
+    expect(updated.status).toBe(200);
+    expect(updated.body).toMatchObject({ status: 'updated', plugin: { ref: 'v1.1.0', status: 'ready' } });
+    expect(updated.body.plugin.plugin).toMatchObject({ commit: V2, manifest: { version: '1.1.0' } });
+    expect(JSON.parse((await api('GET', '/me/settings', { cookie })).body.text).plugins).toEqual({
+      [SOURCE]: { enabled: true, ref: 'v1.1.0' },
+    });
+    expect((await api('GET', '/me/plugins/updates', { cookie })).body.updates).toEqual([]);
+
+    // v1.2.0 asks for scope.read: described, nothing switched, until the reader approves it in a browser.
+    vi.stubGlobal(
+      'fetch',
+      fakeGitHub(
+        { [V2]: repoAt(bump('1.1.0')), [V3]: repoAt(bump('1.2.0', ['scope.read'])) },
+        { 'v1.1.0': V2, 'v1.2.0': V3 },
+      ),
+    );
+    forgetTags();
+    const asked = await api('POST', '/me/plugins/updates', { cookie, body: { source: SOURCE } });
+    expect(asked.body).toEqual({
+      status: 'consent',
+      to: { ref: 'v1.2.0', commit: V3, version: '1.2.0', name: 'Hello' },
+      missing: { permissions: ['scope.read'], network: [] },
+    });
+    expect((await installed(cookie)).plugins).toMatchObject([{ ref: 'v1.1.0', status: 'ready' }]);
+    const byAgent = await api('POST', '/me/plugins/updates', { token, body: { source: SOURCE, approve: true } });
+    expect(byAgent.status).toBe(403);
+    const approved = await api('POST', '/me/plugins/updates', { cookie, body: { source: SOURCE, approve: true } });
+    expect(approved.body).toMatchObject({ status: 'updated', plugin: { ref: 'v1.2.0', status: 'ready' } });
+    expect((await installed(cookie)).plugins).toMatchObject([
+      { ref: 'v1.2.0', status: 'ready', plugin: { commit: V3 }, missing: { permissions: [], network: [] } },
+    ]);
+
+    // A ref that isn't there changes nothing; nor does a plugin that isn't installed.
+    expect((await api('POST', '/me/plugins/updates', { cookie, body: { source: SOURCE, ref: 'v9' } })).status).toBe(
+      422,
+    );
+    expect((await api('POST', '/me/plugins/updates', { cookie, body: { source: 'github:someone/else' } })).status).toBe(
+      404,
+    );
+  });
+
+  it("re-pins a site default for the reader alone, who must approve it, since it's theirs from then on", async () => {
+    const cookie = await signUp('ada@ethz.ch');
+    vi.stubGlobal('fetch', fakeGitHub({ [V1]: repoAt(), [V2]: repoAt(bump('1.1.0')) }, { 'v1.0.0': V1, 'v1.1.0': V2 }));
+    const source = { kind: 'github' as const, owner: OWNER, repo: REPO, path: FOLDER, ref: null };
+    await storePluginFiles(
+      source,
+      V1,
+      Object.entries(helloFiles()).map(([path, t]) => ({ path, bytes: Buffer.from(t) })),
+    );
+    await pinPlugin(SOURCE, 'v1.0.0', V1);
+    await saveSiteSettings(`{ "plugins.default": ["${SOURCE}@v1.0.0"] }`);
+    expect((await api('GET', '/me/plugins/updates', { cookie })).body.updates).toMatchObject([
+      { latest: { tag: 'v1.1.0' } },
+    ]);
+    const asked = await api('POST', '/me/plugins/updates', { cookie, body: { source: SOURCE } });
+    expect(asked.body).toMatchObject({ status: 'consent', missing: { permissions: ['page.read'] } });
+    await api('POST', '/me/plugins/updates', { cookie, body: { source: SOURCE, approve: true } });
+    expect((await installed(cookie)).plugins).toMatchObject([{ from: 'user', ref: 'v1.1.0', status: 'ready' }]);
+    // Everyone else still runs the site's.
+    expect((await installed()).plugins).toMatchObject([{ from: 'site', ref: 'v1.0.0', plugin: { commit: V1 } }]);
+  });
+});
+
+describe('discovering plugins', () => {
+  it('lists the topic’s repos from GitHub, publicly, cached five minutes', async () => {
+    const search = vi.fn(async (input: string | URL | Request) => {
+      const url = String(input instanceof Request ? input.url : input);
+      if (!url.startsWith('https://api.github.com/search/repositories')) return new Response('', { status: 404 });
+      return Response.json({
+        items: [
+          {
+            name: 'potentialpaper-score-standing',
+            owner: { login: 'benedict-armstrong' },
+            html_url: 'https://github.com/benedict-armstrong/potentialpaper-score-standing',
+            description: 'Where you stand',
+            stargazers_count: 3,
+            pushed_at: '2026-11-15T10:00:00Z',
+            topics: ['potentialpaper-plugin'],
+          },
+        ],
+      });
+    });
+    vi.stubGlobal('fetch', search);
+    const { GET } = await import('@/app/api/v1/plugins/discover/route');
+    const raw = await GET(new Request('http://test.local/api/v1/plugins/discover'), { params: Promise.resolve({}) });
+    expect(raw.headers.get('cache-control')).toBe('public, max-age=300');
+    const res = await api('GET', '/plugins/discover');
+    expect(res.status).toBe(200);
+    expect(res.body).toMatchObject({
+      stale: false,
+      plugins: [{ source: 'github:benedict-armstrong/potentialpaper-score-standing', stars: 3 }],
+    });
+    expect(search).toHaveBeenCalledTimes(1);
   });
 });

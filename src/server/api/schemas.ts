@@ -733,6 +733,59 @@ export const PluginStorageBody = z.object({
 });
 export const PluginStorage = z.object({ data: z.record(z.string(), z.unknown()), bytes: z.number().int() });
 
+// Discovery and updates (`handoffs/plugins.md` Phase 3).
+
+/** `GET /plugins/discover`: public repos with the topic `potentialpaper-plugin`, most starred first. */
+export const DiscoveredPlugins = z.object({
+  plugins: z.array(
+    z.object({
+      source: z.string(),
+      owner: z.string(),
+      repo: z.string(),
+      description: z.string().nullable(),
+      stars: z.number().int(),
+      pushedAt: z.string().nullable(),
+      htmlUrl: z.string(),
+      avatarUrl: z.string().nullable(),
+      topics: z.array(z.string()),
+    }),
+  ),
+  fetchedAt: z.string(),
+  stale: z.boolean(),
+});
+
+/** `GET /me/plugins/updates`: installed plugins with a newer release than the version they run. */
+export const PluginUpdates = z.object({
+  updates: z.array(
+    z.object({
+      source: z.string(),
+      pluginId: z.string(),
+      current: z.object({ ref: z.string().nullable(), commit: z.string().nullable(), version: z.string() }),
+      latest: z.object({ tag: z.string(), commit: z.string(), version: z.string() }),
+    }),
+  ),
+});
+
+/** `POST /me/plugins/updates`: move a plugin to `ref` (by default its newest release). */
+export const PluginUpdateBody = z.object({
+  source: z.string().min(1).max(400),
+  ref: z
+    .string()
+    .regex(/^[A-Za-z0-9_.\/-]{1,200}$/)
+    .optional(),
+  /** Approve what the new version asks for that the reader hasn't granted. Only from a browser session. */
+  approve: z.boolean().optional(),
+});
+
+export const PluginUpdateResult = z.discriminatedUnion('status', [
+  z.object({ status: z.literal('updated'), plugin: InstalledPlugin }),
+  z.object({
+    status: z.literal('consent'),
+    to: z.object({ ref: z.string(), commit: z.string(), version: z.string(), name: z.string() }),
+    missing: PluginMissing,
+  }),
+]);
+
 /** A page of any kind, as plugins and links see it (`page.resolve`, `GET /pages/{identifier}`). */
 export const PageSummary = z.object({
   kind: z.string(),
