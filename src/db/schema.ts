@@ -501,8 +501,8 @@ export const pdfDocuments = pgTable(
 
 /**
  * A venue that publishes its reviews, such as a conference on OpenReview. `forms` says how to show each
- * kind of note it publishes (`lib/submissions.ts`), so the page knows no venue by name. Written by
- * imports (`server/import-reviews.ts`).
+ * kind of note it publishes (`lib/submissions.ts`), so the page knows no venue by name. A projection of the
+ * `reviews/<source>/<submission>/` files a bot commits (`server/review-projection.ts`), keyed `<source>:<venue>`.
  */
 export const venues = pgTable('venues', {
   /** The source and its id for the venue: `openreview:ICLR.cc/2027/Conference`. */
@@ -516,7 +516,8 @@ export const venues = pgTable('venues', {
 
 /**
  * A paper's submission to a venue. A paper can have several: rejected at one venue, accepted at the next.
- * Imported, never edited on the site, so it is not part of the page's repo.
+ * A projection of the page repo's `reviews/<source>/<submission>/` files (`server/review-projection.ts`), which
+ * only the bot granted the source writes; rebuilt with `consumers:rebuild -- reviews`.
  */
 export const submissions = pgTable(
   'submissions',
@@ -536,7 +537,7 @@ export const submissions = pgTable(
     /** As the venue words it: "Accept (Poster)". */
     decision: text('decision'),
     url: text('url'),
-    /** When the source was read: its notes are as they stood then. */
+    /** When its folder in the repo last changed: an import that finds nothing new commits nothing. */
     fetchedAt: timestamp('fetched_at', { withTimezone: true, mode: 'date' }).notNull(),
   },
   (t) => [

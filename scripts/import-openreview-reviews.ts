@@ -1,10 +1,11 @@
 import 'dotenv/config';
 import { DatabaseSync } from 'node:sqlite';
 import { getPool } from '@/db';
-import { importReviews, type SubmissionInput } from '@/server/import-reviews';
+import { IMPORT_RATE_LIMIT, importReviews, type ImportResult, type SubmissionInput } from '@/server/import-reviews';
 import { openReviewForms } from '@/server/venue-sources/iclr-forms';
 import {
   forumUrl,
+  OPENREVIEW_NOTE_LICENSE,
   parseReply,
   submissionStatus,
   venueUrl,
@@ -13,12 +14,16 @@ import {
 } from '@/server/venue-sources/openreview';
 
 /**
- * Imports a venue's public OpenReview notes (reviews, meta-reviews, decisions, comments) from a scrape:
- * `npm run papers:import-reviews -- data/iclr2027.sqlite ICLR.cc/2027/Conference "ICLR 2027"`
+ * Imports a venue's public OpenReview notes (reviews, meta-reviews, decisions, comments) from a scrape, as the
+ * `openreview` bot's files in each paper's repo (`server/import-reviews.ts`):
+ * `npm run papers:import-reviews -- data/iclr2027.sqlite ICLR.cc/2027/Conference "ICLR 2027" [--from <forum id>]
+ * [--concurrency 4]`
  *
- * The scrape has `submissions(id, number, venueid)`, `replies(forum, raw)` with each reply's API v2 note
- * as JSON, and optionally `meta(key, value)` with `reviews_fetched_at`. Submissions attach to papers by
- * their OpenReview id, so import the papers first (`papers:import-iclr`).
+ * The scrape has `submissions(id, number, venueid)` and `replies(forum, raw)` with each reply's API v2 note
+ * as JSON. Submissions attach to papers by their OpenReview id, so import the papers first
+ * (`papers:import-iclr`). Re-running commits only what changed, so a run that stopped is resumed by running it
+ * again (`--from` skips the forums before one, in id order, to get there sooner). The worker's `reviews`
+ * consumer then projects the files into the tables the page reads.
  */
 
 const BATCH = 1_000;
@@ -27,17 +32,6 @@ interface SubmissionRow {
   id: string;
   number: number | null;
   venueid: string | null;
-}
-
-function fetchedAt(sqlite: DatabaseSync): Date {
-  try {
-    const row = sqlite.prepare(`select value from meta where key = 'reviews_fetched_at'`).get() as
-      { value: string } | undefined;
-    if (row) return new Date(row.value);
-  } catch {
-    // No `meta` table: the scrape is taken to be as old as the import.
-  }
-  return new Date();
 }
 
 function toSubmission(row: SubmissionRow, notes: ParsedNote[]): SubmissionInput {
@@ -58,19 +52,39 @@ function toSubmission(row: SubmissionRow, notes: ParsedNote[]): SubmissionInput 
   };
 }
 
+function flag(args: string[], name: string): string | undefined {
+  const at = args.indexOf(name);
+  if (at < 0) return undefined;
+  const [, value] = args.splice(at, 2);
+  return value;
+}
+
 async function main() {
-  const [path, group, name] = process.argv.slice(2);
-  if (!path || !group || !name) {
-    throw new Error('usage: papers:import-reviews <path to sqlite> <OpenReview venue group> <venue name>');
+  const args = process.argv.slice(2);
+  const from = flag(args, '--from') ?? '';
+  const concurrency = Number(flag(args, '--concurrency') ?? '4');
+  const [path, group, name] = args;
+  if (!path || !group || !name || !Number.isInteger(concurrency) || concurrency < 1) {
+    throw new Error(
+      'usage: papers:import-reviews <path to sqlite> <OpenReview venue group> <venue name> [--from <forum>] [--concurrency n]',
+    );
   }
   const sqlite = new DatabaseSync(path, { readOnly: true });
-  const venue = { id: `openreview:${group}`, name, url: venueUrl(group), forms: openReviewForms(group) };
-  const when = fetchedAt(sqlite);
+  const venue = {
+    source: 'openreview',
+    id: group,
+    name,
+    url: venueUrl(group),
+    forms: openReviewForms(group),
+    license: OPENREVIEW_NOTE_LICENSE,
+  };
   const rows = sqlite
-    .prepare(`select id, number, venueid from submissions order by id`)
-    .all() as unknown as SubmissionRow[];
+    .prepare(`select id, number, venueid from submissions where id >= ? order by id`)
+    .all(from) as unknown as SubmissionRow[];
+  const started = Date.now();
   const replies = sqlite.prepare(`select raw from replies where forum >= ? and forum <= ? order by forum`);
-  const totals = { submissions: 0, notes: 0, skipped: 0, private: 0 };
+  const totals = { submissions: 0, notes: 0, skipped: 0, committed: 0, unchanged: 0, private: 0 };
+  const failed: ImportResult['failed'] = [];
   for (let start = 0; start < rows.length; start += BATCH) {
     const batch = rows.slice(start, start + BATCH);
     const byForum = new Map<string, ParsedNote[]>(batch.map((row) => [row.id, []]));
@@ -82,16 +96,23 @@ async function main() {
     const result = await importReviews(
       venue,
       batch.map((row) => toSubmission(row, byForum.get(row.id)!)),
-      when,
+      { rateLimit: IMPORT_RATE_LIMIT, concurrency },
     );
-    totals.submissions += result.submissions;
-    totals.notes += result.notes;
-    totals.skipped += result.skipped;
-    console.log(`${start + batch.length} / ${rows.length}`);
+    for (const key of ['submissions', 'notes', 'skipped', 'committed', 'unchanged'] as const) {
+      totals[key] += result[key];
+    }
+    for (const failure of result.failed) console.log(`failed ${failure.externalId}: ${failure.error}`);
+    failed.push(...result.failed);
+    const seconds = Math.round((Date.now() - started) / 1000);
+    console.log(
+      `${start + batch.length} / ${rows.length} (through ${batch.at(-1)!.id}, ${seconds}s): ` +
+        `${totals.committed} committed, ${totals.unchanged} unchanged, ${totals.skipped} skipped, ${failed.length} failed`,
+    );
   }
   console.log(
-    `imported ${totals.submissions} submissions with ${totals.notes} notes; ` +
-      `${totals.skipped} without a paper here, ${totals.private} notes not public`,
+    `${totals.submissions} submissions with ${totals.notes} notes (${totals.committed} committed, ` +
+      `${totals.unchanged} unchanged); ${totals.skipped} without a paper here, ${failed.length} refused, ` +
+      `${totals.private} notes not public`,
   );
   sqlite.close();
   await getPool().end();

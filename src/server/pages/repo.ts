@@ -52,6 +52,20 @@ export async function readFiles(db: Reader, paperId: string, tree: string, prefi
   return files;
 }
 
+/**
+ * Every file under folder `dir` (`reviews/openreview/abc`), by full path, reading only the trees on the way
+ * there and below it. Empty if there is no such folder.
+ */
+export async function readFolder(db: Reader, paperId: string, tree: string, dir: string): Promise<Map<string, string>> {
+  let at = tree;
+  for (const name of dir.split('/')) {
+    const entry = parseTree(await mustRead(db, paperId, at, 'tree')).find((e) => e.name === name);
+    if (!entry?.isTree) return new Map();
+    at = entry.oid;
+  }
+  return readFiles(db, paperId, at, `${dir}/`);
+}
+
 export async function readText(db: Reader, paperId: string, blob: string | undefined): Promise<Version> {
   if (!blob) return null;
   return (await mustRead(db, paperId, blob, 'blob')).toString('utf8');
