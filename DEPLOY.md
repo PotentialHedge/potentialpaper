@@ -123,6 +123,29 @@ Demo files are in R2, through the `R2_*` keys in `.env.production`: an account t
 storing it on the container's disk. A page's rendered HTML names its demos' addresses, so after moving the
 domain run `dc run --rm tools npm run pages:rebuild`.
 
+## Postgres 19 (not done in production yet)
+
+Dev runs `postgres:19rc2` since 2026-11-16 (`docker-compose.dev.yml`); production stays on 16 until 19.0 is
+tagged (due 2026-11-19). Then, once:
+
+1. In `docker-compose.prod.yml`, pin the image to the exact tag (`postgres:19.0`), add
+   `command: ['postgres', '-c', 'autovacuum_max_parallel_workers=2']`, and mount a **new** volume
+   `pgdata19:/var/lib/postgresql` (not `.../data`: since 18 the image keeps data in
+   `/var/lib/postgresql/<major>/docker`, and the old path would quietly leave it in the container). Keep the
+   `pgdata` volume declared but unmounted.
+2. `dc stop app ingest ssh`, then dump the old cluster:
+   `docker exec potentialpaper-postgres-1 pg_dumpall -U "$POSTGRES_USER" > data/pg19/prod-pg16.sql`.
+3. `dc up -d postgres` (now 19, empty), restore with
+   `docker exec -i potentialpaper-postgres-1 psql -U "$POSTGRES_USER" -d postgres < data/pg19/prod-pg16.sql`
+   (the "role already exists" error is expected), then `analyze`. The restore rebuilds the full-text and
+   `pg_trgm` indexes, as 19's release notes ask.
+4. Continue the recipe from `dc run --rm tools`, and check the site. Remove the old `potentialpaper_pgdata`
+   volume only after it checks out.
+
+Checked on dev: `max_locks_per_transaction` is 128 by default now (enough), and nothing uses JIT (off by
+default now). The dev volume went the same way: `potentialpaper-dev_pgdata` (16) is kept beside
+`potentialpaper-dev_pgdata19`.
+
 ## When it goes wrong
 
 Read `dc logs -f app`, fix the problem, commit and run the recipe again. If the database is beyond saving,

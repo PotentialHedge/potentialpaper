@@ -96,3 +96,19 @@ data and search can each be scaled later without a rewrite.
 ## Log
 
 (Each phase adds what it did, what it changed from the plan, and what's left.)
+
+**How the phases run:** one T3 thread per phase, on its own branch (`data-model-phase-<n>`), cut from the previous
+phase's branch so this file stays current. Commit and push after each working step. At the end, add your entry
+below and launch the next phase's thread pointing at this file. Merging into `main` waits for Benedict.
+
+### Phase 0, dev half (2026-11-16, branch `data-model-phase-0`)
+
+- Dev is on `postgres:19rc2` with `autovacuum_max_parallel_workers=2`, volume `pgdata19` mounted at
+  `/var/lib/postgresql`. Dumped with `pg_dumpall` (`data/pg19/dev-pg16.sql`, gitignored) and restored into the new
+  volume. The old `potentialpaper-dev_pgdata` (16) is kept. `max_locks_per_transaction` is 128, and nothing uses JIT.
+- There is no `pg-backup.sh` in this repo (DESIGN.md names acceptodds'), so it was `pg_dumpall` straight.
+- Migrations and checks on 19: lint, format, typecheck pass; 516 of 522 tests pass. The 6 failures are all in
+  `tests/integration/pdf-ingest.test.ts` and fail the same way on 16: the host has no poppler (`pdftotext`). Not
+  related to this work; running them needs poppler on the host, or the tools image.
+- **Left: production**, once 19.0 is tagged (2026-11-19 or later). The steps are in DEPLOY.md, "Postgres 19".
+  It doesn't block Phases 1 to 5.

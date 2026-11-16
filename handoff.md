@@ -18,7 +18,7 @@ GitHub repos come later.
 
 Milestones 0, 1 and 2 are built, merged into `main` and deployed, and Milestone 3's web editor (VS Code for the Web) is live. Mail doesn't work yet.
 
-- **Stack:** Next 16.4.5, Drizzle, Postgres 16 (moving to 19: `handoffs/data-model.md` Phase 0), Better Auth,
+- **Stack:** Next 16.4.5, Drizzle, Postgres 19 in dev (`19rc2`), 16 in production until 19.0 is tagged (DEPLOY.md, "Postgres 19"), Better Auth,
   Tailwind v4 and Vitest, with Cloudflare R2 for PDFs and images.
 - **Deploying:** SSH to `ben-docker-1` (Tailscale), repo at `~/projects/papertrail`. If it times out, this
   Mac's Tailscale is disconnected. The server's `curl --aws-sigv4` gets 403 from R2 with good keys; test keys

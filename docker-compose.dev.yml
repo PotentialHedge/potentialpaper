@@ -4,16 +4,21 @@ name: potentialpaper-dev
 
 services:
   postgres:
-    image: postgres:16
+    # Postgres 19 (handoffs/data-model.md Phase 0). Since 18 the image keeps data under
+    # /var/lib/postgresql/<major>/docker, so the volume mounts /var/lib/postgresql: mounting the old
+    # .../data path would leave the real data inside the container. `pgdata` is the old 16 volume, kept
+    # until 19 checks out.
+    image: postgres:19rc2
     restart: unless-stopped
     environment:
       POSTGRES_USER: potentialpaper
       POSTGRES_PASSWORD: potentialpaper
       POSTGRES_DB: potentialpaper
+    command: ['postgres', '-c', 'autovacuum_max_parallel_workers=2']
     ports:
       - '127.0.0.1:55433:5432'
     volumes:
-      - pgdata:/var/lib/postgresql/data
+      - pgdata19:/var/lib/postgresql
     healthcheck:
       test: ['CMD-SHELL', 'pg_isready -U potentialpaper -d potentialpaper']
       interval: 30s
@@ -26,4 +31,4 @@ services:
         max-file: '5'
 
 volumes:
-  pgdata:
+  pgdata19:
