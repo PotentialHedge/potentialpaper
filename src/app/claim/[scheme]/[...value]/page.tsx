@@ -6,7 +6,7 @@ import { ui } from '@/components/ui';
 import { paperPath } from '@/lib/paper-ids';
 import { authHref } from '@/lib/return-to';
 import { viewerFromHeaders } from '@/server/auth';
-import { confirmedAuthors, ownAddressesOnPaper, ownClaim } from '@/server/claims';
+import { canStepDown, confirmedAuthors, ownAddressesOnPaper, ownClaim } from '@/server/claims';
 import { ClaimForm, StepDown } from './ClaimForm';
 
 export const dynamic = 'force-dynamic';
@@ -61,9 +61,11 @@ export default async function ClaimPage({ params }: Props) {
                 (addresses.onPaper.length > 0
                   ? `, because your address ${addresses.onPaper.join(' and ')} is printed on its first page`
                   : ', from an address of yours printed on its first page')}
-              . <a href={editHref(found.id)}>Write the author section</a> (in <code>author/</code>).
+              {mine.method === 'vouch' && ', added by a co-author'}.{' '}
+              <a href={editHref(found.id)}>Write the author section</a> (in <code>author/</code>), or{' '}
+              <a href="/papers">add your co-authors</a>.
             </p>
-            {mine.method === 'email' && (
+            {canStepDown(mine) && (
               <p className={ui.fine}>
                 <StepDown paper={found.canonical} />
               </p>

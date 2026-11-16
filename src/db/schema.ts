@@ -589,7 +589,7 @@ export const CLAIM_STATUSES = ['pending', 'confirmed', 'rejected', 'declined'] a
 export type ClaimStatus = (typeof CLAIM_STATUSES)[number];
 /**
  * How a claim was (or is to be) decided: `manual` by an admin, `email` because one of the account's
- * confirmed addresses is on the paper's first page, and later `vouch`, by a confirmed co-author.
+ * confirmed addresses is on the paper's first page, and `vouch` by a confirmed co-author (`decided_by`).
  */
 export const CLAIM_METHODS = ['manual', 'email', 'vouch'] as const;
 export type ClaimMethod = (typeof CLAIM_METHODS)[number];

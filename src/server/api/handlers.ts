@@ -24,7 +24,8 @@ import { addSshKey, listSshKeys, removeSshKey } from '../ssh-keys';
 import { previewDemoSources } from '../demos/attach';
 import { snapshotDemo } from '../demos/snapshot';
 import { demoUrl } from '@/lib/demos';
-import { ownClaim, requestClaim, withdrawClaim } from '../claims';
+import { addCoAuthor, ownClaim, requestClaim, withdrawClaim } from '../claims';
+import { authoredPapers } from '../my-papers';
 import { revertCommit, type Actor, type CommitResult } from '../pages/commit';
 import { renderHtml } from '../pages/html';
 import { renderMarkdown } from '../pages/markdown';
@@ -370,6 +371,37 @@ export const deleteClaim = route(async (req) => {
   const { paper } = await knownPaper(scheme, value);
   await withdrawClaim(paper.id, principal.account.id);
   return respond(S.OwnClaim, { claim: null }, { principal });
+});
+
+/** The papers the viewer is an author of, or has claimed (`/papers`). */
+export const getMyPapers = route(async (req) => {
+  const principal = await requireAuth(req);
+  const authored = await authoredPapers(principal.account.id);
+  return respond(
+    S.MyPapers,
+    {
+      // The schema drops the internal `paperId`.
+      authored: authored.map(({ canonical, waiting, ...row }) => ({
+        ...row,
+        paper: canonical,
+        waiting: waiting.map(({ claimId, createdAt, ...w }) => ({ ...w, claim: claimId, createdAt: toIso(createdAt) })),
+      })),
+    },
+    { principal },
+  );
+});
+
+/** A confirmed author adds a co-author, confirmed at once (`method: 'vouch'`). */
+export const postCoAuthor = route(async (req) => {
+  const principal = await requireVerified(req);
+  const body = await parseBody(req, S.CoAuthorBody);
+  const { paper } = await knownPaper(body.paper.scheme, body.paper.value);
+  const added = await addCoAuthor(
+    paper.id,
+    principal.account,
+    'claim' in body ? { claimId: body.claim } : { handle: body.handle, authorIndex: body.authorIndex },
+  );
+  return respond(S.CoAuthorAdded, added, { status: 201, principal });
 });
 
 /** Mails the person a code for their agent. Anonymous, and the same answer whether or not they have an account. */

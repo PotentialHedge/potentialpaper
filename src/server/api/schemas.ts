@@ -332,6 +332,53 @@ export const OwnClaim = z.object({
     .nullable(),
 });
 
+/**
+ * A confirmed author adds a co-author: an account by `handle` and which printed author (`authorIndex`) it is, or a
+ * `claim` someone made and is waiting on (`GET /me/papers`'s `waiting`).
+ */
+export const CoAuthorBody = z.union([
+  z.object({
+    paper: PaperIdentifier,
+    handle: z.string().trim().min(1).max(64),
+    authorIndex: z.number().int().min(0).max(10_000),
+  }),
+  z.object({ paper: PaperIdentifier, claim: z.uuid() }),
+]);
+export const CoAuthorAdded = z.object({ authorIndex: z.number().int(), authorName: z.string() });
+
+/** The signed-in account's papers (`server/my-papers.ts`). */
+export const MyPapers = z.object({
+  authored: z.array(
+    z.object({
+      title: z.string(),
+      year: z.number().int().nullable(),
+      venue: z.string().nullable(),
+      paper: PaperIdentifier,
+      path: z.string(),
+      authors: z.array(z.string()),
+      mine: z.object({
+        authorIndex: z.number().int(),
+        authorName: z.string(),
+        status: z.enum(['pending', 'confirmed', 'rejected', 'declined']),
+        method: z.enum(['manual', 'email', 'vouch']),
+        canStepDown: z.boolean(),
+      }),
+      confirmed: z.array(z.object({ authorIndex: z.number().int(), authorName: z.string() })),
+      waiting: z.array(
+        z.object({
+          claim: z.uuid(),
+          authorIndex: z.number().int(),
+          authorName: z.string(),
+          evidence: z.string(),
+          realName: z.string().nullable(),
+          institutions: z.array(z.string()),
+          createdAt: z.string(),
+        }),
+      ),
+    }),
+  ),
+});
+
 /** Asks for a code mailed to the person, for their agent to trade for a token (`server/agent-codes.ts`). */
 export const AgentCodeBody = z.object({ email: Email });
 export const AgentTokenBody = z.object({ code: z.string().trim().min(1).max(32) });

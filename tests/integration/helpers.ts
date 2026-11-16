@@ -33,6 +33,8 @@ import * as commentRoute from '@/app/api/v1/comments/[id]/route';
 import * as commentReplies from '@/app/api/v1/comments/[id]/replies/route';
 import * as commentPreview from '@/app/api/v1/comments/preview/route';
 import * as myMentions from '@/app/api/v1/me/mentions/route';
+import * as myPapers from '@/app/api/v1/me/papers/route';
+import * as myCoAuthors from '@/app/api/v1/me/papers/co-authors/route';
 import { getDb, getPool } from '@/db';
 import { clearDevOutbox, devOutbox } from '@/server/mail';
 
@@ -82,6 +84,8 @@ const ROUTES: [RegExp, any][] = [
   [/^\/comments\/(?<id>[^/?]+)\/replies(\?.*)?$/, commentReplies],
   [/^\/comments\/(?<id>[^/?]+)$/, commentRoute],
   [/^\/me\/mentions(\?.*)?$/, myMentions],
+  [/^\/me\/papers$/, myPapers],
+  [/^\/me\/papers\/co-authors$/, myCoAuthors],
   [/^\/me\/password$/, password],
   [/^\/me\/affiliations$/, affiliations],
   [/^\/me\/affiliations\/(?<id>[^/]+)$/, affiliation],

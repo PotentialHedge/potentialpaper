@@ -47,7 +47,10 @@ export function NavUser() {
       <nav aria-label="Main navigation" className="flex flex-wrap items-baseline gap-x-4.5 gap-y-1 text-sm">
         {viewer ? (
           viewer.profileComplete ? (
-            <Link href="/profile">@{viewer.handle}</Link>
+            <>
+              <Link href="/papers">my papers</Link>
+              <Link href="/profile">@{viewer.handle}</Link>
+            </>
           ) : (
             <Link href={authHref(VERIFY_EMAIL, pathname)}>finish your profile</Link>
           )
