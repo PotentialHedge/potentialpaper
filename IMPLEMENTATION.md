@@ -90,13 +90,17 @@ Most of the risk is here, so it comes before the editor.
 ## 7. Published API and webhooks
 
 - Freeze `/api/v1`, publish docs, add webhooks over the outbox, bot token flow.
+- Bots as in DESIGN.md §10 ("Server-side extensions: bots"): registration, path grants, short-lived tokens,
+  delivery ids. The groundwork (file types, outbox consumers, the OpenReview importer as the first bot) comes
+  earlier, in `handoffs/data-model.md`.
 - Write one small example bot, such as one that adds links from a replication dataset.
 
 ## 8. Extensions v0
 
 - Manifest validation, SHA pinning, R2 snapshot, sandboxed host, `postMessage` RPC, permissions and
   consent, per-user install, kill switch.
-- Move two built-in panels onto the extension API to prove it works.
+- Move two built-in panels onto the extension API to prove it works. The Submissions panel, a renderer
+  for `reviews/**` files (DESIGN.md §4.8), is a natural first.
 - Start with a small set of slots. An acceptodds odds panel makes a good first extension.
 
 ## Main risks

@@ -1,7 +1,9 @@
 # PotentialPaper — design
 
-Status: draft for review, 2026-11-05.
-The build order is in [IMPLEMENTATION.md](IMPLEMENTATION.md).
+Status: draft for review, 2026-11-05. Updated 2026-11-16 with the data model for bots and plugins, search
+and the scaling path (§3, §4.3, §4.4, §4.8–4.11, §10, §12).
+The build order is in [IMPLEMENTATION.md](IMPLEMENTATION.md), and the work that follows from the 2026-11-16
+decisions is in [handoffs/data-model.md](handoffs/data-model.md).
 
 ## 1. What this is
 
@@ -27,10 +29,14 @@ in the spirit of VS Code extensions.
 2. **Who said it is always visible.** An author's words, the community's words and a bot's words
    never look alike.
 3. **Git holds the documents and Postgres holds the social activity.** Anything people edit
-   together is in git. Votes, comments and sessions are not.
+   together is in git, and so is anything a bot imports onto a page, such as a venue's reviews, so it
+   has a history too. Votes, comments and sessions are not.
 4. **Git is the source of truth for page content.** Every page-content table in Postgres can be
    rebuilt from it.
 5. **The UI is one client of the API**, as in acceptodds. Bots and extensions use the same API.
+6. **The repo is the data, plugins are views.** Anyone can extend the site by writing a bot that commits
+   files of a known type into pages (§10), and a renderer for a type of file shows it (§4.8). Our own
+   importers are bots like anyone else's.
 
 ### Not in the first version
 
@@ -47,7 +53,7 @@ Same as acceptodds unless a reason is stated here. The reference is
 | Concern | Choice                                                                          |
 | ------- | ------------------------------------------------------------------------------- |
 | App     | TypeScript, Next.js 16 App Router, Node 26, `output: 'standalone'`              |
-| Data    | Postgres 16 with Drizzle; migrations are a separate deploy step                 |
+| Data    | Postgres 19 with Drizzle; migrations are a separate deploy step (§4.11)         |
 | Auth    | Better Auth: email-first sign-up, link plus 6-digit code, API keys              |
 | UI      | Tailwind v4 with acceptodds' `globals.css` tokens and `components/ui.ts`        |
 | Content | `react-markdown` stack with GFM and KaTeX, `d3-force` for the graph             |
@@ -98,13 +104,16 @@ paper_identifiers(scheme, value, paper_id, pk(scheme, value))   -- arxiv, doi, o
   metadata, abstracts included, to CC0; OpenAlex's data is CC0 but an abstract keeps the work's own
   open license, and is dropped without one. OpenReview reviews, scores and comments are CC BY 4.0,
   which requires attribution and a link on every one we show.
-- **Submissions and their reviews are imported, not edited.** `submissions` ties a paper to a venue
-  (status, decision, source link), and `submission_notes` holds what the venue published about it:
-  reviews, meta-reviews, decisions and comments, threaded by `reply_to`, each with its license and link.
-  Only notes the source shows everyone are imported. They live in tables rather than the page's repo,
-  since nobody edits them on the site and a re-import replaces them. Nothing is venue-specific: a
-  `venues` row's `forms` gives each kind of note its labels, field order, score ranges and summary
-  columns, and fields no form names are shown by what their values look like.
+- **Submissions and their reviews are imported by bots into the page's repo** (decided 2026-11-16; until
+  it is built they are in the `submissions` and `submission_notes` tables). Each source writes
+  `reviews/<source>/<submission>/` (§4.3): the submission (venue, status, decision, link, the version it
+  is of), the venue's forms, and one file per note: reviews, meta-reviews, decisions and comments,
+  threaded by `reply_to`, each with its license and link. Only notes the source shows everyone are
+  imported. Only that source's bot writes its folder, nobody edits them on the site, and a re-import
+  commits only what changed, so a reviewer raising a score is a commit in the page's history. The
+  tables stay as a projection of those files (§4.9), for listings across papers such as a venue's
+  scores. Nothing is venue-specific: the forms give each kind of note its labels, field order, score
+  ranges and summary columns, and fields no form names are shown by what their values look like.
 - **Duplicates get merged.** A moderator, or an admin by script, sets `merged_into`. The old address redirects,
   and its repo's content is folded into the survivor with one commit that records where it came
   from. Links resolve through the merge when read.
@@ -191,6 +200,9 @@ thumbnail.gif                   the paper's picture, in place of its PDF's first
                                 .png, .jpg, .gif, .webp or .avif, named for its type, one a page)
 thumbnail.json                  the picture's words: { "alt", "caption" }
 demos/<name>/index.html         a demo kept in the page, with the files it loads beside it
+reviews/<source>/<submission>/submission.json   a bot's import: the submission (§3, §4.8)
+reviews/<source>/<submission>/forms.json        the venue's forms for its notes
+reviews/<source>/<submission>/notes/<id>.json   one review, decision or comment
 extensions/<id>/...             reserved: data owned by one extension (section 10)
 ```
 
@@ -216,7 +228,11 @@ attribute can name a filter and filters run programs on a clone.
 | `author/**`               | Confirmed authors of this paper, admins                                                     |
 | `community/**`            | Any verified account, subject to page protection                                            |
 | `demos/<name>/**`         | Any verified account; a folder the author section shows, only its confirmed authors; admins |
+| `reviews/<source>/**`     | Only the bot granted `<source>` (`openreview` is our importer), admins                      |
 | `extensions/<id>/**`      | Extension `<id>` acting for a consenting user                                               |
+
+`<source>` and `<submission>` are lower-case slugs: the source's id for the submission (an OpenReview
+forum id) where it is one. Grants of a folder to a bot are data, not code (§10, "Bots").
 
 **Demos** are code that runs on the page, in a sandboxed frame from a host of their own
 (`lib/demos.ts`, served by `server/demos/serve.ts` at `/d/<snapshot>/…`). Either section embeds one
@@ -287,9 +303,13 @@ transaction a commit:
    `409` with both versions, and the editor shows them.
 4. Writes blobs, trees and the commit.
 5. Moves the head with compare-and-swap, `UPDATE ... WHERE head = $base`.
-6. Updates `page_current`, `page_links`, the search index, `page_revisions` and the event outbox.
+6. Updates `page_current`, `page_links`, `page_revisions` and the event outbox.
 
 After commit the route purges the Cloudflare URLs for the page and its link targets.
+
+Only what the page itself shows is written in the commit's transaction, so an editor always sees their own
+edit. Everything else derived from a commit (the search index, the review tables, webhooks to bots) is a
+consumer of the outbox (§4.9) and catches up within seconds.
 
 **Pushed commits are stored verbatim**, so their ids don't change, and only if: author and committer are
 exactly the identity the site gives that account on that page (`u_…`, or the per-claim `a_…` on a paper it
@@ -416,6 +436,81 @@ rare admin action, run as a script, that rewrites that one page's commits from t
 and records the old-to-new oid map and the reason in a public log. Existing clones keep the old
 history and diverge. Having a repo per page limits the damage to one page, which is a real
 advantage of this model.
+
+### 4.8 File types: the contract between bots and plugins
+
+Decided 2026-11-16. Every kind of file a page can hold is registered once, with:
+
+- **a path pattern**, such as `versions/*.json` or `reviews/*/*/notes/*.json`;
+- **a schema** (zod; JSON Schema is made from it for editors and bots, as `server/pages/schemas.ts`'s
+  `PAGE_SCHEMAS` already does). A file of a type that can change shape names its version inside it,
+  `"schema": "review/1"`. A new version is a new schema beside the old one, so files already committed
+  never need migrating;
+- **an indexer**, which turns a file into search documents (§4.10) and rows of any projection the type has;
+- **a renderer**, which shows it on the page.
+
+The commit path checks every file against its type, whoever writes it, so a bot that writes valid
+`review/1` files is shown and found with no code from us. Renderers start as built-in panels in the
+page's named slots; with extensions (§10) a renderer for a pattern can come from an extension, and a
+reader can turn a built-in one off or replace it. Built-in types: sections, links, versions, the picture,
+the PDF, demos, and from 2026-11-16 submissions, forms and notes (`review/1`).
+
+### 4.9 Derived data: the outbox and its consumers
+
+Decided 2026-11-16. `page_events` (one row per commit, written in its transaction) is the only way
+derived data outside `page_current` learns of a change. Each consumer (the search indexer, the review
+projection, webhooks to bots, later feeds) keeps its own cursor in a table and does one idempotent job,
+"bring page P up to head H": it reads the page at that head and replaces what it holds for P. Replaying
+an event is harmless, an event that arrives late for a page already past it is skipped by `seq`, and
+rebuilding a consumer's data is resetting its cursor to zero.
+
+Now: one worker process (a compose service, like `ingest`) reads `page_events` in order, woken by
+`LISTEN/NOTIFY` from the commit, with a poll as a fallback. Later, the same consumers can sit behind a
+queue (Kafka, NATS or a cloud queue), partitioned by `paper_id` so each page's events stay in order.
+This is how GitHub's code search is fed: pushes go to Kafka, and crawlers turn them into documents.
+
+### 4.10 Search
+
+Decided 2026-11-16. Everything in a repo is searchable, whoever wrote it:
+
+```
+search_docs(paper_id, path, blob_oid, kind, text, fields jsonb, tsv tsvector)   -- GIN on tsv
+```
+
+The search consumer (§4.9) writes it from each file's indexer (§4.8): a section's text, a review's
+fields, a link's label. Keyed by blob id, as GitHub's index is, so an unchanged file is never indexed
+twice. A hit names the file, so results can point at the review or section that matched, and the query
+syntax (`lib/query.ts`) gains scopes such as `in:reviews` and `in:page`, and later filters on fields a
+form marks as scores. `papers.search` (title and abstract) stays for ranking papers. `server/search.ts`
+remains the only way to query, so Postgres full text can later be swapped for OpenSearch or
+Meilisearch, fed by the same consumer, if it gets slow (tens of millions of documents).
+
+### 4.11 Scaling path
+
+Decided 2026-11-16: build for one server, with seams that let each part grow on its own. GitHub's Git
+storage (rebuilt in 2026) has the same shape as ours: refs in a small store updated by compare-and-swap,
+objects in object storage, and servers that are only caches. Our refs are `page_refs` and our objects
+are `page_objects`.
+
+| Seam                                                                                                | Now                                   | Upgrade when it hurts                                                                                      |
+| --------------------------------------------------------------------------------------------------- | ------------------------------------- | ---------------------------------------------------------------------------------------------------------- |
+| **One object store interface** (`GitRepo`, `server/git/repo.ts`): nothing else reads `page_objects` | Object bodies are Postgres rows       | Bodies to R2 as packs, a pack manifest per repo in Postgres, refs stay in `page_refs` (~100 GB of objects) |
+| **The repo is the unit**: every table keyed by `paper_id` first, one repo per transaction           | One Postgres                          | Partition or shard by `paper_id` (e.g. Citus), several writers                                             |
+| **Derived data through the outbox** (§4.9)                                                          | One worker reading `page_events`      | A queue partitioned by `paper_id`                                                                          |
+| **Search behind `server/search.ts`** (§4.10)                                                        | Postgres full text on `search_docs`   | An external search engine fed by the same consumer                                                         |
+| **File types and bot grants are data** (§4.8, §10)                                                  | A registry in code, grants in a table | Types from extensions                                                                                      |
+
+Merging two papers is the one write across repos, and stays rare. Not now: queues, sharding, packs in R2,
+an external search engine, more than one region.
+
+**Postgres 19** (released 2026-11-19) suits this, since most of our big tables only grow
+(`page_objects`, `page_events`, `search_docs`): queries now mark pages all-visible, so those tables need
+less vacuuming; autovacuum vacuums indexes in parallel (`autovacuum_max_parallel_workers`, off by default,
+turn it on) and orders tables by a score (`pg_stat_autovacuum_scores`); `REPACK (CONCURRENTLY)` reclaims
+space after a large re-import without locking; TOAST defaults to lz4. The official image keeps its data
+under `/var/lib/postgresql/<version>/docker` since 18, so the volume mounts at `/var/lib/postgresql`. The
+upgrade from 16 is a dump and restore, which also rebuilds the full-text and `pg_trgm` indexes as 19's
+release notes ask.
 
 ## 5. Accounts and institutions
 
@@ -668,6 +763,7 @@ A repo has a manifest and built files at a commit:
   "contributes": {
     "paperPanels": [{ "title": "Replications", "slot": "paper.aside" }],
     "fenceRenderers": ["replication-table"],
+    "fileRenderers": [{ "glob": "reviews/*/*/**", "slot": "paper.tabs" }],
     "linkLabels": [{ "id": "formalizes", "reads": "formalizes", "inverse": "formalized by" }],
     "pages": [{ "path": "/x/replications", "title": "Replications" }]
   }
@@ -696,10 +792,27 @@ restyling the host page or reading its session. That limit is what makes it safe
 Each user installs what they want, and it affects only them. Admins can review specific versions and
 make them default for everyone, by script. A kill switch disables any extension site-wide.
 
-### Server-side extensions
+### Server-side extensions: bots
 
 We host none. An extension backend runs anywhere, reads `GET /api/v1/events` or receives webhooks, and
 acts through a bot token that is labeled like any bot.
+
+Decided 2026-11-16: bots are how data gets onto pages, and they work like GitHub Apps:
+
+- **A bot is a registration** with an id, an owner and **write grants on path patterns**, such as
+  `reviews/openreview/**`. It starts with none. Admins grant them, by script, and the grant also says
+  whether what it writes is shown to everyone by default. Grants are rows, checked by the same path rules
+  as everyone (`rules.ts`), and a wider grant needs an admin again.
+- **It commits through the same API** (`commitPage`), one page per commit, with `Bot: true` and its id in
+  the trailers, under its own rate limits. Re-running an import that finds nothing new commits nothing.
+- **Its tokens are short-lived**, made from a long-lived secret, as GitHub Apps' installation tokens are.
+- **It hears about changes** through webhooks from the outbox (§4.9), each with a delivery id so a bot can
+  drop repeats, or by reading `GET /api/v1/events`.
+- **What it writes must match a file type** (§4.8), so the site can show, index and check it with no code
+  of the bot's.
+
+Our own OpenReview import is the first bot, `openreview`, and goes through exactly this route, which keeps
+the route honest. The activity feed hides bot commits by default.
 
 ### What to do now, so this stays cheap
 
@@ -710,6 +823,8 @@ acts through a bot token that is labeled like any bot.
 | Paper page assembled from named slots (`paper.aside`, `paper.tabs`, ...) | Built-in panels become the first extensions |
 | Fence renderer registry in Markdown                                      | Rendered output has somewhere to attach     |
 | Path permissions, with `extensions/` reserved                            | Extension data has a defined, safe home     |
+| File types with schema, indexer and renderer (§4.8)                      | Renderers from extensions plug in by path   |
+| Bot grants on path patterns, as data                                     | Third-party bots need no code from us       |
 | Labels stored as data                                                    | Namespaced labels need no schema change     |
 | Strict CSP from the start                                                | Retrofitting CSP is painful                 |
 
@@ -731,6 +846,20 @@ Decided on 2026-11-05:
 - **Identity:** real names are optional, with anonymous commenting available (section 5.3).
 - **Joining:** institutional email only, following acceptodds (section 5).
 - **Name:** PotentialPaper.
+
+Decided on 2026-11-16 (the work is in [handoffs/data-model.md](handoffs/data-model.md)):
+
+- **The repo is the data, plugins are views** (principle 6). Imported submissions and reviews move into
+  the page repo under `reviews/<source>/`, written only by that source's bot, so score changes have
+  history (§3, §4.3).
+- **File types** with schema, indexer and renderer are the contract between bots and plugins (§4.8).
+- **Bots work like GitHub Apps:** path grants as data, short-lived tokens, webhooks with delivery ids
+  (§10).
+- **Derived data outside `page_current` comes from outbox consumers**, idempotent per page and
+  rebuildable from zero (§4.9).
+- **Search covers every file** through `search_docs` (§4.10).
+- **Scaling** goes through five seams, built now; queues, sharding and object storage wait (§4.11).
+- **Postgres 19**, from 16 (§4.11).
 
 ### Later
 

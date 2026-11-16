@@ -63,8 +63,8 @@ Things only you can do or decide, most urgent first. Milestones 1 and 2 and the 
 
 ## Housekeeping
 
-- [ ] **Stale design docs.** You stopped my earlier update of `DESIGN.md` and `IMPLEMENTATION.md`. Should I redo
-      it? They still describe a strict CSP, and Milestone 2 differs from `DESIGN.md` in three ways. `node-diff3` is
+- [ ] **Stale design docs.** You stopped my earlier update of `DESIGN.md` and `IMPLEMENTATION.md`. The data model
+      parts were updated on 2026-11-16; should I redo the rest? They still describe a strict CSP, and Milestone 2 differs from `DESIGN.md` in three ways. `node-diff3` is
       gone: it took 12 seconds on a 2,000-line file of repeated lines while holding the page's lock, so merging now
       uses `diff`, with limits. `page_current` holds Markdown rather than HTML until rendering arrives in
       Milestone 3. A new private table, `commit_identities`, ties `u_` ids to accounts, so `page_revisions` can be

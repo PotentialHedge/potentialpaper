@@ -18,8 +18,8 @@ GitHub repos come later.
 
 Milestones 0, 1 and 2 are built, merged into `main` and deployed, and Milestone 3's web editor (VS Code for the Web) is live. Mail doesn't work yet.
 
-- **Stack:** Next 16.4.5, Drizzle, Postgres 16, Better Auth, Tailwind v4 and Vitest, with Cloudflare R2 for PDFs
-  and images.
+- **Stack:** Next 16.4.5, Drizzle, Postgres 16 (moving to 19: `handoffs/data-model.md` Phase 0), Better Auth,
+  Tailwind v4 and Vitest, with Cloudflare R2 for PDFs and images.
 - **Deploying:** SSH to `ben-docker-1` (Tailscale), repo at `~/projects/papertrail`. If it times out, this
   Mac's Tailscale is disconnected. The server's `curl --aws-sigv4` gets 403 from R2 with good keys; test keys
   with `aws4fetch` instead.
@@ -81,6 +81,30 @@ Milestones 0, 1 and 2 are built, merged into `main` and deployed, and Milestone 
   ICLR 2027 submissions are anonymous, so almost none have emails (0 of the dev database's 500); recent arXiv
   first pages give at least one for 69%.
 
+## Direction: the repo is the data, bots write it, plugins show it (decided 2026-11-16, not built yet)
+
+Future work should follow this. The plan, in phases, is `handoffs/data-model.md`; the design is `DESIGN.md` §3,
+§4.3, §4.4, §4.8–4.11 and §10.
+
+- **Submissions and reviews move into the page repo**, `reviews/<source>/<submission>/` (`submission.json`,
+  `forms.json`, `notes/<id>.json`), written only by the bot granted that source. Score changes get history, and
+  anyone's bot can import a journal's reviews the same way. Today they are still only in `submissions`,
+  `submission_notes` and `venues.forms`, which become a projection.
+- **File types** (path pattern, schema versioned in the file, indexer, renderer) are the contract between bots and
+  plugins; they grow out of `PAGE_SCHEMAS` (`server/pages/schemas.ts`).
+- **Bots work like GitHub Apps:** path grants as rows, short-lived tokens, webhooks with delivery ids. Our OpenReview
+  importer becomes the first bot.
+- **Derived data outside `page_current` comes from consumers of `page_events`** (nothing reads it yet), each with a
+  cursor, idempotent per page, rebuildable from zero.
+- **Search covers every file** (`search_docs`); today it is only titles and abstracts (`papers.search`).
+- **Scaling seams, built now:** all object access through `GitRepo`, everything keyed by `paper_id`, derived data via
+  the outbox, search behind `server/search.ts`, types and grants as data. Queues, sharding, packs in R2 and an
+  external search engine wait until something hurts (§4.11 says when).
+- **Postgres 19** (GA 2026-11-19): note the volume mount moves to `/var/lib/postgresql`.
+
+Order: Phase 0 Postgres 19, 1 object store interface, 2 outbox consumers, 3 file types and the review layout, 4
+search, 5 the OpenReview importer as a bot with the backfill of ~126k notes.
+
 ## Preview and PDFs inside VS Code, desktop extension (2026-11-15, merged into `main` and deployed at dd7eb99)
 
 All in `docs/web-editor.md` ("VS Code for the Web", "VS Code on the desktop"); the short of it:
@@ -136,7 +160,7 @@ All in `docs/web-editor.md` ("VS Code for the Web", "VS Code on the desktop"); t
   Prettier and refuses on errors (`precommit.ts`).
 - Rebuilding the editor (`npm run editor:build`) replaces `public/editor/` under a running `next dev`, which left
   its watcher reloading every page in a loop; restart the dev server afterwards (`systemctl --user restart
-  papertrail-dev`, the dev server's unit now, log `data/dev-server.log`).
+papertrail-dev`, the dev server's unit now, log `data/dev-server.log`).
 - Deployed from a clean worktree (`docker compose -p potentialpaper …`), as the shared checkout held another
   session's uncommitted work, which `COPY . .` would have shipped.
 - Another session was building comments/mentions in the same checkout at the same time (uncommitted
@@ -217,11 +241,16 @@ Also revisit the CSP now that user-written content ships: scripts currently allo
   module more than once. It overrides the generated file.
 - Scripts allow `'unsafe-inline'` in the CSP, because nonces would rule out caching pages at the edge.
 - OpenAlex abstracts are shown only under an open license. arXiv and OpenReview metadata is CC0.
+- The data model of 2026-11-16 (section above, `handoffs/data-model.md`): imported data lives in the repo under a
+  bot's own folder, file types are the bot/plugin contract, bots are GitHub-App-like, derived data comes from outbox
+  consumers, search covers every file, scaling goes through the five seams, Postgres 19.
 
 ## Stale docs
 
-The user stopped an earlier update of `DESIGN.md` and `IMPLEMENTATION.md` without saying why, so ask before
-redoing it. They still describe a strict CSP, `node-diff3`, and `page_current` holding HTML. `README.md` doesn't exist.
+`DESIGN.md` was updated on 2026-11-16 for the data model (§3, §4.3, §4.4, §4.8–4.11, §10, §12), at the user's
+request. Its other parts and `IMPLEMENTATION.md` are partly stale: they still describe a strict CSP, `node-diff3`,
+and `page_current` holding HTML. The user once stopped a broader update without saying why, so ask before redoing
+the rest. `README.md` doesn't exist.
 
 ## How to work with this user
 
