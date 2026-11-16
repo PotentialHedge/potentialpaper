@@ -17,7 +17,7 @@ import { savePaper } from '@/server/papers';
 import { reviewsConsumer } from '@/server/review-projection';
 import { saveSiteSettings } from '@/server/settings';
 import { recomputeDueScopes, scopeHasScores, scopeStatsConsumer } from '@/server/scope-stats';
-import { syncVenuePages, VENUES_BOT } from '@/server/venue-pages';
+import { syncVenuePages, VENUES_BOT, venueScoreStats } from '@/server/venue-pages';
 import { api, closePool, ORIGIN, resetDatabase } from './helpers';
 
 /**
@@ -204,6 +204,20 @@ describe('scope statistics (A)', () => {
     );
     expect(await scopeHasScores(series.id)).toBe(true);
     expect(await scopeHasScores(edition.id)).toBe(true);
+
+    // The venue page's panel: quartiles and medians by outcome, without the values.
+    const panel = await venueScoreStats(edition.id);
+    expect(panel.map((f) => f.field)).toEqual(['rating', 'confidence']);
+    expect(panel[0]).toMatchObject({ count: 3, q1: 3, median: 6, q3: 7, hidden: false });
+    expect(panel[0].split.accepted).toMatchObject({ count: 1, median: 7 });
+    expect(panel[0].split.rejected).toMatchObject({ count: 1, median: 3 });
+    expect(panel[0].split.pending.counts.reduce((a, b) => a + b, 0)).toBe(1);
+    expect((await venueScoreStats(series.id)).map((f) => f.venue.id)).toEqual([
+      ICLR_2027,
+      ICLR_2027,
+      ICLR_2026,
+      ICLR_2026,
+    ]);
 
     const missing = await api('GET', `/pages/${enc('venue:iclr/2027')}/scores/${enc(ICLR_2027)}/soundness`);
     expect(missing.status).toBe(404);

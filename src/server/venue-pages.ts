@@ -2,6 +2,7 @@ import { and, asc, eq, like, sql } from 'drizzle-orm';
 import { getDb, type Database } from '@/db';
 import { pageCurrent, pages, venues } from '@/db/schema';
 import { keyedPagePath, type VenueFile, venueFileSchema } from '@/lib/kinds';
+import { STAT_OUTCOMES, type StatOutcome } from '@/lib/scope-stats';
 import type { SubmissionStatus } from '@/lib/submissions';
 import { type VenuePlace, venuePlace } from '@/lib/venues';
 import { ensureBot } from './bots';
@@ -9,6 +10,7 @@ import { IMPORT_RATE_LIMIT } from './import-reviews';
 import { type Actor, commitPage, createPage } from './pages/commit';
 import type { PageRow } from './pages/kinds';
 import { pageSummaries } from './plugins/pages';
+import { venueStatsHideUntil } from './settings';
 
 /**
  * Venue pages (`handoffs/pages.md` Phase 2): the `venues` bot, which makes a series' and an edition's pages from the
@@ -22,8 +24,8 @@ import { pageSummaries } from './plugins/pages';
  * (`page-members.ts`). It never takes anything away and never rewrites what someone else wrote: on a page whose
  * `venue.json` is there, it only adds a missing source. Its organisers and admins own the rest.
  *
- * **Score statistics** (`handoffs/plugins.md` Phase 4, `scope_stats`) aren't built yet; `venueScoreStats` is their
- * place, and the edition's page shows them once it returns something.
+ * **Score statistics** come from `scope_stats` (`handoffs/plugins.md` Phase 4, `server/scope-stats.ts`); `venueScoreStats`
+ * reads them for the page's `scores` panel.
  */
 
 export const VENUES_BOT = 'venues';
@@ -318,14 +320,88 @@ export async function venueDecisions(
   return rows.map((row) => ({ decision: row.decision, count: row.n }));
 }
 
+/** One score field at one venue, as the venue page's `scores` panel shows it. */
+export interface VenueScoreField {
+  venue: { id: string; name: string };
+  field: string;
+  label: string;
+  count: number;
+  min: number | null;
+  max: number | null;
+  /** The middle half and the median of the submissions' means. */
+  q1: number | null;
+  median: number | null;
+  q3: number | null;
+  /** Bins per outcome, all over the same range (`bins`' `lo`/`hi`/`width`), so they stack. */
+  bins: { lo: number; hi: number; width: number; counts: number[] };
+  split: Record<StatOutcome, { count: number; counts: number[]; median: number | null }>;
+  /** Withheld by `plugins.venueStats.hideUntil` until the venue's decisions are out: no numbers but the count. */
+  hidden: boolean;
+}
+
 /**
- * A venue's score statistics: per score field, its submissions' means, bins and the split by status
- * (`handoffs/plugins.md` Phase 4's `scope_stats`). Not built yet; until it is, there are none and the page shows no
- * panel for them. When `scope_stats` lands, read it here and add a `scores` panel to `lib/panels.ts`' venue slots.
+ * A venue's score statistics (`scope_stats`, `server/scope-stats.ts`), rolled up from its editions: per venue its
+ * papers were submitted to and per score field, the bins by outcome and the quartiles, without the values themselves,
+ * which the page doesn't need. Empty until the statistics are computed.
  */
-export async function venueScoreStats(pageId: string): Promise<null> {
-  void pageId;
-  return null;
+export async function venueScoreStats(pageId: string, database: Database = getDb()): Promise<VenueScoreField[]> {
+  const hideUntil = await venueStatsHideUntil();
+  const at = (q: number) => sql.raw(`values[greatest(1, ceil(count * ${q})::int)]`);
+  const { rows } = await database.execute<{
+    venue_id: string;
+    venue_name: string | null;
+    field: string;
+    label: string;
+    count: number;
+    min: number | null;
+    max: number | null;
+    q1: number | null;
+    median: number | null;
+    q3: number | null;
+    bins: VenueScoreField['bins'];
+    split: Record<string, { count: number; counts: number[]; median: number | null }>;
+    decisions_out: boolean;
+  }>(sql`
+    select st.venue_id, v.name as venue_name, st.field, st.label, st.count, st.min, st.max,
+           ${at(0.25)} as q1, ${at(0.5)} as median, ${at(0.75)} as q3, st.bins, st.decisions_out,
+           (select jsonb_object_agg(g.key, jsonb_build_object(
+                     'count', g.value -> 'count',
+                     'counts', g.value -> 'bins' -> 'counts',
+                     'median', g.value -> 'values' -> greatest(0, ceil((g.value ->> 'count')::int * 0.5)::int - 1)))
+              from jsonb_each(st.by_status) g) as split
+      from scope_stats st
+      left join venues v on v.id = st.venue_id
+     where st.scope_page_id = ${pageId}
+     order by max(st.count) over (partition by st.venue_id) desc, st.venue_id, st.position
+  `);
+  return rows.map((row) => {
+    const hidden = hideUntil === 'decisions' && !row.decisions_out;
+    const zero = row.bins.counts.map(() => 0);
+    return {
+      venue: { id: row.venue_id, name: row.venue_name ?? row.venue_id },
+      field: row.field,
+      label: row.label,
+      count: row.count,
+      min: row.min,
+      max: row.max,
+      q1: hidden ? null : row.q1,
+      median: hidden ? null : row.median,
+      q3: hidden ? null : row.q3,
+      bins: hidden ? { ...row.bins, counts: zero } : row.bins,
+      split: Object.fromEntries(
+        STAT_OUTCOMES.map((outcome) => {
+          const group = row.split?.[outcome];
+          return [
+            outcome,
+            hidden || !group
+              ? { count: 0, counts: zero, median: null }
+              : { count: Number(group.count), counts: group.counts, median: group.median ?? null },
+          ];
+        }),
+      ) as VenueScoreField['split'],
+      hidden,
+    };
+  });
 }
 
 export function isVenueStatus(value: string): value is VenueStatus {

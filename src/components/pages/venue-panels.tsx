@@ -1,12 +1,14 @@
 import { ui } from '@/components/ui';
 import { formatIdentifier, keyedPagePath, type VenueFile } from '@/lib/kinds';
-import { STATUS_LABELS } from '@/lib/submissions';
+import type { StatOutcome } from '@/lib/scope-stats';
+import { formatScore, STATUS_LABELS } from '@/lib/submissions';
 import { sourceTitle, sourceUrl } from '@/lib/venues';
 import {
   presentVenuePapers,
   type StatusCounts,
   venueChildren,
   venueDecisions,
+  type VenueScoreField,
   venueScoreStats,
   venueSiblings,
   venueStatusCounts,
@@ -169,22 +171,153 @@ export function VenueOrganizers({ pageKey: key, ownersHtml }: KindPanelProps) {
   );
 }
 
-/**
- * The venue's submissions by status, rolled up from its editions, with filters. Score statistics join here once
- * `scope_stats` exists (`handoffs/plugins.md` Phase 4, `venueScoreStats`).
- */
+/** The venue's submissions by status, rolled up from its editions, with filters. */
 export async function VenuePapers({ kind, pageKey: key, pageId }: KindPanelProps) {
   const identifier = formatIdentifier({ kind, key });
-  const [initial, counts, decisions, scores] = await Promise.all([
+  const [initial, counts, decisions] = await Promise.all([
     presentVenuePapers(pageId),
     venueStatusCounts(pageId),
     venueDecisions(pageId),
-    venueScoreStats(pageId),
   ]);
+  return <VenuePapersList identifier={identifier} initial={initial} counts={counts} decisions={decisions} />;
+}
+
+/** Outcomes as the figure stacks them, bottom up, with their colours and words. */
+const OUTCOMES: { outcome: StatOutcome; label: string; colour: string }[] = [
+  { outcome: 'accepted', label: 'Accepted', colour: 'bg-up' },
+  { outcome: 'rejected', label: 'Rejected', colour: 'bg-down/70' },
+  { outcome: 'withdrawn', label: 'Withdrawn', colour: 'bg-faint/60' },
+  { outcome: 'pending', label: 'No decision yet', colour: 'bg-rule-strong' },
+];
+
+const score = (value: number | null) => (value === null ? '–' : formatScore(Math.round(value * 100) / 100));
+
+/** One field's means as a histogram, each bar stacked by outcome. */
+function ScoreHistogram({ field }: { field: VenueScoreField }) {
+  const { bins, split } = field;
+  const totals = bins.counts;
+  const peak = Math.max(1, ...totals);
+  const shown = OUTCOMES.filter(({ outcome }) => split[outcome].count > 0);
+  const range = (i: number) => `${score(bins.lo + i * bins.width)} to ${score(bins.lo + (i + 1) * bins.width)}`;
+  const summary =
+    `${field.label} at ${field.venue.name}: ${field.count.toLocaleString('en')} submissions, median ${score(field.median)}` +
+    (shown.length > 1
+      ? `; ${shown.map(({ outcome, label }) => `${label.toLowerCase()} ${split[outcome].count}`).join(', ')}`
+      : '');
   return (
-    <>
-      {scores /* Phase 4's statistics render here, above the list, once there are any. */}
-      <VenuePapersList identifier={identifier} initial={initial} counts={counts} decisions={decisions} />
-    </>
+    <figure className="mt-3">
+      <div role="img" aria-label={summary} className="flex h-28 items-end gap-px border-b border-ink">
+        {totals.map((total, i) => (
+          <div
+            key={i}
+            title={`${range(i)}: ${total.toLocaleString('en')}`}
+            className="flex h-full min-w-0 flex-1 flex-col-reverse"
+          >
+            {OUTCOMES.map(({ outcome, colour }) => {
+              const n = split[outcome].counts[i] ?? 0;
+              return n > 0 ? <div key={outcome} className={colour} style={{ height: `${(n / peak) * 100}%` }} /> : null;
+            })}
+          </div>
+        ))}
+      </div>
+      <div className="mt-0.5 flex justify-between font-mono text-[11px] text-muted">
+        <span>{score(bins.lo)}</span>
+        <span>{score(bins.hi)}</span>
+      </div>
+      <figcaption className={ui.caption}>
+        {field.label}: each submission&apos;s mean over its reviews
+        {shown.length > 1 && (
+          <>
+            {' '}
+            ·{' '}
+            {shown.map(({ outcome, label, colour }, i) => (
+              <span key={outcome} className="whitespace-nowrap">
+                {i > 0 && ' '}
+                <span aria-hidden className={`mr-1 inline-block h-2 w-2 align-middle ${colour}`} />
+                {label} ({split[outcome].count.toLocaleString('en')})
+              </span>
+            ))}
+          </>
+        )}
+      </figcaption>
+    </figure>
+  );
+}
+
+/**
+ * The venue's score statistics (`scope_stats`, `handoffs/plugins.md` Phase 4): per venue its papers were submitted to
+ * (several on a series), the first score field (usually the overall rating) as a histogram split by outcome, and every
+ * score field's quartiles, with the medians of accepted and rejected submissions once decisions are out. Plugins get
+ * the same numbers from `scope.scores`.
+ */
+export async function VenueScores({ pageId }: KindPanelProps) {
+  const fields = await venueScoreStats(pageId);
+  if (fields.length === 0) return null;
+  const byVenue = new Map<string, VenueScoreField[]>();
+  for (const field of fields) byVenue.set(field.venue.id, [...(byVenue.get(field.venue.id) ?? []), field]);
+  const several = byVenue.size > 1;
+  return (
+    <section id="scores">
+      <h2 className={ui.groupHeading}>Review scores</h2>
+      {[...byVenue.values()].map((list) => {
+        const [first] = list;
+        const decided = list.some((f) => f.split.accepted.count + f.split.rejected.count > 0);
+        return (
+          <div key={first.venue.id} className={several ? 'mt-5' : undefined}>
+            {several && <h3 className={ui.sectionHeading}>{first.venue.name}</h3>}
+            {first.hidden ? (
+              <p className={ui.empty}>
+                {first.count.toLocaleString('en')} submissions have scores. They are shown once the venue&apos;s
+                decisions are out.
+              </p>
+            ) : (
+              <>
+                <ScoreHistogram field={first} />
+                <div className={ui.tableScroll}>
+                  <table className={ui.table}>
+                    <thead>
+                      <tr>
+                        <th className={ui.th()}>Score</th>
+                        <th className={ui.th(true)}>Submissions</th>
+                        <th className={ui.th(true)}>Median</th>
+                        <th className={ui.th(true)}>Middle half</th>
+                        {decided && <th className={ui.th(true)}>Accepted</th>}
+                        {decided && <th className={ui.th(true)}>Rejected</th>}
+                      </tr>
+                    </thead>
+                    <tbody className="font-sans text-sm">
+                      {list.map((f) => (
+                        <tr key={f.field}>
+                          <td className={ui.td}>
+                            {f.label}
+                            {f.min !== null && f.max !== null && (
+                              <span className="text-muted">
+                                {' '}
+                                ({score(f.min)}–{score(f.max)})
+                              </span>
+                            )}
+                          </td>
+                          <td className={`${ui.td} ${ui.num}`}>{f.count.toLocaleString('en')}</td>
+                          <td className={`${ui.td} ${ui.num}`}>{score(f.median)}</td>
+                          <td className={`${ui.td} ${ui.num}`}>
+                            {score(f.q1)} to {score(f.q3)}
+                          </td>
+                          {decided && <td className={`${ui.td} ${ui.num}`}>{score(f.split.accepted.median)}</td>}
+                          {decided && <td className={`${ui.td} ${ui.num}`}>{score(f.split.rejected.median)}</td>}
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              </>
+            )}
+          </div>
+        );
+      })}
+      <p className={ui.fine}>
+        Each submission&apos;s mean over its public reviews. Medians by outcome are of the means. Reviews are
+        OpenReview&apos;s, CC BY 4.0.
+      </p>
+    </section>
   );
 }

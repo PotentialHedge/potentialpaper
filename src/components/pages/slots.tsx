@@ -7,7 +7,7 @@ import { slotPanels } from '@/lib/panels';
 import type { PageLink } from '@/server/page-links';
 import type { ScopePaper } from '@/server/page-members';
 import { LinksBox } from './LinkLists';
-import { VenueAbout, VenueEditions, VenueOrganizers, VenuePapers } from './venue-panels';
+import { VenueAbout, VenueEditions, VenueOrganizers, VenuePapers, VenueScores } from './venue-panels';
 
 /**
  * The panels of the kinds of page other than a paper (`lib/kinds.ts`), by id in `lib/panels.ts`, rendered into a
@@ -130,12 +130,16 @@ const PANELS: Record<string, ComponentType<KindPanelProps>> = {
 /** A user page's `about` is its owners' part: the person's own words. */
 const USER_PANELS: Record<string, ComponentType<KindPanelProps>> = { ...PANELS, about: OwnersSection };
 
-/** A venue's own panels (`venue-panels.tsx`): its editions, its organisers' claim, its submissions by status. */
+/**
+ * A venue's own panels (`venue-panels.tsx`): its editions, its organisers' claim, its review scores, its submissions by
+ * status.
+ */
 const VENUE_PANELS: Record<string, ComponentType<KindPanelProps>> = {
   ...PANELS,
   about: VenueAbout,
   editions: VenueEditions,
   organizers: VenueOrganizers,
+  scores: VenueScores,
   papers: VenuePapers,
 };
 
