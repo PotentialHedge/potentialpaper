@@ -1,6 +1,7 @@
 'use client';
 
 import { type ReactNode, useState } from 'react';
+import { usePluginPanels } from '@/components/plugins/PluginPanel';
 import { ui } from '@/components/ui';
 import { arrangePanels, type PanelKind } from '@/lib/panels';
 import { useSetting } from '@/lib/settings/client';
@@ -12,13 +13,17 @@ import { useSetting } from '@/lib/settings/client';
  */
 export function ArrangedTabs({
   kind,
-  panels,
+  slot,
+  panels: builtIn,
 }: {
   kind: PanelKind;
+  /** The slot's full name (`venue.tabs`), for plugins' panels, which join as tabs of their own. */
+  slot?: string;
   panels: { id: string; title: string; node: ReactNode }[];
 }) {
   const hidden = useSetting<string[]>(`${kind}.panels.hidden`);
   const order = useSetting<string[]>(`${kind}.panels.order`);
+  const panels = [...builtIn, ...usePluginPanels(slot)];
   const ids = arrangePanels(
     panels.map((p) => p.id),
     hidden,

@@ -11,6 +11,8 @@ import { linksFrom, linksTo } from '@/server/page-links';
 import { scopeMemberCount, scopePapers } from '@/server/page-members';
 import { cloneAddresses } from '@/server/pages/clone';
 import { findKeyedPage } from '@/server/pages/kinds';
+import { PluginPageProvider } from '@/components/plugins/PluginPage';
+import { pageFacts, pageSummaries, scopesOfPage } from '@/server/plugins/pages';
 import { KindSlot } from './slots';
 
 /**
@@ -52,12 +54,16 @@ export async function KeyedPageRoute({ kind, segments }: { kind: KeyedKind; segm
   if (!found) notFound();
   const { page, key, current } = found;
   const scope = KINDS[kind].scope;
-  const [from, to, count, list] = await Promise.all([
+  const [from, to, count, list, summaries, scopes, facts] = await Promise.all([
     linksFrom(page.id),
     linksTo(page.id),
     scope ? scopeMemberCount(page.id) : Promise.resolve(0),
     scope ? scopePapers(page.id) : Promise.resolve([]),
+    pageSummaries([page.id]),
+    scopesOfPage(page),
+    pageFacts(page),
   ]);
+  const summary = summaries.get(page.id)!;
   const props = {
     kind,
     key,
@@ -73,25 +79,27 @@ export async function KeyedPageRoute({ kind, segments }: { kind: KeyedKind; segm
   const clone = cloneAddresses({ kind, key });
   return (
     <main className={ui.paperPage}>
-      <article>
-        <p className={`${ui.fine} mt-6 text-center font-sans`}>{KINDS[kind].title}</p>
-        <h1 className="mt-1 text-center text-[26px] leading-tight font-normal">{props.name}</h1>
-        <p className={`${ui.fine} text-center font-sans`}>
-          <span className={ui.mono}>
-            {kind}:{key}
-          </span>{' '}
-          · clone with <span className={ui.mono}>git clone {clone.https}</span>
-        </p>
-        <div className="mt-5 grid grid-cols-[minmax(0,1fr)_300px] items-start gap-8 narrow:grid-cols-1">
-          <div>
-            <KindSlot slot="main" {...props} />
+      <PluginPageProvider data={{ kind, page: summary, scopes, facts }}>
+        <article>
+          <p className={`${ui.fine} mt-6 text-center font-sans`}>{KINDS[kind].title}</p>
+          <h1 className="mt-1 text-center text-[26px] leading-tight font-normal">{props.name}</h1>
+          <p className={`${ui.fine} text-center font-sans`}>
+            <span className={ui.mono}>
+              {kind}:{key}
+            </span>{' '}
+            · clone with <span className={ui.mono}>git clone {clone.https}</span>
+          </p>
+          <div className="mt-5 grid grid-cols-[minmax(0,1fr)_300px] items-start gap-8 narrow:grid-cols-1">
+            <div>
+              <KindSlot slot="main" {...props} />
+            </div>
+            <aside className="space-y-3">
+              <KindSlot slot="aside" {...props} />
+            </aside>
           </div>
-          <aside className="space-y-3">
-            <KindSlot slot="aside" {...props} />
-          </aside>
-        </div>
-        <KindSlot slot="tabs" {...props} />
-      </article>
+          <KindSlot slot="tabs" {...props} />
+        </article>
+      </PluginPageProvider>
     </main>
   );
 }

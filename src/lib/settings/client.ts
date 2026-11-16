@@ -9,8 +9,10 @@ import {
   parseSettings,
   resolveSettings,
   type ResolvedSettings,
+  setInSettings,
   type SettingsProblem,
 } from './document';
+import type { PluginSettings } from './spec';
 
 /**
  * settings.json in the browser. Signed in, the document is the account's (`/api/v1/me/settings`); signed out, it
@@ -37,6 +39,8 @@ export interface SettingsState {
   siteText: string;
   values: ResolvedSettings;
   problems: SettingsProblem[];
+  /** The settings the reader's installed plugins declare, which `values` and `problems` take into account. */
+  plugins: PluginSettings[];
 }
 
 const DEFAULTS: ResolvedSettings = resolveSettings({});
@@ -47,6 +51,7 @@ const SERVER_STATE: SettingsState = {
   siteText: EMPTY_SETTINGS,
   values: DEFAULTS,
   problems: [],
+  plugins: [],
 };
 
 let state: SettingsState | null = null;
@@ -106,6 +111,7 @@ interface MySettingsBody {
   text: string;
   values: ResolvedSettings;
   problems: SettingsProblem[];
+  plugins: PluginSettings[];
 }
 
 async function fetchJson<T>(url: string): Promise<{ status: number; body: T | null }> {
@@ -118,20 +124,23 @@ export function load(): Promise<void> {
   loading ??= (async () => {
     try {
       const me = await fetchJson<MySettingsBody>('/api/v1/me/settings');
-      const site = await fetchJson<{ text: string }>('/api/v1/settings');
+      const site = await fetchJson<{ text: string; plugins: PluginSettings[] }>('/api/v1/settings');
       const siteText = site.body?.text ?? EMPTY_SETTINGS;
       if (me.body) {
         update({ loaded: true, signedIn: true, siteText, ...me.body });
         return;
       }
       const text = lsGet(LOCAL_SETTINGS_KEY) ?? EMPTY_SETTINGS;
+      // Signed out, the site's default plugins are the installed ones.
+      const plugins = site.body?.plugins ?? [];
       update({
         loaded: true,
         signedIn: false,
         text,
         siteText,
-        values: resolveSettings({ site: parseSettings(siteText), user: parseSettings(text) }),
-        problems: checkSettings(text),
+        values: resolveSettings({ site: parseSettings(siteText), user: parseSettings(text) }, plugins),
+        problems: checkSettings(text, plugins),
+        plugins,
       });
     } catch {
       // Offline or the API is down: keep what we have.
@@ -163,14 +172,14 @@ export class SettingsError extends Error {
 export async function saveSettings(text: string): Promise<SettingsProblem[]> {
   const s = current();
   if (!s.signedIn) {
-    const problems = checkSettings(text);
+    const problems = checkSettings(text, s.plugins);
     const errors = problems.filter((p) => p.severity === 'error');
     if (errors.length) throw new SettingsError(errors.map(formatProblem).join('\n'), problems);
     lsSet(LOCAL_SETTINGS_KEY, text);
     update({
       ...s,
       text,
-      values: resolveSettings({ site: parseSettings(s.siteText), user: parseSettings(text) }),
+      values: resolveSettings({ site: parseSettings(s.siteText), user: parseSettings(text) }, s.plugins),
       problems,
     });
     return problems;
@@ -187,6 +196,25 @@ export async function saveSettings(text: string): Promise<SettingsProblem[]> {
   }
   update({ ...s, ...(body as MySettingsBody), signedIn: true });
   return (body as MySettingsBody).problems;
+}
+
+/**
+ * Set one key of the reader's settings.json (`undefined` removes it), keeping the rest of the file as written: what a
+ * plugin's `settings.set` does.
+ */
+export async function setSetting(key: string | string[], value: unknown): Promise<void> {
+  if (!current().loaded) await load();
+  await saveSettings(setInSettings(current().text, key, value));
+}
+
+/** The current state, outside React. */
+export function settingsSnapshot(): SettingsState {
+  return current();
+}
+
+/** Be told when the settings change, outside React. */
+export function subscribeSettings(listener: () => void): () => void {
+  return subscribe(listener) as () => void;
 }
 
 /** A signed-out reader's file still in this browser; `null` when there is none worth importing. */

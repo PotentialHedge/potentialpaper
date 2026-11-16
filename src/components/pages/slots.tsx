@@ -146,6 +146,7 @@ export function KindSlot({ slot, ...props }: KindPanelProps & { slot: 'main' | '
     const Panel = (props.kind === 'user' ? USER_PANELS : PANELS)[id];
     return { id, title, node: <Panel {...props} /> };
   });
-  if (slot === 'tabs') return <ArrangedTabs kind={props.kind} panels={panels} />;
-  return <ArrangedPanels kind={props.kind} panels={panels} />;
+  const name = `${props.kind}.${slot}`;
+  if (slot === 'tabs') return <ArrangedTabs kind={props.kind} slot={name} panels={panels} />;
+  return <ArrangedPanels kind={props.kind} slot={name} panels={panels} />;
 }

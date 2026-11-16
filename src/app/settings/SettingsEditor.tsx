@@ -288,7 +288,8 @@ function RawEditor({
 }) {
   const area = useRef<HTMLTextAreaElement>(null);
   const [busy, setBusy] = useState(false);
-  const problems = useMemo(() => checkSettings(draft), [draft]);
+  const { plugins } = useSettings();
+  const problems = useMemo(() => checkSettings(draft, plugins), [draft, plugins]);
   const errors = problems.filter((p) => p.severity === 'error');
   const changed = draft !== saved;
 

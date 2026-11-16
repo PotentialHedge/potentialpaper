@@ -266,6 +266,7 @@ export function Slot({ name, ...props }: PanelProps & { name: PaperSlot }) {
     const Panel = PANELS[id];
     return { id, title, node: <Panel {...props} /> };
   });
-  if (name === 'paper.tabs') return <ArrangedTabs kind="paper" panels={panels} />;
-  return <ArrangedPanels kind="paper" panels={panels} />;
+  if (name === 'paper.tabs') return <ArrangedTabs kind="paper" slot={name} panels={panels} />;
+  // `paper.body` is the paper's own slot, not one plugins name (`main`, `aside`, `tab`), so none join it.
+  return <ArrangedPanels kind="paper" slot={name === 'paper.body' ? undefined : name} panels={panels} />;
 }
