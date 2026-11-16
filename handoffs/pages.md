@@ -10,7 +10,7 @@ and labs, and people. Each of these becomes a page of its own, built the same wa
 files with path rules, derived data from outbox consumers, named slots, and file types that bots write and plugins
 show. A plugin written once can then add a panel to a paper, a venue, a topic, an organisation or a person.
 
-## Decisions (proposed 2026-11-16)
+## Decisions (made with Benedict, 2026-11-16)
 
 - **One page model for every kind.**
   - Add a `pages(id uuid pk, kind, key, created_at)` table, unique on `(kind, key)`.
@@ -42,18 +42,28 @@ show. A plugin written once can then add a panel to a paper, a venue, a topic, a
 
 - **Shared layout.** Every kind has the same layout:
   - `.potentialpaper/` for the system;
-  - sections in `about/NN-*.md`, written like a paper's;
+  - sections in `NN-*.md` files, written like a paper's. They live in up to two folders. One is the owners' section,
+    where the kind has owners: `author/` on a paper, `organizers/` on a venue, `members/` on an org, `about/` on a
+    user page. The other is `community/`, on every kind except user pages;
   - `links.jsonl` (labeled links from this page, to pages of any kind);
   - the kind file;
   - `extensions/<id>/` for plugins' and bots' data;
   - bot folders granted by path, as `reviews/<source>/**` is today.
 - **Who may edit, as path rules per kind** (`rules.ts` gains the kind):
-  - Venue: any verified account edits `about/`. The kind file and `sources` are for maintainers and admins. A
-    maintainer is an organiser, granted by an admin as a bot grant is.
-  - Topic: any verified account, subject to page protection. `parents` changes are patrolled, as a page's
-    protection is.
-  - Org: verified members (an affiliation whose domain is one of the org's `domains`) and admins.
-  - User: the account itself, its agents' tokens, and admins.
+  - Venue: two sections, as a paper has.
+    - `community/`: any verified account, from the moment the page exists, subject to page protection.
+    - `organizers/`: confirmed organisers only. An organiser claims the venue as an author claims a paper,
+      confirmed by an admin for now (`claims:decide`). Until someone claims it, the section stays empty and the
+      page shows "Organise this venue? Claim it".
+    - The kind file and `sources`: the `venues` bot, organisers and admins.
+  - Topic: community-run. Any verified account can make a topic and edit any topic's `community/`, `topic.json`
+    (name, aliases, parents) and links, subject to page protection. Changes to `parents` show in the patrol feed,
+    since they move papers between roll-ups. Topics the `topics` bot seeds are ordinary topics: the community edits
+    them like any other, and the bot never overwrites a human edit (it writes only files it made, and stops at a
+    file a person has changed).
+  - Org: `members/` for verified members (an affiliation whose domain is one of the org's `domains`), `community/`
+    for any verified account, and the kind file for members and admins.
+  - User: only the account itself, its agents' tokens, and admins.
 - **Membership is links and projections.**
   - A paper is at a venue through its submissions: the projection that already exists.
   - A paper is in a topic through a labeled link `in-topic` from the paper to `topic:<slug>`. It can be asserted by
@@ -65,10 +75,13 @@ show. A plugin written once can then add a panel to a paper, a venue, a topic, a
     statistic and plugin query above the paper reads that table.
 - **Hierarchies roll up.** A topic's papers include its descendants'. A series' papers are its editions'. An org's
   papers are its children's. The consumer keeps the closure (`page_ancestors`), so a roll-up is one join.
-- **Identity on user pages follows DESIGN.md §5.3.** A handle's page never publicly connects that handle to an author
-  identity. It lists claimed papers only when the account shows its real name. Otherwise, claimed work appears only
-  under the author identity on each paper. This is the one place where adding a kind can leak something, so the
-  rule lives in the `user` kind's projection, not in its page component.
+- **Every account has a public page at `/u/<handle>`** (decided 2026-11-16). It is made with the account, so a
+  handle always resolves to a page. What it shows is the account's choice, through `profile.json` and the `user.*`
+  settings (`handoffs/plugins.md` Phase 1). Exactly which items there are, and their defaults, are decided when
+  Phase 3 is built. Until then the safe default holds: the page shows the handle, the `about/` section and
+  activity under the handle, and it never connects the handle to an author identity (DESIGN.md §5.3) unless the
+  account chooses to. Plugins see exactly what the public sees. This is the one place where adding a kind can leak
+  something, so the rule lives in the `user` kind's projection, not in its page component or in plugins.
 - **Search** indexes every kind. `kind:venue` and the other kinds become scopes, as `in:reviews` is.
 
 ## Phases (one agent each; update this file at the end of yours)
@@ -92,13 +105,16 @@ show. A plugin written once can then add a panel to a paper, a venue, a topic, a
   OpenReview import already knows (`venues` rows map to `sources`).
 - `/v/<series>`: editions over time. `/v/<series>/<edition>`: about, dates, papers (by status, with filters), and
   the score statistics (`handoffs/plugins.md`, Phase 4) once they exist.
-- Maintainer grants by script, as `bots:grant` does it.
+- `community/` is open from the start. `organizers/` comes with organiser claims, built on the author claim flow
+  (`server/claims.ts`), with a venue as the claimed page.
 
 ### Phase 3: user pages
 
-- `/u/<handle>`, which the profile page links to. `profile.json` holds what the account chose to show.
-- `about/` is free text; `links.jsonl` holds links to homepage, ORCID, Scholar and to their own work. The §5.3 rule
-  applies to every list on the page.
+- Every account gets `/u/<handle>`, made at sign-up and backfilled for existing accounts. The profile page links to
+  it. `profile.json` holds what the account chose to show.
+- `about/` is free text; `links.jsonl` holds links to homepage, ORCID, Scholar and to their own work.
+- Decide the items and defaults with Benedict before building them: real name, institution, claimed papers,
+  activity, comments. Each is a `user.show.*` setting that defaults to the §5.3-safe value.
 - Activity on the page (edits, links, comments under the handle) comes from the outbox. Bot commits are hidden, as
   in the feed.
 
@@ -111,10 +127,13 @@ show. A plugin written once can then add a panel to a paper, a venue, a topic, a
 
 ### Phase 5: topic pages
 
-- Seed top-level topics from the arXiv taxonomy, through a `topics` bot, with categories as `in-topic` links in
-  papers' `links.jsonl` under the bot's grant. OpenReview keywords are suggestions, not links, until someone confirms
-  them.
-- Making a topic, choosing parents, merging and renaming: a merge leaves a redirect, as paper merges do.
+- Seed topics from the arXiv taxonomy (archives as parents, categories as children: `cs` → `cs.LG`), through a
+  `topics` bot, with categories as `in-topic` links in papers' `links.jsonl` under the bot's grant. OpenReview
+  keywords are suggestions, not links, until someone confirms them.
+- Anyone verified can make a topic: a "New topic" form, and a topic made on the fly when a link names a slug that
+  doesn't exist yet, as a paper page is made on first visit. New topics can sit under arXiv ones or anywhere else.
+- Editing a topic (name, aliases, parents, sections, links), merging and renaming is open to the community, with page
+  protection and the patrol feed. A merge or rename leaves a redirect, as paper merges do.
 - Shows sub-topics, papers (rolled up), venues where the topic is common, and orgs active in it.
 
 ### Later (not this plan)
@@ -125,11 +144,7 @@ show. A plugin written once can then add a panel to a paper, a venue, a topic, a
 
 ## Open questions
 
-- User pages and author identities: should a person who shows their real name get one page that joins their handle
-  and their author identities, or should author identities get pages of their own (`/a/<id>`), which a user page
-  links to only by choice?
-- Who maintains a venue page before any organiser claims it: only the `venues` bot, or the community as for topics?
-- Is the arXiv taxonomy the right root for topics, or should topics start empty and grow from what people link?
+- Which items a user page can show, and their defaults (Phase 3).
 
 ## Log
 
