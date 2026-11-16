@@ -105,8 +105,10 @@ Code.
 
 The same extension works in VS Code on a computer (and VS Codium, Cursor…), on a `git clone` of a page: a folder
 with the page's `prek.toml` at its root. `npm run editor:extension` also packages it as
-`public/editor/potentialpaper.vsix`, served at `/editor/potentialpaper.vsix` and linked from the Edit dialog's
-"With git" part; install it with Extensions → ⋯ → Install from VSIX, or `code --install-extension`. The `.vsix` is
+`public/editor/potentialpaper.vsix`, served at `/editor/potentialpaper.vsix`. The Edit dialog offers it once someone
+copies the clone command: a `curl … && <editor> --install-extension` command for VS Code, Cursor, Windsurf or
+VSCodium, or the download, for Extensions → ⋯ → Install from VSIX. (It isn't on the Marketplace or Open VSX, so no
+`vscode:extension/…` link.) The `.vsix` is
 built without the proposed API the browser build turns on, and needs VS Code 1.90.
 
 There it has the preview, the PDF viewer, the JSON schemas, the section formatter and New Link; Source Control is
