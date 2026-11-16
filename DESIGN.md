@@ -126,8 +126,9 @@ A page's history is a **real git repository**: real blobs, trees and commits wit
 and a stock `git clone` works. The objects are rows in Postgres instead of files on disk.
 
 ```
-page_refs(paper_id pk, head oid)                       -- the only mutable part of a repo
-page_objects(paper_id, oid, type, body, pk(paper_id, oid))
+pages(id pk, kind, key, unique(kind, key))             -- every page of every kind; a paper's id is its paper id
+page_refs(page_id pk, head oid)                        -- the only mutable part of a repo
+page_objects(page_id, oid, type, body, pk(page_id, oid))
 ```
 
 Git's object format is simple enough that hashing and writing objects takes roughly 200 lines of
@@ -172,7 +173,7 @@ there are no hooks, and tools that expect files on disk need a clone first. Noth
 gives a normal repo.
 
 **Scale check.** At the measured 23 KB per page, one million actively edited pages come to about
-23 GB, which one Postgres handles comfortably. The primary key leads with `paper_id`, so hash
+23 GB, which one Postgres handles comfortably. The primary key leads with `page_id`, so hash
 partitioning remains available later.
 
 ### 4.2 A repo exists only after the first edit
@@ -205,6 +206,18 @@ reviews/<source>/<submission>/forms.json        the venue's forms for its notes
 reviews/<source>/<submission>/notes/<id>.json   one review, decision or comment
 extensions/<id>/...             reserved: data owned by one extension (section 10)
 ```
+
+**Pages of every kind** (decided 2026-11-16, built in `handoffs/pages.md` Phase 1). A paper is the first kind of
+page; venues (`/v/iclr/2027`), topics (`/t/<slug>`), organisations (`/o/<slug>`) and people (`/u/<handle>`) are
+pages built the same way, each a repo with the same shape: `.gitattributes`, `prek.toml` and
+`.potentialpaper/metadata.json` (`{ layout, kind, key }`) for the system; its parts' sections, the owners'
+(`author/` on a paper, `organizers/`, `members/`, `about/`) and `community/` (all but a user's); each part's
+`links.jsonl` (§8); its kind file (`venue.json`, `topic.json`, `org.json`, `profile.json`); and `extensions/`. The
+kind registry, `src/lib/kinds.ts`, declares each kind's address, kind file and schema, parts, slots
+(`<kind>.main`, `<kind>.aside`, `<kind>.tabs`), file types and plugin context keys, and `rules.ts` takes the
+page's kind. Every table of the page store is keyed by `page_id` (`pages(id, kind, key)`); a paper's page id is its
+paper id. Other kinds' pages are made by `createPage` (`npm run pages:create`), which starts their repo with the
+system's commit, and are cloned and pushed at `/git/<kind>/<key>.git` (or over SSH at their own address).
 
 **Sections** are named `NN-slug.md` or `NN-slug.html`: two digits, then a lower-case ASCII slug.
 They show in the order of their names, which is the order `ls` lists them in. A section's title is the
@@ -341,9 +354,9 @@ Details that have to be right:
 Reads never touch git objects.
 
 ```
-page_current(paper_id pk, head, author_html, community_html, resources jsonb, updated_at)
-page_revisions(paper_id, seq, oid, account_id, kind, summary, paths[], bytes_delta, at, pk(paper_id, seq))
-page_links(id, source_paper, target_paper, label, origin, note, ..., revision)
+page_current(page_id pk, head, author_html, community_html, ..., kind_file jsonb, name, updated_at)
+page_revisions(page_id, seq, oid, account_id, kind, summary, paths[], bytes_delta, at, pk(page_id, seq))
+page_links(page_id, path, link_id, target, target_kind, target_page_id, label, origin, note, ...)
 ```
 
 Markdown is rendered and sanitized **at commit time** and stored as HTML. Raw HTML in Markdown is
@@ -471,7 +484,7 @@ rebuilding a consumer's data is resetting its cursor to zero.
 
 Now: one worker process (a compose service, like `ingest`) reads `page_events` in order, woken by
 `LISTEN/NOTIFY` from the commit, with a poll as a fallback. Later, the same consumers can sit behind a
-queue (Kafka, NATS or a cloud queue), partitioned by `paper_id` so each page's events stay in order.
+queue (Kafka, NATS or a cloud queue), partitioned by `page_id` so each page's events stay in order.
 This is how GitHub's code search is fed: pushes go to Kafka, and crawlers turn them into documents.
 
 ### 4.10 Search
@@ -479,7 +492,7 @@ This is how GitHub's code search is fed: pushes go to Kafka, and crawlers turn t
 Decided 2026-11-16. Everything in a repo is searchable, whoever wrote it:
 
 ```
-search_docs(paper_id, path, blob_oid, kind, text, fields jsonb, tsv tsvector)   -- GIN on tsv
+search_docs(page_id, path, blob_oid, kind, text, fields jsonb, tsv tsvector)   -- GIN on tsv
 ```
 
 The search consumer (§4.9) writes it from each file's indexer (§4.8): a section's text, a review's
@@ -506,8 +519,8 @@ are `page_objects`.
 | Seam                                                                                                | Now                                   | Upgrade when it hurts                                                                                      |
 | --------------------------------------------------------------------------------------------------- | ------------------------------------- | ---------------------------------------------------------------------------------------------------------- |
 | **One object store interface** (`GitRepo`, `server/git/repo.ts`): nothing else reads `page_objects` | Object bodies are Postgres rows       | Bodies to R2 as packs, a pack manifest per repo in Postgres, refs stay in `page_refs` (~100 GB of objects) |
-| **The repo is the unit**: every table keyed by `paper_id` first, one repo per transaction           | One Postgres                          | Partition or shard by `paper_id` (e.g. Citus), several writers                                             |
-| **Derived data through the outbox** (§4.9)                                                          | One worker reading `page_events`      | A queue partitioned by `paper_id`                                                                          |
+| **The repo is the unit**: every table keyed by `page_id` first, one repo per transaction            | One Postgres                          | Partition or shard by `page_id` (e.g. Citus), several writers                                              |
+| **Derived data through the outbox** (§4.9)                                                          | One worker reading `page_events`      | A queue partitioned by `page_id`                                                                           |
 | **Search behind `server/search.ts`** (§4.10)                                                        | Postgres full text on `search_docs`   | An external search engine fed by the same consumer                                                         |
 | **File types and bot grants are data** (§4.8, §10)                                                  | A registry in code, grants in a table | Types from extensions                                                                                      |
 
@@ -668,7 +681,7 @@ below it.
 ### Format
 
 A link is a statement made **on the source page about the target**. It lives as one line in that
-page's `links.jsonl`, so it gets history, revert and blame with no extra machinery:
+page's `<part>/links.jsonl` (`community/links.jsonl`, `author/links.jsonl`), so it gets history, revert and blame with no extra machinery:
 
 ```json
 {
@@ -682,7 +695,8 @@ page's `links.jsonl`, so it gets history, revert and blame with no extra machine
 }
 ```
 
-- `to` is a public identifier, never an internal id, so a clone means something on its own.
+- `to` is a public identifier, never an internal id, so a clone means something on its own: a paper's
+  (`arxiv:…`, `doi:…`) or any other kind's (`venue:iclr/2027`, `topic:linear-attention`, `org:eth`, `user:alice`).
 - `page_links` is the query index, derived from git and rebuildable. It answers "what links here",
   which is shown on the target page as well as the source.
 - `origin` comes from the path: `author/` links show as author-asserted and `community/` links as
@@ -709,6 +723,13 @@ Labels are data, in a table, with a reading in each direction:
 | `concurrent-with`    | concurrent with    | (symmetric)       | discourse |                |               |
 | `same-idea-as`       | same idea as       | (symmetric)       | discourse |                |               |
 | `related`            | related to         | (symmetric)       | discourse |                |               |
+| `in-topic`           | is about           | covered by        | topic     |                |               |
+| `introduces-topic`   | introduces         | introduced by     | topic     |                |               |
+
+Built 2026-11-16 (`handoffs/pages.md` Phase 1): the vocabulary is `src/lib/labeled-links.ts`, where each label
+also says which kinds it goes from and to (the classic labels paper to paper, `related` between any kinds, the
+topic labels paper to topic). `page_links` is kept by the `links` outbox consumer (`server/page-links.ts`), not in
+the commit's transaction, and the paper page and every other kind show "Links" and "What links here".
 
 - Contested labels **require a note**, because that is where the content is.
 - **No `plagiarizes` or `scoops` label.** These allege misconduct against named people, and a

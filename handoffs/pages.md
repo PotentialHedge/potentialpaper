@@ -1,6 +1,6 @@
 # Handoff: pages above the paper (venues, topics, organisations, people)
 
-Status: plan, 2026-11-16. Nothing here is built yet. Read with `handoffs/plugins.md`: plugins work on every kind of
+Status: plan, 2026-11-16. Phase 1 (the page model) is built; see the Log. Read with `handoffs/plugins.md`: plugins work on every kind of
 page this plan adds.
 
 ## Goal
@@ -160,3 +160,86 @@ show. A plugin written once can then add a panel to a paper, a venue, a topic, a
 branch so this file stays current. Commit and push after each working step. At the end, add your entry below and
 launch the next phase's thread pointing at this file. Merging into `main` waits for Benedict.
 Phase 1 comes before `handoffs/plugins.md` Phase 2, so the plugin host is built for every kind from the start.
+
+### Phase 1: the page model (2026-11-16, branch `pages-phase-1`)
+
+Built:
+
+- **`pages(id, kind, key)`** (`drizzle/0032_pages.sql`), unique on `(kind, key)`. A paper's page id is its paper id
+  and its key is that id; its row is made and deleted with the paper by triggers (`papers_page_insert`,
+  `papers_page_delete`), so every writer of `papers` (imports, merges, on-demand creation) gets one, and the
+  migration made one per existing paper (not only per repo). `page_objects`, `page_refs`, `page_revisions`,
+  `page_current`, `page_events`, `search_docs` and `demo_pins` are renamed `paper_id` → `page_id` in place and
+  reference `pages`. `bot_grants` gains `kind` (default `paper`; key `(account, kind, pattern)`).
+- **The kind registry, `src/lib/kinds.ts`**: per kind its route, identifier form (`venue:iclr/2027`), kind file
+  and zod schema (`venue.json`: name, dates, url, sources; `topic.json`: name, aliases, broader; `org.json`: name,
+  domains, parents, ror; `profile.json`), parts (owners' and `community/`), slots, file types, plugin context
+  keys, whether it is a scope, and key depth. Also `parseIdentifier`/`formatIdentifier`, `pagePath`,
+  `parentsOf`, `sourcesOf`. `server/pages/schemas.ts` gained `labeledLink` (JSONL), `venue`, `topic`, `org` and
+  `profile` file types, sections in every kind's parts, and `kindsOfFileType`.
+- **Kind-aware writes**: `rules.ts` (`layoutProblem`, `pathDenied`, `contentProblem`, `grantProblem` take the
+  kind), `check.ts` (`rolesOf` reads the page's kind; `Roles.confirmedAuthor` is now `owner`), `commit.ts` (the
+  first commit's metadata per kind; `createPage(kind, key)` makes a page and starts its repo with the system's
+  commit), `projections.ts` (the owners' part into the `author_*` columns; `page_current.kind_file` and `.name`).
+  `npm run pages:create -- <kind> <key>` for admins.
+- **Clone and push** at `/git/<kind>/<key>.git` over HTTP, and over SSH at `<route>/<key>` or `<kind>/<key>`
+  (`clone.ts`'s `GitAddress.page`, `findRepo`, `pageClonePath`; `ssh-command.ts`). Pushes refresh the page's
+  address (`refreshPages`). Tested with stock git on a venue page (`tests/integration/kinds.test.ts`).
+- **Consumers declare kinds** (`Consumer.kinds`; `reviews` is paper-only). Two new consumers:
+  - `links` (`server/page-links.ts`): every part's `links.jsonl` into `page_links`; `linksFrom`/`linksTo` ("what
+    links here", by resolved page or any identifier the page answers to, so a target named before its page existed
+    is found). It refreshes the pages its links name.
+  - `members` (`server/page-members.ts`): `page_member_sources` (what each paper says it belongs to: submissions
+    as `<source>:<venue id>`, `in-topic`/`introduces-topic` links), `page_scope_names` (a scope's identifier and
+    `venue.json` `sources`), `page_parents`, and from those `page_members` and the closure `page_ancestors`.
+    `scopeMembers`, `scopeMemberCount`, `scopePapers` roll up by default.
+- **Labeled links** (`src/lib/labeled-links.ts`): DESIGN.md §8's vocabulary plus `in-topic` and
+  `introduces-topic`, each label with the kinds it may go from and to; checked per line at commit.
+- **Routes and slots per kind**: `/v/[...key]`, `/t/[slug]`, `/o/[...key]`, `/u/[handle]`
+  (`components/pages/page-route.tsx`, `slots.tsx`), each from `<kind>.main`, `<kind>.aside`, `<kind>.tabs`
+  (`ArrangedTabs`). Every kind's panels are in `lib/panels.ts`, so their `<kind>.panels.*` settings appear on
+  their own. The paper page gained `paper.tabs` and the `links` and `backlinks` panels.
+- DESIGN.md §4.1, §4.3, §4.5, §4.9–4.11 (now "keyed by `page_id` first") and §8 updated; IMPLEMENTATION.md notes it.
+
+Calls I made where the plan left room:
+
+- **`page_links` didn't exist** (labeled links, Milestone 4, weren't built), so this phase built the minimum:
+  the file type, the label table, the index and "what links here". No "add a link" form, stances or graph.
+- **`links.jsonl` lives in each part** (`community/links.jsonl`, `author/links.jsonl`, `about/links.jsonl`), not at
+  the top, because DESIGN.md §8 takes `origin` from the path and the path rules then need nothing new.
+- **`page_links` and membership are consumers**, not written in the commit's transaction (DESIGN.md §4.4 said
+  `page_links` was): `handoffs/data-model.md` decided only `page_current` is. They catch up in seconds.
+- **Membership is joined from both halves** (`page_member_sources` × `page_scope_names`) so it's the same whatever
+  page changes first and rebuilds identically. `page_ancestors` is recomputed whole on each scope's event (scopes are
+  few; cycles stop at depth 16 or when they return).
+- **Which tables were re-keyed**: those of the repo (objects, refs, revisions, current, events, search docs, demo
+  pins). Tables about papers as papers (`author_claims`, `submissions`, `comments`, `paper_follows`, agent posts) keep
+  `paper_id`. Comments and follows on other kinds come with their phases (follows are in "Later").
+- **Other kinds start with a system commit** (metadata, `.gitattributes`, `prek.toml`; no starter sections), so they
+  can be cloned and pushed at once; a paper still starts at its first edit.
+- **`related`**, DESIGN.md's existing label, is the topic-to-topic `related-to` of the plan.
+- **Owners outside papers**: a user page's owner is the account whose handle is the key; venue organisers and org
+  members are not owners yet (Phases 2 and 4), so only admins (and a venue/org bot granted the kind file) write
+  those parts. Grants: venues and orgs may grant their kind file; no bot writes topic or user pages.
+- **`profile.json` is `{}` only** until Phase 3 decides its items; a user page's name is always `@handle`.
+- **Search**: `search_docs` now indexes every kind's files, but `server/search.ts` still returns papers only;
+  `kind:` scopes come later.
+- **Pages of other kinds revalidate every 5 minutes** (papers: a day), since their backlinks and papers change with
+  other pages' commits; link targets are also refreshed by the `links` consumer.
+
+For later phases:
+
+- Phase 2: the `venues` bot needs `npm run bots:grant -- venues venue.json --kind venue --by <admin>`, then
+  `createPage('venue', …)` and a commit of `venue.json` with `sources`; membership follows. Organiser claims make
+  `owner` true in `check.ts`'s `keyedRoles`.
+- Phase 3: user pages are keyed by handle; a handle change has to move the key (and `user:` links).
+- The web editor, workspace API and history/diff pages are still paper-only; other kinds are edited by push.
+- No `GET /api/v1/pages/{identifier}` yet; plugins Phase 2 (`page.resolve`, `page.read`) is the place for it.
+- `prek.toml` changed (more JSON types, prettier on every kind's parts), so existing clones' copy is stale; a commit
+  that doesn't touch it is unaffected, and `npm run pages:add-starter` can rewrite it.
+
+Checks: typecheck, lint and `next build` pass. Unit tests: 347 pass (8 new in `tests/unit/kinds.test.ts`).
+Integration: 258 of 265 pass, 11 new (`kinds.test.ts`, `page-members.test.ts`); the 7 failures are the same as
+before this phase (six `pdf-ingest.test.ts` without poppler, one `follows.test.ts`). Run against this worktree's
+own database, `potentialpaper_test_pages1`. One fast-check merge property test (`page-git.test.ts`) failed once
+and passed on rerun; it touches nothing changed here.

@@ -68,6 +68,10 @@ Most of the risk is here, so it comes before the editor.
 - Grouped link display, stances, neighbourhood graph, `/graph`.
 - Citation import and the "How does this connect?" prompt.
 
+Built ahead of the rest of this milestone (2026-11-16, `handoffs/pages.md` Phase 1): `links.jsonl` in each part,
+the label table with `in-topic`, `page_links` and "what links here" on pages of every kind. The "add a link" form,
+grouped display, stances and the graph are still to come.
+
 ## 5. Authors
 
 - Claims: email in the paper, ORCID, co-author vouch, manual queue. Co-author notification and dispute.
@@ -105,6 +109,13 @@ Most of the risk is here, so it comes before the editor.
 - Planned in `handoffs/plugins.md`, brought forward. Built 2026-11-16 (its Phase 1): settings.json, layered
   defaults ← site ← user, with `/settings`, `GET`/`PUT /api/v1/me/settings` and `/schemas/settings.json`
   (DESIGN.md §10).
+
+## Pages above the paper
+
+Planned in `handoffs/pages.md`: venues, topics, organisations and people as pages of their own, built like a
+paper's. Phase 1 (the page model) is built: `pages`, the page store keyed by `page_id`, the kind registry
+(`lib/kinds.ts`), path rules, commits, clone and push per kind, `page_members` and `page_ancestors`, and generic
+routes and slots (`/v`, `/t`, `/o`, `/u`).
 
 ## Main risks
 
