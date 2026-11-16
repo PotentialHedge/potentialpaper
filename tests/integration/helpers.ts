@@ -36,6 +36,8 @@ import * as myMentions from '@/app/api/v1/me/mentions/route';
 import * as myPapers from '@/app/api/v1/me/papers/route';
 import * as myCoAuthors from '@/app/api/v1/me/papers/co-authors/route';
 import * as follows from '@/app/api/v1/follows/route';
+import * as mySettings from '@/app/api/v1/me/settings/route';
+import * as siteSettings from '@/app/api/v1/settings/route';
 import { getDb, getPool } from '@/db';
 import { clearDevOutbox, devOutbox } from '@/server/mail';
 
@@ -88,6 +90,8 @@ const ROUTES: [RegExp, any][] = [
   [/^\/me\/papers$/, myPapers],
   [/^\/me\/papers\/co-authors$/, myCoAuthors],
   [/^\/follows(\?.*)?$/, follows],
+  [/^\/me\/settings$/, mySettings],
+  [/^\/settings$/, siteSettings],
   [/^\/me\/password$/, password],
   [/^\/me\/affiliations$/, affiliations],
   [/^\/me\/affiliations\/(?<id>[^/]+)$/, affiliation],
@@ -118,7 +122,7 @@ export function commitFiles(
 export async function api(
   method: string,
   path: string,
-  opts: { cookie?: string; token?: string; body?: unknown; form?: FormData; origin?: string } = {},
+  opts: { cookie?: string; token?: string; body?: unknown; text?: string; form?: FormData; origin?: string } = {},
 ): Promise<ApiResult> {
   const headers: Record<string, string> = { origin: opts.origin ?? ORIGIN };
   if (opts.cookie) headers.cookie = opts.cookie;
@@ -127,7 +131,7 @@ export async function api(
   const request = new Request(new URL(`/api/v1${path}`, ORIGIN), {
     method,
     headers,
-    body: opts.form ?? (opts.body === undefined ? undefined : JSON.stringify(opts.body)),
+    body: opts.form ?? opts.text ?? (opts.body === undefined ? undefined : JSON.stringify(opts.body)),
   });
   for (const [pattern, module] of ROUTES) {
     const match = pattern.exec(path);

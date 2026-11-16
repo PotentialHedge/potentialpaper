@@ -655,3 +655,25 @@ export const MentionList = z.object({
   mentions: z.array(z.object({ comment: Comment, paper: z.object({ title: z.string(), path: z.string() }) })),
   nextCursor: z.string().nullable(),
 });
+
+/** One problem in a settings.json (`lib/settings/document.ts`). */
+export const SettingsProblem = z.object({
+  severity: z.enum(['error', 'warning']),
+  key: z.string().nullable(),
+  line: z.number().int().positive(),
+  message: z.string(),
+});
+
+/** `GET`/`PUT /me/settings`: the account's settings.json as written, and every setting's value. */
+export const MySettings = z.object({
+  text: z.string(),
+  values: z.record(z.string(), z.unknown()),
+  problems: z.array(SettingsProblem),
+  updatedAt: z.iso.datetime().nullable(),
+});
+
+/** `GET /settings`: the site layer and the values a reader who isn't signed in starts from. */
+export const SiteSettings = z.object({
+  text: z.string(),
+  values: z.record(z.string(), z.unknown()),
+});

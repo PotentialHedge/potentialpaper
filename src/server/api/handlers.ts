@@ -52,6 +52,8 @@ import { canonicalPaperId, paperPath, parsePaperId } from '@/lib/paper-ids';
 import { findPaper, lookupPaper } from '../papers';
 import { searchPapers } from '../search';
 import { siteUrl } from '../site';
+import { saveUserSettings, settingsFor, siteSettingsView, type SettingsView } from '../settings';
+import { MAX_SETTINGS_BYTES } from '@/lib/settings';
 import { ApiError } from './errors';
 import { parseBody, parseParam, parseQuery, respond, route, toIso, toIsoOrNull } from './http';
 import * as S from './schemas';
@@ -115,6 +117,35 @@ export const patchMe = route(async (req) => {
   const principal = await requireAuth(req);
   const updated = await updateProfile(principal.account, await parseBody(req, S.MePatch));
   return respond(S.Me, presentMe(updated), { principal });
+});
+
+function presentSettings(view: SettingsView) {
+  return { ...view, updatedAt: toIsoOrNull(view.updatedAt) };
+}
+
+/** The account's settings.json (DESIGN.md §10), as written, with every setting's resolved value. */
+export const getMySettings = route(async (req) => {
+  const principal = await requireAuth(req);
+  return respond(S.MySettings, presentSettings(await settingsFor(principal.account)), { principal });
+});
+
+/**
+ * Replace the account's settings.json. The body is the file itself (JSONC), whatever its content type. A 422 lists
+ * every error, one per line, each naming its key; unknown keys are kept, with a warning in `problems`.
+ */
+export const putMySettings = route(async (req) => {
+  const principal = await requireAuth(req);
+  const length = Number(req.headers.get('content-length') ?? 0);
+  if (length > MAX_SETTINGS_BYTES * 2) {
+    throw new ApiError(413, 'validation_error', `settings.json may be at most ${MAX_SETTINGS_BYTES / 1024} KB`);
+  }
+  const text = await req.text();
+  return respond(S.MySettings, presentSettings(await saveUserSettings(principal.account, text)), { principal });
+});
+
+/** The site layer of settings and the values it gives, for readers who aren't signed in. Public. */
+export const getSiteSettings = route(async () => {
+  return respond(S.SiteSettings, await siteSettingsView());
 });
 
 export const setPassword = route(async (req) => {
