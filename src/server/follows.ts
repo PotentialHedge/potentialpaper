@@ -4,6 +4,7 @@ import { user } from '@/db/auth-schema';
 import { accounts, commentMentions, comments, pageEvents, paperFollows } from '@/db/schema';
 import { aliasName } from '@/lib/aliases';
 import { renderCoAuthorMail, renderCommentMail, renderEditMail } from '@/lib/follow-mail';
+import { shownHandle } from '@/lib/profile';
 import { getComment } from './comments';
 import { sendMail } from './mail';
 import { summaries, type PaperSummary } from './my-papers';
@@ -163,7 +164,11 @@ export async function mailCommentFollowers(commentId: string, database: Database
   const base = siteUrl();
   const author = shown.comment.author;
   const from =
-    author.kind === 'alias' ? aliasName(author.alias) : author.kind === 'author' ? author.name : `@${author.handle}`;
+    author.kind === 'alias'
+      ? aliasName(author.alias)
+      : author.kind === 'author'
+        ? author.name
+        : `@${shownHandle(author.handle, author.bot)}`;
   const mail = renderCommentMail({
     from,
     title: shown.paper.title,

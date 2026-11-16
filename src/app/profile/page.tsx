@@ -3,6 +3,7 @@ import { headers } from 'next/headers';
 import { redirect } from 'next/navigation';
 import { SignOut } from '@/components/SignOut';
 import { ui } from '@/components/ui';
+import { shownHandle } from '@/lib/profile';
 import { authHref, VERIFY_EMAIL } from '@/lib/return-to';
 import { listAffiliations } from '@/server/affiliations';
 import { viewerFromHeaders } from '@/server/auth';
@@ -30,7 +31,7 @@ export default async function Profile() {
   ]);
   return (
     <main className={ui.page}>
-      <h1 className="mt-6 text-[26px] font-normal">@{account.handle}</h1>
+      <h1 className="mt-6 text-[26px] font-normal">@{shownHandle(account.handle, account.isBot)}</h1>
       <p className={`${ui.fine} mb-4 font-sans`}>
         Signed in as {viewer.email} · <SignOut className={ui.linkBtn} />
       </p>

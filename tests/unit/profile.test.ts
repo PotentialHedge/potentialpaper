@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import fc from 'fast-check';
-import { cleanHandleInput, handleProblem, HANDLE_PATTERN } from '@/lib/profile';
+import { cleanHandleInput, handleProblem, HANDLE_PATTERN, shownHandle } from '@/lib/profile';
 
 describe('handleProblem', () => {
   it('accepts ordinary handles, including pseudonyms', () => {
@@ -37,5 +37,12 @@ describe('cleanHandleInput', () => {
 
   it('only ever yields characters a handle may hold', () => {
     fc.assert(fc.property(fc.string({ unit: 'binary' }), (s) => /^[a-z0-9-]*$/.test(cleanHandleInput(s))));
+  });
+});
+
+describe('shownHandle', () => {
+  it('puts [bot] at the end of a bot’s handle, and leaves a person’s alone', () => {
+    expect(shownHandle('openreview', true)).toBe('openreview[bot]');
+    expect(shownHandle('ada', false)).toBe('ada');
   });
 });

@@ -5,6 +5,7 @@ import type { z } from 'zod';
 import { ui } from '@/components/ui';
 import { aliasName } from '@/lib/aliases';
 import { COMMENT_PAGE, MAX_COMMENT_LENGTH, REPLY_PAGE } from '@/lib/comments';
+import { shownHandle } from '@/lib/profile';
 import type { PaperId } from '@/lib/paper-ids';
 import { authHref } from '@/lib/return-to';
 import type * as S from '@/server/api/schemas';
@@ -266,7 +267,7 @@ function Thread({ c, tree }: { c: Comment; tree: Tree }) {
 function authorLabel(a: Comment['author']): string {
   if (a.kind === 'author') return a.name;
   if (a.kind === 'alias') return aliasName(a.alias);
-  return a.realName ?? `@${a.handle}`;
+  return a.realName ?? `@${shownHandle(a.handle, a.bot)}`;
 }
 
 /** The editor for a new comment, or with `parentId` a reply. */
@@ -400,8 +401,7 @@ function Byline({ author }: { author: Comment['author'] }) {
   return (
     <span>
       {author.realName && <span className="text-ink">{author.realName} </span>}
-      <span className={author.realName ? '' : 'text-ink'}>@{author.handle}</span>
-      {author.bot && <span className={ui.badge}>bot</span>}
+      <span className={author.realName ? '' : 'text-ink'}>@{shownHandle(author.handle, author.bot)}</span>
       {author.institutions.length > 0 && <span>, {author.institutions.join(', ')}</span>}
       {you}
     </span>

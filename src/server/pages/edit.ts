@@ -1,12 +1,13 @@
 import { eq, inArray } from 'drizzle-orm';
 import { getDb, type Database } from '@/db';
 import { accounts, commitIdentities } from '@/db/schema';
+import { shownHandle } from '@/lib/profile';
 import { claimNames } from '../claims';
 import { SYSTEM_AUTHOR_ID } from './git-objects';
 import { pageHistory, type PublicRevision } from './repo';
 
 export interface HistoryEntry extends PublicRevision {
-  /** Who made it: a handle, or `null` for the system or one of the paper's authors. */
+  /** Who made it: a handle (a bot's ends in `[bot]`), or `null` for the system or one of the paper's authors. */
   handle: string | null;
   /** One of the paper's confirmed authors, by the name on the paper: their handle never shows here. */
   authorName: string | null;
@@ -31,7 +32,7 @@ export async function historyWithHandles(
   }));
 }
 
-/** Handles by commit identity. Only the two columns cross: the account id stays in the join. */
+/** Handles by commit identity, as shown: a bot's ends in `[bot]`. Only the two columns cross: the account id stays in the join. */
 export async function handlesOf(
   authorIds: readonly string[],
   database: Database = getDb(),
@@ -39,9 +40,9 @@ export async function handlesOf(
   const ids = [...new Set(authorIds)].filter((id) => id !== SYSTEM_AUTHOR_ID && id.startsWith('u_'));
   if (ids.length === 0) return new Map();
   const rows = await database
-    .select({ id: commitIdentities.id, handle: accounts.handle })
+    .select({ id: commitIdentities.id, handle: accounts.handle, isBot: accounts.isBot })
     .from(commitIdentities)
     .innerJoin(accounts, eq(accounts.id, commitIdentities.accountId))
     .where(inArray(commitIdentities.id, ids));
-  return new Map(rows.map((row) => [row.id, row.handle]));
+  return new Map(rows.map((row) => [row.id, shownHandle(row.handle, row.isBot)]));
 }

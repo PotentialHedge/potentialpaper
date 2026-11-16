@@ -61,7 +61,7 @@ export function renderEditMail(m: EditMail): RenderedMail {
 }
 
 export interface CommentMail extends FollowNotes {
-  /** The commenter as the page shows them: a handle, an alias, or an author's name. */
+  /** The commenter as the page shows them: a handle (a bot's ends in `[bot]`), an alias, or an author's name. */
   from: string;
   title: string;
   /** As written: raw Markdown. */
