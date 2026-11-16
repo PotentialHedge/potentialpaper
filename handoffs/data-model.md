@@ -214,3 +214,44 @@ fields }`, the shape Phase 4's `search_docs` rows can take) and `render: { panel
   consumer). `slots.tsx` doesn't read `render` yet. Per-bot rate limits aren't built: a backfill must pass
   `rateLimit` to `commitPage`, since `COMMIT_RATE_LIMIT` (burst 30, 0.2/s) applies to bot accounts. Production
   needs migration `0027` on the next deploy.
+
+### Phase 4 (2026-11-16, branch `data-model-phase-4`)
+
+- **`search_docs`** (migration `0028_search_docs`): `(paper_id, path, n)` primary key, `blob_oid`, `kind`, `scope`
+  (`page` | `reviews`), `text`, `fields`, and `tsv` generated from `text` (GIN). Cascades with the paper.
+- **The `search` consumer** (`src/server/search-index.ts`, registered in `CONSUMERS`): lists the head's files, keeps
+  rows whose path still has the same blob id without reading the file, deletes rows of changed or vanished files,
+  and indexes the rest through `indexFile`. Empty blobs (the dozen starter sections) are never read. One advisory
+  lock per page. `reset` truncates the table, so `consumers:rebuild -- search` re-indexes everything (do that after
+  changing an indexer).
+- **Registry:** `PAGE_SCHEMAS` gains `section`, a `format: 'text'` entry (schema `z.string()`, pattern
+  `{author,community}/NN-slug.{md,html}`), whose indexer strips markup (`sectionText`) and records `part` and
+  `title`. Every indexed type now names its `scope`; `searchScopeOf(path)`. JSON-only consumers (the `/schemas/`
+  route, `write-page-schemas.ts`, `prek.toml`) go through `PAGE_SCHEMA_NAMES`, so nothing about them changed.
+  Versions' documents now carry `label` too.
+- **Query** (`lib/query.ts`): `in:paper` (default), `in:page`, `in:reviews`, `in:all` (aliases `review`, `pages`,
+  `title`, `abstract`…); several add up; a scope is not a term (doesn't count toward the 8) and applies to the whole
+  query. Unknown or negated scopes are dropped with an error. `positiveText(node)` collects the words to mark.
+- **Search** (`server/search.ts`): a text term matches titles/abstracts (`papers.search`) and/or a file in scope,
+  where all its words must be in one file. Negation, `OR` and field filters work as before. Relevance stays
+  `papers.search`'s rank when titles are searched, plus the best matching file's `ts_rank_cd` when files are, so a
+  files-only search ranks by them. The misspelled-title fallback only runs when titles are searched. Each hit has
+  `matches` (best 3: path, kind, label, `ts_headline` snippet with U+E000/U+E001 around matched words) and
+  `matchCount`; the API's `SearchResponse` includes both. The home page shows them under each row
+  (`components/paper/SearchMatches.tsx`), and the syntax help lists the scopes.
+- **Dev:** both databases migrated; the dev worker runs as the transient user unit `papertrail-worker` (log
+  `data/worker.log`, recipe in DEPLOY.md "Outbox consumers"); it indexed the dev DB's 2,010 events (2 sections, 7
+  versions; no reviews until Phase 5). Not kept across a reboot, like `papertrail-dev`.
+- **Tests:** `tests/unit/search-scopes.test.ts` (scopes, `positiveText`, the section type, snippets) and
+  `tests/integration/search-docs.test.ts` (indexing, edits and deletions, unchanged blobs not re-read, rebuild,
+  every scope, negation/OR/filters, no fuzzy fallback in files). Checks: lint, format, typecheck pass; 557 of 563
+  tests pass, the 6 failures being the known poppler ones.
+- **Changed from the plan / decided here:** a plain search (no `in:`) still looks only at titles and abstracts, so the
+  home page behaves as before and reviews don't flood it; files are searched on request. Easy to flip
+  (`DEFAULT_SCOPES` in `lib/query.ts`) if Benedict wants files in by default. `search_docs` has `scope` and `n`
+  beyond DESIGN.md's column list (one file may give several documents). Matches aren't links to the exact spot yet:
+  they name the file under the paper's row, which links to the paper.
+- **Left:** production needs migration `0028` and the `worker` service (`dc --profile tools up -d worker`), which
+  then replays every page's events into the index once. Score filters (`rating>=8`) are still "Later". With ~126k
+  notes after Phase 5, check `in:reviews` timing on the relevance sort (a correlated `max(ts_rank_cd)` per matching
+  paper); a `kind:` filter would be easy to add on the `kind` column. `slots.tsx` still doesn't read `render`.

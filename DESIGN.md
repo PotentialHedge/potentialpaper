@@ -485,6 +485,12 @@ form marks as scores. `papers.search` (title and abstract) stays for ranking pap
 remains the only way to query, so Postgres full text can later be swapped for OpenSearch or
 Meilisearch, fed by the same consumer, if it gets slow (tens of millions of documents).
 
+Built 2026-11-16 (Phase 4 of `handoffs/data-model.md`): the `search` consumer (`server/search-index.ts`) and
+scopes `in:paper` (titles and abstracts, the default, so a plain search is unchanged), `in:page` (sections, links,
+versions, the picture's words), `in:reviews` (submissions and notes) and `in:all`. The words of one term must be in
+one file; each hit lists its best few matching files with a snippet. `search_docs` also has `scope` and a per-file
+document number `n`; a file's blob id is checked before it is read again.
+
 ### 4.11 Scaling path
 
 Decided 2026-11-16: build for one server, with seams that let each part grow on its own. GitHub's Git
