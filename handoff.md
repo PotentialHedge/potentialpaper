@@ -81,6 +81,38 @@ Milestones 0, 1 and 2 are built, merged into `main` and deployed, and Milestone 
   ICLR 2027 submissions are anonymous, so almost none have emails (0 of the dev database's 500); recent arXiv
   first pages give at least one for 69%.
 
+## User content domain, editor fixes (2026-11-16, on `main`, deployed at afce06c)
+
+- **`ppusercontent.com`** (bought 2026-11-16) is the user content domain: demos at `<snapshot>.ppusercontent.com`,
+  the web editor's webviews at `<uuid>.ppusercontent.com` (VS Code's ids are 52-char base32 hashes, never 32 hex,
+  so they can't be mistaken for a demo). `CONTENT_ORIGIN` in `lib/demos.ts`; `proxy.ts` answers every subdomain
+  (a demo's files, the webview `pre/` pages with `webviewCsp`, else 404). Cloudflare zone, wildcard DNS, Origin CA
+  cert and Traefik file: DEPLOY.md, "User content". The webviews (preview panel, PDF viewer) now work in
+  production, so `potentialpaper.webviews` is always on and the host page's own side preview and its
+  show/hide button are gone (`EditorHost`, `PreviewHtml.tsx` deleted).
+- **Gotcha: `next.config.ts` headers are fixed at image build time**, when `APP_URL` isn't set, so anything naming
+  the site's origin (`siteUrl()`) must be sent at run time (`proxy.ts`, route handlers) instead. That is why a
+  webview's `frame-ancestors` comes from `proxy.ts`.
+- **Editor hang on a second visit (fixed, 7d81c15):** VS Code restored the last open editor and listed the folder
+  before the extension registered its file system, so both waited for `activate()` to finish, which awaited its
+  own `showTextDocument`: deadlock (empty "/", blank tab). `activate()` no longer awaits it and skips it when
+  editors are being restored; the file system waits for the first load (`FileSystem`'s `loaded`) and reports
+  paths new to the explorer as Created. Reproduced headless: Playwright from `~/.npm/_npx/e41f203b7505f1fb`,
+  dev server on :3007 behind a TCP forward from :3000 (the site's configured origin), a session row inserted
+  into the dev DB with a `better-auth.session_token` cookie signed by HMAC-SHA256 of `BETTER_AUTH_SECRET`.
+- **Open when this was written:**
+  - The first deploy's `pages:rebuild` (all ~42.6k pages, systemd unit `pp-deploy`, log in the session
+    scratchpad) was still running; it ends with an edge purge. Until it reaches it, the one page with a demo
+    (snapshot `23fb730f…`) still points at the old host. Check with
+    `select count(*) from page_current where community_html like '%papers-content%' or author_html like '%papers-content%'`
+    (0 when done). Then delete the `papers-content.potentialhedge.com` A record in the `potentialhedge.com` zone.
+    Next time, rebuild only the pages that need it: the full rebuild takes well over half an hour.
+  - In the dev preview panel, KaTeX's fonts failed to load (`net::ERR_FAILED` from the webview), so math may fall
+    back to another font. Not looked into.
+  - Public Suffix List entry for `ppusercontent.com` (TODO.md).
+  - In Safari, a stale VS Code: Develop → Empty Caches, plus clearing service workers and Cache Storage from
+    the console; the site's extension itself is `no-cache`.
+
 ## Direction: the repo is the data, bots write it, plugins show it (decided 2026-11-16, not built yet)
 
 Future work should follow this. The plan, in phases, is `handoffs/data-model.md`; the design is `DESIGN.md` §3,
