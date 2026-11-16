@@ -1,0 +1,223 @@
+# Handoff: settings.json, plugins from GitHub, data for plugins, and the score-standing plugin
+
+Status: plan, 2026-11-16. Nothing here is built yet.
+
+## Goal
+
+Make the site as extensible as we can safely make it. Anyone with a public GitHub repo can add panels to a paper's
+page, readers find those plugins and install them, and each reader's site and plugin preferences live in one
+`settings.json`, as in VS Code and Presio. The first plugin outside this repo is **score standing**, the acceptodds
+"where you stand" figure for review scores. It shows the histogram and the continuous curve, and it lives at
+`github.com/benedict-armstrong/potentialpaper-score-standing`.
+
+This is IMPLEMENTATION.md Milestone 8 (Extensions v0), brought forward, with DESIGN.md §10 as its design. Where this
+file and §10 differ, this file wins. Phase 1 updates §10 to match.
+
+Prior art to read before starting: Presio's plugin system (`gh api repos/PotentialHedge/presio/contents/<path>`):
+`shared/plugin/{manifest,protocol,sources,settings,refs}.ts`, `client/src/lib/plugins/{resolve,registry,discover}.ts`,
+`client/src/lib/plugins/host/*`, `client/src/lib/settings.ts`, `server/routes/plugins.ts`,
+`server/agent/content/plugins.md`. For the charts, see acceptodds (`~/projects/papermarket/platform`):
+`src/lib/distribution.ts`, `src/components/StandingChart.tsx`, `src/components/VenueStanding.tsx`,
+`src/server/venue-field.ts`, `src/server/field-snapshot.ts`.
+
+## Decisions (made with Benedict, 2026-11-16)
+
+- **One `settings.json` per account, layered as in VS Code.** The layers are defaults, then site settings, then the
+  user's. Defaults come from the core schema and from each installed plugin's `contributes.settings`. An admin sets
+  the site layer. The user layer is the account's document. Keys are dotted (`paper.panels.hidden`). Plugin keys are
+  namespaced by plugin id (`benedict-armstrong/score-standing.view`). The document holds only what differs from the
+  layer below it. Values are checked when read and never trusted when written, so a bad value reads as the default
+  rather than breaking the page. Settings are **preferences**. Remembered state, such as dismissed prompts or a
+  plugin's cache, stays out of the document, as VS Code keeps it out of its `settings.json`.
+- **Plugins load from GitHub, pinned to a commit.** A plugin is a public repo with a `potentialpaper-plugin.json`
+  manifest and built files committed to the repo. We never run a build. Installing resolves a tag or branch to a
+  SHA, and the server copies the files at that SHA once. This is the demos pipeline: `server/demos/github.ts`
+  (codeload tarball) and `tar.ts`, with R2 for storage.
+- **Each plugin runs on its own origin.** A plugin is served at `<plugin host>.ppusercontent.com/<sha>/…`, where
+  the host label is a stable hash of the plugin id. Its frame is `sandbox="allow-scripts allow-same-origin"`. The
+  same-origin flag is safe only because that origin is the plugin's own, on a different site from the app. It lets
+  a plugin keep its own IndexedDB cache across versions. The CSP comes from the manifest (see D below).
+- **The only bridge is a typed `postMessage` RPC.** Each call is checked against the permissions the user granted.
+  A plugin never touches the host's DOM or session. Plugins declare what they add (panels, settings, commands), and
+  the host draws it.
+- **Consent is not in settings.json.** The document lists installed plugins, and a hand-edited file can add one. A
+  grant row records which plugin id, at which SHA, received which permissions. A plugin with no matching grant shows
+  an approval prompt instead of running. New permissions in an update need consent again.
+- **Data for plugins comes three ways (A, B and D). Plugins never write state that other users share.**
+  - **A: aggregates the site computes.** A `venue_stats` outbox consumer keeps per-venue, per-score-field
+    statistics, rebuildable like every consumer (DESIGN.md §4.9). They are served by the REST API and by the RPC.
+  - **B: generic bulk reads.** A venue's submissions with their score vectors and decisions, with an ETag, for
+    plugins that want their own statistics. They cache it in their own origin's IndexedDB.
+  - **D: plugins with their own backend.** The manifest's `network` list goes into the plugin's CSP `connect-src`.
+    A backend can also be a bot (DESIGN.md §10) that reads the events API and commits files of a known type through
+    a grant.
+  - **Not C.** Shared state that clients can write can be poisoned by anyone. Shared derived state comes from the
+    site (A) or from the plugin's own backend (D). Per-user plugin storage is fine and comes in Phase 1.
+- **Score standing is external.** It lives in Benedict's GitHub, goes through discovery like anyone's, and gets no
+  host code of its own. If it needs something from the host, the host API grows for everyone.
+
+## Phases (one agent each; update this file at the end of yours)
+
+### Phase 1: settings.json
+
+- `user_settings(user_id pk, doc text, updated_at)`. Keep the **text** (JSONC, so comments and order survive), and
+  parse it when read. Signed-out readers use localStorage, offered for import when they sign in.
+- Site layer: `config/settings.json` in the repo, or a `site_settings` row, whichever deploys more simply. Admins
+  edit it by script.
+- `lib/settings/`: a core schema (zod, one entry per key with default and description) and resolution
+  (`defaults ← site ← user`), shared by server and browser. Port Presio's `SettingSpec` and
+  `sanitizeSettingValue` (`shared/plugin/settings.ts`) for plugin-declared settings.
+- `GET/PUT /api/v1/me/settings` returns the raw text and the resolved values. PUT validates and reports every problem,
+  each on one line naming its key, as Presio's manifest validator does. Unknown keys are kept, with a warning, so a
+  file can name a plugin's settings before that plugin is installed. Agents and scripts use the same route.
+- `/schemas/settings.json` is the JSON Schema of the core keys plus the requesting user's installed plugins' keys,
+  served the way `PAGE_SCHEMAS` are, so the editor can complete and validate.
+- `/settings` has a form generated from the schema, plus "Edit settings.json": a raw editor with schema validation.
+  Use the web editor's Monaco if it is cheap to embed. Otherwise use a plain editor with server validation. The page
+  also has Export and Import.
+- First core keys should be real ones: `paper.panels.hidden` and `paper.panels.order` (readers turning built-in
+  renderers off, DESIGN.md §4.8), `feed.showBots`, and `theme` if a theme switch exists by then. Don't invent
+  settings to fill the list.
+
+### Phase 2: the plugin host
+
+- **Manifest** (`lib/plugins/manifest.ts`, zod, JSON Schema at `/schemas/plugin-manifest.json`): `id`, `name`,
+  `version`, `apiVersion`, `main` (an HTML file), `permissions`, `network` (origins, https only), and `contributes`:
+  `paperPanels` (`{ id, title, slot, when? }`), `settings`, and `commands`. Unknown fields are warnings, not errors, so
+  a newer manifest still loads on an older host. The validator reports every problem in one pass.
+- **`when` conditions** (`paper.hasSubmissions`, `paper.hasScores`, `signedIn`) let the host decide whether to show a
+  panel at all, so a paper page doesn't start a frame per installed plugin. These are activation events, as in VS
+  Code.
+- **Sources and snapshots:** `github:<owner>/<repo>[/path][@ref]`, resolved to a SHA on the server with
+  `GITHUB_TOKEN`. Copy the files once into R2, keyed by SHA, reusing the demos code. Limits: total size, file count,
+  and a list of allowed extensions (the demos' list plus `png`, `woff2` and `wasm`). The manifest is validated when
+  the snapshot is taken.
+- **Serving** (`server/plugins/serve.ts`, beside `demos/serve.ts`):
+  - CSP `default-src 'self'`.
+  - `connect-src 'self' <network…>`.
+  - `frame-ancestors` the site.
+  - Immutable caching per SHA.
+- **Dev mode:** a source of `http://localhost:<port>/` runs unpinned, for that browser only. This is how a plugin
+  author works against `npm run dev`.
+- **The host** (`components/plugins/PluginFrame.tsx`):
+  - Frames go in the paper page's slots (`components/paper/slots.tsx`; start with `paper.aside` and `paper.body`).
+  - Frames are sized by `ui.setHeight`.
+  - Theme tokens are sent on load and on change, so plugins can match light and dark.
+  - Frames load lazily when scrolled into view.
+- **RPC protocol** (`lib/plugins/protocol.ts`), versioned. It starts with:
+  - `context.get`: the paper id, its venues and submissions, viewer signed in or not, theme.
+  - `settings.get`, `settings.set` (own keys only), and a `settings.change` event.
+  - `storage.get` and `storage.set`: per user and per plugin, 64 KB, in Postgres, for small state that should follow
+    the account.
+  - `paper.read`: title, authors, sections.
+  - `reviews.forPaper`: this paper's submissions, notes and venue forms, from `submissions.ts`.
+  - `ui.setHeight` and `ui.openUrl`.
+- **SDK:** one file served immutably at `https://ppusercontent.com/sdk/v1/pp.js`, with `pp.d.ts` in the repo and in
+  the guide. It works with no build step. An npm package can come later.
+- **Install and consent:** `user_plugin_grants(user_id, plugin_id, sha, permissions, granted_at)`. The `plugins` key
+  in settings.json maps each source to `{ enabled, ref }`, as in Presio's `CoreSettings["plugins"]`. A prompt lists
+  the permissions and the network origins in plain words.
+- **Kill switch and defaults:** the site layer has `plugins.blocked` (ids, or ids at a SHA) and `plugins.default`
+  (sources installed for everyone, which a user can turn off).
+- Prove it with `examples/plugins/hello/`, an in-repo plugin used by the tests: it reads the context and a setting,
+  and stores a value.
+- Update DESIGN.md §10 and IMPLEMENTATION.md Milestone 8 to match what was built.
+
+### Phase 3: discovery and the plugin pages
+
+- `GET /api/v1/plugins/discover`: public repos with the GitHub topic **`potentialpaper-plugin`**, most starred first,
+  cached for 5 minutes with a stale list served while GitHub fails. Port Presio's `server/routes/plugins.ts`.
+- `/settings/plugins`:
+  - Installed: on/off, version, settings, permissions, remove.
+  - Discover: the topic list with stars, description and last push.
+  - Add by source: a GitHub URL or `owner/repo`.
+  - Load from localhost, for development.
+- Update check: a newer tag shows "Update". If the update needs new permissions, it asks before switching.
+- **A guide for agents**, `/plugins.md`, linked from `llms.txt`. It covers the manifest, SDK, permissions, data
+  routes, the dev loop and publishing (tag a release, add the topic). Its README line is Presio's: "Read
+  https://…/plugins.md and build me a PotentialPaper plugin."
+
+### Phase 4: data for plugins (A and B)
+
+- **A, the `venue_stats` consumer** (`server/venue-stats.ts`). It runs after the reviews projection: it reads
+  `submissions` and `submission_notes` rather than the repo, so it is a consumer of the projection's changes, not of
+  `page_events` directly. Either chain it off the reviews consumer, or have it read events and recompute the
+  affected venue. Pick whichever is simpler and idempotent.
+  - Per `(venue, field)`, for every field the venue's forms mark `score`, it keeps:
+    - every submission's mean over its reviews, sorted (reuse the means in `lib/submissions.ts`);
+    - the count;
+    - `min` and `max` from the form;
+    - fixed-width bins;
+    - the same split by `status` (accepted, rejected, withdrawn, pending).
+  - Recomputing one venue is a single SQL aggregate. ICLR is about 40k submissions, so it runs on change and is
+    debounced per venue. `consumers:rebuild -- venue-stats` rebuilds it.
+- `GET /api/v1/venues/{id}/scores` lists the fields and counts. `GET /api/v1/venues/{id}/scores/{field}` returns the
+  sorted values, bins, the split by status, and `computedAt`. Both are public, use ETags, and are cached by the CDN
+  for a minute. This is the data the standing figure needs. Leave curve-fitting to the client: it is view logic, and
+  20k numbers is nothing.
+- **B, bulk:** `GET /api/v1/venues/{id}/submissions?fields=scores,status` streams NDJSON. Each row has the submission,
+  its paper, its status, and every review's score vector. It is gzipped, ETagged on the venue's last change, and
+  public, because the reviews are CC BY and the licence and source link travel with the data.
+- RPC: `venue.scores(venueId, field?)` and `venue.submissions(venueId)` (streamed in chunks), behind a `venue.read`
+  permission.
+- Add both routes to the published API docs and the OpenAPI, so outside backends (D) use the same data.
+
+### Phase 5: plugins with their own backend (D)
+
+- `network` origins go into the plugin's CSP `connect-src`. They are shown in the consent prompt, and a new origin
+  needs consent again. The backend is the plugin's own: it gets no session, and if it wants the viewer's identity it
+  asks for an `identity` permission (next point).
+- `identity` permission: `identity.token()` returns a short-lived signed token naming the user and the plugin id,
+  audience-bound to that plugin, so a backend can verify a viewer without ever seeing their session. Publish the
+  verification key at `/.well-known/jwks.json`.
+- A manifest's optional `bot` field names the bot account a plugin writes through, so the consent prompt can say
+  what that plugin's data on pages comes from. Bot registration for outsiders, tokens and webhooks remain
+  Milestone 7. Only pull them forward if a plugin needs them.
+- Document the pattern in `/plugins.md` with a small example backend.
+
+### Phase 6: score standing (external)
+
+Repo: `benedict-armstrong/potentialpaper-score-standing`, MIT, with the topic `potentialpaper-plugin`. Vite and
+TypeScript, with `dist/` committed (we never build) and CI that fails if `dist/` is stale. Release by tagging
+`v0.1.0`.
+
+- Manifest:
+  - Permissions: `reviews.read`, `venue.read`.
+  - One `paper.aside` panel, "Standing at <venue>", `when: paper.hasScores`.
+  - Settings:
+    - `view`: `both` (default), `histogram` or `curve`.
+    - `field`: a string naming the score field; empty means the venue's first, usually the overall rating.
+    - `splitByDecision`: `auto` (default; on once decisions are out), `on` or `off`.
+- The figure, ported from acceptodds:
+  - **(a) Histogram** (`VenueStanding`): the venue's bins, with this paper's bin marked and the share below shaded.
+    Hovering a bar shows its range, its count and its share.
+  - **(b) Curve** (`StandingChart`): a kernel density of the means (`lib/distribution.ts`: `bandwidth`, `density`,
+    `rootScaled`), the area below the paper shaded, and a line at the paper labelled with its band ("Top 12%").
+    Hover and arrow keys read off "N papers below".
+  - Scores are discrete (ICLR rates on {1, 3, 5, 6, 8, 10}), so means bunch at a few values. Choose the bandwidth so
+    the curve doesn't invent modes between them. The histogram shows the bunching honestly, which is why both are
+    shown.
+  - After decisions, both figures split by outcome, which shows the accept rate per bin.
+  - With several submissions (rejected at one venue, accepted at the next), there is a tab per venue.
+  - A field switcher lists the venue's score fields (rating, soundness, presentation, …) and changes the `field`
+    setting.
+- Data comes from A only (`venue.scores`). The plugin caches by ETag in its own IndexedDB, so moving between papers
+  at the same venue costs nothing.
+- It looks right in both themes using the host's tokens, works at phone width, and has an accessible name and a
+  text summary for screen readers, as acceptodds' figure has.
+- Later (v0.2): the paper's position before and after rebuttal, from the review files' git history. This needs a
+  `reviews.history` RPC in the host.
+
+## Open questions
+
+- Showing rank during reviewing: the data is public and acceptodds shows prices, but a percentile on the paper's own
+  page while reviews are still open is a stronger statement. One option is a site setting, `plugins.venueStats.hideUntil`
+  (`decisions` or `never`), that A respects.
+- Which plugins go in `plugins.default`, if any, at launch.
+
+## Log
+
+**How the phases run:** one T3 thread per phase, on its own branch (`plugins-phase-<n>`), cut from the previous
+phase's branch so this file stays current. Commit and push after each working step. At the end, add your entry below
+and launch the next phase's thread pointing at this file. Merging into `main` waits for Benedict.
+Phases 4 and 5 depend only on Phase 2, and Phase 6 needs Phases 2–4.
