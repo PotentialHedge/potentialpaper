@@ -1,3 +1,4 @@
+import { spawnSync } from 'node:child_process';
 import { createHash } from 'node:crypto';
 import { mkdtempSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
@@ -15,6 +16,15 @@ import { encodeLfsPointer, PAPER_PDF_PATH, PDF_PATH, versionPath, versionPdfPath
 import { savePaper } from '@/server/papers';
 import { ingest, MAX_ATTEMPTS } from '@/server/pdfs/ingest';
 import { ORIGIN, api, closePool, lastMailTo, resetDatabase, signUp } from './helpers';
+
+/**
+ * These tests run poppler (\`pdftotext\`, \`pdftoppm\`). A machine without it skips them, saying so; CI installs it
+ * (\`.github/workflows/ci.yml\`) and never skips.
+ */
+const HAS_POPPLER = spawnSync('pdftotext', ['-v']).error === undefined;
+if (!HAS_POPPLER && process.env.CI) throw new Error('pdftotext is missing: CI must install poppler-utils');
+if (!HAS_POPPLER) console.warn('pdf-ingest: skipped, poppler (pdftotext) is not installed here');
+const describePoppler = describe.skipIf(!HAS_POPPLER);
 
 const PAPER = { scheme: 'arxiv', value: '1706.03762' } as const;
 const AUTHORS = ['Ashish Vaswani', 'Noam Shazeer', 'Niki Parmar'];
@@ -110,7 +120,7 @@ async function claimRow(paperId: string, authorIndex: number) {
   return rows.find((r) => r.authorIndex === authorIndex) ?? null;
 }
 
-describe('pdfs:ingest', () => {
+describePoppler('pdfs:ingest', () => {
   it('runs every stage once, and a second run has nothing to do', async () => {
     const paperId = await paperWithPdf();
     const first = await ingest({ pdfDir });
@@ -185,7 +195,7 @@ describe('pdfs:ingest', () => {
   }, 30_000);
 });
 
-describe('authors by an email on the first page', () => {
+describePoppler('authors by an email on the first page', () => {
   it('makes an account the author when it signs up, if its address says which one, with no claim', async () => {
     const paperId = await paperWithPdf();
     await ingest({ pdfDir });
