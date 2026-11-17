@@ -1,6 +1,7 @@
 # Handoff: pages above the paper (venues, topics, organisations, people)
 
-Status: plan, 2026-11-16. Phases 1 (the page model), 2 (venue pages), 3 (user pages) and 4 (organisation pages) are built; see the Log. Read with `handoffs/plugins.md`: plugins work on every kind of
+Status: plan, 2026-11-16. Phases 1 (the page model), 2 (venue pages), 3 (user pages), 4 (organisation pages) and 5
+(topic pages) are built; see the Log. Read with `handoffs/plugins.md`: plugins work on every kind of
 page this plan adds.
 
 ## Goal
@@ -532,3 +533,134 @@ six in `pdf-ingest.test.ts` (no poppler) and one in `follows.test.ts`.
 - The test fixture allowlist gained `mit.edu`, and a ROR fixture was added (`INSTITUTION_ROR_PATH`).
 
 These ran against this worktree's own database, `potentialpaper_test_pages4`, through an untracked `.env`.
+
+### Phase 5: topic pages (2026-11-17, branch `pages-phase-5`)
+
+Built:
+
+- **Making a topic** (`server/topic-pages.ts`, `lib/topics.ts`):
+  - `/new/topic` (a form: name, address, other names, broader topics, "What it is") and `POST /api/v1/topics`.
+    Anyone verified may. The topic's `topic.json` (and the article's first section, `community/10-what-it-is.md`)
+    is committed by whoever makes it, so the path rules check it as any edit.
+  - **Names are checked first.** Two names are the same when they differ only in case, accents, punctuation and
+    plurals (`topicNameKey`: "State-space models" = "state space model"). A name or alias another topic has is
+    refused with `409 topic_exists`, naming that topic. `GET /api/v1/topics?q=` lists the same name first (`exact`),
+    then similar ones (pg_trgm); the forms show it as one types and the new-topic form won't submit a duplicate.
+  - `broader` must name topics that exist; they are written by their current slug.
+- **A paper in a topic:** a Topics box on every paper (`paper.aside`, panel `topics`) lists its topics and has "Add a
+  topic": a name, offered from existing topics as one types, and "is about it" or "introduced it".
+  `POST /api/v1/pages/{paper}/topics` `{ topic | name, label? }` appends the link to the paper's
+  `community/links.jsonl`, or `author/links.jsonl` when one of its confirmed authors adds it, and makes the topic if
+  it was named and no topic has the name or an alias. Link ids are ULIDs (`newLinkId`). The paper's Links box no longer
+  repeats topic links.
+- **The page** (`components/pages/topic-panels.tsx`, `lib/panels.ts`), read once by the route (`topicOverview`,
+  `presentTopicPapers`):
+  - `topic.main`: `about` (other names, merged topics, "Edit this topic", "New topic", the protection), `community`
+    (the article), `introduced` (where it started: the papers that introduced it, oldest first).
+  - `topic.aside`: `topics` (broader, narrower and related, each with its rolled-up paper count), `venues` and `orgs`
+    (`scopeOverlap`, by count), links, backlinks.
+  - `topic.tabs`: `papers` (rolled up from narrower topics, each with the narrower topic it is in, "introduced it",
+    its venue and decision, and its score; sortable by date, venue and score, `GET …/topic-papers?sort=`) and
+    `suggestions` ("Might belong here").
+  - `GET /api/v1/pages/{identifier}/topic` gives the overview.
+- **Might belong here** (`server/topic-suggestions.ts`, table `topic_suggestions`, the `topic-suggestions` consumer for
+  papers and topics):
+  - OpenReview **keywords** are now kept: `submission.json` has an optional `keywords`, the reviews import writes it
+    from scrapes that have the column, and the projection fills `submissions.keywords`. A keyword with the same words
+    as a name (English stems, any order) scores 3; the name as a phrase in the title 2, in the abstract 1 (names of two
+    words or more only). A paper's score is the sum, its reason the strongest. Papers already in the topic aren't
+    suggested; each topic keeps its best 200.
+  - Confirm links the paper (`in-topic`, or "It introduced this"); dismiss is remembered. Only `open` rows are ever
+    rewritten, so neither comes back, through a recompute or `consumers:rebuild -- topic-suggestions`.
+    `GET`/`POST /api/v1/pages/{identifier}/suggestions`.
+- **Editing, renaming, merging** (`/t/<slug>/edit`):
+  - One form for name, aliases, broader and related topics (`related` links in `community/links.jsonl`, other lines
+    kept) and the whole article as Markdown with a `#` heading per section (`planSections`; an empty article starts
+    from "What it is / Key ideas / History / Open problems", and a heading with nothing under it isn't saved).
+    `PATCH /api/v1/pages/{identifier}/topic` `{ base, … }`, one commit merged with what changed since `base`.
+  - **Rename** (`POST …/rename` `{ slug, name? }`): the page's key moves in one transaction, the old slug goes into
+    `page_redirects`, and the system commits the metadata ("Moved from topic:a to topic:b by @handle"). A new name
+    is the person's own commit, keeping the old name as an alias.
+  - **Merge** (`POST …/merge` `{ into }`): the survivor gains the duplicate's name and aliases as aliases, its
+    broader topics, its sections (each "From topic:x, merged into this page.", text it already has skipped) and its
+    links, in one commit by the person. The duplicate gets `pages.merged_into`, takes no more commits
+    (`409 page_merged`), and its redirects and anything merged into it move along. Decided suggestions move too.
+  - **Old names keep counting.** `findPageByAddress` follows redirects and merges (`survivorOf`); `/t/<old>` redirects.
+    `formerKeys` (old slugs, merged topics' keys) are among the page's `page_scope_names`, so papers and narrower
+    topics that name the old identifier stay in, and among what "what links here" matches. A new page that takes an
+    old key takes its address (a trigger on `pages`).
+- **Page protection** (DESIGN.md §7, `server/page-protection.ts`, table `page_protection`): `established` (accounts
+  verified at least 4 days ago) or `admins`, optionally until a date. Set by admins with `npm run pages:protect` or
+  `PUT /api/v1/pages/{identifier}/protection`; `GET` is public, and the page and editor say it. It is checked in
+  `checkTree`, so a push is held like a web edit. It holds what the community writes on any kind of page; owners keep
+  their own part and bots their grants. Renames, merges and dismissals check it too. `403 page_protected`.
+- **The patrol feed** (`server/changes.ts`, `/changes`, linked in the navbar; `GET /api/v1/changes`):
+  - every commit to every page, newest first in the outbox's order, by kind;
+  - bots hidden unless asked;
+  - "only changes that move papers between topics": a topic's `broader` changed (read from the commit and its
+    parent), merges and renames, also flagged "moves papers" in the full feed;
+  - who made it as the history shows it (handle, a confirmed author's name on their paper, or the system).
+- Migration `0039_topic_pages.sql`. New API error codes `page_merged`, `page_protected` and `topic_exists`. The public
+  GETs are in `/openapi.json`; `llms.txt` and an `/agent/updates` notice describe the routes. DESIGN.md §4.3 (topic
+  pages), §4.9 (the suggestions consumer) and §7 (`/changes`, protection), and IMPLEMENTATION.md (Milestone 3 and
+  "Pages above the paper") are updated.
+
+Calls I made where the plan left room:
+
+- **Page protection and the patrol feed didn't exist** (Milestone 3), so this phase built the minimum the plan's
+  "with page protection and the patrol feed" needs, for every kind: two levels and a feed. Watchlists, digests,
+  one-click revert for keyed pages, new-account rate limits, reports and blocks are still Milestone 3. "Established"
+  is time since the address was confirmed (4 days, like Wikipedia's autoconfirmed), not an edit count.
+- **Protection holds the community's paths only.** Owners' parts (a paper's `author/`) and bots' grants aren't held,
+  since protection is against edit wars, not a way to take a page from those it belongs to.
+- **Merges keep the duplicate's page**, as paper merges do, marked `merged_into`, rather than deleting it and
+  leaving only a redirect, so its history stays readable by clone. Its scope rows are cleared in the merge
+  transaction, and the `members` consumer writes none for a merged page. After the merge, the survivor's membership is
+  re-indexed at once, so it holds even when the fold changed no file.
+- **A rename's metadata commit is the system's**, as a handle change is: only the system writes `.potentialpaper/`.
+  The summary names who did it, so the feed shows it.
+- **Suggestions from the map's nearest neighbours** wait for the map's vectors (the plan's "later").
+- **Score sorting across venues** compares where each paper's mean sits in its venue's range (scales differ). A paper
+  with several submissions shows its accepted one, else the latest. The list reads up to 5,000 papers and sorts them
+  in memory; a topic that big would want SQL paging.
+- **The topic's papers and suggestions are tabs**, below the article and its side boxes, so the page still reads as
+  an article; both ids can be moved or hidden in settings like any panel's. The generic `about` panel is gone; each
+  kind has its own.
+- **"Add a topic" puts the link in `author/`** when a confirmed author adds it: the authors assert it as authors
+  (§8's `origin`), under their `a_` identity.
+- **Dismissing needs a verified account and respects the topic's protection**, as an edit would; confirming is an edit
+  of the paper, so the paper's protection applies.
+- **No topic search scope** (`kind:topic` in search): the plan lists search for every kind as a decision, not as this
+  phase's work.
+
+For later phases:
+
+- One-click revert, history and diff pages are still paper-only. A topic's bad edit is undone by editing it again
+  or by `git push`; the feed links to the page, not to a diff.
+- Watchlists ("Following a page of any kind", Later) can feed off `recentChanges`.
+- The suggestions' keyword match reads every submission's keywords when a topic changes. The seam, if it grows, is an
+  index of the keywords' normalised words.
+- Score standing doesn't declare topics (`handoffs/plugins.md` Phase 6). A topic's `page.hasScores` isn't a context
+  key yet; adding it is a line in `KINDS.topic.contextKeys`.
+
+Checks: typecheck, lint, prettier and `next build` pass. Unit tests: 404 pass. 9 of them are new, in
+`tests/unit/topics.test.ts`: slugs, duplicate names, aliases, link ids, keywords, protection, sorting by score
+across scales, and folding a merge.
+
+Integration: 300 of 308 pass, 1 skipped (the network plugin test). The 7 failures are the same as before this phase:
+six in `pdf-ingest.test.ts` (no poppler) and one in `follows.test.ts`. 10 tests are new, in
+`tests/integration/topic-pages.test.ts`:
+
+- making a topic, with duplicates refused by name, plural and alias, a taken address, the name lookup, and a missing
+  broader topic;
+- linking papers by name (the topic made) and by identifier, `exists` the second time, an author's link in `author/`,
+  roll-up through `broader` with `via` and `introduced`, and the overview and paper routes;
+- suggestions by keyword, title and abstract, confirm and dismiss, both surviving a rebuild;
+- a rename's redirect keeping links, members and narrower topics, and the old slug taken again;
+- a merge folding names, sections and links, moving members and a dismissal, refusing commits to the duplicate, and
+  resolving to the survivor;
+- protection levels for a fresh, an established and an admin account, set and lifted only by admins;
+- the patrol feed's order, attribution, roll-up filter and paging;
+- keywords through `submission.json` into the projection and suggestions, with papers sorted by their reviews' scores.
+
+These ran against this worktree's own database, `potentialpaper_test_pages5`, through an untracked `.env`.

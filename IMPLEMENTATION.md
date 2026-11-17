@@ -57,6 +57,8 @@ Most of the risk is here, so it comes before the editor.
 - Section editor with preview, summary and conflict UI; Markdown rendered and sanitized at commit.
 - History, diff and revert pages.
 - `/changes`, watchlist, digest mail, protection levels, new-account rate limits, reports, blocks.
+  Built ahead of the rest (2026-11-17, `handoffs/pages.md` Phase 5): `/changes` (and `GET /api/v1/changes`) and
+  per-page protection levels (`established`, `admins`; `npm run pages:protect`).
 - Redaction script and its public log.
 - **Blocker for the alpha: choose the contribution license** (design section 12, still to discuss).
 - Alpha with a few dozen invited researchers, in one field, on ICLR papers. Most of what matters is
@@ -148,7 +150,12 @@ departments and labs (`/new/org/<key>`); an org's papers (`page_members` `via` `
 claims when they show their institution and from domains printed on page 1, kept up by the worker's `org-members`
 task, and roll up from departments; the page lists people who show it, and venues and topics by count
 (`GET /api/v1/pages/{identifier}/org`). `show_institution` is now the one institution switch (no
-`user.show.institution`).
+`user.show.institution`). Phase 5 (topic pages) is built: anyone verified makes a topic (`/new/topic`,
+`POST /api/v1/topics`, names and aliases checked for duplicates first) or makes it from a paper's "Add a topic", which
+links the paper (`in-topic`, `introduces-topic`); the page reads as an article with where it started, its broader,
+narrower and related topics, venues and organisations, its papers sortable by date, venue and score, and "might
+belong here" (`topic_suggestions`, from OpenReview keywords, titles and abstracts; dismissals remembered); editing,
+renaming (`page_redirects`) and merging (`pages.merged_into`) are open to the community at `/t/<slug>/edit`.
 
 ## Main risks
 

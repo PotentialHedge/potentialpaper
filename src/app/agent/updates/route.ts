@@ -10,6 +10,10 @@ export const dynamic = 'force-dynamic';
 const UPDATES: { date: string; text: string }[] = [
   {
     date: '2026-11-17',
+    text: 'Topics have pages: `/t/<slug>` (identifier `topic:<slug>`), research ideas such as "Linear attention", which anyone verified makes and writes. Before making one, check its names with `GET /api/v1/topics?q=`: a name or alias another topic has is refused (`topic_exists`). When a person asks you to put a paper in a topic, `POST /api/v1/pages/<paper identifier>/topics` with `{ "topic": "topic:<slug>" }` or `{ "name" }` (the topic is made if none has the name); `introduces-topic` marks the paper that started it. A topic\'s papers, sortable by date, venue or score, are at `GET /api/v1/pages/<identifier>/topic-papers`; papers that might belong at `…/suggestions`. Every edit to every page is at `/changes` and `GET /api/v1/changes`. A protected page refuses some edits with `page_protected`: say so to the person rather than retrying.',
+  },
+  {
+    date: '2026-11-17',
     text: "Organisations have pages: `/o/<key>` (identifier `org:<key>`, departments and labs under it, such as `org:eth-zurich/inf`), made from the institutions people sign up from. An organisation's papers are its members' claimed papers (when they show their institution) and those whose first page prints one of its email domains; `GET /api/v1/pages/<identifier>/org` gives its departments, the people who show it as their institution, and its venues and topics by count. A member may add a department or lab with `POST /api/v1/pages/<identifier>/children`, when the person asks. Whether a person's institution is public is one choice, their profile's `showInstitution`: there is no `user.show.institution` setting any more.",
   },
   {

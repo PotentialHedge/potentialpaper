@@ -2,7 +2,10 @@ import { and, eq, sql } from 'drizzle-orm';
 import { afterAll, beforeEach, describe, expect, it } from 'vitest';
 import { getDb } from '@/db';
 import { accounts, pageCurrent, submissions, topicSuggestions, venues } from '@/db/schema';
+import { ensureBot, grantBot, OPENREVIEW_BOT } from '@/server/bots';
 import { rebuildConsumer, runConsumer } from '@/server/consumers/run';
+import { submissionFiles } from '@/server/import-reviews';
+import { reviewsConsumer } from '@/server/review-projection';
 import { linksConsumer, linksTo } from '@/server/page-links';
 import { membersConsumer, scopeMembers } from '@/server/page-members';
 import { commitPage } from '@/server/pages/commit';
@@ -475,5 +478,90 @@ describe('protection and the patrol feed', () => {
       'Start Linear attention',
       'Start the topic page linear-attention',
     ]);
+  });
+});
+
+describe('keywords and scores from a venue', () => {
+  const FORMS = {
+    Official_Review: {
+      label: 'Official review',
+      fields: [{ key: 'rating', label: 'Rating', type: 'score' as const, min: 1, max: 10 }],
+      summary: ['rating'],
+    },
+  };
+
+  /** A paper submitted to ICLR 2027 with these keywords and ratings, as the openreview bot commits it. */
+  async function submitted(arxiv: string, title: string, keywords: string[], ratings: number[]) {
+    const paperId = await paper(arxiv, title);
+    const bot = await ensureBot(OPENREVIEW_BOT);
+    await grantBot(OPENREVIEW_BOT, 'reviews/openreview/**', { grantedBy: 'system' });
+    const forum = `f${arxiv.replace('.', '')}`;
+    const license = 'CC-BY-4.0';
+    const files = submissionFiles(
+      { source: 'openreview', id: 'ICLR.cc/2027/Conference', name: 'ICLR 2027', url: null, forms: FORMS, license },
+      {
+        externalId: forum,
+        paper: { scheme: 'arxiv', value: arxiv },
+        number: 1,
+        status: 'accepted',
+        decision: 'Accept (Poster)',
+        keywords,
+        url: `https://openreview.net/forum?id=${forum}`,
+        notes: ratings.map((rating, i) => ({
+          externalId: `r${i}`,
+          replyTo: null,
+          kind: 'review' as const,
+          invitation: 'Official_Review',
+          signature: `Reviewer ${i}`,
+          content: { rating },
+          license,
+          url: null,
+          createdAt: new Date('2026-11-01T00:00:00Z'),
+          modifiedAt: null,
+        })),
+      },
+    );
+    await commitPage(
+      paperId,
+      null,
+      bot,
+      [...files].map(([path, content]) => ({ path, content })),
+      'Import',
+    );
+    return paperId;
+  }
+
+  it('keeps keywords from submission.json, suggests by them, and sorts papers by their reviews', async () => {
+    const { cookie } = await person('ada');
+    const high = await submitted('2405.00001', 'A first paper', ['Linear attention', 'RNNs'], [8, 6]);
+    const low = await submitted('2405.00002', 'A second paper', ['efficient transformers'], [3, 4]);
+    expect(await runConsumer(reviewsConsumer, { retryNow: true })).toMatchObject({ status: 'caught-up' });
+    const [row] = await getDb()
+      .select({ keywords: submissions.keywords })
+      .from(submissions)
+      .where(eq(submissions.paperId, high));
+    expect(row.keywords).toEqual(['Linear attention', 'RNNs']);
+    expect(await fileAt(high, 'reviews/openreview/f240500001/submission.json')).toContain('"keywords"');
+
+    expect((await newTopic(cookie, { name: 'Linear attention' })).status).toBe(201);
+    await catchUp();
+    const suggested = await api('GET', `/pages/${enc('topic:linear-attention')}/suggestions`);
+    expect(suggested.body.suggestions).toMatchObject([{ identifier: 'arxiv:2405.00001', reason: 'keyword' }]);
+
+    for (const arxiv of ['2405.00002', '2405.00001']) {
+      await api('POST', `/pages/${enc(`arxiv:${arxiv}`)}/topics`, {
+        cookie,
+        body: { topic: 'topic:linear-attention' },
+      });
+    }
+    await catchUp();
+    const byScore = await api('GET', `/pages/${enc('topic:linear-attention')}/topic-papers?sort=score`);
+    expect(byScore.body.papers.map((p: { title: string }) => p.title)).toEqual(['A first paper', 'A second paper']);
+    expect(byScore.body.papers[0]).toMatchObject({
+      venue: { name: 'ICLR 2027' },
+      decision: 'Accept (Poster)',
+      score: { mean: 7, min: 1, max: 10, label: 'Rating' },
+    });
+    void low;
   });
 });

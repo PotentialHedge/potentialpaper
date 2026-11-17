@@ -258,6 +258,31 @@ member who shows their institution (weight 1), and those whose page 1 prints an 
 under one (weight 0.5), rolled up from its departments. The page lists its departments and labs, the members who show
 it as their institution (by handle; §5.3), the venues and topics its papers are at by count, and its papers.
 
+**Topic pages** (built in `handoffs/pages.md` Phase 5). A topic (`/t/linear-attention`, `topic:linear-attention`) is a
+research idea at the size of a Wikipedia article, not a field. There is no seeded list and no bot writes them: anyone
+verified makes one (`/new/topic`, `POST /api/v1/topics`), or makes it from a paper's "Add a topic", which links the
+paper and makes the topic if no topic has that name or alias. Names are checked first: two names are the same when
+they differ only in case, accents, punctuation and plurals (`lib/topics.ts`), and a name or alias another topic has
+is refused (`topic_exists`); the forms list similar topics as one types. Its `topic.json` holds its name, aliases and
+optional `broader` topics (a loose DAG, by slug, each a topic that exists); its article is `community/` ("What it
+is", "Key ideas", "History", "Open problems" as the editor's starting headings); `related` links (§8) name related
+topics. **A paper is in a topic** through its own labeled link, `in-topic` or `introduces-topic`, in its
+`community/links.jsonl`, or its `author/links.jsonl` when one of its confirmed authors adds it; a topic's papers roll
+up from the topics it is broader than. The page reads as an article: its names and where to edit it, the article,
+where it started (the papers that introduced it); beside them its broader, narrower and related topics, the venues
+and organisations its papers are at by count, and its links; below, its papers, sortable by date, venue and review
+score (the mean of the venue's first score field, compared by where it sits in the venue's range, as scales differ),
+and **"might belong here"**: `topic_suggestions`, which the `topic-suggestions` consumer keeps from OpenReview
+keywords (now kept in `submission.json`), and the topic's names in titles and abstracts. A person confirms one (the
+paper is linked, as their edit) or dismisses it, and a dismissal is remembered: the machine never rewrites a decided
+row. **Editing** the names, broader and related topics and the article is one commit (`/t/<slug>/edit`,
+`PATCH /api/v1/pages/{identifier}/topic`), as a push would be. **Renaming** moves the page's key and leaves its old
+slug in `page_redirects`; **merging** folds the duplicate's names (as aliases), broader topics, sections and links
+into the survivor in one commit and marks the duplicate `pages.merged_into`, so its address and identifier lead to
+the survivor and it takes no more commits, while its history stays. Either way the page answers to its old
+identifiers: membership (`page_scope_names`) and "what links here" count links that name them (`formerKeys`). Both
+are open to the community, under page protection, and show in `/changes` (§7).
+
 **Sections** are named `NN-slug.md` or `NN-slug.html`: two digits, then a lower-case ASCII slug.
 They show in the order of their names, which is the order `ls` lists them in. A section's title is the
 `#` heading (or `<h1>`) its file starts with, and otherwise its slug. HTML is checked against an
@@ -533,6 +558,11 @@ rows (`scope_state`: `changed_at`, and a `due_at` a few seconds ahead, debounced
 the first change), and the worker recomputes due scopes after each pass. Its own `scope-stats` consumer only marks,
 so `consumers:rebuild -- scope-stats` still starts it over.
 
+Topic suggestions (`topic_suggestions`) are kept by the `topic-suggestions` consumer, which handles papers and
+topics: a topic's event matches its names against every paper, a paper's event matches the paper against every
+topic. Its rows have a status, and only `open` ones are ever rewritten (its reset deletes those alone), so what people
+decided survives a rebuild.
+
 Data that comes from tables rather than repos is the other case. An org's papers come from author claims, confirmed
 addresses, `show_institution` and the addresses read off PDFs, none of which is a commit to the paper's page. Triggers
 on those tables put the affected papers in a queue (`org_members_due`, migration `0038`), and the worker's
@@ -746,10 +776,17 @@ below it.
   their author identity with a badge (section 5.3). Authors have no special power here.
 - **Anti-vandalism is the real product.** Wikipedia works because patrolling is cheap, so these are
   v1 and not extras:
-  - `/changes`, a filterable feed of all edits
+  - `/changes`, a filterable feed of all edits. Built (`handoffs/pages.md` Phase 5, `server/changes.ts`): every
+    commit to every page newest first in the outbox's order, by kind of page, bots hidden unless asked, and "moves
+    papers" for changes to a topic's broader topics, merges and renames; also `GET /api/v1/changes`. Who made each
+    change shows as the page's history shows it (a handle, a confirmed author's name on their paper, the system)
   - watchlists with email digest
   - one-click revert
-  - per-page protection levels
+  - per-page protection levels. Built (`page_protection`, `server/page-protection.ts`): `established` (only
+    accounts whose institutional address was confirmed at least four days ago) and `admins`, set by admins
+    (`npm run pages:protect`, `PUT /api/v1/pages/{identifier}/protection`), optionally until a date. Checked in
+    `checkTree`, so a push is held as a web edit is. It holds what the community writes; owners keep their own part
+    and bots their grants
   - rate limits that are tighter for new accounts
   - reports and account blocks
 - **Institutional email is a strong anti-sockpuppet measure**, and also why a block means something.
