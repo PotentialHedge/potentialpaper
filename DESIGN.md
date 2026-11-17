@@ -923,7 +923,12 @@ Built 2026-11-16 (`handoffs/plugins.md` Phase 1). One document per account, laye
   naming its key; unknown keys are kept, with a warning, so a file can name a plugin's settings before the plugin
   is installed. Agents and scripts use the same route.
 - `/schemas/settings.json` is its JSON Schema: the core keys and the requesting account's installed plugins' keys.
-  `/settings` has a form made from the schema, the raw file with the same checks, and Export and Import.
+  `/settings` is laid out as VS Code's settings editor (rebuilt 2026-11-17, `lib/settings/form.ts`): a page per
+  category (each kind's pages, "Your public page") and one per installed plugin (`/settings/plugins/<owner>/<name>`)
+  down the side, a search over every setting, and each setting drawn by a standard control (a switch, a dropdown or
+  radio buttons, a text or number field, a list to add to, remove from and reorder, a box per choice, a fixed set to
+  put in order), saved as it changes, with a mark and a reset on what the reader's file sets. There is no editor for
+  the raw file: it is downloaded, edited in the reader's own editor, and uploaded, with the same checks.
 - **Settings are preferences.** Remembered state (dismissed prompts, a plugin's cache) stays out of the document,
   and so does consent (below).
 - The first core keys are `<kind>.panels.hidden` and `<kind>.panels.order`: a reader turns panels off or reorders
@@ -970,9 +975,11 @@ Built 2026-11-16 (`handoffs/plugins.md` Phase 2). A plugin is a public repo (or 
   site-wide pin of a ref never moves. The new commit is copied first, so a broken release changes nothing. If it asks
   for a permission or network origin their grant lacks, the update only describes it (`consent`) until they approve
   it in a browser, which switches and grants at once.
-- **`/settings/plugins`**: the installed plugins (on and off, version and commit, update, what each may do with
-  approve and withdraw, its settings as a form drawn from its `SettingSpec`s, remove), Discover, add by source, and
-  load from localhost. `/settings` links there, and its hidden/order lists offer installed plugins' panels too.
+- **`/settings/plugins`**: the installed plugins, Discover, add by source, and load from localhost. Each installed
+  plugin has its own page, `/settings/plugins/<owner>/<name>`: on and off, version and commit, update, its settings
+  drawn from its `SettingSpec`s (`boolean`, `number`, `string`, `enum`, `list`, `set`, each with an optional
+  `title`, `group` and `order`), what it may do with approve and withdraw, and remove. The core panel lists offer
+  installed plugins' panels too.
 - **`/plugins.md`**, linked from `llms.txt`, is the guide for agents: the manifest, the SDK (its method, permission
   and `when` tables are made from the code), the data routes, the dev loop and publishing. A README says "Read
   https://…/plugins.md and build me a PotentialPaper plugin."

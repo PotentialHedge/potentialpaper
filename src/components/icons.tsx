@@ -26,6 +26,24 @@ export function FilterIcon({ className = 'size-4' }: { className?: string }) {
   );
 }
 
+/** A magnifying glass: a search field's mark. */
+export function SearchIcon({ className = 'size-3.5' }: { className?: string }) {
+  return (
+    <svg
+      viewBox="0 0 16 16"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth="1.5"
+      strokeLinecap="round"
+      aria-hidden="true"
+      className={className}
+    >
+      <circle cx="7" cy="7" r="4.5" />
+      <path d="M10.5 10.5 14 14" />
+    </svg>
+  );
+}
+
 /** A link or button with its icon beside its word. */
 export const WITH_ICON = 'inline-flex items-center gap-1';
 

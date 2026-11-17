@@ -1,6 +1,13 @@
 import { z } from 'zod';
 import { CORE_SETTINGS } from './core';
-import { qualify, type PluginSettings, type SettingSpec } from './spec';
+import {
+  DEFAULT_ITEM_LENGTH,
+  DEFAULT_MAX_ITEMS,
+  qualify,
+  settingTitle,
+  type PluginSettings,
+  type SettingSpec,
+} from './spec';
 
 /**
  * The JSON Schema of a settings.json: the core keys and the given plugins' keys, so an editor can complete and
@@ -21,7 +28,7 @@ export function settingsJsonSchema(origin: string, plugins: PluginSettings[] = [
   }
   for (const plugin of plugins) {
     for (const [name, spec] of Object.entries(plugin.settings)) {
-      properties[qualify(plugin.id, name)] = specSchema(spec, plugin);
+      properties[qualify(plugin.id, name)] = specSchema(name, spec, plugin);
     }
   }
   return {
@@ -39,8 +46,9 @@ export function settingsJsonSchema(origin: string, plugins: PluginSettings[] = [
   };
 }
 
-function specSchema(spec: SettingSpec, plugin: PluginSettings): Record<string, unknown> {
+function specSchema(name: string, spec: SettingSpec, plugin: PluginSettings): Record<string, unknown> {
   const common = {
+    title: settingTitle(name, spec),
     description: spec.description ? `${spec.description} (${plugin.title ?? plugin.id})` : (plugin.title ?? plugin.id),
     default: spec.default,
   };
@@ -61,6 +69,23 @@ function specSchema(spec: SettingSpec, plugin: PluginSettings): Record<string, u
         type: 'string',
         enum: spec.values,
         ...(spec.labels && { enumDescriptions: spec.labels }),
+        ...common,
+      };
+    case 'list':
+      return {
+        type: 'array',
+        items: spec.values
+          ? { type: 'string', enum: spec.values, ...(spec.labels && { enumDescriptions: spec.labels }) }
+          : { type: 'string', minLength: 1, maxLength: spec.maxLength ?? DEFAULT_ITEM_LENGTH },
+        maxItems: spec.maxItems ?? DEFAULT_MAX_ITEMS,
+        uniqueItems: true,
+        ...common,
+      };
+    case 'set':
+      return {
+        type: 'array',
+        items: { type: 'string', enum: spec.values, ...(spec.labels && { enumDescriptions: spec.labels }) },
+        uniqueItems: true,
         ...common,
       };
   }

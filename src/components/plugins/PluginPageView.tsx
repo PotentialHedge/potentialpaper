@@ -1,5 +1,6 @@
 'use client';
 
+import Link from 'next/link';
 import { ui } from '@/components/ui';
 import { usePlugins } from '@/lib/plugins/client';
 import { PluginFrame, type ReadyPlugin } from './PluginFrame';
@@ -23,7 +24,7 @@ export function PluginPageView({ path }: { path: string[] }) {
         {plugin
           ? `${plugin.plugin.manifest.name} has no page “${pageId ?? ''}”.`
           : `You don’t have the plugin ${id} installed.`}{' '}
-        <a href="/settings">Settings</a>
+        <Link href="/settings/plugins">Plugins</Link>
       </p>
     );
   }
