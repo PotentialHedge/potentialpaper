@@ -163,16 +163,16 @@ serves at start (`dc logs ssh`). Check it from outside: `ssh -T -p 2222 git@git.
 Demos and the web editor's webviews are served from `ppusercontent.com`, a domain of its own so they share no
 site with the app (`src/lib/demos.ts`): each demo at `<snapshot>.ppusercontent.com`, each webview (the preview,
 the PDF viewer) at `<uuid>.ppusercontent.com`. `proxy.ts` answers every subdomain: a demo's files on a demo's
-host, VS Code's webview pages on any other, and a 404 for everything else; nothing is served at the domain itself.
+host, VS Code's webview pages on any other, and a 404 for everything else. The domain itself serves only the plugin SDK (`/sdk/`).
 Set up 2026-11-16, outside this repo:
 
-- **Cloudflare zone** `ppusercontent.com` (account `c5c3512236b6994f91a383719eeb05be`, Free plan): a proxied
-  wildcard A record `*` → `77.244.248.196`, SSL Full (strict), Always Use HTTPS, TLS 1.2 minimum. Universal SSL
+- **Cloudflare zone** `ppusercontent.com` (account `c5c3512236b6994f91a383719eeb05be`, Free plan): proxied
+  A records `*` and the apex (added 2026-11-17, for the SDK) → `77.244.248.196`, SSL Full (strict), Always Use HTTPS, TLS 1.2 minimum. Universal SSL
   covers `*.ppusercontent.com`, one level only, so names stay one label deep.
 - **Origin certificate:** a Cloudflare Origin CA certificate for `ppusercontent.com` and `*.ppusercontent.com`
   (valid to 2041-11-12) in `~/proxy/certs/ppusercontent.com.{pem,key}`, loaded by Traefik from
   `~/proxy/certs/dynamic/ppusercontent-com.yml`. The key was made on this host and never left it.
-- **Traefik:** the `-demos` router in `docker-compose.prod.yml` (`HostRegexp` on the domain's subdomains).
+- **Traefik:** the `-demos` router in `docker-compose.prod.yml` (`HostRegexp` on the domain and its subdomains).
 
 To move to another domain: `NEXT_PUBLIC_CONTENT_ORIGIN` (built into the app, so a rebuild) and
 `CONTENT_HOST_PATTERN` (Traefik) in `.env.production`, and the same three steps for the new zone.

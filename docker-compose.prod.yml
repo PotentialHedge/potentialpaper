@@ -93,7 +93,7 @@ services:
       # User content on a domain of its own (lib/demos.ts): demos (sandboxed code from GitHub) at <snapshot>.<domain>
       # and the web editor's webviews at <uuid>.<domain>. A first visit asks for every file of a demo at once, so it
       # gets the git router's limit. The app answers these hosts from proxy.ts, and nothing else of the app.
-      - traefik.http.routers.${COMPOSE_PROJECT_NAME:-potentialpaper}-demos.rule=HostRegexp(`^[a-z0-9-]+\.${CONTENT_HOST_PATTERN:-ppusercontent\.com}$$`)
+      - traefik.http.routers.${COMPOSE_PROJECT_NAME:-potentialpaper}-demos.rule=HostRegexp(`^([a-z0-9-]+\.)?${CONTENT_HOST_PATTERN:-ppusercontent\.com}$$`)
       - traefik.http.routers.${COMPOSE_PROJECT_NAME:-potentialpaper}-demos.entrypoints=websecure
       - traefik.http.routers.${COMPOSE_PROJECT_NAME:-potentialpaper}-demos.tls=true
       - traefik.http.routers.${COMPOSE_PROJECT_NAME:-potentialpaper}-demos.service=${COMPOSE_PROJECT_NAME:-potentialpaper}
