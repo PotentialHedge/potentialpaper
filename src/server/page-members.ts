@@ -1,4 +1,4 @@
-import { and, desc, eq, inArray, or, sql } from 'drizzle-orm';
+import { and, desc, eq, inArray, or, sql, type SQL } from 'drizzle-orm';
 import { getDb, type Database } from '@/db';
 import {
   pageAncestors,
@@ -34,13 +34,79 @@ import { markPaperScopes, markScopes } from './scope-stats';
  *   `sources`) and its parents (`page_parents`).
  *
  * Then the paper's or the scope's rows of `page_members` are joined again from those, so the result is the same
- * whichever page changed first, and both halves come from the repos alone, which makes a rebuild give the same
- * rows. Orgs' members (claims and printed domains) come with `handoffs/pages.md` Phase 4.
+ * whichever page changed first, and a rebuild gives the same rows.
+ *
+ * **Orgs** (`handoffs/pages.md` Phase 4): a paper is from an org through the confirmed author claims of verified
+ * members who show their institution (`accounts.show_institution`), and through the addresses printed on its page 1
+ * (`pdf_documents.emails`). Each is a source `domain:<domain>` with `via` `affiliation`, one per domain from the
+ * address's up to its last two labels (`inf.ethz.ch`, `ethz.ch`), weight 1 for a claim and 0.5 for a printed
+ * address; an org page answers to `domain:<d>` for each of its `org.json` `domains`. These come from tables, not
+ * the paper's repo, so besides the paper's own events they are brought up to date by the worker's `org-members` task
+ * (`syncDueAffiliations`), from a queue (`org_members_due`) that triggers on `author_claims`, `affiliations`,
+ * `accounts` and `pdf_documents` fill (migration `0038`). Claims and printed addresses share one `via`, so nothing
+ * public says which of the two put a paper on an org's page.
  */
 
 interface MemberSource {
   via: string;
   source: string;
+}
+
+/** How an org's papers belong (`page_members.via`), whether through a member's claim or a printed address. */
+export const AFFILIATION_VIA = 'affiliation';
+/** The weight of a paper from an org through an address printed on page 1 alone: likely, not certain. */
+export const PRINTED_ADDRESS_WEIGHT = 0.5;
+
+/** A list of page ids for `in (…)`. */
+function idList(ids: readonly string[]) {
+  return sql`(${sql.join(
+    ids.map((id) => sql`${id}::uuid`),
+    sql`, `,
+  )})`;
+}
+
+/**
+ * The affiliation sources of the papers `paperIds` selects (a subquery of page ids, or every paper when `null`):
+ * each domain of a confirmed author's confirmed address, where the author is a verified account (not a bot) that
+ * shows its institution, and each domain of an address printed on page 1 of the paper's current PDF.
+ */
+function affiliationSources(paperIds: SQL | null) {
+  const claims = paperIds ? sql`and ac.paper_id in (${paperIds})` : sql``;
+  const printed = paperIds ? sql`where c.page_id in (${paperIds})` : sql``;
+  return sql`
+    select x.paper_id, ${AFFILIATION_VIA} as via, 'domain:' || x.domain as source, max(x.weight) as weight
+      from (
+        select ac.paper_id, s.domain, 1::float8 as weight
+          from author_claims ac
+          join accounts a on a.id = ac.account_id and a.show_institution and a.verified_at is not null and not a.is_bot
+          join affiliations f on f.account_id = a.id and f.verified_at is not null
+          cross join lateral domain_suffixes(split_part(f.email, '@', 2)) s(domain)
+         where ac.status = 'confirmed' ${claims}
+        union all
+        select c.page_id, s.domain, ${PRINTED_ADDRESS_WEIGHT}::float8
+          from page_current c
+          join pdf_documents d on d.sha256 = c.pdf ->> 'sha256'
+          cross join lateral unnest(d.emails) e(email)
+          cross join lateral domain_suffixes(split_part(e.email, '@', 2)) s(domain)
+          ${printed}
+      ) x
+      join pages p on p.id = x.paper_id and p.kind = 'paper'
+     group by x.paper_id, x.domain
+  `;
+}
+
+/** Writes the affiliation sources of the papers `paperIds` selects (all of them when `null`), replacing theirs. */
+async function writeAffiliationSources(tx: Writer, paperIds: SQL | null): Promise<void> {
+  await tx.execute(
+    paperIds
+      ? sql`delete from page_member_sources where via = ${AFFILIATION_VIA} and paper_id in (${paperIds})`
+      : sql`delete from page_member_sources where via = ${AFFILIATION_VIA}`,
+  );
+  await tx.execute(sql`
+    insert into page_member_sources (paper_id, via, source, weight)
+    ${affiliationSources(paperIds)}
+    on conflict (paper_id, via, source) do update set weight = excluded.weight
+  `);
 }
 
 /** What a paper at this commit says it belongs to. */
@@ -61,15 +127,16 @@ async function paperSources(db: Reader, page: PageRow, files: ReadonlyMap<string
   return [...out.values()];
 }
 
-/** Joins the paper's rows of `page_members` again from its sources and the scopes' names. */
-async function joinPaper(tx: Writer, paperId: string): Promise<void> {
-  await tx.delete(pageMembers).where(eq(pageMembers.paperId, paperId));
+/** Joins the rows of `page_members` of the papers `paperIds` selects again from their sources and the scopes' names. */
+async function joinPapers(tx: Writer, paperIds: SQL): Promise<void> {
+  await tx.execute(sql`delete from page_members where paper_id in (${paperIds})`);
   await tx.execute(sql`
-    insert into page_members (scope_page_id, paper_id, via)
-    select distinct n.page_id, s.paper_id, s.via
+    insert into page_members (scope_page_id, paper_id, via, weight)
+    select n.page_id, s.paper_id, s.via, max(s.weight)
       from page_member_sources s
       join page_scope_names n on n.name = s.source
-     where s.paper_id = ${paperId}
+     where s.paper_id in (${paperIds})
+     group by n.page_id, s.paper_id, s.via
     on conflict do nothing
   `);
 }
@@ -78,11 +145,12 @@ async function joinPaper(tx: Writer, paperId: string): Promise<void> {
 async function joinScope(tx: Writer, scopeId: string): Promise<void> {
   await tx.delete(pageMembers).where(eq(pageMembers.scopePageId, scopeId));
   await tx.execute(sql`
-    insert into page_members (scope_page_id, paper_id, via)
-    select distinct n.page_id, s.paper_id, s.via
+    insert into page_members (scope_page_id, paper_id, via, weight)
+    select n.page_id, s.paper_id, s.via, max(s.weight)
       from page_scope_names n
       join page_member_sources s on s.source = n.name
      where n.page_id = ${scopeId}
+     group by n.page_id, s.paper_id, s.via
     on conflict do nothing
   `);
 }
@@ -131,7 +199,9 @@ export async function indexMembers(database: Database, pageId: string, head: str
       if (sources.length > 0) {
         await tx.insert(pageMemberSources).values(sources.map((s) => ({ paperId: pageId, ...s })));
       }
-      await joinPaper(tx, pageId);
+      // Its PDF may have changed, and with it the addresses on page 1.
+      await writeAffiliationSources(tx, sql`select ${pageId}::uuid`);
+      await joinPapers(tx, sql`select ${pageId}::uuid`);
       await markPaperScopes(tx, pageId);
     });
     return;
@@ -167,11 +237,46 @@ export const membersConsumer: Consumer = {
     await indexMembers(database, pageId, head);
   },
   async reset({ database }) {
-    await database.execute(
-      sql`truncate page_members, page_member_sources, page_scope_names, page_parents, page_ancestors`,
-    );
+    await database.transaction(async (tx) => {
+      await tx.execute(
+        sql`truncate page_members, page_member_sources, page_scope_names, page_parents, page_ancestors, org_members_due`,
+      );
+      // A paper with claims but no repo has no events to replay; its affiliations are written here, and joined when
+      // the org pages' events are.
+      await writeAffiliationSources(tx, null);
+    });
   },
 };
+
+/**
+ * Brings the affiliation sources of the papers due (`org_members_due`) up to date, and their rows of `page_members`,
+ * a batch at a time; the worker's `org-members` task. Returns how many papers it did.
+ */
+export async function syncDueAffiliations(options: { database?: Database; batch?: number } = {}): Promise<number> {
+  const { database = getDb(), batch = 500 } = options;
+  let done = 0;
+  for (;;) {
+    const ids = await database.transaction(async (tx) => {
+      const { rows } = await tx.execute<{ paper_id: string }>(sql`
+        delete from org_members_due
+         where paper_id in (
+           select paper_id from org_members_due order by marked_at, paper_id limit ${batch} for update skip locked
+         )
+        returning paper_id
+      `);
+      const ids = rows.map((row) => row.paper_id).sort();
+      if (ids.length === 0) return ids;
+      const papers = sql`select id from pages where kind = 'paper' and id in ${idList(ids)}`;
+      await markScopes(tx, sql`select scope_page_id from page_members where paper_id in (${papers})`);
+      await writeAffiliationSources(tx, papers);
+      await joinPapers(tx, papers);
+      await markScopes(tx, sql`select scope_page_id from page_members where paper_id in (${papers})`);
+      return ids;
+    });
+    done += ids.length;
+    if (ids.length < batch) return done;
+  }
+}
 
 /** A scope's pages: itself and every page it is an ancestor of (its editions, narrower topics, labs). */
 export function rolledUp(scopeId: string) {

@@ -6,6 +6,7 @@ import { accounts, affiliations, type Account, type Affiliation } from '@/db/sch
 import { ApiError } from './api/errors';
 import { claimByEmail } from './claims';
 import { institutionForEmail } from './institution-domains';
+import { ensureOrgPageFor } from './org-pages';
 import { affiliationCodeMail, affiliationTakenMail } from '@/lib/auth-mails';
 import { sendMail } from './mail';
 import { consume, rateLimitHeaders, type RateLimitConfig } from './ratelimit';
@@ -262,6 +263,8 @@ export async function verifyAffiliation(
   }
   // A newly confirmed address may be on the first page of a paper, claimed or not.
   await claimByEmail({ accountId: input.accountId }, database);
+  // And its institution may have no page yet.
+  await ensureOrgPageFor(outcome.row.email, database);
   return outcome.row;
 }
 

@@ -2,7 +2,10 @@
  * What a person's page (`/u/<handle>`, `handoffs/pages.md` Phase 3) may show beyond its handle, its `about/` and its
  * links: each item is a `user.show.<item>` setting in the account's settings.json, and defaults to what DESIGN.md
  * §5.3 allows without asking, so that nothing ties the handle to a real name or an author identity unless the account
- * turns it on. The page's `profile.json` repeats the choices (never the values), so a clone of the page says what it
+ * turns it on. **The institution is the one exception** (`handoffs/pages.md` Phase 4): it is the account's
+ * `show_institution`, asked at sign-up and changed on `/profile`, which also puts the institution beside the handle on
+ * comments, lists the account among its organisation's members and counts its papers there. One switch, so the
+ * institution is never public in one place and hidden in another. The page's `profile.json` repeats the choices (never the values), so a clone of the page says what it
  * shows; the settings are what counts (`server/user-pages.ts`).
  *
  * The items and their defaults are a decision for Benedict to confirm (`handoffs/pages.md`, Open questions).
@@ -13,6 +16,11 @@
 export const USER_SHOW_ITEMS = ['realName', 'institution', 'claimedPapers', 'activity', 'comments'] as const;
 export type UserShowItem = (typeof USER_SHOW_ITEMS)[number];
 export type UserShown = Record<UserShowItem, boolean>;
+
+/** The items that are settings: all but the institution, which is the account's `show_institution`. */
+export const USER_SHOW_SETTINGS = USER_SHOW_ITEMS.filter(
+  (item): item is Exclude<UserShowItem, 'institution'> => item !== 'institution',
+);
 
 export interface UserShowInfo {
   /** The settings form's label. */
@@ -32,7 +40,7 @@ export const USER_SHOW: Record<UserShowItem, UserShowInfo> = {
   institution: {
     title: 'Institution',
     description:
-      'Show the institutions of your confirmed addresses on your page. Off by default: at a small institution this alone can identify you.',
+      "Show the institutions of your confirmed addresses: on your page, beside your handle on comments, and on your organisation's page, which then lists you as a member and counts the papers you authored. Set on your profile, where you answered it at sign-up; off until you choose.",
     default: false,
   },
   claimedPapers: {
@@ -62,13 +70,19 @@ export const DEFAULT_SHOWN: UserShown = Object.fromEntries(
   USER_SHOW_ITEMS.map((item) => [item, USER_SHOW[item].default]),
 ) as UserShown;
 
-/** The choices as resolved settings say them; anything not a boolean reads as the default. */
-export function shownFromSettings(values: Record<string, unknown>): UserShown {
-  return Object.fromEntries(
-    USER_SHOW_ITEMS.map((item) => {
+/**
+ * The choices as resolved settings say them, anything not a boolean reading as the default, with the institution as
+ * the account's `show_institution` says.
+ */
+export function shownFromSettings(values: Record<string, unknown>, showInstitution: boolean): UserShown {
+  const shown = Object.fromEntries(
+    USER_SHOW_SETTINGS.map((item) => {
       const value = values[userShowKey(item)];
       return [item, typeof value === 'boolean' ? value : USER_SHOW[item].default];
     }),
+  );
+  return Object.fromEntries(
+    USER_SHOW_ITEMS.map((item) => [item, item === 'institution' ? showInstitution : shown[item]]),
   ) as UserShown;
 }
 

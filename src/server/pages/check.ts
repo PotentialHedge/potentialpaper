@@ -1,7 +1,7 @@
 import { randomBytes } from 'node:crypto';
 import { and, eq } from 'drizzle-orm';
 import { accounts, authorClaims, botGrants, commitIdentities, papers } from '@/db/schema';
-import { type PageKind, partsOf } from '@/lib/kinds';
+import { isUnderDomain, KINDS, orgFileSchema, type PageKind, partsOf } from '@/lib/kinds';
 import { parseReviewPath, SUBMISSION_FILE } from '@/lib/review-files';
 import { cleanEvidence } from '@/lib/evidence';
 import { MAX_LINKS, parseLinkFile } from '@/lib/paper-links';
@@ -16,6 +16,7 @@ import { mustPage, type PageRow } from './kinds';
 import { changedFiles, type Reader } from './repo';
 import {
   contentProblem,
+  grantCovers,
   isDemoPath,
   isLinkPath,
   isReviewPath,
@@ -47,6 +48,7 @@ import {
 } from './rules';
 import { prekProblem } from './starter';
 import { pageClaimRoles } from '../page-claims';
+import { domainsAbove, isOrgMember } from '../org-roles';
 
 /**
  * Whether a change to a page's tree is allowed: who is making it, what it writes, and what the whole tree
@@ -89,14 +91,15 @@ async function keyedRoles(db: Reader, actor: Actor, page: PageRow): Promise<Acto
     : [];
   // A venue's confirmed organisers, here or on the series above it (`page-claims.ts`).
   const claims = await pageClaimRoles(db, page, account.isBot ? null : actor.accountId);
+  // An org's verified members, by address, here or on an org above it (`org-roles.ts`).
+  const member = !account.isBot && account.verifiedAt !== null && (await isOrgMember(db, page, actor.accountId));
   return {
     ...none,
     system: false,
     admin: actor.isAdmin,
     verified: account.isBot || account.verifiedAt !== null,
-    // A user page is its account's, and its agents' tokens act as the account. An org's members (affiliations) are
-    // owners from `handoffs/pages.md` Phase 4.
-    owner: (page.kind === 'user' && !account.isBot && account.handle === page.key) || claims.owner,
+    // A user page is its account's, and its agents' tokens act as the account.
+    owner: (page.kind === 'user' && !account.isBot && account.handle === page.key) || claims.owner || member,
     claimed: claims.claimed,
     bot: account.isBot,
     grants,
@@ -425,6 +428,59 @@ async function checkLfsFiles(changed: readonly string[], after: FileTree, text: 
   }
 }
 
+async function orgDomains(files: FileTree, text: TextOf): Promise<string[]> {
+  const blob = files.get(KINDS.org.kindFile);
+  if (!blob) return [];
+  try {
+    const parsed = orgFileSchema.safeParse(JSON.parse((await text(blob)) ?? 'null'));
+    return parsed.success ? (parsed.data.domains ?? []) : [];
+  } catch {
+    return [];
+  }
+}
+
+/**
+ * An org's `domains` say who its members are and which papers are its own, so they are not anyone's to widen
+ * (`handoffs/pages.md` Phase 4). A top-level org's come from the institution allowlist: only admins and the `orgs`
+ * bot change them. A department's or lab's are its organisation's or under them (`inf.ethz.ch` under `ethz.ch`), so
+ * its members can't take in another institution's people or papers.
+ */
+async function checkOrgDomains(db: Reader, check: TreeCheck): Promise<void> {
+  const { roles } = check;
+  if (roles.system || roles.admin) return;
+  const path = KINDS.org.kindFile;
+  const page = await mustPage(db, check.pageId);
+  const after = await orgDomains(check.after, check.text);
+  if (!page.key.includes('/')) {
+    const granted = roles.grants?.some((pattern) => grantCovers(pattern, path)) ?? false;
+    if (granted) return;
+    const before = await orgDomains(check.before, check.text);
+    const same = before.length === after.length && before.every((domain) => after.includes(domain));
+    if (!same) {
+      throw new ApiError(
+        403,
+        'forbidden',
+        `${path}: only admins and the orgs bot change a top-level organisation's domains`,
+        { path },
+      );
+    }
+    return;
+  }
+  const above = await domainsAbove(db, page);
+  for (const domain of after) {
+    if (!above.some((under) => isUnderDomain(domain, under))) {
+      throw new ApiError(
+        422,
+        'validation_error',
+        above.length > 0
+          ? `${path}: ${domain} is not one of its organisation's domains or under one (${above.join(', ')})`
+          : `${path}: ${domain}: its organisation has no domains for a department's to be under`,
+        { path },
+      );
+    }
+  }
+}
+
 export interface TreeCheck {
   pageId: string;
   /** The roles of whoever commits, on this page; `kind` is the page's (a paper's when absent). */
@@ -486,6 +542,9 @@ export async function checkTree(db: Reader, check: TreeCheck): Promise<string[]>
 
   const kind = roles.kind ?? 'paper';
   checkTreeShape(after, kind);
+  if (kind === 'org' && changed.includes(KINDS.org.kindFile)) {
+    await checkOrgDomains(db, check);
+  }
   // Pages of other kinds have no title links, PDFs, pictures or demos (`lib/kinds.ts`'s file types).
   if (kind !== 'paper') return [];
   if (changed.some(isLinkPath)) await checkLinkLabels(after, text);

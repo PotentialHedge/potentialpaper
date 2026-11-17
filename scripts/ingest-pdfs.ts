@@ -2,6 +2,7 @@ import 'dotenv/config';
 import { parseArgs } from 'node:util';
 import { getPool } from '@/db';
 import { ingest, STAGES, type IngestOptions } from '@/server/pdfs/ingest';
+import { syncOrgPages } from '@/server/org-pages';
 
 const USAGE = `Runs the PDF ingest pipeline (src/server/pdfs/ingest.ts) over every PDF a page points at: each
 stage that is missing or out of date, and failures again once their retry is due. Safe to stop and run again.
@@ -46,6 +47,11 @@ async function main() {
   const pass = async () => {
     const started = Date.now();
     const report = await ingest(options);
+    if (report.documents > 0) {
+      // Addresses read off page 1 may be at institutions with no page yet (the \`orgs\` bot).
+      const orgs = await syncOrgPages();
+      if (orgs.written.length > 0) console.log(`${orgs.written.length} org pages written`);
+    }
     if (report.documents > 0 || !values.watch) {
       const stages = Object.entries(report.stages)
         .map(([name, { done, failed }]) => `${name} ${done} done${failed ? `, ${failed} failed` : ''}`)

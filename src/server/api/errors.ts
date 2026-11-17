@@ -29,6 +29,7 @@ export const API_ERROR_CODES = [
   'page_busy',
   'claim_taken',
   'claim_decided',
+  'page_exists',
   'method_not_allowed',
   'internal_error',
   // A push (`server/pages/receive.ts`).

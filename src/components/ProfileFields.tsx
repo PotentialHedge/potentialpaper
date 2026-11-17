@@ -85,8 +85,10 @@ export function ProfileFields({
         </label>
       </fieldset>
       <p className={ui.fine}>
-        At a small institution, the name alone can identify you. Moderators can always see your real account. On papers
-        you have claimed as an author, you always appear under the name printed on the paper.
+        Showing it puts it beside your handle on comments and on your page, lists you among your organisation&rsquo;s
+        members on its page, and counts the papers you authored there. At a small institution, the name alone can
+        identify you. Moderators can always see your real account. On papers you have claimed as an author, you always
+        appear under the name printed on the paper.
       </p>
     </>
   );

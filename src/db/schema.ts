@@ -445,8 +445,11 @@ export const pageLinks = pgTable(
 
 /**
  * What each paper says it belongs to, by public name: a submission's venue (`via` `submission`, `source`
- * `openreview:ICLR.cc/2027/Conference`) or a topic it links to (`via` the label, `source` `topic:<slug>`). Written by
- * the `members` consumer (`server/page-members.ts`) from the paper's files, whether or not a page of that name
+ * `openreview:ICLR.cc/2027/Conference`), a topic it links to (`via` the label, `source` `topic:<slug>`), or an
+ * institution's email domain (`via` `affiliation`, `source` `domain:ethz.ch`, and every domain above the address's:
+ * a confirmed author who shows their institution, weight 1, or an address printed on page 1, weight 0.5). Written by
+ * the `members` consumer (`server/page-members.ts`) from the paper's files and, for affiliations, from
+ * `author_claims`, `affiliations` and `pdf_documents` (`server/org-members.ts`), whether or not a page of that name
  * exists yet, so `page_members` can be joined again whenever one appears.
  */
 export const pageMemberSources = pgTable(
@@ -457,9 +460,23 @@ export const pageMemberSources = pgTable(
       .references(() => pages.id, { onDelete: 'cascade' }),
     via: text('via').notNull(),
     source: text('source').notNull(),
+    /** How sure it is: 1, or less for a source that counts for less than certain (an address printed on page 1). */
+    weight: doublePrecision('weight').notNull().default(1),
   },
   (t) => [primaryKey({ columns: [t.paperId, t.via, t.source] }), index('page_member_sources_source_idx').on(t.source)],
 );
+
+/**
+ * Papers whose affiliation sources (`page_member_sources` with `via` `affiliation`) are due again, because something
+ * they come from changed outside the paper's repo: a claim confirmed or withdrawn, an address confirmed or removed, an
+ * account's `show_institution`, the addresses read off a PDF. Filled by triggers on those tables (migration `0038`),
+ * emptied by the worker's `org-members` task (`server/org-members.ts`).
+ */
+export const orgMembersDue = pgTable('org_members_due', {
+  /** A paper's page id; no foreign key, since the triggers fire while a paper is being deleted too. */
+  paperId: uuid('paper_id').primaryKey(),
+  markedAt: timestamp('marked_at', { withTimezone: true, mode: 'date' }).notNull().defaultNow(),
+});
 
 /**
  * The names a scope (a venue, topic or org page) answers to: its own identifier (`venue:iclr/2027`) and its kind
@@ -490,7 +507,8 @@ export const pageParents = pgTable(
 
 /**
  * The papers of every scope (`handoffs/pages.md`): a venue's through their submissions, a topic's through links,
- * later an org's through claims and domains. Every list, count, statistic and plugin query above the paper reads
+ * an org's through its members' confirmed claims and the domains printed on page 1 (`via` `affiliation` for both, so
+ * nothing public tells the two apart). Every list, count, statistic and plugin query above the paper reads
  * this table, rolled up through `page_ancestors`. Written only by the `members` consumer; `weight` is for later
  * sources that count for less than certain (a domain printed on page 1).
  */

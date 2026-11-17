@@ -91,7 +91,10 @@ export const orgFileSchema = z
       .array(z.string().regex(/^[a-z0-9-]+(\.[a-z0-9-]+)+$/))
       .max(20)
       .optional()
-      .meta({ description: 'Email domains whose verified addresses make someone a member: "ethz.ch".' }),
+      .meta({
+        description:
+          "Email domains whose confirmed addresses, at the domain or under it, make someone a member, and whose addresses on papers make them its papers: \"ethz.ch\". A department's are its organisation's or under them; a top-level organisation's are changed by admins and the orgs bot.",
+      }),
     parents: slugList('Organisations it belongs to besides the one its address is under, by key: "eth".'),
     ror: z
       .string()
@@ -328,12 +331,33 @@ export function parentsOf(kind: KeyedKind, key: string, kindFile: unknown): stri
 
 /**
  * The names a scope answers to besides its own identifier: a venue's `sources`, so that a paper's submission to
- * `openreview:ICLR.cc/2027/Conference` makes it a member of the venue page that lists that source.
+ * `openreview:ICLR.cc/2027/Conference` makes it a member of the venue page that lists that source; an org's
+ * `domains`, as `domain:ethz.ch`, so that a paper with a member's claim or an address at that domain (or under it) is
+ * one of its papers (`server/page-members.ts`).
  */
 export function sourcesOf(kind: KeyedKind, kindFile: unknown): string[] {
-  if (kind !== 'venue') return [];
-  const parsed = venueFileSchema.safeParse(kindFile);
-  return parsed.success ? (parsed.data.sources ?? []) : [];
+  if (kind === 'venue') {
+    const parsed = venueFileSchema.safeParse(kindFile);
+    return parsed.success ? (parsed.data.sources ?? []) : [];
+  }
+  if (kind === 'org') {
+    const parsed = orgFileSchema.safeParse(kindFile);
+    return parsed.success ? (parsed.data.domains ?? []).map(domainName) : [];
+  }
+  return [];
+}
+
+/** The name a domain goes by among a scope's names (`page_scope_names`): `domain:ethz.ch`. */
+export function domainName(domain: string): string {
+  return `domain:${domain}`;
+}
+
+/**
+ * Whether `domain` is `under` or one of its subdomains: `inf.ethz.ch` is under `ethz.ch`, and so is `ethz.ch`; an
+ * address matches an org by every domain it is under, as `server/institution-domains.ts` matches the allowlist.
+ */
+export function isUnderDomain(domain: string, under: string): boolean {
+  return domain === under || domain.endsWith(`.${under}`);
 }
 
 /** The name a keyed page shows: its kind file's `name`, or else its key; a user page's handle. */

@@ -9,7 +9,8 @@ import { ApiError } from './api/errors';
 import { claimByEmail } from './claims';
 import { institutionForEmail } from './institution-domains';
 import { refreshPages } from './pages/refresh';
-import { afterHandleChange, startUserPage } from './user-pages';
+import { ensureOrgPageFor } from './org-pages';
+import { afterHandleChange, startUserPage, syncProfileFile } from './user-pages';
 
 function placeholderHandle(): string {
   return `user-${randomBytes(6)
@@ -72,6 +73,8 @@ export async function ensureAccountForUser(
       }
       // Its page at /u/<handle> exists already (a trigger made it with the account); its repo starts here.
       await startUserPage(created, database);
+      // Its institution's page, if nobody from there has come before.
+      if (institution) await ensureOrgPageFor(user.email, database);
       return created;
     } catch (err) {
       if (!isUniqueViolation(err)) throw err;
@@ -125,6 +128,10 @@ export async function updateProfile(
       })
       .where(eq(accounts.id, account.id))
       .returning();
+    // The page's profile.json says whether it shows the institution (`user-pages.ts`).
+    if (updated.showInstitution !== account.showInstitution) {
+      await syncProfileFile(updated, database).catch((err) => console.error('profile.json', err));
+    }
     // The trigger moved the page to the new handle and left a redirect from the old one.
     if (updated.handle !== account.handle) await afterHandleChange(account.handle, updated.handle, database);
     // What the page shows may have changed (a real name), whether or not it shows it.

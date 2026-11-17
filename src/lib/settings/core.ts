@@ -5,7 +5,7 @@ import { PAGE_PANELS, PANEL_KINDS, panelIds, SLOT_TITLES, type PanelKind } from 
 import { PLUGIN_PANEL_ID_RE } from '../plugins/manifest';
 import { parsePluginSource, sourceKey } from '../plugins/sources';
 import { PLUGIN_ID_RE } from './spec';
-import { USER_SHOW, USER_SHOW_ITEMS, userShowKey } from '../user-pages';
+import { USER_SHOW, USER_SHOW_SETTINGS, userShowKey } from '../user-pages';
 
 /**
  * The site's own settings: one entry per key, with its schema, default and description. The settings form, the
@@ -197,10 +197,13 @@ const PLUGIN_SETTINGS: Record<string, CoreSetting> = {
   },
 };
 
-/** What the account's public page shows (`lib/user-pages.ts`): one switch per item, the account's own choice. */
+/**
+ * What the account's public page shows (`lib/user-pages.ts`): one switch per item, the account's own choice. The
+ * institution is not among them: it is the profile's "show your institution", which governs it everywhere.
+ */
 export const USER_PAGE_GROUP = 'Your public page';
 const USER_SETTINGS: Record<string, CoreSetting> = Object.fromEntries(
-  USER_SHOW_ITEMS.map((item): [string, CoreSetting] => [
+  USER_SHOW_SETTINGS.map((item): [string, CoreSetting] => [
     userShowKey(item),
     {
       schema: z.boolean() as z.ZodType,

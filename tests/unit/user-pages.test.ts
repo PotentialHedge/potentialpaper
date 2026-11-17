@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { parseLabeledLinks } from '@/lib/labeled-links';
 import { checkSettings, CORE_SETTINGS, parseSettings, resolveSettings, settingsJsonSchema } from '@/lib/settings';
-import { DEFAULT_SHOWN, profileFileText, shownFromSettings, USER_SHOW_ITEMS, userShowKey } from '@/lib/user-pages';
+import { DEFAULT_SHOWN, profileFileText, shownFromSettings, USER_SHOW_SETTINGS, userShowKey } from '@/lib/user-pages';
 import { profileFileSchema } from '@/lib/kinds';
 import { commentExcerpt } from '@/server/user-pages';
 
@@ -15,14 +15,27 @@ describe('what a user page shows', () => {
       comments: true,
     });
     const values = resolveSettings({});
-    for (const item of USER_SHOW_ITEMS) expect(values[userShowKey(item)]).toBe(DEFAULT_SHOWN[item]);
+    for (const item of USER_SHOW_SETTINGS) expect(values[userShowKey(item)]).toBe(DEFAULT_SHOWN[item]);
+    expect(shownFromSettings(values, false)).toEqual(DEFAULT_SHOWN);
+  });
+
+  it("takes the institution from the account's show_institution, not from a setting", () => {
+    expect(CORE_SETTINGS['user.show.institution']).toBeUndefined();
+    expect(shownFromSettings(resolveSettings({}), true)).toEqual({ ...DEFAULT_SHOWN, institution: true });
+    expect(shownFromSettings({ 'user.show.institution': true }, false).institution).toBe(false);
+    expect(checkSettings('{ "user.show.institution": true }')).toEqual([
+      expect.objectContaining({ severity: 'warning', key: 'user.show.institution' }),
+    ]);
   });
 
   it("is each account's own choice: the site layer can't turn an item on", () => {
     const site = parseSettings('{ "user.show.realName": true, "user.show.activity": false }');
-    expect(shownFromSettings(resolveSettings({ site }))).toEqual(DEFAULT_SHOWN);
+    expect(shownFromSettings(resolveSettings({ site }), false)).toEqual(DEFAULT_SHOWN);
     const user = parseSettings('{ "user.show.realName": true, "user.show.activity": false }');
-    expect(shownFromSettings(resolveSettings({ site, user }))).toMatchObject({ realName: true, activity: false });
+    expect(shownFromSettings(resolveSettings({ site, user }), false)).toMatchObject({
+      realName: true,
+      activity: false,
+    });
     expect(checkSettings('{ "user.show.realName": true }', [], 'site')).toEqual([
       expect.objectContaining({ severity: 'warning', key: 'user.show.realName' }),
     ]);
@@ -33,11 +46,11 @@ describe('what a user page shows', () => {
     expect(checkSettings('{ "user.show.realName": "yes" }')).toEqual([
       expect.objectContaining({ severity: 'error', key: 'user.show.realName' }),
     ]);
-    expect(shownFromSettings(resolveSettings({ user: { 'user.show.realName': 'yes' } })).realName).toBe(false);
+    expect(shownFromSettings(resolveSettings({ user: { 'user.show.realName': 'yes' } }), false).realName).toBe(false);
   });
 
   it('draws each item as a switch, shown to signed-in readers, in the JSON Schema too', () => {
-    for (const item of USER_SHOW_ITEMS) {
+    for (const item of USER_SHOW_SETTINGS) {
       const setting = CORE_SETTINGS[userShowKey(item)];
       expect(setting).toMatchObject({ widget: 'switch', accountOnly: true, signedInOnly: true });
     }

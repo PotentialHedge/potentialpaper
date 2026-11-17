@@ -45,12 +45,12 @@ export async function accountOfUserPage(db: Reader, key: string): Promise<Accoun
 }
 
 /**
- * What the account chose to show, from its own settings.json alone: `user.show.*` are `accountOnly`, so the site
- * layer can't turn them on for everyone.
+ * What the account chose to show, from its own settings.json alone (`user.show.*` are `accountOnly`, so the site
+ * layer can't turn them on for everyone), and its institution as its `show_institution` says.
  */
-export async function shownFor(accountId: string): Promise<UserShown> {
-  const { text } = await userSettingsRow(accountId);
-  return shownFromSettings(resolveSettings({ user: parseSettings(text) }));
+export async function shownFor(account: Pick<Account, 'id' | 'showInstitution'>): Promise<UserShown> {
+  const { text } = await userSettingsRow(account.id);
+  return shownFromSettings(resolveSettings({ user: parseSettings(text) }), account.showInstitution);
 }
 
 export interface ClaimedPaper {
@@ -100,7 +100,7 @@ export async function userPageView(
   if (page.kind !== 'user') return null;
   const account = await accountOfUserPage(database, page.key);
   if (!account) return null;
-  const shown = await shownFor(account.id);
+  const shown = await shownFor(account);
   const [claimedPapers, activity, commentList] = await Promise.all([
     shown.claimedPapers ? claimedPapersOf(account.id, database) : null,
     shown.activity && !account.isBot ? activityOf(account.id, limit, database) : shown.activity ? [] : null,
@@ -239,9 +239,9 @@ export async function startUserPage(
 }
 
 /**
- * Brings the page's `profile.json` in line with the account's `user.show.*` settings: a commit by the system, only
- * when it differs; on a page with no repo yet, its first commit. Called when the account is made, when its settings
- * are saved, and by `npm run users:pages`. The page reads the settings, never the file, so a failure here shows nothing it shouldn't.
+ * Brings the page's `profile.json` in line with the account's `user.show.*` settings and its `show_institution`: a
+ * commit by the system, only when it differs; on a page with no repo yet, its first commit. Called when the account is
+ * made, when its settings are saved or its profile's institution choice changes, and by `npm run users:pages`. The page reads the settings, never the file, so a failure here shows nothing it shouldn't.
  */
 export async function syncProfileFile(
   account: Pick<Account, 'id' | 'handle'>,
@@ -249,7 +249,12 @@ export async function syncProfileFile(
 ): Promise<'committed' | 'unchanged' | 'no-page'> {
   const page = await findKeyedPage(database, 'user', account.handle);
   if (!page) return 'no-page';
-  const shown = await shownFor(account.id);
+  const [row] = await database
+    .select({ id: accounts.id, showInstitution: accounts.showInstitution })
+    .from(accounts)
+    .where(eq(accounts.id, account.id));
+  if (!row) return 'no-page';
+  const shown = await shownFor(row);
   const text = profileFileText(shown);
   const [current] = await database
     .select({ kindFile: pageCurrent.kindFile })
