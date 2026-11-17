@@ -1291,6 +1291,22 @@ export const userPluginStorage = pgTable(
 );
 
 /**
+ * The keys that sign plugins' identity tokens (`server/plugins/identity.ts`, `handoffs/plugins.md` Phase 5): ES256
+ * key pairs as JWKs. The newest unretired key signs; every unretired key is published at `/.well-known/jwks.json`, so
+ * a backend verifies tokens across a rotation. The first is made on first use; `npm run identity:keys` rotates and
+ * retires them.
+ */
+export const identityKeys = pgTable('identity_keys', {
+  kid: text('kid').primaryKey(),
+  alg: text('alg').notNull(),
+  privateJwk: jsonb('private_jwk').$type<Record<string, string>>().notNull(),
+  publicJwk: jsonb('public_jwk').$type<Record<string, string>>().notNull(),
+  createdAt: createdAt(),
+  /** When it stopped being published; tokens it signed no longer verify. */
+  retiredAt: timestamp('retired_at', { withTimezone: true, mode: 'date' }),
+});
+
+/**
  * Score statistics of every scope (`handoffs/plugins.md` Phase 4, data for plugins A), per `(scope, venue, field)`:
  * every submission's mean over its reviews for a score field of the venue's review forms, sorted, with bins and the
  * split by outcome (`lib/scope-stats.ts`). Rolled up like membership. Written only by `server/scope-stats.ts`, from

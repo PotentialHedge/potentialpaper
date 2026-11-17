@@ -705,6 +705,14 @@ export const InstalledPlugin = z.object({
       baseUrl: z.string(),
       origin: z.string(),
       manifest: z.record(z.string(), z.unknown()),
+      bot: z
+        .object({
+          handle: z.string(),
+          known: z.boolean(),
+          grants: z.array(z.object({ kind: z.string(), pattern: z.string() })),
+        })
+        .nullable()
+        .optional(),
     })
     .nullable(),
   missing: PluginMissing,
@@ -725,6 +733,31 @@ export const PluginGrantBody = z.object({
   commit: z.string().regex(/^[0-9a-f]{40}$/),
 });
 export const PluginIdQuery = z.object({ plugin: z.string().min(1).max(120) });
+/** `POST /me/plugins/identity`: a token for one of the reader's plugins; `dev` for one loaded from localhost. */
+export const PluginIdentityBody = z.object({ plugin: z.string().min(1).max(120), dev: z.boolean().optional() });
+export const PluginIdentityToken = z.object({
+  token: z.string(),
+  expiresAt: z.string(),
+  audience: z.string(),
+  issuer: z.string(),
+  subject: z.string(),
+  handle: z.string(),
+  jwksUrl: z.string(),
+});
+/** `/.well-known/jwks.json`: the keys that sign plugins' identity tokens. */
+export const Jwks = z.object({
+  keys: z.array(
+    z.looseObject({
+      kty: z.string(),
+      crv: z.string(),
+      x: z.string(),
+      y: z.string(),
+      kid: z.string(),
+      alg: z.string(),
+      use: z.string(),
+    }),
+  ),
+});
 export const PluginStorageBody = z.object({
   plugin: z.string().min(1).max(120),
   key: z.string().regex(/^[A-Za-z0-9_.:-]{1,100}$/),

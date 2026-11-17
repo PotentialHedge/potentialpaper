@@ -67,6 +67,47 @@ export function missingConsent(
   };
 }
 
+/**
+ * Permissions only the reader can give, even to a site default (`handoffs/plugins.md` Phase 5): `identity` tells a
+ * plugin's backend who the reader is, which no admin can decide for them. A site default that asks for one runs
+ * without it until the reader approves it.
+ */
+export const PERSONAL_PERMISSIONS: readonly PluginPermission[] = ['identity'];
+
+/**
+ * What the reader must still approve for a plugin: everything a `user` plugin asks for that its grant doesn't give;
+ * for a `site` default, only its personal permissions.
+ */
+export function consentMissing(
+  from: InstalledEntry['from'],
+  manifest: Pick<PluginManifest, 'permissions' | 'network'>,
+  grant: Grant | null,
+): { permissions: PluginPermission[]; network: string[] } {
+  const missing = missingConsent(manifest, grant);
+  if (from === 'user') return missing;
+  return { permissions: missing.permissions.filter((p) => PERSONAL_PERMISSIONS.includes(p)), network: [] };
+}
+
+/** The permissions a running plugin's calls are checked against: what it asks for, less what waits for approval. */
+export function runningPermissions(
+  plugin: Pick<InstalledPlugin, 'from' | 'missing'> & { plugin: { manifest: Pick<PluginManifest, 'permissions'> } },
+): PluginPermission[] {
+  if (plugin.from === 'dev') return plugin.plugin.manifest.permissions;
+  return plugin.plugin.manifest.permissions.filter((p) => !plugin.missing.permissions.includes(p));
+}
+
+/**
+ * The bot a manifest names (`bot`), as this site knows it: whether there is such a bot, and what it may write. Naming
+ * a bot grants a plugin nothing; the approval prompt says where the plugin's data on pages comes from.
+ */
+export interface PluginBot {
+  handle: string;
+  /** Whether this site has a bot account by that handle. */
+  known: boolean;
+  /** What it may write, by kind of page and path pattern (`bot_grants`). */
+  grants: { kind: PageKind; pattern: string }[];
+}
+
 /** A plugin as the page that runs it sees it (`GET /api/v1/plugins/installed`). */
 export interface InstalledPlugin {
   source: string;
@@ -88,6 +129,8 @@ export interface InstalledPlugin {
     baseUrl: string;
     origin: string;
     manifest: PluginManifest;
+    /** The bot its manifest names, if any. */
+    bot?: PluginBot | null;
   } | null;
   missing: { permissions: PluginPermission[]; network: string[] };
 }

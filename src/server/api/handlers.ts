@@ -66,6 +66,7 @@ import {
   resolvePage,
 } from '../plugins/pages';
 import { pluginStorage, setPluginStorage, storageBytes } from '../plugins/storage';
+import { identityTokenFor } from '../plugins/identity';
 import { DISCOVER_CACHE_MS, discoverPlugins } from '../plugins/discover';
 import { pluginUpdates, updatePlugin } from '../plugins/updates';
 import { findPage } from '../pages/kinds';
@@ -898,6 +899,17 @@ export const deletePluginGrant = route(async (req) => {
   const { plugin } = parseQuery(req, S.PluginIdQuery);
   await revokePlugin(principal.account, plugin);
   return respond(S.Ok, { status: 'ok' }, { principal });
+});
+
+/**
+ * A short-lived token naming the reader to one of their plugins' backends (`pp.identity.token()`, permission
+ * `identity`). Only in a browser: the frame's host asks for it on the plugin's behalf. Never cached.
+ */
+export const postPluginIdentity = route(async (req) => {
+  const principal = await requireSession(req);
+  const body = await parseBody(req, S.PluginIdentityBody);
+  const token = await identityTokenFor(principal.account, body);
+  return respond(S.PluginIdentityToken, token, { principal, headers: { 'Cache-Control': 'no-store' } });
 });
 
 /**

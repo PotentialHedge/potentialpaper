@@ -86,6 +86,7 @@ export const HOST_METHODS = {
   'reviews.forPaper': 'reviews.read',
   'scope.scores': 'scope.read',
   'scope.papers': 'scope.read',
+  'identity.token': 'identity',
   'ui.setHeight': null,
   'ui.openUrl': null,
 } as const satisfies Record<string, PluginPermission | null>;
@@ -106,6 +107,21 @@ export const STORAGE_KEY_RE = /^[A-Za-z0-9_.:-]{1,100}$/;
 export const MAX_PAPERS_CHUNK = 2000;
 /** The fields `scope.papers` can give each paper (`GET /pages/{identifier}/papers?fields=`). */
 export const PAPER_FIELDS = ['submissions', 'scores', 'status'] as const;
+
+/**
+ * What `identity.token` gives (`server/plugins/identity.ts`): a JWT naming the reader to the plugin's own backend,
+ * which checks it against `jwksUrl` with `issuer` and `audience` (the plugin's id).
+ */
+export interface IdentityToken {
+  token: string;
+  expiresAt: string;
+  audience: string;
+  issuer: string;
+  /** The reader's subject for this plugin (`sub`): stable, and different for every plugin. */
+  subject: string;
+  handle: string;
+  jwksUrl: string;
+}
 
 /** The tallest a frame may make itself. */
 export const MAX_FRAME_HEIGHT = 4000;

@@ -6,7 +6,7 @@
 declare namespace PP {
   type PageKind = 'paper' | 'venue' | 'topic' | 'org' | 'user';
 
-  type Permission = 'page.read' | 'scope.read' | 'reviews.read';
+  type Permission = 'page.read' | 'scope.read' | 'reviews.read' | 'identity';
   type Outcome = 'accepted' | 'rejected' | 'withdrawn' | 'pending';
 
   type ErrorCode = 'MethodNotFound' | 'PermissionDenied' | 'InvalidParams' | 'Unavailable' | 'Internal';
@@ -177,6 +177,26 @@ declare namespace PP {
     }[];
   }
 
+  /**
+   * A token naming the reader to your own backend (`identity`). Your backend verifies it (ES256) against `jwksUrl`,
+   * with `iss` = `issuer` (the site's origin) and `aud` = `audience` (your plugin's id), and checks `exp`.
+   */
+  interface IdentityToken {
+    /** The JWT. Claims: `iss`, `aud`, `sub`, `handle`, `plugin`, `iat`, `nbf`, `exp`, `jti` (and `dev: true` from localhost). */
+    token: string;
+    /** When it stops verifying (five minutes after it was made). */
+    expiresAt: string;
+    /** Your plugin's id; `dev:<id>` when it is loaded from localhost. */
+    audience: string;
+    issuer: string;
+    /** The reader's `sub` for your plugin: stable across handle changes, and different for every plugin. */
+    subject: string;
+    /** The reader's handle, as the site shows it. */
+    handle: string;
+    /** `<site>/.well-known/jwks.json`. */
+    jwksUrl: string;
+  }
+
   interface SDK {
     readonly apiVersion: 1;
     /** Resolves with the context once the page has answered; every call waits for it. */
@@ -241,6 +261,15 @@ declare namespace PP {
     reviews: {
       /** Needs `reviews.read`: a paper's submissions, notes and venue forms. The current paper by default. */
       forPaper(identifier?: string): Promise<{ submissions: Submission[] }>;
+    };
+    identity: {
+      /**
+       * Needs `identity`: a token naming the reader, for your backend (one of your `network` origins). Fails with
+       * `Unavailable` when the reader is signed out. The host keeps a token while it has more than a minute left.
+       */
+      token(): Promise<IdentityToken>;
+      /** `fetch` with `Authorization: Bearer <token>` added. */
+      fetch(input: RequestInfo | URL, init?: RequestInit): Promise<Response>;
     };
     ui: {
       /** Size the frame yourself; this turns off the automatic sizing to your body's height. */

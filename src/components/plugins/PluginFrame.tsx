@@ -2,13 +2,14 @@
 
 import { useEffect, useRef, useState } from 'react';
 import { type Connection, connect, HostError, type HostServices } from '@/lib/plugins/host';
-import type { InstalledPlugin } from '@/lib/plugins/installed';
+import { type InstalledPlugin, runningPermissions } from '@/lib/plugins/installed';
 import { API_VERSION } from '@/lib/plugins/manifest';
 import {
   BOOT_MESSAGE,
   type FrameContext,
   HELLO_MESSAGE,
   HOST_METHODS,
+  type IdentityToken,
   MAX_STORAGE_BYTES,
   PROTOCOL_VERSION,
   type Theme,
@@ -98,6 +99,38 @@ async function apiLines(path: string): Promise<{ rows: unknown[]; next: string |
     .filter((line) => line.trim() !== '')
     .map((line) => JSON.parse(line) as unknown);
   return { rows, next: res.headers.get('x-next-cursor') };
+}
+
+/**
+ * A token naming the reader to a plugin's backend (`server/plugins/identity.ts`). Kept per plugin while it has more
+ * than a minute left, so a plugin that asks on every request costs one call to the site every few minutes.
+ */
+const identityTokens = new Map<string, IdentityToken>();
+
+async function identityToken(plugin: ReadyPlugin): Promise<IdentityToken> {
+  if (!settingsSnapshot().signedIn) {
+    identityTokens.clear();
+    throw new HostError('Unavailable', 'the reader is signed out');
+  }
+  const dev = plugin.from === 'dev';
+  const key = `${dev ? 'dev:' : ''}${plugin.plugin.id}`;
+  const kept = identityTokens.get(key);
+  if (kept && Date.parse(kept.expiresAt) - Date.now() > 60_000) return kept;
+  const res = await fetch('/api/v1/me/plugins/identity', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ plugin: plugin.plugin.id, ...(dev ? { dev: true } : {}) }),
+  });
+  const body = await res.json().catch(() => null);
+  if (!res.ok) {
+    const message = body?.error?.message ?? `HTTP ${res.status}`;
+    throw new HostError(
+      res.status === 401 ? 'Unavailable' : res.status === 403 ? 'PermissionDenied' : 'Internal',
+      message,
+    );
+  }
+  identityTokens.set(key, body as IdentityToken);
+  return body as IdentityToken;
 }
 
 interface Latest {
@@ -194,10 +227,11 @@ export function PluginFrame({
     const context = () => frameContext(latest.current);
     const services: HostServices = {
       context,
-      // A site default, or a dev plugin, runs with what it asks for; any other with what the reader granted, which
-      // the server checked covers it before listing it as ready.
+      // A dev plugin runs with what it asks for; a site default with what it asks for less what only the reader can
+      // give and hasn't (`identity`); any other with what the reader granted, which the server checked covers it
+      // before listing it as ready.
       get permissions() {
-        return latest.current.plugin.plugin.manifest.permissions;
+        return runningPermissions(latest.current.plugin);
       },
       get settingSpecs() {
         return latest.current.plugin.plugin.manifest.contributes.settings;
@@ -241,6 +275,7 @@ export function PluginFrame({
       },
       api: apiGet,
       apiLines,
+      identityToken: () => identityToken(latest.current.plugin),
       setHeight: (h) => setHeight(Math.max(0, h)),
       openUrl: (url) => {
         window.open(url, '_blank', 'noopener,noreferrer');

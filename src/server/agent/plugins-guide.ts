@@ -52,6 +52,10 @@ export const METHOD_DOCS: Record<keyof typeof HOST_METHODS, { call: string; does
     call: 'pp.scope.papers([identifier], { fields, onChunk })',
     does: "Every paper of a scope with its submissions, statuses and each review's scores, in chunks, for your own statistics.",
   },
+  'identity.token': {
+    call: 'pp.identity.token()',
+    does: 'A short-lived token naming the signed-in reader to your own backend ([Your own backend](#your-own-backend)). `pp.identity.fetch(url, init)` sends it as `Authorization: Bearer …`.',
+  },
   'ui.setHeight': {
     call: 'pp.ui.setHeight(px)',
     does: `Size your frame yourself (at most ${MAX_FRAME_HEIGHT}px). By default the SDK sizes it to your body.`,

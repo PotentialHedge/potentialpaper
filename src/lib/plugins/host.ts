@@ -10,6 +10,7 @@ import {
   type FrameEvent,
   HOST_METHODS,
   type HostMethod,
+  type IdentityToken,
   isEnvelope,
   MAX_FRAME_HEIGHT,
   MAX_PAPERS_CHUNK,
@@ -53,6 +54,11 @@ export interface HostServices {
    * the chunk after (`X-Next-Cursor`), `null` at the end.
    */
   apiLines(path: string): Promise<{ rows: unknown[]; next: string | null }>;
+  /**
+   * A token naming the signed-in reader to the plugin's backend (`POST /me/plugins/identity`); rejects with
+   * `Unavailable` when the reader is signed out.
+   */
+  identityToken(): Promise<IdentityToken>;
   setHeight(height: number): void;
   openUrl(url: string): void;
 }
@@ -131,6 +137,7 @@ const HANDLERS: Record<HostMethod, Handler> = {
     if (after !== undefined) query.set('after', after as string);
     return s.apiLines(`/pages/${enc(identifier as string)}/papers?${query}`);
   },
+  'identity.token': (s) => s.identityToken(),
   'ui.setHeight': (s, { height }) => s.setHeight(Math.min(MAX_FRAME_HEIGHT, Math.round(height as number))),
   'ui.openUrl': (s, { url }) => s.openUrl(url as string),
 };

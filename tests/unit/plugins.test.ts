@@ -2,7 +2,13 @@ import { readFileSync } from 'node:fs';
 import { runInNewContext } from 'node:vm';
 import { afterEach, describe, expect, it } from 'vitest';
 import { connect, dispatch, type HostServices } from '@/lib/plugins/host';
-import { installedEntries, isBlocked, missingConsent } from '@/lib/plugins/installed';
+import {
+  consentMissing,
+  installedEntries,
+  isBlocked,
+  missingConsent,
+  runningPermissions,
+} from '@/lib/plugins/installed';
 import { manifestJsonSchema, panelSlot, PLUGIN_PANEL_ID_RE, validateManifest } from '@/lib/plugins/manifest';
 import { BOOT_MESSAGE, type FrameContext, HELLO_MESSAGE } from '@/lib/plugins/protocol';
 import { formatPluginSource, parsePluginSource, sourceKey } from '@/lib/plugins/sources';
@@ -259,6 +265,18 @@ function services(
       calls.push(path);
       return { rows: [{ path }], next: null };
     },
+    identityToken: async () => {
+      calls.push('identity');
+      return {
+        token: 'h.p.s',
+        expiresAt: '2026-11-17T12:05:00.000Z',
+        audience: 'potentialhedge/hello',
+        issuer: 'http://test.local',
+        subject: 'p_x',
+        handle: 'ada',
+        jwksUrl: 'http://test.local/.well-known/jwks.json',
+      };
+    },
     setHeight: (h) => calls.push(`height ${h}`),
     openUrl: (url) => calls.push(`open ${url}`),
     ...overrides,
@@ -317,7 +335,7 @@ describe('the host side of the RPC', () => {
 });
 
 /** A window for the SDK to run in: a parent to say hello to, and nothing of a real DOM it doesn't need. */
-function sdkWindow() {
+function sdkWindow(globals: Record<string, unknown> = {}) {
   const listeners: ((event: unknown) => void)[] = [];
   const toParent: unknown[] = [];
   const parent = { postMessage: (message: unknown) => toParent.push(message) };
@@ -344,6 +362,7 @@ function sdkWindow() {
     Error,
     JSON,
     Math,
+    ...globals,
   });
   return { win, listeners, toParent, parent, style };
 }
@@ -455,6 +474,71 @@ describe('data for plugins over the RPC (scope.scores, scope.papers)', () => {
     await expect(pp.scope.papers('venue:iclr/2027', { fields: ['votes'] })).rejects.toMatchObject({
       code: 'InvalidParams',
     });
+    connection.close();
+  });
+});
+
+describe('plugins with their own backend (identity, bot)', () => {
+  it('accepts identity and a bot in the manifest, and warns when there is no backend to send a token to', () => {
+    const report = validateManifest({
+      ...HELLO,
+      permissions: ['identity'],
+      network: ['https://api.example.org'],
+      bot: 'hello-bot',
+    });
+    expect(report.errors).toEqual([]);
+    expect(report.warnings).toEqual([]);
+    expect(report.manifest).toMatchObject({ permissions: ['identity'], bot: 'hello-bot' });
+    expect(validateManifest({ ...HELLO, permissions: ['identity'] }).warnings).toEqual([
+      'permissions: "identity" gives a token for your own backend, and "network" names none to send it to',
+    ]);
+    expect(validateManifest({ ...HELLO, bot: '@Hello Bot' }).errors).toEqual([expect.stringMatching(/^bot: /)]);
+  });
+
+  it('asks the reader for identity even for a site default, which runs without it until then', () => {
+    const manifest = {
+      permissions: ['page.read', 'identity'] as ('page.read' | 'identity')[],
+      network: ['https://a.example.org'],
+    };
+    expect(consentMissing('site', manifest, null)).toEqual({ permissions: ['identity'], network: [] });
+    expect(consentMissing('site', manifest, { permissions: ['identity'], network: [] })).toEqual({
+      permissions: [],
+      network: [],
+    });
+    expect(consentMissing('user', manifest, null)).toEqual({
+      permissions: ['page.read', 'identity'],
+      network: ['https://a.example.org'],
+    });
+    const site = { from: 'site' as const, missing: consentMissing('site', manifest, null), plugin: { manifest } };
+    expect(runningPermissions(site)).toEqual(['page.read']);
+    expect(runningPermissions({ ...site, from: 'dev' })).toEqual(['page.read', 'identity']);
+  });
+
+  it('gives a token only with identity, and the SDK sends it to the backend', async () => {
+    expect(await dispatch(services(), call('identity.token'))).toMatchObject({
+      error: { code: 'PermissionDenied', message: expect.stringContaining('"identity"') },
+    });
+    const s = services({ permissions: ['identity'] });
+    expect(await dispatch(s, call('identity.token'))).toMatchObject({ result: { token: 'h.p.s', handle: 'ada' } });
+
+    const sent: { url: string; auth: string | null; method: string }[] = [];
+    const fakeFetch = async (url: string, init: RequestInit) => {
+      sent.push({ url, auth: new Headers(init.headers).get('authorization'), method: init.method ?? 'GET' });
+      return new Response('{}');
+    };
+    const { win, listeners, parent } = sdkWindow({ fetch: fakeFetch, Headers });
+    const channel = new MessageChannel();
+    open.push(channel.port1, channel.port2);
+    const connection = connect(channel.port1, s);
+    for (const listener of listeners) {
+      listener({ source: parent, data: { type: BOOT_MESSAGE, protocol: 1, context: CONTEXT }, ports: [channel.port2] });
+    }
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any -- the SDK as the page sees it
+    const pp = win.pp as any;
+    await pp.ready;
+    expect((await pp.identity.token()).audience).toBe('potentialhedge/hello');
+    await pp.identity.fetch('https://api.example.org/notes', { method: 'POST', headers: { 'X-A': '1' } });
+    expect(sent).toEqual([{ url: 'https://api.example.org/notes', auth: 'Bearer h.p.s', method: 'POST' }]);
     connection.close();
   });
 });

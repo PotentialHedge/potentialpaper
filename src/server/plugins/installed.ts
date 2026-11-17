@@ -1,13 +1,14 @@
-import { and, eq } from 'drizzle-orm';
+import { and, eq, inArray } from 'drizzle-orm';
 import { getDb, type Database } from '@/db';
-import { userPluginGrants, type Account } from '@/db/schema';
+import { accounts, botGrants, userPluginGrants, type Account } from '@/db/schema';
 import {
+  consentMissing,
   type Grant,
   type InstalledEntry,
   installedEntries,
   type InstalledPlugin,
   isBlocked,
-  missingConsent,
+  type PluginBot,
 } from '@/lib/plugins/installed';
 import { pluginOrigin } from '@/lib/plugins/origin';
 import { parsePluginSource, type PluginSource, sourceKey, sourcePageUrl } from '@/lib/plugins/sources';
@@ -73,6 +74,25 @@ async function grantsOf(account: Account | null, database: Database): Promise<Ma
   return new Map(rows.map((row) => [row.pluginId, row]));
 }
 
+/** The bots manifests name, as this site knows them: whether each is a bot here, and its grants. */
+async function botsByHandle(handles: string[], database: Database): Promise<Map<string, PluginBot>> {
+  const out = new Map<string, PluginBot>();
+  if (handles.length === 0) return out;
+  const rows = await database
+    .select({ handle: accounts.handle, kind: botGrants.kind, pattern: botGrants.pattern })
+    .from(accounts)
+    .leftJoin(botGrants, eq(botGrants.accountId, accounts.id))
+    .where(and(inArray(accounts.handle, handles), eq(accounts.isBot, true)))
+    .orderBy(botGrants.kind, botGrants.pattern);
+  for (const handle of handles) out.set(handle, { handle, known: false, grants: [] });
+  for (const row of rows) {
+    const bot = out.get(row.handle)!;
+    bot.known = true;
+    if (row.kind && row.pattern) bot.grants.push({ kind: row.kind, pattern: row.pattern });
+  }
+  return out;
+}
+
 /**
  * Every plugin the reader's settings install, enabled or not. `fetch` copies those not copied yet (from GitHub, the
  * first time anyone installs a source at a ref); without it, they show as errors until something copies them.
@@ -112,20 +132,23 @@ export async function installedPlugins(
       continue;
     }
     seen.add(plugin.id);
-    const missing =
-      entry.from === 'site'
-        ? { permissions: [], network: [] }
-        : missingConsent(snapshot.manifest, grants.get(plugin.id) ?? null);
+    // A site default runs without the reader's approval, except for what only the reader can give (`identity`),
+    // which it goes without until they do.
+    const missing = consentMissing(entry.from, snapshot.manifest, grants.get(plugin.id) ?? null);
     const status: InstalledPlugin['status'] = !entry.enabled
       ? 'disabled'
       : isBlocked(blocked, plugin.id, plugin.commit)
         ? 'blocked'
-        : missing.permissions.length > 0 ||
-            missing.network.length > 0 ||
-            (entry.from === 'user' && !grants.has(plugin.id))
+        : entry.from === 'user' &&
+            (missing.permissions.length > 0 || missing.network.length > 0 || !grants.has(plugin.id))
           ? 'consent'
           : 'ready';
     out.push({ ...base, status, plugin, missing });
+  }
+  const handles = [...new Set(out.flatMap((p) => (p.plugin?.manifest.bot ? [p.plugin.manifest.bot] : [])))];
+  const bots = await botsByHandle(handles, database);
+  for (const p of out) {
+    if (p.plugin) p.plugin.bot = p.plugin.manifest.bot ? (bots.get(p.plugin.manifest.bot) ?? null) : null;
   }
   return out;
 }

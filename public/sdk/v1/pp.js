@@ -265,6 +265,22 @@
         });
       },
     },
+    identity: {
+      /** Needs `identity`: a short-lived token naming the reader, for your own backend to verify. */
+      token: function () {
+        return call('identity.token');
+      },
+      /** `fetch` with the token as `Authorization: Bearer …`, for one of your `network` origins. */
+      fetch: function (input, init) {
+        return call('identity.token').then(function (identity) {
+          var options = Object.assign({}, init || {});
+          var headers = new Headers(options.headers || {});
+          headers.set('Authorization', 'Bearer ' + identity.token);
+          options.headers = headers;
+          return fetch(input, options);
+        });
+      },
+    },
     ui: {
       setHeight: function (height) {
         autoHeight = false;

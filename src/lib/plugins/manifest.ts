@@ -1,6 +1,7 @@
 import { z } from 'zod';
 import { KINDS, PAGE_KINDS, type PageKind } from '../kinds';
 import { PLUGIN_ID_RE, sanitizeSettingValue, SETTING_NAME_RE, type PluginSettingSpec } from '../settings/spec';
+import { HANDLE_PATTERN } from '../profile';
 import { MANIFEST_FILE } from './sources';
 import { MAX_WHEN_LENGTH, whenKeys, parseWhen, whenProblem } from './when';
 
@@ -28,6 +29,8 @@ export const PERMISSIONS = {
   'page.read': "Read the page it is on: its sections, links and kind file (a venue's venue.json, …)",
   'scope.read': 'List the papers of venues, topics and organisations',
   'reviews.read': "Read papers' submissions, reviews and decisions",
+  identity:
+    "Tell its own backend who you are: your handle, in a short-lived token signed by this site that only this plugin's backend accepts",
 } as const;
 export type PluginPermission = keyof typeof PERMISSIONS;
 export const PERMISSION_NAMES = Object.keys(PERMISSIONS) as PluginPermission[];
@@ -156,6 +159,10 @@ export const manifestSchema = z
       .max(10)
       .default([])
       .meta({ description: 'Origins its own backend lives at, which its frames may connect to. https only.' }),
+    bot: z.string().regex(HANDLE_PATTERN, "a bot's handle, without the @").optional().meta({
+      description:
+        'The handle of the bot account whose files on pages this plugin shows, so the approval prompt can say where its data comes from. Naming a bot grants nothing.',
+    }),
     contributes: z
       .looseObject({
         panels: z.array(panelSchema).max(8).default([]).meta({ description: 'Panels on pages, each a frame.' }),
@@ -201,6 +208,8 @@ export interface PluginManifest {
   main: string;
   permissions: PluginPermission[];
   network: string[];
+  /** The bot account whose files on pages it shows (`handoffs/plugins.md` Phase 5); informational. */
+  bot?: string;
   contributes: {
     panels: PanelContribution[];
     pages: { id: string; title: string }[];
@@ -335,6 +344,9 @@ function crossChecks(
     if (sanitizeSettingValue(spec, spec.default) === undefined) {
       error(`${at}.default`, `${JSON.stringify(spec.default)} doesn't fit the setting's own type`);
     }
+  }
+  if (manifest.permissions.includes('identity') && manifest.network.length === 0) {
+    warn('permissions', '"identity" gives a token for your own backend, and "network" names none to send it to');
   }
   if (panels.length === 0 && pages.length === 0) {
     warn('contributes', 'adds no panels or pages, so it never runs');
