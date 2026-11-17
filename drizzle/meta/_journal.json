@@ -288,6 +288,13 @@
       "when": 1794881895227,
       "tag": "0040_identity_keys",
       "breakpoints": true
+    },
+    {
+      "idx": 41,
+      "version": "7",
+      "when": 1794924310580,
+      "tag": "0041_paper_views",
+      "breakpoints": true
     }
   ]
 }

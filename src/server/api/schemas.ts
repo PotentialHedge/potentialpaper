@@ -352,6 +352,8 @@ export const CoAuthorAdded = z.object({ authorIndex: z.number().int(), authorNam
 /** Whether the viewer follows a paper (`null` when nobody is signed in), and how many do. */
 export const FollowState = z.object({ following: z.boolean().nullable(), followers: z.number().int() });
 export const FollowBody = z.object({ paper: PaperIdentifier });
+export const ViewBody = z.object({ paper: PaperIdentifier });
+export const ViewState = z.object({ views: z.number().int() });
 
 /** The signed-in account's papers (`server/my-papers.ts`, `server/follows.ts`). */
 export const MyPapers = z.object({

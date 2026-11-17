@@ -7,8 +7,9 @@ import { ui } from '@/components/ui';
 import type { PaperId } from '@/lib/paper-ids';
 import { EditDialog, type EditOptions } from './EditDialog';
 import { FollowStar } from './FollowStar';
+import { ViewCount } from './ViewCount';
 
-/** Cite, follow, history and for agents: gray, so Edit stays the one red action under the title. */
+/** Cite, follow, history and for agents (and the view count after them): gray, so Edit stays the one red action under the title. */
 const SECONDARY = 'cursor-pointer text-muted hover:text-ink hover:underline';
 
 /** The quick actions under a paper's title. A client island for the BibTeX's clipboard and the Edit dialog. */
@@ -57,6 +58,7 @@ export function TitleActions({
         <AgentIcon />
         for agents
       </a>
+      <ViewCount paper={paper} />
     </div>
   );
 }
