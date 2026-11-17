@@ -83,6 +83,24 @@ Milestones 0, 1 and 2 are built, merged into `main` and deployed, and Milestone 
   ICLR 2027 submissions are anonymous, so almost none have emails (0 of the dev database's 500); recent arXiv
   first pages give at least one for 69%.
 
+## Test suite and CI cleanup (2026-11-17, branch `tests-cleanup`)
+
+- **The suite is green, with no "pre-existing" failures left.** Locally, `npm run test:all` passes in full,
+  pdf-ingest included, once poppler is on `PATH`. There is no sudo here, but `apt-get download poppler-utils
+libpoppler118 liblcms2-2 libopenjp2-7 libpixman-1-0` plus `dpkg-deb -x` into a scratch dir works with
+  `LD_LIBRARY_PATH`. A failing test is a regression now; don't log it as pre-existing.
+- **Root causes:**
+  - CI stopped at `format:check` on the generated `config/institution-ror.json`. It is now in `.prettierignore`.
+  - The Postgres "database does not exist" lines came from the healthcheck: `pg_isready` without `-d`. It now
+    names its database.
+  - `follows.test.ts` used the handle `cy`. Handles need at least 3 characters (`HANDLE_PATTERN`), so its setup
+    got 422.
+  - The `page-git` flake was a real bug: `mergeFile` compared both sides joined, so an emptied line and a deleted
+    one looked the same. Now fast-check runs on a fixed seed (`tests/setup-env.ts`); set `FC_SEED` to explore.
+  - The comments flake: a random UUID or alias can contain "ada". It now checks for `"ada"` as a JSON value.
+- **Each worktree gets its own test database** (`TEST_DATABASE_URL` in an untracked `.env`). Run
+  `DATABASE_URL=$TEST_DATABASE_URL npm run db:migrate` once to set it up.
+
 ## User content domain, editor fixes (2026-11-16, on `main`, deployed at afce06c)
 
 - **`ppusercontent.com`** (bought 2026-11-16) is the user content domain: demos at `<snapshot>.ppusercontent.com`,
