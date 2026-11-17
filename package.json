@@ -37,6 +37,7 @@
     "pages:migrate-lfs": "tsx scripts/migrate-page-lfs.ts",
     "pages:add-starter": "tsx scripts/add-page-starter.ts",
     "pages:protect": "tsx scripts/protect-page.ts",
+    "identity:keys": "tsx scripts/identity-keys.ts",
     "claims:decide": "tsx scripts/decide-claim.ts",
     "venues:sync": "tsx scripts/sync-venue-pages.ts",
     "orgs:sync": "tsx scripts/sync-org-pages.ts",

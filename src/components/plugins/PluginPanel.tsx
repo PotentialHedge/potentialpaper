@@ -14,6 +14,7 @@ import {
   type PluginPermission,
 } from '@/lib/plugins/manifest';
 import { pageWhenContext, whenHolds } from '@/lib/plugins/when';
+import { BotNote } from './BotNote';
 import { PluginFrame, type ReadyPlugin } from './PluginFrame';
 import { usePluginPage } from './PluginPage';
 
@@ -24,8 +25,20 @@ import { usePluginPage } from './PluginPage';
  * hasn't approved shows its consent prompt in place of each panel, rather than running.
  */
 
-/** A plugin's consent prompt: who made it, what it asks for in plain words, and where it may send data. */
-export function ConsentPrompt({ plugin, signedIn }: { plugin: ReadyPlugin; signedIn: boolean }) {
+/**
+ * A plugin's consent prompt: who made it, what it asks for in plain words, where it may send data, and whose data it
+ * shows. `personal`: a running site default asking only for what the reader alone can give (`identity`), shown above
+ * its frame.
+ */
+export function ConsentPrompt({
+  plugin,
+  signedIn,
+  personal = false,
+}: {
+  plugin: ReadyPlugin;
+  signedIn: boolean;
+  personal?: boolean;
+}) {
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [dismissed, setDismissed] = useState(false);
@@ -53,18 +66,22 @@ export function ConsentPrompt({ plugin, signedIn }: { plugin: ReadyPlugin; signe
           {id}
         </a>
         {commit && <span className={ui.mono}> @{commit.slice(0, 7)}</span>}
-        {isUpdate ? ', has been updated and asks for more.' : ', asks to run here.'}
+        {personal
+          ? ', which this site runs for everyone, asks for more.'
+          : isUpdate
+            ? ', has been updated and asks for more.'
+            : ', asks to run here.'}
       </p>
       {manifest.description && <p className={ui.fine}>{manifest.description}</p>}
       <p className="mt-2">It runs in a frame of its own and never sees your session. It may:</p>
       <ul className="mt-1 list-disc pl-5">
-        <li>Show panels on pages, and keep its own settings and a little data with your account</li>
-        {asks.map((p) => (
+        {!personal && <li>Show panels on pages, and keep its own settings and a little data with your account</li>}
+        {(personal ? plugin.missing.permissions : asks).map((p) => (
           <li key={p} className={plugin.missing.permissions.includes(p) ? '' : 'text-muted'}>
             {PERMISSIONS[p]}
           </li>
         ))}
-        {manifest.network.length > 0 && (
+        {!personal && manifest.network.length > 0 && (
           <li>
             Send data to and load data from{' '}
             {manifest.network.map((origin, i) => (
@@ -75,6 +92,7 @@ export function ConsentPrompt({ plugin, signedIn }: { plugin: ReadyPlugin; signe
             ))}
           </li>
         )}
+        {!personal && <BotNote bot={plugin.plugin.bot} />}
       </ul>
       {error && <p className="mt-2 text-accent">{error}</p>}
       <div className="mt-3 flex gap-3">
@@ -147,16 +165,21 @@ function PluginPanel({
     plugin.status === 'consent' ? (
       <ConsentPrompt plugin={plugin} signedIn={viewer.signedIn} />
     ) : (
-      <PluginFrame
-        plugin={plugin}
-        surface={{ type: 'panel', id: panel.id, slot }}
-        page={page}
-        viewer={viewer}
-        title={`${panel.title} (${plugin.plugin.manifest.name})`}
-        onConnect={(c) => {
-          connection.current = c;
-        }}
-      />
+      <>
+        {viewer.signedIn && plugin.missing.permissions.length > 0 && (
+          <ConsentPrompt plugin={plugin} signedIn personal />
+        )}
+        <PluginFrame
+          plugin={plugin}
+          surface={{ type: 'panel', id: panel.id, slot }}
+          page={page}
+          viewer={viewer}
+          title={`${panel.title} (${plugin.plugin.manifest.name})`}
+          onConnect={(c) => {
+            connection.current = c;
+          }}
+        />
+      </>
     );
   const header = (
     <div className="mb-1 flex items-baseline justify-between gap-2 font-sans text-xs text-faint">

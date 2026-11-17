@@ -19,8 +19,9 @@ import {
   updatePluginTo,
   usePlugins,
 } from '@/lib/plugins/client';
-import type { InstalledPlugin } from '@/lib/plugins/installed';
+import { type InstalledPlugin, PERSONAL_PERMISSIONS, type PluginBot } from '@/lib/plugins/installed';
 import { PERMISSIONS, type PluginPermission } from '@/lib/plugins/manifest';
+import { BotNote } from '@/components/plugins/BotNote';
 import { parsePluginSource, sourceKey } from '@/lib/plugins/sources';
 import {
   parseSettings,
@@ -257,33 +258,42 @@ function InstalledItem({
           <summary className="cursor-pointer text-muted">
             What it may do{p.status === 'consent' ? ' (not approved yet)' : ''}
           </summary>
-          {manifest.permissions.length === 0 && manifest.network.length === 0 ? (
+          {manifest.permissions.length === 0 && manifest.network.length === 0 && !p.plugin?.bot ? (
             <p className={ui.fine}>It reads nothing beyond the page it is on, and sends nothing anywhere.</p>
           ) : (
             <Asks
               permissions={manifest.permissions as PluginPermission[]}
               network={manifest.network}
               pending={missing}
+              bot={p.plugin?.bot}
             />
           )}
-          {signedIn && p.plugin?.commit && p.from === 'user' && p.status === 'consent' && (
-            <button
-              className={ui.linkBtn}
-              disabled={busy}
-              onClick={() => run(() => grantPlugin(p.plugin!.id, p.plugin!.commit!), `Approved ${name}.`)}
-            >
-              Approve
-            </button>
-          )}
-          {signedIn && p.plugin && p.from === 'user' && p.status === 'ready' && (
-            <button
-              className={ui.linkBtn}
-              disabled={busy}
-              onClick={() => run(() => revokePlugin(p.plugin!.id), `Withdrew your approval of ${name}.`)}
-            >
-              Withdraw approval
-            </button>
-          )}
+          {signedIn &&
+            p.plugin?.commit &&
+            (p.from === 'user' ? p.status === 'consent' : p.status === 'ready' && p.missing.permissions.length > 0) && (
+              <button
+                className={ui.linkBtn}
+                disabled={busy}
+                onClick={() => run(() => grantPlugin(p.plugin!.id, p.plugin!.commit!), `Approved ${name}.`)}
+              >
+                Approve
+              </button>
+            )}
+          {signedIn &&
+            p.plugin &&
+            p.status === 'ready' &&
+            (p.from === 'user' ||
+              (p.from === 'site' &&
+                manifest.permissions.some((perm) => PERSONAL_PERMISSIONS.includes(perm)) &&
+                p.missing.permissions.length === 0)) && (
+              <button
+                className={ui.linkBtn}
+                disabled={busy}
+                onClick={() => run(() => revokePlugin(p.plugin!.id), `Withdrew your approval of ${name}.`)}
+              >
+                Withdraw approval
+              </button>
+            )}
           <Contributes plugin={p} />
         </details>
       )}
@@ -300,10 +310,12 @@ function Asks({
   permissions,
   network,
   pending,
+  bot,
 }: {
   permissions: PluginPermission[];
   network: string[];
   pending?: Set<string>;
+  bot?: PluginBot | null;
 }) {
   return (
     <ul className="mt-1 list-disc pl-5">
@@ -319,6 +331,7 @@ function Asks({
           {pending?.has(origin) && <span className="text-muted"> · not approved yet</span>}
         </li>
       ))}
+      <BotNote bot={bot} />
     </ul>
   );
 }
