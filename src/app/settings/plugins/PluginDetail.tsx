@@ -4,7 +4,7 @@ import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { useEffect, useState } from 'react';
 import { BotNote } from '@/components/plugins/BotNote';
-import { Switch } from '@/components/settings/controls';
+import { Switch } from '@/components/controls';
 import { SettingsList, useSettingItems } from '@/components/settings/SettingsList';
 import { ui } from '@/components/ui';
 import {
@@ -141,8 +141,8 @@ export function PluginDetail({ id }: { id: string }) {
             <Switch
               checked={p.enabled}
               disabled={busy}
-              label={`${manifest.name} on`}
-              onChange={(on) => run(() => setPluginEnabled(p, on))}
+              aria-label={`${manifest.name} on`}
+              onCheckedChange={(on) => run(() => setPluginEnabled(p, on))}
             />
           </label>
         )}

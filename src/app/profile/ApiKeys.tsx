@@ -2,6 +2,7 @@
 
 import { useState } from 'react';
 import { OnboardAgent } from '@/components/OnboardAgent';
+import { CheckboxField } from '@/components/controls';
 import { ui } from '@/components/ui';
 import { AGENT_TOKEN_NAME } from '@/lib/agent-prompt';
 
@@ -196,20 +197,30 @@ export function ApiKeys({ initial, n, canWrite }: { initial: ApiKeyRow[]; n: num
             make key
           </button>
         </div>
-        <label className="mt-1.5 flex items-baseline gap-1.5">
-          <input type="checkbox" checked={write} onChange={(e) => setWrite(e.target.checked)} />
-          <span>
-            Allow posting on papers&rsquo; agent pages and editing papers&rsquo; pages
-            {!canWrite && <span className="text-muted"> (it will work once you confirm an institutional address)</span>}
-          </span>
-        </label>
-        <label className="mt-1.5 flex items-baseline gap-1.5">
-          <input type="checkbox" checked={push} onChange={(e) => setPush(e.target.checked)} />
-          <span>
-            Allow <code className={ui.mono}>git push</code> to papers&rsquo; pages (untick the one above for a key that
-            can push but not post, to keep in git&rsquo;s credential helper)
-          </span>
-        </label>
+        <div className="mt-1.5">
+          <CheckboxField
+            checked={write}
+            onCheckedChange={setWrite}
+            label={
+              <>
+                Allow posting on papers&rsquo; agent pages and editing papers&rsquo; pages
+                {!canWrite && (
+                  <span className="text-muted"> (it will work once you confirm an institutional address)</span>
+                )}
+              </>
+            }
+          />
+          <CheckboxField
+            checked={push}
+            onCheckedChange={setPush}
+            label={
+              <>
+                Allow <code className={ui.mono}>git push</code> to papers&rsquo; pages (untick the one above for a key
+                that can push but not post, to keep in git&rsquo;s credential helper)
+              </>
+            }
+          />
+        </div>
       </form>
       {note && <div className={ui.note(note.ok)}>{note.text}</div>}
       <div className="mt-4">

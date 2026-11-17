@@ -55,7 +55,7 @@ Same as acceptodds unless a reason is stated here. The reference is
 | App     | TypeScript, Next.js 16 App Router, Node 26, `output: 'standalone'`              |
 | Data    | Postgres 19 with Drizzle; migrations are a separate deploy step (§4.11)         |
 | Auth    | Better Auth: email-first sign-up, link plus 6-digit code, API keys              |
-| UI      | Tailwind v4 with acceptodds' `globals.css` tokens and `components/ui.ts`        |
+| UI      | Tailwind v4 with acceptodds' `globals.css` tokens and `components/ui.ts`; form controls in `components/controls` (Radix primitives and dnd-kit lists, styled with the tokens) |
 | Content | `react-markdown` stack with GFM and KaTeX, `d3-force` for the graph             |
 | Mail    | Resend                                                                          |
 | Tests   | Vitest and fast-check; integration tests against real Postgres                  |
@@ -927,7 +927,7 @@ Built 2026-11-16 (`handoffs/plugins.md` Phase 1). One document per account, laye
   category (each kind's pages, "Your public page") and one per installed plugin (`/settings/plugins/<owner>/<name>`)
   down the side, a search over every setting, and each setting drawn by a standard control (a switch, a dropdown or
   radio buttons, a text or number field, a list to add to, remove from and reorder, a box per choice, a fixed set to
-  put in order), saved as it changes, with a mark and a reset on what the reader's file sets. There is no editor for
+  put in order; lists reorder by dragging, `components/controls`), saved as it changes, with a mark and a reset on what the reader's file sets. There is no editor for
   the raw file: it is downloaded, edited in the reader's own editor, and uploaded, with the same checks.
 - **Settings are preferences.** Remembered state (dismissed prompts, a plugin's cache) stays out of the document,
   and so does consent (below).
