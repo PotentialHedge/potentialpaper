@@ -1,6 +1,6 @@
 import { randomBytes } from 'node:crypto';
 import { and, eq } from 'drizzle-orm';
-import { accounts, authorClaims, botGrants, commitIdentities, papers } from '@/db/schema';
+import { accounts, authorClaims, botGrants, commitIdentities, pages, papers } from '@/db/schema';
 import { isUnderDomain, KINDS, orgFileSchema, type PageKind, partsOf } from '@/lib/kinds';
 import { parseReviewPath, SUBMISSION_FILE } from '@/lib/review-files';
 import { cleanEvidence } from '@/lib/evidence';
@@ -49,6 +49,7 @@ import {
 import { prekProblem } from './starter';
 import { pageClaimRoles } from '../page-claims';
 import { domainsAbove, isOrgMember } from '../org-roles';
+import { checkProtection, isEstablished } from '../page-protection';
 
 /**
  * Whether a change to a page's tree is allowed: who is making it, what it writes, and what the whole tree
@@ -67,11 +68,15 @@ export type Actor = { kind: 'system' } | { kind: 'account'; accountId: string; i
 
 export const SYSTEM_ACTOR: Actor = { kind: 'system' };
 
-export type ActorRoles = Roles & { bot: boolean; claimIdentity: string | null; kind: PageKind };
+/**
+ * `established`: verified long enough ago that a page under `established` protection lets them edit
+ * (`page-protection.ts`).
+ */
+export type ActorRoles = Roles & { bot: boolean; claimIdentity: string | null; kind: PageKind; established: boolean };
 
 /** Who the actor is on a page of a kind other than a paper: a user page's account, a venue's organisers. */
 async function keyedRoles(db: Reader, actor: Actor, page: PageRow): Promise<ActorRoles> {
-  const none = { owner: false, claimed: false, claimIdentity: null, kind: page.kind };
+  const none = { owner: false, claimed: false, claimIdentity: null, kind: page.kind, established: false };
   if (actor.kind === 'system') {
     const { claimed } = await pageClaimRoles(db, page, null);
     return { ...none, claimed, system: true, admin: false, verified: false, bot: false };
@@ -98,6 +103,7 @@ async function keyedRoles(db: Reader, actor: Actor, page: PageRow): Promise<Acto
     system: false,
     admin: actor.isAdmin,
     verified: account.isBot || account.verifiedAt !== null,
+    established: isEstablished(account.verifiedAt),
     // A user page is its account's, and its agents' tokens act as the account.
     owner: (page.kind === 'user' && !account.isBot && account.handle === page.key) || claims.owner || member,
     claimed: claims.claimed,
@@ -126,6 +132,7 @@ export async function rolesOf(db: Reader, actor: Actor, pageId: string): Promise
       bot: false,
       claimIdentity: null,
       kind: 'paper',
+      established: false,
     };
   }
   const claim = confirmed.find((c) => c.accountId === actor.accountId);
@@ -147,6 +154,7 @@ export async function rolesOf(db: Reader, actor: Actor, pageId: string): Promise
     system: false,
     admin: actor.isAdmin,
     verified: account.isBot || account.verifiedAt !== null,
+    established: isEstablished(account.verifiedAt),
     owner: claim !== undefined,
     claimed,
     bot: account.isBot,
@@ -204,10 +212,19 @@ export async function takeCommit(actor: Actor, rateLimit: RateLimitConfig = COMM
   }
 }
 
-/** The page is there, and if it is a paper's, the paper is not merged into another (whose page is the one to edit). */
+/**
+ * The page is there and not merged into another, whose page is the one to edit: a paper (`papers.merged_into`) or a
+ * topic (`pages.merged_into`, `topic-pages.ts`).
+ */
 export async function checkPaper(db: Reader, pageId: string, migration = false): Promise<void> {
   const page = await mustPage(db, pageId);
-  if (page.kind !== 'paper') return;
+  if (page.kind !== 'paper') {
+    const [row] = await db.select({ mergedInto: pages.mergedInto }).from(pages).where(eq(pages.id, pageId));
+    if (row?.mergedInto && !migration) {
+      throw new ApiError(409, 'page_merged', 'this page was merged into another', { into: row.mergedInto });
+    }
+    return;
+  }
   const [paper] = await db.select({ mergedInto: papers.mergedInto }).from(papers).where(eq(papers.id, pageId));
   if (!paper) throw new ApiError(404, 'not_found', 'no such paper');
   if (paper.mergedInto && !migration) {
@@ -250,6 +267,7 @@ export async function checkMayWrite(db: Reader, pageId: string, actor: Actor, pa
   const roles = await rolesOf(db, actor, pageId);
   await checkPaper(db, pageId);
   for (const path of paths) checkPath(path, undefined, roles, false);
+  await checkProtection(db, pageId, roles, paths);
 }
 
 /** Why this can't be the file's content, or `null`: `contentProblem`, and the page's fixed `prek.toml`. */
@@ -484,7 +502,7 @@ async function checkOrgDomains(db: Reader, check: TreeCheck): Promise<void> {
 export interface TreeCheck {
   pageId: string;
   /** The roles of whoever commits, on this page; `kind` is the page's (a paper's when absent). */
-  roles: Roles & { kind?: PageKind };
+  roles: Roles & { kind?: PageKind; established?: boolean };
   /** The parent's files, or none for a page's first commit. */
   before: FileTree;
   /** The files the commit will have. */
@@ -522,6 +540,8 @@ export async function checkTree(db: Reader, check: TreeCheck): Promise<string[]>
     }
     checkPath(path, after.has(path) ? undefined : null, roles, migration);
   }
+  // A protected page holds back the community's paths from those below its level (`page-protection.ts`).
+  if (!migration) await checkProtection(db, check.pageId, roles, changed);
   for (const path of changed) {
     const blob = after.get(path);
     if (blob === undefined) continue;

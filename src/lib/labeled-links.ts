@@ -249,3 +249,13 @@ export function encodeLabeledLink(link: LabeledLinkLine): string {
     ...(evidence ? { evidence } : {}),
   });
 }
+
+const CROCKFORD = '0123456789ABCDEFGHJKMNPQRSTVWXYZ';
+
+/** A new link's id: a ULID (time first, so a file's ids sort by when the links were made). */
+export function newLinkId(now: number = Date.now()): string {
+  let time = '';
+  for (let t = now, i = 0; i < 10; i += 1, t = Math.floor(t / 32)) time = CROCKFORD[t % 32] + time;
+  const random = crypto.getRandomValues(new Uint8Array(16));
+  return time + [...random].map((b) => CROCKFORD[b % 32]).join('');
+}

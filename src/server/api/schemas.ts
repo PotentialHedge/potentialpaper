@@ -965,3 +965,216 @@ export const PagePapersQuery = z.object({
   /** Papers in this chunk; left out, every paper in one stream. */
   limit: z.coerce.number().int().min(1).max(5000).optional(),
 });
+
+// Topic pages (`handoffs/pages.md` Phase 5, `server/topic-pages.ts`).
+
+const topicName = z.string().min(1).max(120);
+const topicSlugParam = z.string().min(1).max(60);
+
+/** `GET /topics?q=`: topics whose name or an alias is like `q`, the same name first. */
+export const TopicSearchQuery = z.object({ q: z.string().max(120).default('') });
+
+export const TopicMatches = z.object({
+  topics: z.array(
+    z.object({
+      identifier: z.string(),
+      key: z.string(),
+      name: z.string(),
+      aliases: z.array(z.string()),
+      url: z.string(),
+      matched: z.string(),
+      /** The same name: making another topic of it would be a duplicate. */
+      exact: z.boolean(),
+    }),
+  ),
+});
+
+/** `POST /topics`: a new topic. */
+export const NewTopicBody = z.object({
+  name: topicName,
+  aliases: z.array(topicName).max(20).optional(),
+  /** Broader topics, by slug. */
+  broader: z.array(topicSlugParam).max(20).optional(),
+  /** Its address; made from the name when absent. */
+  slug: topicSlugParam.optional(),
+  /** The article's first section, "What it is", in Markdown. */
+  summary: z.string().max(20_000).optional(),
+});
+
+/** `POST /pages/{paper}/topics`: puts a paper in a topic, by identifier, or by name (made if no topic has it). */
+export const PaperTopicBody = z
+  .object({
+    topic: z.string().min(1).max(200).optional(),
+    name: topicName.optional(),
+    label: z.enum(['in-topic', 'introduces-topic']).optional(),
+    note: z.string().max(2000).optional(),
+  })
+  .refine((body) => body.topic || body.name, { message: 'give topic (an identifier) or name' });
+
+export const PaperTopicResult = z.object({
+  topic: PageSummary,
+  created: z.boolean(),
+  status: z.enum(['linked', 'exists']),
+});
+
+const TopicRef = z.object({
+  identifier: z.string(),
+  url: z.string().nullable(),
+  name: z.string(),
+  papers: z.number().int(),
+});
+const ScopeRef = z.object({ identifier: z.string(), url: z.string(), name: z.string(), papers: z.number().int() });
+const TopicPaperRef = z.object({
+  identifier: z.string(),
+  url: z.string(),
+  title: z.string(),
+  year: z.number().int().nullable(),
+});
+
+/** `GET /pages/{identifier}/topic`: what a topic page lists besides its article and papers. */
+export const TopicOverview = z.object({
+  aliases: z.array(z.string()),
+  broader: z.array(TopicRef),
+  narrower: z.array(TopicRef),
+  related: z.array(TopicRef),
+  introducedBy: z.array(TopicPaperRef),
+  venues: z.array(ScopeRef),
+  orgs: z.array(ScopeRef),
+  suggestions: z.array(TopicPaperRef.extend({ reason: z.string(), matched: z.string() })),
+  suggestionCount: z.number().int(),
+  /** Topics merged into it, by their old identifiers. */
+  mergedFrom: z.array(z.string()),
+  protection: z
+    .object({ level: z.string(), reason: z.string().nullable(), expiresAt: z.string().nullable() })
+    .nullable(),
+});
+
+export const TopicPapersQuery = z.object({
+  sort: z.enum(['date', 'venue', 'score']).default('date'),
+  offset: z.coerce.number().int().min(0).max(1_000_000).default(0),
+  limit: z.coerce.number().int().min(1).max(200).default(50),
+});
+
+/** `GET /pages/{identifier}/topic-papers`: a topic's papers, rolled up from narrower topics, sorted. */
+export const TopicPapers = z.object({
+  total: z.number().int(),
+  papers: z.array(
+    z.object({
+      title: z.string(),
+      identifier: z.string().nullable(),
+      address: z.string().nullable(),
+      year: z.number().int().nullable(),
+      introduces: z.boolean(),
+      /** The narrower topic it is in, when it isn't in this one directly. */
+      via: z.object({ identifier: z.string(), address: z.string(), name: z.string() }).nullable(),
+      venue: z
+        .object({ id: z.string(), name: z.string(), identifier: z.string().nullable(), address: z.string().nullable() })
+        .nullable(),
+      status: z.string().nullable(),
+      decision: z.string().nullable(),
+      /** Its reviews' mean of the venue's first score field, on the venue's scale. */
+      score: z
+        .object({ mean: z.number(), min: z.number().nullable(), max: z.number().nullable(), label: z.string() })
+        .nullable(),
+    }),
+  ),
+  nextOffset: z.number().int().nullable(),
+});
+
+/** `PATCH /pages/{identifier}/topic`: edits a topic in one commit; what is left out stays. */
+export const TopicEditBody = z.object({
+  /** The commit the form loaded. */
+  base: z
+    .string()
+    .regex(/^[0-9a-f]{40}$/)
+    .nullable(),
+  name: topicName.optional(),
+  aliases: z.array(topicName).max(20).optional(),
+  broader: z.array(topicSlugParam).max(20).optional(),
+  /** The whole article as Markdown, a `#` heading per section. */
+  article: z.string().max(200_000).optional(),
+  /** Related topics, by slug. */
+  related: z.array(topicSlugParam).max(100).optional(),
+  summary: z.string().max(500).optional(),
+});
+
+export const TopicEdited = z.object({ head: z.string().nullable(), changed: z.boolean() });
+
+/** `POST /pages/{identifier}/rename`: a topic's new address, and optionally its new name. */
+export const RenameBody = z.object({ slug: topicSlugParam, name: topicName.optional() });
+
+/** `POST /pages/{identifier}/merge`: merges this topic into another. */
+export const MergeBody = z.object({ into: z.string().min(1).max(200), summary: z.string().max(500).optional() });
+
+export const SuggestionsQuery = z.object({
+  offset: z.coerce.number().int().min(0).max(100_000).default(0),
+  limit: z.coerce.number().int().min(1).max(200).default(50),
+});
+
+/** `GET /pages/{identifier}/suggestions`: papers that might belong in the topic, best first. */
+export const Suggestions = z.object({
+  total: z.number().int(),
+  suggestions: z.array(TopicPaperRef.extend({ reason: z.string(), matched: z.string(), score: z.number() })),
+});
+
+/** `POST /pages/{identifier}/suggestions`: confirms (links the paper) or dismisses (remembered) a suggestion. */
+export const SuggestionBody = z.object({
+  paper: z.string().min(1).max(300),
+  action: z.enum(['confirm', 'dismiss']),
+  label: z.enum(['in-topic', 'introduces-topic']).optional(),
+});
+
+/** `GET`/`PUT /pages/{identifier}/protection`. */
+export const Protection = z.object({
+  protection: z
+    .object({
+      level: z.enum(['established', 'admins']),
+      reason: z.string().nullable(),
+      expiresAt: z.string().nullable(),
+    })
+    .nullable(),
+});
+
+export const ProtectionBody = z.object({
+  /** `null` lifts it. */
+  level: z.enum(['established', 'admins']).nullable(),
+  reason: z.string().max(500).optional(),
+  expiresAt: z.iso.datetime({ offset: true }).optional(),
+});
+
+/** `GET /changes`: the patrol feed. */
+export const ChangesQuery = z.object({
+  kind: z.enum(['paper', 'venue', 'topic', 'org', 'user']).optional(),
+  bots: z.enum(['true', 'false']).default('false'),
+  rollUp: z.enum(['true', 'false']).default('false'),
+  before: z.coerce.number().int().min(1).optional(),
+  limit: z.coerce.number().int().min(1).max(200).default(50),
+});
+
+export const Changes = z.object({
+  changes: z.array(
+    z.object({
+      id: z.number().int(),
+      page: z.object({ kind: z.string(), identifier: z.string(), url: z.string(), name: z.string() }),
+      seq: z.number().int(),
+      oid: z.string(),
+      summary: z.string(),
+      kind: z.string(),
+      paths: z.array(z.string()),
+      bytesDelta: z.number().int(),
+      at: z.string(),
+      /** A handle, a confirmed author's name on their own paper, or the system. */
+      by: z.union([
+        z.object({ handle: z.string() }),
+        z.object({ authorName: z.string() }),
+        z.object({ system: z.literal(true) }),
+      ]),
+      bot: z.boolean(),
+      links: z.boolean(),
+      /** It moves papers between topics' roll-ups. */
+      rollUp: z.boolean(),
+    }),
+  ),
+  /** `before` for the next page, or `null`. */
+  next: z.number().int().nullable(),
+});

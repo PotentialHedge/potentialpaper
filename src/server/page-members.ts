@@ -15,7 +15,7 @@ import { TOPIC_LABELS } from '@/lib/labeled-links';
 import { parseReviewFile, parseReviewPath } from '@/lib/review-files';
 import type { Consumer } from './consumers/types';
 import { readPageLinks } from './page-links';
-import { mustPage, type PageRow } from './pages/kinds';
+import { formerKeys, mustPage, type PageRow, survivorOf } from './pages/kinds';
 import { readCommit, readFiles, readText, type Reader } from './pages/repo';
 import type { Writer } from './pages/projections';
 import { markPaperScopes, markScopes } from './scope-stats';
@@ -208,13 +208,31 @@ export async function indexMembers(database: Database, pageId: string, head: str
   }
   if (!KINDS[page.kind].scope) return;
 
+  // A topic merged into another is no scope of its own: the survivor answers to its names (`topic-pages.ts`).
+  if ((await survivorOf(database, page)).id !== page.id) {
+    await database.transaction(async (tx) => {
+      await markScopes(tx, sql`select ${pageId}::uuid`);
+      await tx.delete(pageScopeNames).where(eq(pageScopeNames.pageId, pageId));
+      await tx.delete(pageParents).where(eq(pageParents.pageId, pageId));
+      await tx.delete(pageMembers).where(eq(pageMembers.scopePageId, pageId));
+      await tx.execute(sql`select pg_advisory_xact_lock(hashtextextended('page-ancestors', 0))`);
+      await closeAncestors(tx);
+    });
+    return;
+  }
+
   let kindFile: unknown = null;
   try {
     kindFile = JSON.parse((await readText(database, pageId, files.get(KINDS[page.kind].kindFile))) ?? 'null');
   } catch {
     // A kind file that doesn't parse names no sources and no parents.
   }
-  const names = [formatIdentifier({ kind: page.kind, key: page.key }), ...sourcesOf(page.kind, kindFile)];
+  const kind = page.kind;
+  // Its old keys too (a renamed topic's, those of topics merged into it), so links that name them still count.
+  const names = [
+    ...[page.key, ...(await formerKeys(database, page))].map((key) => formatIdentifier({ kind, key })),
+    ...sourcesOf(page.kind, kindFile),
+  ] as string[];
   const parents = parentsOf(page.kind, page.key, kindFile);
   await database.transaction(async (tx) => {
     // The scope and those above it, before and after: membership and roll-up may both move.

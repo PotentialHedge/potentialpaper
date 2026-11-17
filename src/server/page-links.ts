@@ -11,7 +11,7 @@ import {
 } from '@/lib/labeled-links';
 import { canonicalPaperId } from '@/lib/paper-ids';
 import type { Consumer } from './consumers/types';
-import { findPageByAddress, mustPage, type PageRow } from './pages/kinds';
+import { findPageByAddress, formerKeys, mergedIds, mustPage, type PageRow } from './pages/kinds';
 import { refreshPageIds } from './pages/refresh';
 import { readCommit, readFiles, readText, type Reader } from './pages/repo';
 
@@ -200,7 +200,11 @@ export async function linksFrom(pageId: string, database: Database = getDb()): P
 
 /** The identifiers a page answers to: a paper's every identifier, another kind's `<kind>:<key>`. */
 async function identifiersOf(db: Reader, page: PageRow): Promise<string[]> {
-  if (page.kind !== 'paper') return [formatIdentifier({ kind: page.kind, key: page.key })];
+  if (page.kind !== 'paper') {
+    // Its old keys too: a renamed topic's, those of topics merged into it, a person's old handles.
+    const kind = page.kind;
+    return [page.key, ...(await formerKeys(db, page))].map((key) => formatIdentifier({ kind, key }));
+  }
   const ids = await db
     .select({ scheme: paperIdentifiers.scheme, value: paperIdentifiers.value })
     .from(paperIdentifiers)
@@ -215,12 +219,13 @@ async function identifiersOf(db: Reader, page: PageRow): Promise<string[]> {
 export async function linksTo(pageId: string, database: Database = getDb()): Promise<PageLink[]> {
   const page = await mustPage(database, pageId);
   const names = await identifiersOf(database, page);
+  const ids = [pageId, ...(await mergedIds(database, pageId))];
   const rows = await database
     .select()
     .from(pageLinks)
     .where(
       and(
-        or(eq(pageLinks.targetPageId, pageId), names.length > 0 ? inArray(pageLinks.target, names) : undefined),
+        or(inArray(pageLinks.targetPageId, ids), names.length > 0 ? inArray(pageLinks.target, names) : undefined),
         sql`${pageLinks.pageId} <> ${pageId}`,
       ),
     )

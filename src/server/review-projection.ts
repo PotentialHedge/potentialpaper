@@ -160,6 +160,7 @@ export async function projectReviews(database: Database, paperId: string, head: 
           number: s.number,
           status: s.status,
           decision: s.decision,
+          keywords: s.keywords ?? [],
           url: s.url,
           fetchedAt: item.changedAt,
         })
@@ -170,6 +171,7 @@ export async function projectReviews(database: Database, paperId: string, head: 
             number: s.number,
             status: s.status,
             decision: s.decision,
+            keywords: s.keywords ?? [],
             url: s.url,
             fetchedAt: item.changedAt,
           },

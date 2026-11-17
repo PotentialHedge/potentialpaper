@@ -10,7 +10,7 @@ import { type KeyedKind, keyedPagePath, keyProblem, KINDS, pageName } from '@/li
 import { linksFrom, linksTo } from '@/server/page-links';
 import { scopeMemberCount, scopePapers } from '@/server/page-members';
 import { cloneAddresses } from '@/server/pages/clone';
-import { findKeyedPage, type PageRow, redirectedPage } from '@/server/pages/kinds';
+import { findKeyedPage, type PageRow, redirectedPage, survivorOf } from '@/server/pages/kinds';
 import { orgOverview } from '@/server/org-pages';
 import { userPageView } from '@/server/user-pages';
 import { PluginPageProvider } from '@/components/plugins/PluginPage';
@@ -42,10 +42,14 @@ const load = cache(async (kind: KeyedKind, segments: string[]): Promise<Loaded |
   if (keyProblem(kind, key)) return null;
   const page = await findKeyedPage(getDb(), kind, key);
   if (!page) {
-    // An old handle leads to the page's new address (`page_redirects`).
+    // An old handle or a renamed topic's old slug leads to the page's new address (`page_redirects`).
     const moved = await redirectedPage(getDb(), kind, key);
-    return moved ? { redirect: keyedPagePath(kind, moved.key) } : null;
+    const there = moved && (await survivorOf(getDb(), moved));
+    return there ? { redirect: keyedPagePath(kind, there.key) } : null;
   }
+  // A topic merged into another leads there; its history stays at its own address's tools.
+  const survivor = await survivorOf(getDb(), page);
+  if (survivor.id !== page.id) return { redirect: keyedPagePath(kind, survivor.key) };
   const [current] = await getDb()
     .select({
       name: pageCurrent.name,

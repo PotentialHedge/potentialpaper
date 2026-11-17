@@ -34,6 +34,17 @@ interface SubmissionRow {
   id: string;
   number: number | null;
   venueid: string | null;
+  /** A JSON array, in scrapes that kept the submission's keywords. */
+  keywords?: string | null;
+}
+
+function keywordsOf(row: SubmissionRow): string[] {
+  try {
+    const value: unknown = JSON.parse(row.keywords ?? '[]');
+    return Array.isArray(value) ? value.filter((k): k is string => typeof k === 'string') : [];
+  } catch {
+    return [];
+  }
 }
 
 function toSubmission(row: SubmissionRow, notes: ParsedNote[]): SubmissionInput {
@@ -45,6 +56,7 @@ function toSubmission(row: SubmissionRow, notes: ParsedNote[]): SubmissionInput 
     number: row.number,
     status: submissionStatus(row.venueid, decisionText),
     decision: decisionText,
+    keywords: keywordsOf(row),
     url: forumUrl(row.id),
     notes: notes.map((note) => {
       const input: Partial<ParsedNote> = { ...note };
@@ -80,8 +92,13 @@ async function main() {
     forms: openReviewForms(group),
     license: OPENREVIEW_NOTE_LICENSE,
   };
+  // Older scrapes have no keywords column.
+  const columns = (sqlite.prepare(`select name from pragma_table_info('submissions')`).all() as { name: string }[]).map(
+    (c) => c.name,
+  );
+  const keywords = columns.includes('keywords') ? ', keywords' : '';
   const rows = sqlite
-    .prepare(`select id, number, venueid from submissions where id >= ? order by id`)
+    .prepare(`select id, number, venueid${keywords} from submissions where id >= ? order by id`)
     .all(from) as unknown as SubmissionRow[];
   const started = Date.now();
   const replies = sqlite.prepare(`select raw from replies where forum >= ? and forum <= ? order by forum`);

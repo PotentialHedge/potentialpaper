@@ -254,10 +254,16 @@ export const pages = pgTable(
     id: uuid('id').primaryKey().defaultRandom(),
     kind: text('kind', { enum: PAGE_KINDS }).notNull(),
     key: text('key').notNull(),
+    /**
+     * A topic merged into another (`handoffs/pages.md` Phase 5, `server/topic-pages.ts`): its page and history stay, its
+     * address and identifier lead to the page it was merged into, and nobody commits to it again.
+     */
+    mergedInto: uuid('merged_into').references((): AnyPgColumn => pages.id, { onDelete: 'set null' }),
     createdAt: createdAt(),
   },
   (t) => [
     uniqueIndex('pages_kind_key').on(t.kind, t.key),
+    index('pages_merged_into_idx').on(t.mergedInto),
     check('pages_kind_check', sql.raw(`kind in (${PAGE_KINDS.map((kind) => `'${kind}'`).join(', ')})`)),
   ],
 );
@@ -265,10 +271,11 @@ export const pages = pgTable(
 export type Page = typeof pages.$inferSelect;
 
 /**
- * Where a page's old address leads (`handoffs/pages.md` Phase 3): a user page is keyed by its account's handle, so a
- * changed handle moves the page's key and leaves its old key here. `/u/<old>` and `user:<old>` then still find the
- * page, until another account takes the old handle, which deletes the row. Written only by the triggers on
- * `accounts` (migration `0037`), so every writer of a handle leaves one.
+ * Where a page's old address leads (`handoffs/pages.md` Phases 3 and 5): a user page is keyed by its account's handle,
+ * so a changed handle moves the page's key and leaves its old key here; a renamed topic leaves its old slug. `/u/<old>`
+ * and `user:<old>` (`/t/<old>`, `topic:<old>`) then still find the page. A user's is written only by the triggers on
+ * `accounts` (migration `0037`), so every writer of a handle leaves one, and deleted when another account takes the old
+ * handle; a topic's by `renameTopic` (`server/topic-pages.ts`), deleted when a new topic takes the old slug.
  */
 export const pageRedirects = pgTable(
   'page_redirects',
@@ -730,6 +737,11 @@ export const submissions = pgTable(
     status: text('status', { enum: SUBMISSION_STATUSES }),
     /** As the venue words it: "Accept (Poster)". */
     decision: text('decision'),
+    /** The keywords its authors gave the source (OpenReview's), from `submission.json`; topic suggestions match them. */
+    keywords: text('keywords')
+      .array()
+      .notNull()
+      .default(sql`'{}'::text[]`),
     url: text('url'),
     /** When its folder in the repo last changed: an import that finds nothing new commits nothing. */
     fetchedAt: timestamp('fetched_at', { withTimezone: true, mode: 'date' }).notNull(),
@@ -1328,4 +1340,75 @@ export const scopeState = pgTable(
     computedAt: timestamp('computed_at', { withTimezone: true, mode: 'date' }),
   },
   (t) => [index('scope_state_due_idx').on(t.dueAt)],
+);
+
+/**
+ * Papers that might belong in a topic (`handoffs/pages.md` Phase 5): machines only suggest, a person confirms. Kept by
+ * the `topic-suggestions` consumer (`server/topic-suggestions.ts`) from OpenReview keywords and from the topic's name
+ * and aliases in titles and abstracts. Confirming one links the paper (`in-topic`); **a dismissal is remembered**: a
+ * row that isn't `open` is never rewritten, so the suggestion doesn't come back.
+ */
+export const TOPIC_SUGGESTION_STATUSES = ['open', 'dismissed', 'confirmed'] as const;
+export const TOPIC_SUGGESTION_REASONS = ['keyword', 'title', 'abstract'] as const;
+
+export const topicSuggestions = pgTable(
+  'topic_suggestions',
+  {
+    topicPageId: uuid('topic_page_id')
+      .notNull()
+      .references(() => pages.id, { onDelete: 'cascade' }),
+    paperId: uuid('paper_id')
+      .notNull()
+      .references(() => pages.id, { onDelete: 'cascade' }),
+    status: text('status', { enum: TOPIC_SUGGESTION_STATUSES }).notNull().default('open'),
+    /** The strongest reason: one of its keywords is the topic's name, the name is in its title, or in its abstract. */
+    reason: text('reason', { enum: TOPIC_SUGGESTION_REASONS }).notNull(),
+    /** The name or alias that matched. */
+    matched: text('matched').notNull(),
+    score: doublePrecision('score').notNull(),
+    decidedBy: uuid('decided_by').references(() => accounts.id, { onDelete: 'set null' }),
+    decidedAt: timestamp('decided_at', { withTimezone: true, mode: 'date' }),
+    createdAt: createdAt(),
+  },
+  (t) => [
+    primaryKey({ columns: [t.topicPageId, t.paperId] }),
+    index('topic_suggestions_open_idx').on(t.topicPageId, t.status, t.score),
+    index('topic_suggestions_paper_idx').on(t.paperId),
+    check(
+      'topic_suggestions_status_check',
+      sql.raw(`status in (${TOPIC_SUGGESTION_STATUSES.map((s) => `'${s}'`).join(', ')})`),
+    ),
+    check(
+      'topic_suggestions_reason_check',
+      sql.raw(`reason in (${TOPIC_SUGGESTION_REASONS.map((s) => `'${s}'`).join(', ')})`),
+    ),
+  ],
+);
+
+/**
+ * Page protection (DESIGN.md §7): who may still edit a page that is being fought over. `established`: accounts
+ * verified for a while (`server/page-protection.ts`); `admins`: admins only. Owners (a paper's confirmed authors, a
+ * venue's organisers, an org's members, a person), bots through their grants and the system are not held by it.
+ * Admins set it (`npm run pages:protect`, `PUT /api/v1/pages/{identifier}/protection`).
+ */
+export const PROTECTION_LEVELS = ['established', 'admins'] as const;
+
+export const pageProtection = pgTable(
+  'page_protection',
+  {
+    pageId: uuid('page_id')
+      .primaryKey()
+      .references(() => pages.id, { onDelete: 'cascade' }),
+    level: text('level', { enum: PROTECTION_LEVELS }).notNull(),
+    reason: text('reason'),
+    setBy: uuid('set_by').references(() => accounts.id, { onDelete: 'set null' }),
+    setAt: timestamp('set_at', { withTimezone: true, mode: 'date' })
+      .notNull()
+      .default(sql`clock_timestamp()`),
+    /** When it lapses by itself; `null`: until an admin lifts it. */
+    expiresAt: timestamp('expires_at', { withTimezone: true, mode: 'date' }),
+  },
+  () => [
+    check('page_protection_level_check', sql.raw(`level in (${PROTECTION_LEVELS.map((s) => `'${s}'`).join(', ')})`)),
+  ],
 );

@@ -24,7 +24,7 @@ import { addSshKey, listSshKeys, removeSshKey } from '../ssh-keys';
 import { previewDemoSources } from '../demos/attach';
 import { snapshotDemo } from '../demos/snapshot';
 import { demoUrl } from '@/lib/demos';
-import { formatIdentifier } from '@/lib/kinds';
+import { formatIdentifier, keyedPagePath } from '@/lib/kinds';
 import { addCoAuthor, ownClaim, requestClaim, withdrawClaim } from '../claims';
 import { authoredPapers } from '../my-papers';
 import {
@@ -42,7 +42,7 @@ import { renderMarkdown } from '../pages/markdown';
 import { getDb } from '@/db';
 import { pageCurrent } from '@/db/schema';
 import { eq } from 'drizzle-orm';
-import { refreshPaperPages } from '../pages/refresh';
+import { refreshPageIds, refreshPaperPages } from '../pages/refresh';
 import { fetchPdf, storeFile } from '../files';
 import { mergeFoundVersions, setVersions, versionsAt } from '../versions';
 import { lookUpVersions } from '../version-sources';
@@ -74,6 +74,21 @@ import { presentVenuePapers } from '../venue-pages';
 import { createOrgChild, orgOverview, presentOrgOverview } from '../org-pages';
 import { scopeChangedAt, scopePaperChunk, scopeScoreField, scopeScoreList } from '../scope-stats';
 import { rolesOf } from '../pages/check';
+import { presentChanges, recentChanges } from '../changes';
+import { protectionOf, setProtection } from '../page-protection';
+import { presentTopicPapers } from '../topic-papers';
+import {
+  createTopic,
+  decideSuggestion,
+  editTopic,
+  linkPaperToTopic,
+  mergeTopic,
+  presentTopicOverview,
+  renameTopic,
+  similarTopics,
+  topicOverview,
+  topicSuggestionList,
+} from '../topic-pages';
 import { ApiError } from './errors';
 import {
   etagOf,
@@ -1152,4 +1167,150 @@ export const getPagePapers = route(async (req, params) => {
     headers['Content-Encoding'] = 'gzip';
   }
   return new Response(body, { status: 200, headers: { ...headers, 'Content-Type': 'application/x-ndjson' } });
+});
+
+// Topic pages (`handoffs/pages.md` Phase 5, `server/topic-pages.ts`), page protection and the patrol feed.
+
+async function topicPage(params: Record<string, string | string[]>) {
+  const page = await mustFindPage(identifierParam(params));
+  if (page.kind !== 'topic') throw new ApiError(422, 'validation_error', 'only a topic page has this');
+  return page;
+}
+
+/** Topics whose name or an alias is like `q`, the same name first: what the forms check before making one. Public. */
+export const getTopics = route(async (req) => {
+  const { q } = parseQuery(req, S.TopicSearchQuery);
+  const origin = siteUrl();
+  const topics = (await similarTopics(q)).map((t) => ({ ...t, url: `${origin}${keyedPagePath('topic', t.key)}` }));
+  return respond(S.TopicMatches, { topics }, { headers: PUBLIC_MINUTE });
+});
+
+/** Makes a topic. Anyone verified may; a name or alias another topic has is refused (`topic_exists`). */
+export const postTopic = route(async (req) => {
+  const principal = await requireVerified(req);
+  const body = await parseBody(req, S.NewTopicBody);
+  const page = await createTopic(body, actorOf(principal));
+  return respond(S.PageResponse, await resolvePage(formatIdentifier({ kind: 'topic', key: page.key })), {
+    status: 201,
+    principal,
+  });
+});
+
+/** Puts a paper in a topic (a labeled link from the paper), making the topic if it is named and doesn't exist. */
+export const postPaperTopic = route(async (req, params) => {
+  const principal = await requireVerified(req);
+  const paper = await mustFindPage(identifierParam(params));
+  const body = await parseBody(req, S.PaperTopicBody);
+  const result = await linkPaperToTopic(paper, body, actorOf(principal));
+  const summary = (await pageSummaries([result.topic.id])).get(result.topic.id)!;
+  return respond(
+    S.PaperTopicResult,
+    { topic: summary, created: result.created, status: result.status },
+    { status: result.status === 'linked' ? 201 : 200, principal },
+  );
+});
+
+/** A topic's broader, narrower and related topics, the papers that introduced it, its venues and orgs. Public. */
+export const getTopicOverview = route(async (_req, params) => {
+  const page = await topicPage(params);
+  return respond(S.TopicOverview, presentTopicOverview(await topicOverview(page), siteUrl()), {
+    headers: PUBLIC_MINUTE,
+  });
+});
+
+/** Edits a topic: its name, aliases, broader topics, article and related topics, in one commit. */
+export const patchTopic = route(async (req, params) => {
+  const principal = await requireVerified(req);
+  const page = await topicPage(params);
+  const body = await parseBody(req, S.TopicEditBody);
+  const result = await editTopic(page, body, actorOf(principal));
+  return respond(S.TopicEdited, { head: result.oid, changed: result.status === 'committed' }, { principal });
+});
+
+/** A topic's papers, rolled up from its narrower topics, sorted by date, venue or score. Public. */
+export const getTopicPapers = route(async (req, params) => {
+  const page = await topicPage(params);
+  const query = parseQuery(req, S.TopicPapersQuery);
+  return respond(S.TopicPapers, await presentTopicPapers(page.id, query), { headers: PUBLIC_MINUTE });
+});
+
+/** Gives a topic a new address (and name), leaving a redirect from the old. */
+export const postRename = route(async (req, params) => {
+  const principal = await requireVerified(req);
+  const page = await topicPage(params);
+  const body = await parseBody(req, S.RenameBody);
+  const moved = await renameTopic(page, body, actorOf(principal));
+  return respond(S.PageResponse, await resolvePage(formatIdentifier({ kind: 'topic', key: moved.key })), {
+    principal,
+  });
+});
+
+/** Merges this topic into another, leaving a redirect. */
+export const postMerge = route(async (req, params) => {
+  const principal = await requireVerified(req);
+  const page = await topicPage(params);
+  const { into, summary } = await parseBody(req, S.MergeBody);
+  const survivor = await mustFindPage(into.includes(':') ? into : `topic:${into}`);
+  await mergeTopic(page, survivor, actorOf(principal), { summary });
+  return respond(S.PageResponse, await resolvePage(formatIdentifier({ kind: 'topic', key: survivor.key })), {
+    principal,
+  });
+});
+
+/** Papers that might belong in a topic, best first. Public. */
+export const getSuggestions = route(async (req, params) => {
+  const page = await topicPage(params);
+  const { offset, limit } = parseQuery(req, S.SuggestionsQuery);
+  return respond(S.Suggestions, await topicSuggestionList(page.id, { offset, limit }), { headers: PUBLIC_MINUTE });
+});
+
+/** Confirms (links the paper) or dismisses (remembered, so it doesn't come back) a suggestion. */
+export const postSuggestion = route(async (req, params) => {
+  const principal = await requireVerified(req);
+  const page = await topicPage(params);
+  const { paper, action, label } = await parseBody(req, S.SuggestionBody);
+  await decideSuggestion(page, await mustFindPage(paper), { action, label }, actorOf(principal));
+  return respond(S.Suggestions, await topicSuggestionList(page.id, {}), { principal });
+});
+
+function presentProtection(protection: Awaited<ReturnType<typeof protectionOf>>) {
+  return {
+    protection: protection
+      ? { level: protection.level, reason: protection.reason, expiresAt: toIsoOrNull(protection.expiresAt) }
+      : null,
+  };
+}
+
+/** A page's protection, if it has one. Public. */
+export const getProtection = route(async (_req, params) => {
+  const page = await mustFindPage(identifierParam(params));
+  return respond(S.Protection, presentProtection(await protectionOf(getDb(), page.id)), { headers: PUBLIC_MINUTE });
+});
+
+/** Sets or lifts a page's protection. Admins only. */
+export const putProtection = route(async (req, params) => {
+  const principal = await requireAuth(req);
+  if (!principal.isAdmin) throw new ApiError(403, 'forbidden', 'only admins protect pages');
+  const page = await mustFindPage(identifierParam(params));
+  const { level, reason, expiresAt } = await parseBody(req, S.ProtectionBody);
+  const protection = await setProtection(
+    page,
+    { level, reason, expiresAt: expiresAt ? new Date(expiresAt) : null },
+    actorOf(principal),
+  );
+  await refreshPageIds(getDb(), [page.id]);
+  return respond(S.Protection, presentProtection(protection), { principal });
+});
+
+/** The patrol feed: every commit to every page, newest first, bots hidden unless asked. Public. */
+export const getChanges = route(async (req) => {
+  const query = parseQuery(req, S.ChangesQuery);
+  const changes = await recentChanges({
+    kind: query.kind,
+    bots: query.bots === 'true',
+    rollUp: query.rollUp === 'true',
+    before: query.before,
+    limit: query.limit,
+  });
+  return respond(S.Changes, presentChanges(changes, query.limit), { headers: PUBLIC_MINUTE });
 });

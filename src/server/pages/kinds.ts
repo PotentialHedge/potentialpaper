@@ -1,4 +1,4 @@
-import { and, eq } from 'drizzle-orm';
+import { and, eq, sql } from 'drizzle-orm';
 import { getDb, type Database } from '@/db';
 import { pgErrorCode } from '@/db/errors';
 import { pageRedirects, pages, paperIdentifiers, papers } from '@/db/schema';
@@ -66,12 +66,31 @@ export async function redirectedPage(db: Reader, kind: KeyedKind, key: string): 
 }
 
 /**
- * The page an address names, or `null` (following an old key's redirect): a paper through its identifiers (following a merge to the paper that
- * survived it), any other kind by its key. Never asks a paper source, so it is safe on unbounded input.
+ * The page a keyed page was merged into, as far as merges go (a topic merged into one later merged again), or the page
+ * itself if it wasn't (`pages.merged_into`, `topic-pages.ts`).
+ */
+export async function survivorOf(db: Reader, page: PageRow): Promise<PageRow> {
+  let current = page;
+  for (let hops = 0; hops < 8; hops += 1) {
+    const [row] = await db.select({ mergedInto: pages.mergedInto }).from(pages).where(eq(pages.id, current.id));
+    if (!row?.mergedInto) return current;
+    const next = await pageOf(db, row.mergedInto);
+    if (!next) return current;
+    current = next;
+  }
+  return current;
+}
+
+/**
+ * The page an address names, or `null`, following an old key's redirect and a merge: a paper through its identifiers
+ * (to the paper that survived its merge), any other kind by its key (to the topic it was merged into). Never asks a
+ * paper source, so it is safe on unbounded input.
  */
 export async function findPageByAddress(db: Reader, address: PageAddress): Promise<PageRow | null> {
   if (address.kind !== 'paper') {
-    return (await findKeyedPage(db, address.kind, address.key)) ?? redirectedPage(db, address.kind, address.key);
+    const page =
+      (await findKeyedPage(db, address.kind, address.key)) ?? (await redirectedPage(db, address.kind, address.key));
+    return page && survivorOf(db, page);
   }
   const [row] = await db
     .select({ id: papers.id, mergedInto: papers.mergedInto })
@@ -125,4 +144,42 @@ export async function insertPage(kind: KeyedKind, key: string, database: Databas
   const page = await findKeyedPage(database, kind, key);
   if (!page) throw new Error(`could not make the ${kind} page ${key}`);
   return page;
+}
+
+/**
+ * The other keys a keyed page answers to: its old keys (`page_redirects`, a renamed topic's or a person's old handle),
+ * and the keys of pages merged into it with theirs (`pages.merged_into`). Links and memberships that name one of these
+ * count for the page (`page-links.ts`, `page-members.ts`).
+ */
+export async function formerKeys(db: Reader, page: PageRow): Promise<string[]> {
+  if (page.kind === 'paper') return [];
+  const { rows } = await db.execute<{ key: string }>(sql`
+    with recursive merged (id) as (
+      select id from pages where merged_into = ${page.id}
+      union
+      select p.id from pages p join merged m on p.merged_into = m.id
+    )
+    select key from page_redirects where kind = ${page.kind} and page_id = ${page.id}
+    union
+    select key from pages where id in (select id from merged)
+    union
+    select key from page_redirects where kind = ${page.kind} and page_id in (select id from merged)
+  `);
+  return rows
+    .map((row) => row.key)
+    .filter((key) => key !== page.key)
+    .sort();
+}
+
+/** The ids of the pages merged into this one, as far as merges go. */
+export async function mergedIds(db: Reader, pageId: string): Promise<string[]> {
+  const { rows } = await db.execute<{ id: string }>(sql`
+    with recursive merged (id) as (
+      select id from pages where merged_into = ${pageId}
+      union
+      select p.id from pages p join merged m on p.merged_into = m.id
+    )
+    select id from merged
+  `);
+  return rows.map((row) => row.id);
 }
