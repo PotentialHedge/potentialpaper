@@ -873,6 +873,13 @@ Built 2026-11-16 (`handoffs/plugins.md` Phase 2). A plugin is a public repo (or 
 - **`/plugins.md`**, linked from `llms.txt`, is the guide for agents: the manifest, the SDK (its method, permission
   and `when` tables are made from the code), the data routes, the dev loop and publishing. A README says "Read
   https://…/plugins.md and build me a PotentialPaper plugin."
+- **The first plugin outside this repo** (built 2026-11-17, `handoffs/plugins.md` Phase 6) is score standing,
+  `github.com/benedict-armstrong/potentialpaper-score-standing` (id `benedict-armstrong/score-standing`): the
+  acceptodds "where you stand" figure for review scores, a histogram and a kernel-density curve, on papers (aside:
+  the paper's mean at each venue it went to) and venues (main: the whole distribution, split by decision once
+  decisions are out). Vite and TypeScript with `dist/` committed and CI that fails if it is stale; it reads only
+  `scope.scores` and `reviews.forPaper`, caches each field in its own IndexedDB by `computedAt`, and needed no
+  host code of its own. It is the pattern to point plugin authors at.
 
 ### Security is what shapes everything
 

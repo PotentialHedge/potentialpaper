@@ -1,7 +1,7 @@
 # Handoff: settings.json, plugins from GitHub, data for plugins, and the score-standing plugin
 
-Status: plan, 2026-11-16. Phases 1 (settings.json), 2 (the plugin host), 3 (discovery and the plugin pages) and 4 (data for plugins, A and B) are
-built; see the Log.
+Status: plan, 2026-11-16. Phases 1 (settings.json), 2 (the plugin host), 3 (discovery and the plugin pages), 4 (data for plugins, A and B)
+and 6's paper and venue views (score standing v0.1.0) are built; see the Log.
 
 ## Goal
 
@@ -677,3 +677,111 @@ Checks: typecheck, lint and `next build` pass. Unit tests: 386 pass (7 new: `tes
 marking, debounce and rebuild; ETag and 304; `hideUntil`; the bulk stream with fields, gzip, ETag and chunks). The 7
 failures are the same as before this phase: six in `pdf-ingest.test.ts` (no poppler) and one in `follows.test.ts`.
 These ran against this worktree's own database, `potentialpaper_test_plugins4`, through an untracked `.env`.
+
+### Phase 6: score standing, paper and venue views (2026-11-17, branch `plugins-phase-6`)
+
+Built:
+
+- **The repo**, `github.com/benedict-armstrong/potentialpaper-score-standing`: public, MIT, topic
+  `potentialpaper-plugin`, tagged `v0.1.0`. Vite 8 and TypeScript 7, `dist/` committed with unhashed file names (a
+  commit already pins them), so a rebuild of unchanged code changes nothing. CI (GitHub Actions) runs typecheck, tests
+  and the build, and fails if `dist/` differs from a fresh build. `npm run dev` rebuilds on change and serves the repo
+  with CORS on `http://localhost:5175/` for "Load from localhost". No host code of its own: it loads the SDK from
+  `https://ppusercontent.com/sdk/v1/pp.js` and keeps a copy of `pp.d.ts`.
+- **The manifest** (`benedict-armstrong/score-standing`): permissions `reviews.read` and `scope.read`, no network.
+  One panel, `standing`, `kinds: [paper, venue, org]`, `slot: { paper: aside, "*": main }`, `when: page.hasScores`.
+  Settings `view` (`both`/`histogram`/`curve`), `field` (a string, empty is the venue's first) and
+  `splitByDecision` (`auto`/`on`/`off`). The host's validator passes it with no errors and no warnings.
+- **The figure** (`src/`):
+  - `distribution.ts`, ported from acceptodds: `quantile`, `bandwidth`, `density`, `rootScaled`, `countBelow`,
+    `niceTicks`, `percentAhead`, `standingBand`, `yAt`, plus `latticeGap` and `modes`.
+  - `standing.ts`: settings read leniently, the field (the setting's if the venue has it, else the first), the split
+    (`auto` = `decisionsOut`), the paper's mean as the site takes it (`scoreOf`'s leading-number rule, each review
+    that scores the field counted once), its bin, its standing and band, and the text summary.
+  - `figures.ts`: (a) the histogram's bars, stacked by outcome when split; (b) the curve, a kernel density over the
+    form's range, root-scaled, split into per-outcome layers.
+  - `render.ts`: both as SVG, ported from `VenueStanding` and `StandingChart`. The paper's bin is marked and the part
+    of the field below it shaded; a line at the paper with its band ("This paper, Top 12%"). Hover, or focus and arrow
+    keys: a bar's range, count and share (and its outcomes and accept rate when split); on the curve "N papers below"
+    and, split, the accept rate at that score. Each figure is `role="img"` with an accessible name, described by a
+    screen-reader summary (field, venue, count, median, the paper's mean and place, outcomes and accept rate); the
+    tooltip is a polite live region.
+  - `main.ts`: on a paper, `reviews.forPaper` and `scope.scores` of each of its venue scopes; a tab per submission
+    whose venue has statistics, oldest first, opening on the accepted one (else the latest). On a venue or org, the
+    scope's own `scope.scores`, a tab per venue (a series: one per edition). A field switcher (`<select>`) when the
+    venue has more than one score field; it sets the `field` setting. A note instead of a figure when the site
+    withholds the numbers (`hidden`, `plugins.venueStats.hideUntil`).
+  - `cache.ts`: each field fetched is kept in the plugin's own IndexedDB, stamped with its `computedAt` (50 at most,
+    oldest dropped; memory where IndexedDB is unavailable).
+  - Theme: colours are the host's tokens (`--pp-*`), so it follows light and dark; it redraws at the frame's width.
+- **Tests in the plugin repo** (31, vitest): the maths, including simulated ICLR-sized venues (scale
+  {1, 3, 5, 6, 8, 10}, 1, 3, 4 or 3–5 reviews each) whose curve has one mode where Silverman's rule alone draws
+  several, and a real second mode kept; the models; the cache; and the panel end to end in happy-dom against a fake
+  `pp` (the calls on a paper and a venue, tabs, the caption, aria labels and summary, the field switch writing the
+  setting and the second visit served from the cache, `view` and `splitByDecision`, the hidden note).
+- **In this repo:** `tests/integration/score-standing.test.ts` installs the real plugin from GitHub
+  (`PLUGIN_NETWORK_TESTS=1`; skipped otherwise): newest release, consent for its two permissions, its settings'
+  defaults and a bad value refused, `dist/index.html` and its assets served from its own origin with the SDK allowed
+  by the CSP and its sources not served, where its panel shows (paper `aside`, edition and series `main`, not on a
+  topic, not on an org without members), and the data it reads (the venue page's list names the venue the paper's
+  submission names, rating first; the field's sorted means and split). DESIGN.md §10 ("The model") and
+  IMPLEMENTATION.md Milestone 8 note it.
+
+Calls I made where the plan left room:
+
+- **`org` is declared.** It is harmless now: an org's `page.hasScores` is "it has score statistics", and an org has
+  no members until pages Phase 4, so the panel never shows on one (the integration test checks it). Until the org
+  view is built, on an org it draws what it draws on a venue: the org's own papers' distribution per venue, which is
+  honest if not the plan's figure.
+- **The bandwidth for discrete scores:** Silverman's rule, but never narrower than 0.8 × the widest gap between
+  neighbouring values among those that hold 90% of the submissions (`latticeGap`), and at least 1/40 of the range.
+  Two equal kernels `d` apart dip at `h < d/2`; unequal neighbours (a rare value between two common ones) needed more,
+  and at 0.6 simulated venues still showed spurious modes. Below about a thousand submissions, a second bump is
+  sometimes sampling noise, and is left alone.
+- **The split curve** keeps the root scale: the total curve's height is divided between outcomes in proportion to
+  each outcome's kernel density there, so the accepted layer's share of the height is the accept rate at that score,
+  and the layers add up to the curve. **The split histogram** stacks bars by outcome; the paper's bin is outlined
+  rather than filled, and the region below it is shaded behind the bars.
+- **Colours:** accepted in `up`, rejected in `muted`, withdrawn in `faint`, pending in `rule`. The site's `down` is
+  its `accent`, which marks the paper, so rejected doesn't use it.
+- **Finding a paper's venue statistics:** a paper's scopes are its edition pages (direct `page_members`), so the
+  plugin lists `scope.scores` for each scope of kind `venue` and matches the list's `venue.id` to each submission's.
+  A submission at a venue with no page (a track, TMLR) gets no tab. No host change was needed.
+- **Caching by `computedAt`, not ETag:** the RPC doesn't expose headers. The list call (small) is made on every
+  page and says each field's `computedAt`; the values (up to ~40k numbers) are fetched only when that changes. The
+  browser's HTTP cache under the host's `fetch` revalidates within the minute as well.
+- **Standing** counts strictly below (ties are not beaten), rounds down (`percentAhead` over the rest of the field),
+  and counts the paper in the field even if the statistics are a few seconds behind its reviews.
+- **The field switcher writes the global `field` setting**, so the next paper opens on the same field; a venue
+  without it falls back to its first. `view` and `splitByDecision` are changed on `/settings/plugins` only; the panel
+  has no toggle for them.
+- **No `$schema` in the manifest**, since the site's domain isn't final; the README doesn't link this repo, which is
+  private.
+- **The network test is opt-in**, so the suite doesn't depend on GitHub; I ran it (it passes against `v0.1.0`).
+
+What the org view will need (for the phase after pages Phase 4):
+
+- `page_members` for orgs, so `page.hasScores` is true on one and `scope.scores(org)` lists its venues and fields
+  (the statistics roll up already).
+- **The venue's whole distribution, not the org's:** from an org's `ScoreSummary.venue.id` the plugin has no way to
+  the venue's page. Either `ScoreSummary` carries the venue's page identifier, or `page.resolve` accepts a venue id
+  (`openreview:ICLR.cc/2027/Conference`, through `page_scope_names`). Then `scope.scores(<venue page>, venue, field)`
+  gives the field the curve is drawn from.
+- **The org's papers as named marks** (acceptodds' `marks`): A gives means without names. Either the field route
+  grows an optional list of a scope's members with their means (`{ identifier, title, mean }`, for scopes up to some
+  size), or the plugin reads B (`scope.papers(org, { fields: ['scores'] })`) and averages each paper's score
+  vectors itself. The plan says "data comes from A only", so the first is the cleaner fit.
+- In the plugin: open circles on the curve at each mark (`yAt`), named on hover within a few pixels, as
+  `StandingChart` does; the venue view otherwise.
+
+For later phases:
+
+- v0.2 of the plugin: the org view (above), and before/after rebuttal, which needs a `reviews.history` RPC in the host.
+- `plugins.default` is still open; score standing is a candidate.
+- Discovery will list the repo once GitHub's search indexes its topic.
+
+Checks: typecheck, lint pass. Unit tests: 386 pass (nothing changed in them). Integration: 280 of 287 pass, with the
+new test run by `PLUGIN_NETWORK_TESTS=1`; the 7 failures are the same as before this phase: six in
+`pdf-ingest.test.ts` (no poppler) and one in `follows.test.ts`. These ran against this worktree's own database,
+`potentialpaper_test_plugins6`, through an untracked `.env`. The plugin repo: 31 tests, typecheck and build pass,
+and CI is green on `main` and on the `v0.1.0` tag.

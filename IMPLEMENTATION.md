@@ -125,6 +125,10 @@ grouped display, stances and the graph are still to come.
   `consumers:rebuild -- scope-stats`), `GET /api/v1/pages/{identifier}/scores[/{venue}/{field}]`, the bulk
   `GET /api/v1/pages/{identifier}/papers` (NDJSON), `scope.scores` and `scope.papers` over the RPC, the site setting
   `plugins.venueStats.hideUntil`, and `/openapi.json` for the public page routes.
+- Built 2026-11-17 (its Phase 6), the first third-party extension runs: score standing,
+  `github.com/benedict-armstrong/potentialpaper-score-standing` (v0.1.0), the histogram and curve of a venue's
+  review scores on papers and venues, from `scope.scores` alone, with no host code of its own. Its org view waits for
+  organisation pages with members (`handoffs/pages.md` Phase 4).
 
 ## Pages above the paper
 
