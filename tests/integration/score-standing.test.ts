@@ -3,7 +3,8 @@ import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { afterAll, beforeAll, beforeEach, describe, expect, it } from 'vitest';
 import { getDb } from '@/db';
-import { accounts } from '@/db/schema';
+import { eq } from 'drizzle-orm';
+import { accounts, pageCurrent, pdfDocuments } from '@/db/schema';
 import { panelSlot, validateManifest, type PluginManifest } from '@/lib/plugins/manifest';
 import { pageWhenContext, whenHolds } from '@/lib/plugins/when';
 import { PAGE_KINDS, type PageKind } from '@/lib/kinds';
@@ -11,6 +12,7 @@ import { encodeReviewFile, formsFilePath, noteFilePath, submissionFilePath, type
 import { ensureBot, grantBot, OPENREVIEW_BOT } from '@/server/bots';
 import { CONSUMERS } from '@/server/consumers';
 import { runConsumer } from '@/server/consumers/run';
+import { syncDueAffiliations } from '@/server/page-members';
 import { commitPage, createPage } from '@/server/pages/commit';
 import { savePaper } from '@/server/papers';
 import { servePlugin } from '@/server/plugins/serve';
@@ -22,7 +24,8 @@ import { api, closePool, resetDatabase, signUp } from './helpers';
  * Score standing (`handoffs/plugins.md` Phase 6), the first plugin outside this repo, installed from GitHub as any
  * reader would install it: its newest release, copied at its commit, its manifest checked by the host, its built
  * files served from its own origin. Then where its panel shows (`page.hasScores` on papers and venues, never on
- * topics, and not on organisations until they have members), and that the data it reads has the shape it reads.
+ * topics, and on organisations with scored papers), and that the data it reads has the shape it reads, the org view's
+ * included (the venue's own page and the org's papers by name).
  *
  * It talks to GitHub, so it runs only with `PLUGIN_NETWORK_TESTS=1`:
  *
@@ -46,6 +49,7 @@ afterAll(async () => {
 beforeEach(resetDatabase);
 
 async function catchUp() {
+  await syncDueAffiliations();
   for (const consumer of CONSUMERS) {
     expect(await runConsumer(consumer, { retryNow: true })).toMatchObject({ status: 'caught-up' });
   }
@@ -53,7 +57,12 @@ async function catchUp() {
 }
 
 /** A paper at ICLR 2027 with its reviews' ratings and soundness, and its decision. */
-async function submitted(arxiv: string, forum: string, status: 'accepted' | 'rejected', ratings: number[]) {
+async function submitted(
+  arxiv: string,
+  forum: string,
+  status: 'accepted' | 'rejected',
+  ratings: number[],
+): Promise<string> {
   const paper = await savePaper({
     title: `Paper ${arxiv}`,
     authors: ['A. Author'],
@@ -121,6 +130,19 @@ async function submitted(arxiv: string, forum: string, status: 'accepted' | 'rej
     ],
     'Import',
   );
+  return paper;
+}
+
+/** Puts a PDF with these addresses on page 1 on the paper, as the ingest pipeline leaves it. */
+async function printAddresses(paperId: string, emails: string[]) {
+  const sha256 = paperId.replace(/-/g, '').padEnd(64, '0');
+  await getDb()
+    .update(pageCurrent)
+    .set({ pdf: { sha256, bytes: 1, url: `https://example.org/${sha256}.pdf` } as never })
+    .where(eq(pageCurrent.pageId, paperId));
+  await getDb()
+    .insert(pdfDocuments)
+    .values({ sha256, url: `https://example.org/${sha256}.pdf`, emails });
 }
 
 describe.skipIf(!NETWORK)('score standing, installed from GitHub', () => {
@@ -139,10 +161,21 @@ describe.skipIf(!NETWORK)('score standing, installed from GitHub', () => {
       'Venue',
     );
     await createPage('topic', 'linear-attention');
-    await createPage('org', 'eth');
-    await submitted('2701.00001', 'f1', 'accepted', [8, 6, 8]);
+    const eth = await createPage('org', 'eth');
+    await commitPage(
+      eth.id,
+      eth.head,
+      actor,
+      [{ path: 'org.json', content: JSON.stringify({ name: 'ETH Zurich', domains: ['ethz.ch'] }) }],
+      'Org',
+    );
+    await createPage('org', 'empty');
+    const first = await submitted('2701.00001', 'f1', 'accepted', [8, 6, 8]);
     await submitted('2701.00002', 'f2', 'rejected', [3, 5, 3]);
-    await submitted('2701.00003', 'f3', 'rejected', [5, 5, 6, 3]);
+    const third = await submitted('2701.00003', 'f3', 'rejected', [5, 5, 6, 3]);
+    // Two of the three print an ETH address on page 1: they are ETH's papers.
+    await printAddresses(first, ['a@inf.ethz.ch']);
+    await printAddresses(third, ['b@ethz.ch']);
     await catchUp();
 
     // Installing with no ref takes the newest release; it asks for its two permissions.
@@ -187,7 +220,10 @@ describe.skipIf(!NETWORK)('score standing, installed from GitHub', () => {
     const script = /src="\.\/(assets\/[^"]+\.js)"/.exec(html)?.[1];
     const style = /href="\.\/(assets\/[^"]+\.css)"/.exec(html)?.[1];
     expect((await get(`dist/${script}`)).headers.get('content-type')).toMatch(/^text\/javascript/);
-    expect((await get(`dist/${style}`)).status).toBe(200);
+    const css = await get(`dist/${style}`);
+    expect(css.status).toBe(200);
+    // v0.2.0 and later: the org view's open circles.
+    expect(await css.text()).toContain('.mark');
     expect((await get('src/main.ts')).status).toBe(404);
 
     // Where its panel shows: the browser decides from the page's kind and facts, as here.
@@ -204,8 +240,9 @@ describe.skipIf(!NETWORK)('score standing, installed from GitHub', () => {
     expect(await shows('venue:iclr/2027')).toBe('main');
     expect(await shows('venue:iclr')).toBe('main');
     expect(await shows('topic:linear-attention')).toBeNull();
-    // An organisation has no members until organisation pages are built, so no scores: declared, but quiet.
-    expect(await shows('org:eth')).toBeNull();
+    // An organisation with scored papers shows it; one without stays quiet.
+    expect(await shows('org:eth')).toBe('main');
+    expect(await shows('org:empty')).toBeNull();
 
     // The data it reads: the paper's venue page lists the venue its submission names, rating first, and the field
     // gives sorted means, split by outcome, with decisions out.
@@ -228,5 +265,43 @@ describe.skipIf(!NETWORK)('score standing, installed from GitHub', () => {
       split: { accepted: { count: 1 }, rejected: { count: 2 } },
       bins: { lo: 1, hi: 10 },
     });
+
+    // The org view: the org's list names the venue's own page, which gives the whole distribution, and the org's
+    // field with marks names its two papers with their means, ascending.
+    const orgList = (await api('GET', `/pages/${encodeURIComponent('org:eth')}/scores`)).body;
+    const orgRating = orgList.scores.find((s: { field: string }) => s.field === 'rating');
+    expect(orgRating).toMatchObject({
+      count: 2,
+      venue: { id: submission.venue.id, page: { identifier: 'venue:iclr/2027' } },
+    });
+    const whole = (
+      await api(
+        'GET',
+        `/pages/${encodeURIComponent(orgRating.venue.page.identifier)}/scores/${encodeURIComponent(submission.venue.id)}/rating`,
+      )
+    ).body;
+    expect(whole.values).toEqual(field.values);
+    const marked = (
+      await api(
+        'GET',
+        `/pages/${encodeURIComponent('org:eth')}/scores/${encodeURIComponent(submission.venue.id)}/rating?marks=true`,
+      )
+    ).body;
+    expect(marked.marks).toEqual([
+      {
+        identifier: 'arxiv:2701.00003',
+        address: '/abs/2701.00003',
+        title: 'Paper 2701.00003',
+        mean: 4.75,
+        outcome: 'rejected',
+      },
+      {
+        identifier: 'arxiv:2701.00001',
+        address: '/abs/2701.00001',
+        title: 'Paper 2701.00001',
+        mean: expect.closeTo(22 / 3, 9),
+        outcome: 'accepted',
+      },
+    ]);
   });
 });
