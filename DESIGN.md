@@ -938,8 +938,8 @@ Built 2026-11-16 (`handoffs/plugins.md` Phase 2). A plugin is a public repo (or 
 
 - **The manifest** (`lib/plugins/manifest.ts`, zod; JSON Schema at `/schemas/plugin-manifest.json`) names an `id`
   (`<GitHub owner>/<name>`, and the owner must be the repo's), `name`, `version` (semver), `apiVersion` (1), `main`
-  (an HTML file), `permissions` (`page.read`, `scope.read`, `reviews.read`), `network` (https origins its own backend
-  lives at) and what it `contributes`: `panels` (`{ id, title, kinds, slot, when? }`; `slot` is `main`, `aside` or
+  (an HTML file), `permissions` (`page.read`, `scope.read`, `reviews.read`, `identity`), `network` (https origins
+  its own backend lives at), an optional `bot` (the bot whose files on pages it shows) and what it `contributes`: `panels` (`{ id, title, kinds, slot, when? }`; `slot` is `main`, `aside` or
   `tab`, one for every kind or one per kind, `{ "paper": "aside", "*": "main" }`), `pages` (whole pages at
   `/x/<owner>/<name>/<page>`), `settings` (`SettingSpec`s, keyed `<plugin id>.<name>` in settings.json) and
   `commands` (in each of its panels' menus). The validator reports every problem in one pass, each on a line naming
@@ -998,7 +998,8 @@ Arbitrary JavaScript on the main origin could act as any signed-in user. So:
   touches the host's DOM or session; it declares what it adds, and the host draws it (`components/plugins/`).
   Methods: `context.get` (the page, its scopes, the viewer, the theme), `settings.get`/`set` (own keys only) and a
   `settings.change` event, `storage.get`/`set` (64 KB per account and plugin, in Postgres; localStorage when signed
-  out), `page.read`, `page.members`, `page.resolve`, `reviews.forPaper`, `ui.setHeight` and `ui.openUrl`; theme
+  out), `page.read`, `page.members`, `page.resolve`, `reviews.forPaper`, `scope.scores`, `scope.papers`,
+  `identity.token`, `ui.setHeight` and `ui.openUrl`; theme
   tokens are sent at boot and on change. Frames start when scrolled near. The SDK is one file,
   `https://ppusercontent.com/sdk/v1/pp.js`, with `pp.d.ts` beside it; `examples/plugins/hello/` uses it.
 - The reads go through public routes anyone can call, `GET /api/v1/pages/<identifier>` and its `/files`, `/members`
@@ -1009,7 +1010,9 @@ Arbitrary JavaScript on the main origin could act as any signed-in user. So:
   what was approved. A plugin whose manifest asks for anything its grant lacks shows an approval prompt instead of
   running, listing its permissions and network origins in plain words, so an update that asks for more asks again.
   Only a browser session can approve, never an agent's token. A site default runs with what it asks for: the admin
-  who added it approved it.
+  who added it approved it. The exception is `identity` (below), which only the reader can give: a site default
+  that asks for it runs without it until they approve it. The prompt also names the bot a manifest's `bot` names and
+  what the site lets that bot write, or says the site has no such bot; naming one grants nothing.
 - **Plugins never write state other users share.** Shared state that clients can write can be poisoned by anyone.
   Data comes three ways: aggregates the site computes per scope (a `scope_stats` consumer, §4.9), generic bulk
   reads of a scope's papers with ETags, and a plugin's own backend (its `network` origins, or a bot, below).
@@ -1026,7 +1029,20 @@ Arbitrary JavaScript on the main origin could act as any signed-in user. So:
     papers as NDJSON, each with every submission, its status and decision, and every review's score vector with its
     licence and link; gzipped, ETagged on the scope's `changed_at`, in chunks by cursor (`limit`, `after`,
     `X-Next-Cursor`), and `scope.papers` over the RPC. Both are described at `/openapi.json`.
-- Writes go through `commitPage` like any others and record the extension in a trailer.
+  - **A plugin's own backend (D)**, built 2026-11-17 (`handoffs/plugins.md` Phase 5): the manifest's `network`
+    origins are its frames' only `connect-src` beyond their own origin, named in the approval prompt, and a new one
+    asks again. The backend gets no session. To know who the reader is, a plugin asks for `identity`:
+    `pp.identity.token()` gives an ES256 JWT the site signs (`server/plugins/identity.ts`), good for five minutes,
+    with `iss` the site's origin, `aud` the plugin's id, `sub` a pairwise subject (an HMAC of the account and the
+    plugin, so backends can't join their users by it, stable across handle changes) and `handle`. Only a browser
+    session can get one (`POST /api/v1/me/plugins/identity`, which the frame's host calls), for an installed, running
+    plugin whose `identity` the reader approved; a plugin loaded from localhost gets `aud` `dev:<id>`, which no
+    published backend accepts. The keys (`identity_keys`, made on first use, `npm run identity:keys` to rotate and
+    retire) are published at `/.well-known/jwks.json`, every live key at once so tokens verify across a rotation.
+    `examples/plugins/notes` and its `notes-backend` are the pattern: notes per reader kept by the plugin's backend,
+    verified with Node's own crypto. A backend that puts data on pages for everyone does it as a bot (below).
+- Writes go through `commitPage` like any others and record the extension in a trailer. A plugin's writes for
+  everyone are its bot's (below), named in its manifest's `bot`.
 
 VS Code makes the same trade: extensions get APIs and webviews, not the host's DOM. So "almost
 arbitrary" means adding panels, tabs, whole pages, renderers, labels and commands. It doesn't include

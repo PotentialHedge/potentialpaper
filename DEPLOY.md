@@ -100,6 +100,15 @@ importer, the bot `openreview`, and grants it `reviews/openreview/**`. Grant or 
 `dc run --rm tools npm run bots:grant -- <handle> 'reviews/<source>/**' --by <admin handle> [--create]`
 (`--revoke` takes it back; no arguments lists every grant).
 
+## Plugins' identity keys
+
+Plugins with the `identity` permission get tokens the site signs (ES256), which their backends verify at
+`/.well-known/jwks.json` (DESIGN.md §10, data for plugins D). The first key is made in Postgres (`identity_keys`) on
+first use; nothing to set up. To rotate: `dc run --rm tools npm run identity:keys -- rotate`, wait ten minutes (the
+JWKS is cached five, tokens live five), then `… identity:keys -- retire <old kid>`. Readers' ids at each plugin
+(`sub`) are an HMAC keyed by `PLUGIN_SUBJECT_SECRET`, or `BETTER_AUTH_SECRET` without it: changing that secret changes
+them all, so set `PLUGIN_SUBJECT_SECRET` once before launch if `BETTER_AUTH_SECRET` may ever rotate.
+
 ## Git over SSH
 
 **Not set up in production yet: Benedict decides the name and the port (below).** Until then leave `ssh` out of
