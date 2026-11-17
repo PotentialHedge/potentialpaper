@@ -255,9 +255,12 @@ export function PluginDetail({ id }: { id: string }) {
           <p>
             {p.from === 'dev'
               ? 'Stop loading it from your dev server.'
-              : 'Uninstall it. Its settings stay in your settings.json until you remove them there.'}{' '}
+              : 'Uninstall it. Its settings stay in your settings.json until you remove them there.'}
+          </p>
+          <div className="flex justify-end">
             <button
-              className={ui.linkBtn}
+              type="button"
+              className={ui.btn({ ghost: true, inline: true })}
               disabled={busy}
               onClick={async () => {
                 if (p.from === 'dev') removeDevPlugin(p.source);
@@ -267,7 +270,7 @@ export function PluginDetail({ id }: { id: string }) {
             >
               Remove {manifest.name}
             </button>
-          </p>
+          </div>
         </>
       )}
     </>

@@ -2,6 +2,7 @@
 
 import Link from 'next/link';
 import { type FormEvent, useEffect, useMemo, useState, useSyncExternalStore } from 'react';
+import { CopyField } from '@/components/CopyField';
 import { ui } from '@/components/ui';
 import {
   addDevPlugin,
@@ -57,16 +58,15 @@ export function PluginsSettings() {
   return (
     <>
       <h2 className="font-serif text-xl font-normal">Plugins</h2>
-      <p className="mt-1 mb-2 text-subtle">
-        Plugins add panels to pages: a paper, a venue, a topic, an organisation or a person. Each comes from a public
-        GitHub repo, pinned to a commit, and runs in a frame of its own that sees only what the site gives it. A plugin
-        runs once you approve what it asks for. Each installed plugin has a page of its own here, with its settings.
-      </p>
-      <p className="mb-6 text-subtle">
-        To build one, ask your agent:{' '}
-        <q className="text-ink">Read {origin || 'this site'}/plugins.md and build me a PotentialPaper plugin.</q> The
-        guide is at <a href="/plugins.md">/plugins.md</a>.
-      </p>
+      <p className="mt-1 mb-6 text-subtle">Plugins add panels to pages. Each runs once you approve what it asks for.</p>
+
+      <section className="mb-8">
+        <h3 className="mb-2 font-serif text-lg font-normal">Build one with your agent</h3>
+        <CopyField
+          value={`Read ${origin || ''}/plugins.md and help me build a PotentialPaper plugin.`}
+          label="Prompt for your AI agent"
+        />
+      </section>
       {note && <p className={`${ui.note(note.ok)} mb-3 whitespace-pre-line`}>{note.text}</p>}
 
       <section className="mb-8">
@@ -218,11 +218,11 @@ function Discover({
     <section className="mb-8">
       <h3 className="mb-2 font-serif text-lg font-normal">Discover</h3>
       <p className={`${ui.fine} mt-0 mb-2`}>
-        Public GitHub repos with the topic{' '}
+        Public repos tagged{' '}
         <a href="https://github.com/topics/potentialpaper-plugin" rel="noopener noreferrer" target="_blank">
           potentialpaper-plugin
         </a>
-        , most starred first. Anyone can publish one; look at what it asks for before you approve it.
+        . Check what one asks for before you approve it.
       </p>
       {state.status === 'loading' && <p className={ui.empty}>Asking GitHub…</p>}
       {state.status === 'error' && <p className={ui.note(false)}>{state.error}</p>}
@@ -232,34 +232,50 @@ function Discover({
           {state.plugins.length === 0 ? (
             <p className={ui.fine}>No plugins published yet.</p>
           ) : (
-            <ul className="space-y-3">
-              {state.plugins.map((p) => {
-                const key = sourceKey(parsePluginSource(p.source)!);
-                return (
-                  <li key={p.source} className="flex items-baseline gap-3">
-                    <div className="min-w-0 flex-1">
-                      <a href={p.htmlUrl} rel="noopener noreferrer" target="_blank" className="font-semibold">
-                        {p.owner}/{p.repo}
-                      </a>
-                      <span className="ml-2 text-muted tabular-nums" title={`${p.stars} stars`}>
-                        ★ {p.stars}
-                      </span>
-                      {p.description && <p className="mt-0.5">{p.description}</p>}
-                      {p.pushedAt && (
-                        <p className={`${ui.fine} mt-0`}>last pushed {dateFormat.format(new Date(p.pushedAt))}</p>
-                      )}
-                    </div>
-                    {installed.has(key) ? (
-                      <span className="text-muted">Installed</span>
-                    ) : signedIn ? (
-                      <button className={ui.linkBtn} disabled={busy !== null} onClick={() => install(p)}>
-                        {busy === p.source ? 'Installing…' : 'Install'}
-                      </button>
-                    ) : null}
-                  </li>
-                );
-              })}
-            </ul>
+            <div className={ui.tableScroll}>
+              <table className={`${ui.table} mt-0`}>
+                <thead>
+                  <tr>
+                    <th className={ui.th()}>Plugin</th>
+                    <th className={ui.th(true)}>Stars</th>
+                    <th className={ui.th(true)}>Updated</th>
+                    <th className={ui.th()} />
+                  </tr>
+                </thead>
+                <tbody>
+                  {state.plugins.map((p) => {
+                    const key = sourceKey(parsePluginSource(p.source)!);
+                    return (
+                      <tr key={p.source} className="align-baseline">
+                        <td className={ui.td}>
+                          <a href={p.htmlUrl} rel="noopener noreferrer" target="_blank" className="font-semibold">
+                            {p.owner}/{p.repo}
+                          </a>
+                          {p.description && <p className="mt-0.5 text-subtle">{p.description}</p>}
+                        </td>
+                        <td className={`${ui.td} ${ui.num}`}>{p.stars}</td>
+                        <td className={`${ui.td} text-right whitespace-nowrap text-muted`}>
+                          {p.pushedAt ? dateFormat.format(new Date(p.pushedAt)) : '–'}
+                        </td>
+                        <td className={`${ui.td} pl-4 text-right whitespace-nowrap`}>
+                          {installed.has(key) ? (
+                            <span className="text-muted">Installed</span>
+                          ) : signedIn ? (
+                            <button
+                              className={ui.btn({ ghost: true, inline: true, flush: true })}
+                              disabled={busy !== null}
+                              onClick={() => install(p)}
+                            >
+                              {busy === p.source ? 'Installing…' : 'Install'}
+                            </button>
+                          ) : null}
+                        </td>
+                      </tr>
+                    );
+                  })}
+                </tbody>
+              </table>
+            </div>
           )}
         </>
       )}
@@ -286,9 +302,8 @@ function DevLoad({ onNote }: { onNote: (n: Note) => void }) {
     <section>
       <h3 className="mb-2 font-serif text-lg font-normal">Load from localhost</h3>
       <p className={`${ui.fine} mt-0 mb-2`}>
-        For building a plugin: it runs in this browser only, unpinned, and needs no approval. Serve its folder with CORS
-        on (<code className="font-mono">npx http-server . -p 5174 --cors</code>); see{' '}
-        <a href="/plugins.md">the guide</a>.
+        Runs in this browser only. Serve the folder with CORS on:{' '}
+        <code className="font-mono">npx http-server . -p 5174 --cors</code>
       </p>
       <form onSubmit={load} className="flex gap-2">
         <input
