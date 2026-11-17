@@ -50,17 +50,17 @@ Same as acceptodds unless a reason is stated here. The reference is
 [PotentialHedge/acceptodds](https://github.com/PotentialHedge/acceptodds), checked out locally at
 `../papermarket/platform`.
 
-| Concern | Choice                                                                          |
-| ------- | ------------------------------------------------------------------------------- |
-| App     | TypeScript, Next.js 16 App Router, Node 26, `output: 'standalone'`              |
-| Data    | Postgres 19 with Drizzle; migrations are a separate deploy step (§4.11)         |
-| Auth    | Better Auth: email-first sign-up, link plus 6-digit code, API keys              |
+| Concern | Choice                                                                                                                                                                        |
+| ------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| App     | TypeScript, Next.js 16 App Router, Node 26, `output: 'standalone'`                                                                                                            |
+| Data    | Postgres 19 with Drizzle; migrations are a separate deploy step (§4.11)                                                                                                       |
+| Auth    | Better Auth: email-first sign-up, link plus 6-digit code, API keys                                                                                                            |
 | UI      | Tailwind v4 with acceptodds' `globals.css` tokens and `components/ui.ts`; form controls in `components/controls` (Radix primitives and dnd-kit lists, styled with the tokens) |
-| Content | `react-markdown` stack with GFM and KaTeX, `d3-force` for the graph             |
-| Mail    | Resend                                                                          |
-| Tests   | Vitest and fast-check; integration tests against real Postgres                  |
-| Hosting | One app and one Postgres container behind Traefik and Cloudflare                |
-| Added   | Cloudflare R2 for uploaded media; `node-diff3` and `diff` for merging and diffs |
+| Content | `react-markdown` stack with GFM and KaTeX, `d3-force` for the graph                                                                                                           |
+| Mail    | Resend                                                                                                                                                                        |
+| Tests   | Vitest and fast-check; integration tests against real Postgres                                                                                                                |
+| Hosting | One app and one Postgres container behind Traefik and Cloudflare                                                                                                              |
+| Added   | Cloudflare R2 for uploaded media; `node-diff3` and `diff` for merging and diffs                                                                                               |
 
 **Copy from acceptodds, don't share a package.** The two products will diverge, and a shared
 package would slow both. Good candidates to copy are `better-auth.ts`, `onboarding.ts`,
