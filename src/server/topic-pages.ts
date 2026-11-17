@@ -694,7 +694,10 @@ export async function editTopic(page: PageRow, edit: TopicEdit, actor: Actor, da
 
   if (edit.article !== undefined) {
     const sections = await readSections(database, page.id, files, 'community');
-    const parts = splitSections(edit.article.replace(/\r\n/g, '\n'));
+    // A heading with nothing under it (the editor's template for an empty article) is no section yet.
+    const parts = splitSections(edit.article.replace(/\r\n/g, '\n')).filter(
+      (part) => part.text.replace(/^#[^\n]*\n?/, '').trim() !== '',
+    );
     changes.push(...planSections(sections, 'community', 0, sections.length, parts));
   }
 

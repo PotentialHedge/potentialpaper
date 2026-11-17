@@ -90,7 +90,16 @@ export function OrgPeople({ org }: KindPanelProps) {
   );
 }
 
-function CountBox({ title, kind, pages }: { title: string; kind: 'venue' | 'topic'; pages: OverlapPage[] }) {
+/** Pages of a kind with a count each, most first: an org's venues and topics, a topic's venues and orgs. */
+export function CountBox({
+  title,
+  kind,
+  pages,
+}: {
+  title: string;
+  kind: 'venue' | 'topic' | 'org';
+  pages: OverlapPage[];
+}) {
   if (pages.length === 0) return null;
   return (
     <div className={ui.box}>

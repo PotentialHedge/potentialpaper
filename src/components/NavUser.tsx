@@ -54,6 +54,7 @@ export function NavUser() {
           viewer.profileComplete ? (
             <>
               <Link href="/papers">my papers</Link>
+              <Link href="/changes">changes</Link>
               <Link href="/settings">settings</Link>
               <Link href="/profile">@{viewer.handle}</Link>
             </>
@@ -62,6 +63,7 @@ export function NavUser() {
           )
         ) : viewer === null ? (
           <>
+            <Link href="/changes">changes</Link>
             <Link href="/settings">settings</Link>
             <Suspense fallback={<Link href="/signin">sign in</Link>}>
               <SignIn />

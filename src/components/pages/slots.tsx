@@ -10,6 +10,17 @@ import type { ScopePaper } from '@/server/page-members';
 import type { UserPageView } from '@/server/user-pages';
 import { LinksBox } from './LinkLists';
 import { OrgAbout, OrgDepartments, OrgPeople, OrgTopics, OrgVenues } from './org-panels';
+import {
+  TopicAbout,
+  TopicArticle,
+  TopicIntroduced,
+  TopicNeighbours,
+  TopicOrgs,
+  TopicPapers,
+  TopicVenues,
+  TopicSuggested,
+  type TopicView,
+} from './topic-panels';
 import { UserActivity, UserComments, UserIdentity, UserPapers } from './user-panels';
 import { VenueAbout, VenueEditions, VenueOrganizers, VenuePapers, VenueScores } from './venue-panels';
 
@@ -39,6 +50,8 @@ export interface KindPanelProps {
   user: UserPageView | null;
   /** An org's page: where it sits, its people, venues and topics (`server/org-pages.ts`); `null` on other kinds. */
   org: OrgOverview | null;
+  /** A topic's page: its neighbours, papers and suggestions (`server/topic-pages.ts`); `null` on other kinds. */
+  topic: TopicView | null;
 }
 
 function Html({ html, empty }: { html: string | null; empty: ReactNode }) {
@@ -69,25 +82,9 @@ function CommunitySection({ kind, communityHtml }: KindPanelProps) {
   );
 }
 
-/** What the kind file says, in a line or two: a topic's other names. A venue's is `VenueAbout`, an org's `OrgAbout`. */
-function About({ kind, kindFile }: KindPanelProps) {
-  if (!kindFile) return null;
-  const facts: ReactNode[] = [];
-  if (kind === 'topic') {
-    const aliases = (kindFile.aliases as string[] | undefined) ?? [];
-    if (aliases.length > 0) facts.push(`Also called ${aliases.join(', ')}`);
-  }
-  if (facts.length === 0) return null;
-  return (
-    <p className={`${ui.fine} text-center`}>
-      {facts.map((fact, i) => (
-        <span key={i}>
-          {i > 0 && ' · '}
-          {fact}
-        </span>
-      ))}
-    </p>
-  );
+/** What the kind file says, in a line: a venue's is `VenueAbout`, an org's `OrgAbout`, a topic's `TopicAbout`. */
+function About() {
+  return null;
 }
 
 function Links({ linksFrom }: KindPanelProps) {
@@ -181,10 +178,27 @@ const ORG_PANELS: Record<string, ComponentType<KindPanelProps>> = {
   topics: OrgTopics,
 };
 
+/**
+ * A topic's own panels (`topic-panels.tsx`): its names and where it is edited, the article, the papers that introduced
+ * it, its neighbouring topics, venues and organisations, its papers (sortable) and what might belong here.
+ */
+const TOPIC_PANELS: Record<string, ComponentType<KindPanelProps>> = {
+  ...PANELS,
+  about: TopicAbout,
+  community: TopicArticle,
+  introduced: TopicIntroduced,
+  topics: TopicNeighbours,
+  venues: TopicVenues,
+  orgs: TopicOrgs,
+  papers: TopicPapers,
+  suggestions: TopicSuggested,
+};
+
 const KIND_PANELS: Partial<Record<KeyedKind, Record<string, ComponentType<KindPanelProps>>>> = {
   user: USER_PANELS,
   venue: VENUE_PANELS,
   org: ORG_PANELS,
+  topic: TOPIC_PANELS,
 };
 
 /** A slot's panels, which the reader's settings may hide or reorder (`ArrangedPanels`, `ArrangedTabs`). */

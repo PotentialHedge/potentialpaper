@@ -16,6 +16,9 @@ import { userPageView } from '@/server/user-pages';
 import { PluginPageProvider } from '@/components/plugins/PluginPage';
 import { pageFacts, pageSummaries, scopesOfPage } from '@/server/plugins/pages';
 import { KindSlot } from './slots';
+import type { TopicView } from './topic-panels';
+import { topicOverview } from '@/server/topic-pages';
+import { presentTopicPapers } from '@/server/topic-papers';
 
 /**
  * What the routes of the kinds other than a paper share (`/v/…`, `/t/…`, `/o/…`, `/u/…`, `lib/kinds.ts`): the page
@@ -62,6 +65,11 @@ const load = cache(async (kind: KeyedKind, segments: string[]): Promise<Loaded |
   return { page, key, current: current ?? null };
 });
 
+async function topicView(page: PageRow): Promise<TopicView> {
+  const [overview, papers] = await Promise.all([topicOverview(page), presentTopicPapers(page.id, { sort: 'date' })]);
+  return { overview, papers };
+}
+
 export async function keyedPageMetadata(kind: KeyedKind, segments: string[]): Promise<Metadata> {
   const found = await load(kind, segments);
   if (!found || 'redirect' in found) return {};
@@ -78,12 +86,12 @@ export async function KeyedPageRoute({ kind, segments }: { kind: KeyedKind; segm
   if ('redirect' in found) redirect(found.redirect);
   const { page, key, current } = found;
   const scope = KINDS[kind].scope;
-  const [from, to, count, list, summaries, scopes, facts, user, org] = await Promise.all([
+  const [from, to, count, list, summaries, scopes, facts, user, org, topic] = await Promise.all([
     linksFrom(page.id),
     linksTo(page.id),
     scope ? scopeMemberCount(page.id) : Promise.resolve(0),
-    // A venue lists its submissions by status itself (`venue-panels.tsx`).
-    scope && kind !== 'venue' ? scopePapers(page.id) : Promise.resolve([]),
+    // A venue lists its submissions by status itself (`venue-panels.tsx`), a topic its papers sortable (`topic-panels.tsx`).
+    scope && kind !== 'venue' && kind !== 'topic' ? scopePapers(page.id) : Promise.resolve([]),
     pageSummaries([page.id]),
     scopesOfPage(page),
     pageFacts(page),
@@ -91,6 +99,8 @@ export async function KeyedPageRoute({ kind, segments }: { kind: KeyedKind; segm
     kind === 'user' ? userPageView(page) : Promise.resolve(null),
     // Its people are only those who show it as their institution (`orgPeople`).
     kind === 'org' ? orgOverview(page) : Promise.resolve(null),
+    // Its neighbours, papers and suggestions (`server/topic-pages.ts`).
+    kind === 'topic' ? topicView(page) : Promise.resolve(null),
   ]);
   const summary = summaries.get(page.id)!;
   const props = {
@@ -106,6 +116,7 @@ export async function KeyedPageRoute({ kind, segments }: { kind: KeyedKind; segm
     papers: scope ? { count, list } : null,
     user,
     org,
+    topic,
   };
   const clone = cloneAddresses({ kind, key });
   return (

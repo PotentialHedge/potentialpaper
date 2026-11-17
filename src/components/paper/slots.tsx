@@ -2,6 +2,9 @@ import type { ComponentType } from 'react';
 import { ArrangedPanels } from '@/components/ArrangedPanels';
 import { ArrangedTabs } from '@/components/ArrangedTabs';
 import { LinksBox } from '@/components/pages/LinkLists';
+import { AddTopic } from '@/components/topics/AddTopic';
+import { formatIdentifier, pagePath } from '@/lib/kinds';
+import { TOPIC_LABELS } from '@/lib/labeled-links';
 import { ui } from '@/components/ui';
 import { type PanelId, slotPanels } from '@/lib/panels';
 import type { PageLink } from '@/server/page-links';
@@ -237,8 +240,42 @@ function Discussion({ canonical }: PanelProps) {
   return <Comments paper={canonical} path={paperPath(canonical)} />;
 }
 
+/** Its labeled links, but for its topics, which the Topics box shows. */
 function Links({ linksFrom }: PanelProps) {
-  return <LinksBox links={linksFrom} direction="from" />;
+  return <LinksBox links={linksFrom.filter((link) => !TOPIC_LABELS.includes(link.label))} direction="from" />;
+}
+
+/**
+ * The topics it is in (its `in-topic` and `introduces-topic` links, `handoffs/pages.md` Phase 5), and "Add a topic",
+ * which links it to one by name, making the topic if none has that name yet.
+ */
+function Topics({ linksFrom, canonical }: PanelProps) {
+  const topics = linksFrom.filter((link) => TOPIC_LABELS.includes(link.label));
+  return (
+    <div className={ui.box}>
+      <h2 className={ui.boxHeading}>Topics</h2>
+      {topics.length > 0 ? (
+        <ul className="space-y-1">
+          {topics.map((link, i) => (
+            <li key={i}>
+              {link.page.address ? (
+                <a href={pagePath(link.page.address)} className={link.page.name ? 'text-ink' : 'text-muted italic'}>
+                  {link.page.name ?? formatIdentifier(link.page.address)}
+                </a>
+              ) : (
+                link.page.name
+              )}
+              {link.label === 'introduces-topic' && <span className={ui.badge}>introduced it</span>}
+              {link.origin === 'owners' && <span className={ui.badge}>authors</span>}
+            </li>
+          ))}
+        </ul>
+      ) : (
+        <p className="text-xs text-muted">Not in a topic yet.</p>
+      )}
+      <AddTopic identifier={`${canonical.scheme}:${canonical.value}`} />
+    </div>
+  );
 }
 
 function Backlinks({ linksTo }: PanelProps) {
@@ -252,6 +289,7 @@ const PANELS: Record<PanelId<'paper'>, ComponentType<PanelProps>> = {
   read: ReadThePaper,
   'versions-box': VersionsAside,
   'submissions-box': SubmissionsAside,
+  topics: Topics,
   links: Links,
   backlinks: Backlinks,
   community: CommunitySection,

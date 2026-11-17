@@ -23,6 +23,7 @@ export const PAGE_PANELS = {
     { id: 'read', slot: 'paper.aside', title: 'Picture, PDF and links' },
     { id: 'versions-box', slot: 'paper.aside', title: 'Versions (side box)' },
     { id: 'submissions-box', slot: 'paper.aside', title: 'Submissions (side box)' },
+    { id: 'topics', slot: 'paper.aside', title: 'Topics' },
     { id: 'links', slot: 'paper.aside', title: 'Labeled links' },
     { id: 'backlinks', slot: 'paper.aside', title: 'What links here' },
     { id: 'community', slot: 'paper.body', title: 'Community section' },
@@ -43,9 +44,14 @@ export const PAGE_PANELS = {
   topic: [
     { id: 'about', slot: 'topic.main', title: 'About the topic' },
     { id: 'community', slot: 'topic.main', title: 'Article' },
+    { id: 'introduced', slot: 'topic.main', title: 'Papers that introduced it' },
+    { id: 'topics', slot: 'topic.aside', title: 'Broader, narrower and related topics' },
+    { id: 'venues', slot: 'topic.aside', title: 'Venues' },
+    { id: 'orgs', slot: 'topic.aside', title: 'Organisations' },
     { id: 'links', slot: 'topic.aside', title: 'Labeled links' },
     { id: 'backlinks', slot: 'topic.aside', title: 'What links here' },
     { id: 'papers', slot: 'topic.tabs', title: 'Papers' },
+    { id: 'suggestions', slot: 'topic.tabs', title: 'Might belong here' },
   ],
   org: [
     { id: 'about', slot: 'org.main', title: 'About the organisation' },

@@ -162,13 +162,9 @@ export const submissionFileSchema = z
       .nullable()
       .meta({ description: `Where it stands: ${SUBMISSION_STATUSES.join(', ')}; null when the source doesn't say.` }),
     decision: shortText().nullable().meta({ description: 'The decision as the venue words it: "Accept (Poster)".' }),
-    keywords: z
-      .array(shortText(200))
-      .max(MAX_KEYWORDS)
-      .optional()
-      .meta({
-        description: 'The keywords its authors gave the source, as they wrote them. Topic suggestions match them.',
-      }),
+    keywords: z.array(shortText(200)).max(MAX_KEYWORDS).optional().meta({
+      description: 'The keywords its authors gave the source, as they wrote them. Topic suggestions match them.',
+    }),
     version: z
       .string()
       .regex(VERSION_ID)
