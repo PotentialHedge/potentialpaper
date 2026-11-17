@@ -860,13 +860,13 @@ For later phases:
   bot". Grants of `extensions/<plugin id>/**` need `grantProblem` to allow them.
 - A backend that wants the reader's consent for more (writing on their behalf) would need scoped tokens; nothing
   asks for that yet.
-Checks: typecheck, lint, prettier and `next build` pass (the build lists `/.well-known/jwks.json` and
-`/api/v1/me/plugins/identity`). Unit tests: 407 pass, 3 of them new in `tests/unit/plugins.test.ts`: the manifest's
-`identity` and `bot`; consent for `identity` on a site default and `runningPermissions`; and `identity.token` behind
-its permission, with the real SDK's `pp.identity.fetch` sending the bearer token. Integration: 305 of 313 pass, 1
-skipped (the network plugin test). The 7 failures are the same as before this phase: six in `pdf-ingest.test.ts` (no
-poppler) and one in `follows.test.ts`. 5 tests are new, in `tests/integration/plugin-identity.test.ts`, and each
-token in them is checked by the example backend's `verify.mjs`:
+  Checks: typecheck, lint, prettier and `next build` pass (the build lists `/.well-known/jwks.json` and
+  `/api/v1/me/plugins/identity`). Unit tests: 407 pass, 3 of them new in `tests/unit/plugins.test.ts`: the manifest's
+  `identity` and `bot`; consent for `identity` on a site default and `runningPermissions`; and `identity.token` behind
+  its permission, with the real SDK's `pp.identity.fetch` sending the bearer token. Integration: 305 of 313 pass, 1
+  skipped (the network plugin test). The 7 failures are the same as before this phase: six in `pdf-ingest.test.ts` (no
+  poppler) and one in `follows.test.ts`. 5 tests are new, in `tests/integration/plugin-identity.test.ts`, and each
+  token in them is checked by the example backend's `verify.mjs`:
 
 - an approved plugin's token: its claims, pairwise `sub` and JWKS, refused when the token is for another audience or
   issuer, forged or expired, and refused before approval;
