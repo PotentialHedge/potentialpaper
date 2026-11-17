@@ -1,4 +1,5 @@
 import type { ReactNode } from 'react';
+import { ui } from '@/components/ui';
 import { SettingsShell } from './SettingsShell';
 
 /**
@@ -8,7 +9,7 @@ import { SettingsShell } from './SettingsShell';
  */
 export default function SettingsLayout({ children }: { children: ReactNode }) {
   return (
-    <main className="mx-auto max-w-[1080px] px-6 pt-3 pb-15 narrow:px-4">
+    <main className={ui.page}>
       <SettingsShell>{children}</SettingsShell>
     </main>
   );

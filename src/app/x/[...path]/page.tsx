@@ -11,7 +11,7 @@ export const metadata: Metadata = { title: 'Plugin · PotentialPaper', robots: {
 export default async function PluginRoute({ params }: { params: Promise<{ path: string[] }> }) {
   const path = (await params).path.map(decodeURIComponent);
   return (
-    <main className={ui.paperPage}>
+    <main className={ui.page}>
       <PluginPageView path={path} />
     </main>
   );

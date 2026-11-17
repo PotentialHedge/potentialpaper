@@ -121,7 +121,7 @@ export async function PaperRoute({ scheme, segments }: { scheme: PaperScheme; se
     forums: submissions.map((s) => s.url),
   };
   return (
-    <main className={ui.paperPage}>
+    <main className={ui.page}>
       <PluginPageProvider data={plugins}>
         <article>
           <h1 className="mt-6 text-center text-[26px] leading-tight font-normal">{paper.title}</h1>
