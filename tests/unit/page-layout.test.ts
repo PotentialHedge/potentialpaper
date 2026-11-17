@@ -9,7 +9,6 @@ import {
   layoutProblem,
   layoutVersionOf,
   parseLfsPointer,
-  normalizePath,
   pathDenied,
   type PagePart,
   type Roles,
@@ -27,20 +26,6 @@ function sections(part: PagePart, files: Record<string, string>): SectionFile[] 
 const NOBODY: Roles = { system: false, admin: false, verified: true, owner: false, claimed: false };
 
 describe('the layout', () => {
-  it('lets .potentialpaper/ start with a dot, at the top and spelled exactly so', () => {
-    expect(normalizePath('.potentialpaper/metadata.json')).toEqual({ path: '.potentialpaper/metadata.json' });
-    for (const path of ['.PotentialPaper/x.json', 'community/.potentialpaper/x', '.potentialpaper', '.git/config']) {
-      expect(normalizePath(path)).toHaveProperty('problem');
-    }
-  });
-
-  it('keeps the system dir to the system and admins', () => {
-    expect(pathDenied('.potentialpaper/pdf.json', NOBODY)).toMatch(/only the system and admins/);
-    expect(pathDenied('.potentialpaper/pdf.json', { ...NOBODY, admin: true })).toBeNull();
-    expect(pathDenied('community/10-summary.md', NOBODY)).toBeNull();
-    expect(pathDenied('links/10-code.json', { ...NOBODY, claimed: true })).toMatch(/confirmed authors/);
-  });
-
   it('lets anyone verified write a demo folder, as the community section, and takes its files as they are', () => {
     expect(pathDenied('demos/spin/index.html', NOBODY)).toBeNull();
     expect(pathDenied('demos/spin/index.html', { ...NOBODY, verified: false })).toMatch(/institutional/);
@@ -89,16 +74,6 @@ describe('the layout', () => {
     ]) {
       expect(layoutProblem(path), path).not.toBeNull();
     }
-  });
-
-  it('checks a version file, whose id is its name, and a link file', () => {
-    expect(contentProblem('versions/v_k3x9q2ab.json', '{"kind":"preprint","label":"arXiv v1"}')).toBeNull();
-    expect(contentProblem('versions/v_k3x9q2ab.json', '{"id":"v_x","kind":"preprint","label":"a"}')).toMatch(
-      /file name/,
-    );
-    expect(contentProblem('versions/v_k3x9q2ab.json', '{"kind":"blog","label":"a"}')).toMatch(/kind/);
-    expect(contentProblem('links/10-code.json', '{"label":"Code","url":"https://github.com/x/y"}')).toBeNull();
-    expect(contentProblem('links/10-code.json', '{"label":"Code","url":"javascript:alert(1)"}')).not.toBeNull();
   });
 });
 

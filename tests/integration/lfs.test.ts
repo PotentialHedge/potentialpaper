@@ -199,7 +199,7 @@ describe('the Git LFS batch API', () => {
 });
 
 describe('a page with Git LFS', () => {
-  it('starts with .gitattributes, and the picture editor writes a pointer and its words', async () => {
+  it('starts with .gitattributes, and the set-thumbnail script writes a pointer and its words', async () => {
     const { paperId } = await newPaper();
     const { actor } = await newPusher();
     await setThumbnail(paperId, actor, { image: GIF, alt: 'A dot' });

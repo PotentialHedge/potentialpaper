@@ -12,7 +12,6 @@ import { findKeyedPage } from '@/server/pages/kinds';
 import { readCommit, readFiles, readHead, readText } from '@/server/pages/repo';
 import { savePaper } from '@/server/papers';
 import { pageMembersForPlugins } from '@/server/plugins/pages';
-import { userPageView } from '@/server/user-pages';
 import { api, closePool, resetDatabase, signUp } from './helpers';
 
 /**
@@ -333,16 +332,8 @@ describe('an org', () => {
     expect(route.body).toMatchObject({ people: [{ handle: 'ada' }], peopleCount: 1, parent: null, children: [] });
     expect(JSON.stringify(route.body)).not.toContain('bob');
 
-    // Her own page shows the institution by the same choice, and profile.json says so.
-    const page = (await findKeyedPage(getDb(), 'user', 'ada'))!;
-    expect((await userPageView(page))!.institutions).toEqual(['ETH Zurich']);
+    // Hidden again, she leaves the list (user-pages.test.ts checks her own page and profile.json).
     expect((await api('PATCH', '/me', { cookie: ada.cookie, body: { showInstitution: false } })).status).toBe(200);
-    expect((await userPageView(page))!.institutions).toBeNull();
-    const head = await readHead(getDb(), page.id);
-    const blob = (await readFiles(getDb(), page.id, (await readCommit(getDb(), page.id, head!)).tree)).get(
-      'profile.json',
-    );
-    expect(JSON.parse((await readText(getDb(), page.id, blob!))!).show.institution).toBe(false);
     expect((await orgOverview(eth)).people).toEqual({ handles: [], count: 0 });
   });
 });

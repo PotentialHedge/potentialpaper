@@ -69,7 +69,7 @@ describe('comments', () => {
     expect(newest.html).not.toContain('<img src="https://example.org');
   });
 
-  it('refuses visitors and unverified writes, and needs a known paper', async () => {
+  it('refuses visitors, and needs a known paper', async () => {
     await paper();
     expect((await api('POST', '/comments', { body: { paper: PAPER, body: 'hi' } })).status).toBe(401);
     const ada = await person('ada');

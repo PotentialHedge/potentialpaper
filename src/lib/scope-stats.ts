@@ -84,19 +84,6 @@ export function fieldStats(
   return { ...group(values), min, max, byStatus };
 }
 
-/** The share of `values` (ascending) strictly below `x`, by binary search: where a paper stands. */
-export function shareBelow(values: readonly number[], x: number): number {
-  if (values.length === 0) return 0;
-  let lo = 0;
-  let hi = values.length;
-  while (lo < hi) {
-    const mid = (lo + hi) >> 1;
-    if (values[mid] < x) lo = mid + 1;
-    else hi = mid;
-  }
-  return lo / values.length;
-}
-
 /** The value at quantile `q` (0–1) of ascending `values`, interpolated; `null` when empty. */
 export function quantile(values: readonly number[], q: number): number | null {
   if (values.length === 0) return null;

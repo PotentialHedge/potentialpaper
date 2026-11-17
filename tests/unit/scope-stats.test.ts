@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { binRange, binsOf, fieldStats, outcomeOf, quantile, shareBelow } from '@/lib/scope-stats';
+import { binRange, binsOf, fieldStats, outcomeOf, quantile } from '@/lib/scope-stats';
 import { scoreFieldsOf } from '@/server/scope-stats';
 
 /** Score statistics' pure parts (`lib/scope-stats.ts`): bins, the split by outcome, and which fields count. */
@@ -42,8 +42,6 @@ describe('score statistics', () => {
   });
 
   it('reads off a standing', () => {
-    expect(shareBelow([1, 2, 2, 3], 2)).toBe(0.25);
-    expect(shareBelow([1, 2, 2, 3], 4)).toBe(1);
     expect(quantile([1, 2, 3, 4], 0.5)).toBe(2.5);
     expect(quantile([], 0.5)).toBeNull();
   });

@@ -77,11 +77,6 @@ export function sourceKey(source: PluginSource): string {
   return `github:${source.owner.toLowerCase()}/${source.repo.toLowerCase()}${source.path ? `/${source.path}` : ''}`;
 }
 
-/** The source written out whole, ref included. */
-export function formatPluginSource(source: PluginSource): string {
-  return source.kind === 'dev' ? source.url : `${sourceKey(source)}${source.ref ? `@${source.ref}` : ''}`;
-}
-
 /** The repo's page on GitHub, at a commit when one is given. */
 export function sourcePageUrl(source: PluginSource, commit?: string): string {
   if (source.kind === 'dev') return source.url;

@@ -1,12 +1,11 @@
 import { createHash } from 'node:crypto';
 import { getDb } from '@/db';
-import { linkProblem, MAX_LINKS, type TitleLink } from '@/lib/paper-links';
 import { ApiError } from '../api/errors';
 import { storeImage } from '../media';
 import { checkMayWrite } from './check';
 import { recordLfsObject } from '../lfs';
 import { commitPage, type Actor, type CommitOptions, type CommitResult, type FileChange } from './commit';
-import { linkChanges, thumbnailImagePathIn } from './content';
+import { thumbnailImagePathIn } from './content';
 import { readCommit, readFiles, readHead } from './repo';
 import {
   encodeLfsPointer,
@@ -99,36 +98,6 @@ export async function removeThumbnail(paperId: string, actor: Actor, options: Co
     actor,
     paths.map((path) => ({ path: path!, content: null })),
     'Remove the picture',
-    options,
-  );
-}
-
-/** Replaces the page's own links, a file each in `links/`, in order. An empty list removes them all. */
-export async function setLinks(
-  paperId: string,
-  actor: Actor,
-  links: readonly TitleLink[],
-  options: CommitOptions = {},
-  summary?: string,
-): Promise<CommitResult> {
-  if (links.length > MAX_LINKS) throw new ApiError(422, 'validation_error', `at most ${MAX_LINKS} links`);
-  const clean = links.map((link) => ({ label: link.label.trim(), url: link.url.trim() }));
-  const labels = new Set<string>();
-  for (const [index, link] of clean.entries()) {
-    const problem = linkProblem(link);
-    if (problem) throw new ApiError(422, 'validation_error', `link ${index + 1} ${problem}`, { index });
-    if (labels.has(link.label.toLowerCase())) {
-      throw new ApiError(422, 'validation_error', `two links are called “${link.label}”`, { index });
-    }
-    labels.add(link.label.toLowerCase());
-  }
-  const { head, files } = await filesAtHead(paperId, options);
-  return commitPage(
-    paperId,
-    head,
-    actor,
-    linkChanges(files.keys(), clean),
-    summary?.trim() || 'Change the links',
     options,
   );
 }
