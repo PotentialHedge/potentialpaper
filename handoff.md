@@ -101,6 +101,21 @@ libpoppler118 liblcms2-2 libopenjp2-7 libpixman-1-0` plus `dpkg-deb -x` into a s
 - **Each worktree gets its own test database** (`TEST_DATABASE_URL` in an untracked `.env`). Run
   `DATABASE_URL=$TEST_DATABASE_URL npm run db:migrate` once to set it up.
 
+## Deployed d722a32 (2026-11-17): plugins and pages
+
+Production runs `main` at d722a32: plugins Phases 1–6 and pages Phases 1–5, migrations `0029`–`0040` (41 in all,
+checked first on a throwaway Postgres 16, since CI never got as far as migrating). Postgres still 16, `ssh` still off.
+
+- `PLUGIN_SUBJECT_SECRET` set in `.env.production` (random; never change it after launch). The first identity key
+  was already made on first use (`identity_keys`: 1).
+- One-offs run: `venues:sync` (`venue:iclr`, `venue:iclr/2027`) and `orgs:sync` (8 org pages, the institutions in
+  use). User pages were already backfilled. All six consumers caught up, no `last_error`. Edge cache purged.
+- Snag: `venues:sync` logs `revalidate in app 400 {"error":"paths: 1 to 20 paper paths"}`. The internal revalidate
+  route still takes paper paths only, so a bot's commit to a venue page doesn't refresh it at once (the page
+  revalidates within 5 minutes anyway).
+- Cleaned up: merged branches (local and on GitHub), the phase worktrees and their test databases, and app images
+  older than d412470.
+
 ## User content domain, editor fixes (2026-11-16, on `main`, deployed at afce06c)
 
 - **`ppusercontent.com`** (bought 2026-11-16) is the user content domain: demos at `<snapshot>.ppusercontent.com`,
