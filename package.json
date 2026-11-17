@@ -46,7 +46,9 @@
     "editor:build": "scripts/build-web-editor.sh",
     "editor:extension": "node scripts/build-editor-extension.mjs",
     "format": "prettier --write .",
-    "format:check": "prettier --check ."
+    "format:check": "prettier --check .",
+    "db:seed": "tsx scripts/seed/seed.ts",
+    "db:seed:export": "tsx scripts/seed/export-fixture.ts"
   },
   "dependencies": {
     "@radix-ui/react-popover": "^1.3.1",

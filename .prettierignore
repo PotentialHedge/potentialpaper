@@ -8,3 +8,4 @@ package-lock.json
 next-env.d.ts
 scratch/
 public/
+scripts/seed/fixture.json
