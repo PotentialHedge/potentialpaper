@@ -230,6 +230,17 @@ their own handle's identity, since organising is a public role.
 A venue's page also shows its review scores (`scores`, from `scope_stats`, §10): the first score field as a
 histogram stacked by outcome, and every field's median, middle half and medians by decision, per venue on a series.
 
+**User pages** (built in `handoffs/pages.md` Phase 3). Every account has a page at `/u/<handle>`, keyed by its
+handle and made with the account by a trigger on `accounts` (migration `0037`, which also made one for every existing
+account); its repo starts at sign-up (`npm run users:pages` starts the rest). A handle change moves the page's key in
+the same transaction and leaves a redirect (`page_redirects`): `/u/<old>` and `user:<old>` lead to the page until
+another account takes the old handle. The page shows its handle, its `about/` and its links, and of the rest only what
+the account turned on (§5.3): its real name, institutions, the papers it is a confirmed author of, its activity
+(commits under its handle, from the outbox) and its comments under its handle, each a `user.show.*` setting
+(`lib/user-pages.ts`). Its `profile.json` repeats the choices, never the values, and is written only by the site
+from those settings. A person's own links may also go elsewhere (`homepage`, `orcid`, `scholar`, to https addresses)
+and to their work (`wrote`, to a paper), §8.
+
 **Sections** are named `NN-slug.md` or `NN-slug.html`: two digits, then a lower-case ASCII slug.
 They show in the order of their names, which is the order `ls` lists them in. A section's title is the
 `#` heading (or `<h1>`) its file starts with, and otherwise its slug. HTML is checked against an
@@ -626,6 +637,23 @@ that paper uses a separate per-claim author identity, shown with the name on the
 Their handle never appears on that paper, so nothing publicly connects a pseudonymous handle to a real
 name. Stances on links touching your own paper don't count towards totals.
 
+**What a person's page shows** (`/u/<handle>`, §4.3; built in `handoffs/pages.md` Phase 3) is the account's choice,
+item by item, in its own settings.json (`user.show.*`, which the site layer can't set for everyone):
+
+| Item                                  | Default | Why                                                                            |
+| ------------------------------------- | ------- | ------------------------------------------------------------------------------ |
+| Real name (`user.show.realName`)      | off     | Real names are optional; the handle need not say who someone is                |
+| Institution (`user.show.institution`) | off     | At a small institution it can identify someone on its own                      |
+| Papers authored (`claimedPapers`)     | off     | It ties the handle to the names on those papers, which nothing else does       |
+| Activity (`user.show.activity`)       | on      | Edits and links under the handle are public under it on each page already      |
+| Comments (`user.show.comments`)       | on      | The same; anonymous ones and those on the person's own papers are never listed |
+
+Edits under a per-claim author identity are never listed, whatever the settings say, and neither are comments on a
+paper the account is a confirmed author of. The rule lives in one place, `server/user-pages.ts`'s `userPageView`,
+which the page, plugins' `page.read` and the public routes all read. The page's bylines elsewhere (comments, My
+papers) still follow `real_name` and `show_institution` as above; whether to fold those into the same settings is
+open (`handoffs/pages.md`).
+
 **Known limits.** Writing style and timing can still identify people, and this protects against casual
 linking rather than a determined investigator. Someone who hasn't claimed their paper can still praise
 it under a handle, so claiming stays voluntary and that gap has to be handled by normal patrolling. The
@@ -746,10 +774,15 @@ Labels are data, in a table, with a reading in each direction:
 | `related`            | related to         | (symmetric)       | discourse |                |               |
 | `in-topic`           | is about           | covered by        | topic     |                |               |
 | `introduces-topic`   | introduces         | introduced by     | topic     |                |               |
+| `wrote`              | wrote              | written by        | person    |                |               |
+| `homepage`           | homepage           | homepage of       | person    |                |               |
+| `orcid`              | ORCID              | ORCID of          | person    |                |               |
+| `scholar`            | Google Scholar     | Google Scholar of | person    |                |               |
 
 Built 2026-11-16 (`handoffs/pages.md` Phase 1): the vocabulary is `src/lib/labeled-links.ts`, where each label
 also says which kinds it goes from and to (the classic labels paper to paper, `related` between any kinds, the
-topic labels paper to topic). `page_links` is kept by the `links` outbox consumer (`server/page-links.ts`), not in
+topic labels paper to topic, the person labels from a user page only, `homepage`, `orcid` and `scholar` to an https
+address rather than a page, which no page's "what links here" lists). `page_links` is kept by the `links` outbox consumer (`server/page-links.ts`), not in
 the commit's transaction, and the paper page and every other kind show "Links" and "What links here".
 
 - Contested labels **require a note**, because that is where the content is.
@@ -902,7 +935,7 @@ Arbitrary JavaScript on the main origin could act as any signed-in user. So:
   `https://ppusercontent.com/sdk/v1/pp.js`, with `pp.d.ts` beside it; `examples/plugins/hello/` uses it.
 - The reads go through public routes anyone can call, `GET /api/v1/pages/<identifier>` and its `/files`, `/members`
   and `/submissions`, so a plugin's own backend reads the same data; they give only what the page shows the public
-  (a user page's `about/` and links, §5.3).
+  (a user page's `about/` and links, and only the items its account shows, `userPageView`, §5.3).
 - **Consent is not in settings.json.** The document lists installed plugins (the `plugins` key), and a hand-edited
   file can add one, but a grant row (`user_plugin_grants`: plugin id, SHA, permissions, network origins) records
   what was approved. A plugin whose manifest asks for anything its grant lacks shows an approval prompt instead of

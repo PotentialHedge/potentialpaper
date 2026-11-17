@@ -1,6 +1,6 @@
 # Handoff: pages above the paper (venues, topics, organisations, people)
 
-Status: plan, 2026-11-16. Phases 1 (the page model) and 2 (venue pages) are built; see the Log. Read with `handoffs/plugins.md`: plugins work on every kind of
+Status: plan, 2026-11-16. Phases 1 (the page model), 2 (venue pages) and 3 (user pages) are built; see the Log. Read with `handoffs/plugins.md`: plugins work on every kind of
 page this plan adds.
 
 ## Goal
@@ -152,7 +152,10 @@ show. A plugin written once can then add a panel to a paper, a venue, a topic, a
 
 ## Open questions
 
-- Which items a user page can show, and their defaults (Phase 3).
+- Which items a user page can show, and their defaults (Phase 3). **Built without Benedict, to confirm:** real name,
+  institution and authored papers off; activity and comments under the handle on (see Phase 3's Log). Also open:
+  whether `accounts.real_name`/`show_institution`, which still govern bylines on comments and My papers, should fold
+  into the same `user.show.*` settings.
 
 ## Log
 
@@ -318,3 +321,93 @@ inherited from the series, stepping down, rejection). The 7 failures are the sam
 `potentialpaper_test_pages2`, through an untracked `.env`. A smoke run of `next start` against seeded venues served
 `/v/iclr` (the editions table) and `/v/iclr/2027` (the source line, the claim link, the empty list), redirected a
 signed-out `/claim/venue/iclr` to sign-in, and answered the `venue-papers` route.
+
+### Phase 3: user pages (2026-11-17, branch `pages-phase-3`)
+
+Built:
+
+- **A page with every account** (migration `0037_user_pages.sql`): triggers on `accounts` make the `pages` row
+  (`user`, handle) on insert, move its key on a handle change, and delete it with the account; the migration made one
+  for every existing account. A changed handle leaves `page_redirects(kind, key, page_id)`: `/u/<old>` redirects (307)
+  and `user:<old>` resolves (`findPageByAddress` → `redirectedPage`) until another account takes the old handle,
+  whose trigger deletes the redirect. `afterHandleChange` (from `updateProfile`) commits the page's metadata with its
+  new key and refreshes both addresses.
+- **The repo starts at sign-up** (`ensureAccountForUser` → `startUserPage`): the system's first commit, with
+  `profile.json`. `npm run users:pages` does the same for existing accounts (idempotent).
+- **What it shows: `user.show.*` settings** (`lib/user-pages.ts`, `lib/settings/core.ts`), each a boolean with a
+  `switch` widget in a "Your public page" group of `/settings` (signed in only):
+
+  | Setting                   | Default | Shows                                                                                  |
+  | ------------------------- | ------- | -------------------------------------------------------------------------------------- |
+  | `user.show.realName`      | off     | `accounts.real_name`, under the handle                                                 |
+  | `user.show.institution`   | off     | `accounts.institutions` (confirmed addresses')                                         |
+  | `user.show.claimedPapers` | off     | papers with a confirmed author claim, each with the name printed on it                 |
+  | `user.show.activity`      | on      | commits under the account's `u_` identity, every kind, newest first (outbox order), 50 |
+  | `user.show.comments`      | on      | signed comments, not removed, not on a paper it is a confirmed author of, newest first |
+
+  They are **`accountOnly`** (a new `CoreSetting` flag): resolved from the user layer only, and a site file naming
+  one gets a warning, so no admin can publish everyone's names by changing a default.
+
+- **The rule in one place, `server/user-pages.ts`'s `userPageView`**: the page's panels, plugins' `page.read` (and
+  `GET /pages/{identifier}/files`, through `userKindFile`: `show`, and `realName`, `institutions`, `papers` only when
+  shown) all read it. Never listed, whatever the settings: `a_` (author-identity) commits, anonymous comments,
+  comments on the account's own papers, and a bot's activity.
+- **`profile.json`** is `{ "show": { "<item>": bool, … } }`: the choices, never the values. Only the system writes it
+  (`rules.ts`; the account's push is refused with "follows your user.show.* settings"), from `saveUserSettings`
+  whenever an item changes (`syncProfileFile`), which also refreshes `/u/<handle>`.
+- **The page** (`components/pages/user-panels.tsx`, `lib/panels.ts`): `user.main` has `identity` (real name and
+  institutions under the handle), `about`, `papers`; `user.aside` links and backlinks; `user.tabs` `activity` and
+  `comments`. A tab whose item is off isn't there at all (`PRESENT` in `slots.tsx`). `/profile` says where the page
+  is and links to the settings.
+- **Person links** (`lib/labeled-links.ts`): `homepage`, `orcid` (orcid.org) and `scholar` (scholar.google.com) go
+  from a user page to an https address (`targetKind: 'web'`, a new value of `page_links.target_kind`; no "what links
+  here" for them); `wrote` goes from a user page to a paper. The links box shows a web link by its address with
+  `rel="me"`.
+- DESIGN.md §4.3 (user pages), §5.3 (the items and defaults), §8 (the labels) and §10; IMPLEMENTATION.md; `llms.txt`.
+
+Calls I made where the plan left room:
+
+- **The items and defaults (for Benedict to confirm, in Open questions).** Off: real name, institution, authored
+  papers, each of which can tie the handle to a person or to the names on papers. On: activity and comments, which are
+  public under the handle on each page already, so listing them links nothing new. The plan's "safe default" names
+  "activity under the handle" as shown, which I took to cover comments under the handle too.
+- **Settings are what count; `profile.json` mirrors them.** The plan says both "a `user.show.*` setting" and
+  "`profile.json` holds what the account chose". Two writable copies would disagree, so the settings are the source
+  and only the site writes the file. The file holds no values: a real name committed once stays in a public history
+  after it is turned off. The page reads the settings, so a failed sync never shows more than chosen.
+- **The bylines elsewhere are unchanged.** `real_name` (shown beside the handle on comments when set) and
+  `show_institution` still govern comments and My papers; `user.show.realName`/`institution` govern the page only.
+  Folding them together is a decision for Benedict (Open questions).
+- **Rows by trigger, repos by code.** A trigger covers every writer of `accounts` and the rename's atomicity; a
+  commit can't be made in SQL, so the repo starts at sign-up and by script. A page with no repo still renders
+  (name `@handle`, defaults).
+- **Activity reads `page_revisions` joined to `page_events`** (the outbox row of the same commit) rather than a new
+  consumer: both are written in the commit's transaction, ordered by event id. Bot commits are hidden by being a bot's
+  page; the account's own commits are never a bot's.
+- **A handle change is in the page's history** (the metadata commit "Handle is now @…"); the redirect says the same
+  publicly anyway. The old handle can be taken at once, as before.
+- **`wrote` shows on the paper's "what links here" as "written by @handle".** That ties the handle to the paper by
+  the person's own act, in their own `about/links.jsonl`; nothing else does.
+- **The page is cached 5 minutes** (as Phase 1 left keyed pages); settings changes, profile edits and handle changes
+  refresh it at once, new activity elsewhere shows within the 5 minutes.
+
+For later phases:
+
+- Phase 4 (orgs): members who "chose to show their institution" can read `shownFor(account).institution` (or
+  `show_institution`, until Open questions settles which).
+- Phase 5 (topics) and following pages: a topic's "orgs active in it" and any people list must go through
+  `userPageView`'s rules, not `accounts` directly.
+- The web editor is still paper-only, so a person writes `about/` by `git push` (`/git/user/<handle>.git`).
+
+Checks: typecheck, lint and `next build` pass. Unit tests: 394 pass (8 new in `tests/unit/user-pages.test.ts`:
+defaults, account-only resolution, strict values, the form widget and JSON Schema, `profile.json`, excerpts, person
+links; `kinds.test.ts` updated for `profile.json`). Integration: 284 of 291 pass, 5 new in
+`tests/integration/user-pages.test.ts` (made at sign-up and moved with the handle, redirects and an old handle
+retaken, deletion; the §5.3 defaults on the view, `page.read` and the files route; opting in and out with
+`profile.json` following and no name in any commit; the account refused `profile.json`; the site layer ignored;
+activity and comments with author-identity edits, anonymous comments and own-paper comments left out; person links
+and "what links here"). The 7 failures are the same as before this phase (six `pdf-ingest.test.ts` without poppler,
+one `follows.test.ts`); `comments.test.ts` failed once on a random UUID containing "ada" and passed on rerun. Run
+against this worktree's own database, `potentialpaper_test_pages3`, through an untracked `.env`. A smoke run of
+`next start` served `/u/<handle>` (no real name in the HTML with the defaults, Activity and Comments tabs) and
+redirected the old handle with a 307.

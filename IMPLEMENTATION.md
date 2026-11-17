@@ -138,7 +138,10 @@ paper's. Phase 1 (the page model) is built: `pages`, the page store keyed by `pa
 routes and slots (`/v`, `/t`, `/o`, `/u`). Phase 2 (venue pages) is built: the `venues` bot (`npm run venues:sync`),
 a series' editions, an edition's submissions by status with filters (`GET /api/v1/pages/{identifier}/venue-papers`),
 and organiser claims (`page_claims`, `/claim/venue/<key>`). A venue's review scores (its `scores` panel) come from
-`handoffs/plugins.md` Phase 4's `scope_stats`.
+`handoffs/plugins.md` Phase 4's `scope_stats`. Phase 3 (user pages) is built: every account's `/u/<handle>`, made and
+moved with it (`page_redirects`), showing only what its `user.show.*` settings turn on (`server/user-pages.ts`), with
+activity and comments under the handle, person links (`homepage`, `orcid`, `scholar`, `wrote`) and
+`npm run users:pages`.
 
 ## Main risks
 
