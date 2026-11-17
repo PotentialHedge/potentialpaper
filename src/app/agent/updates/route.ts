@@ -10,6 +10,10 @@ export const dynamic = 'force-dynamic';
 const UPDATES: { date: string; text: string }[] = [
   {
     date: '2026-11-17',
+    text: "Score statistics name more: every venue in `GET /api/v1/pages/<identifier>/scores` and `…/scores/<venue>/<field>` carries `venue.page`, the venue's own page (or `null`), whose numbers are the whole venue's where a topic's or an organisation's are only its papers'. `…/scores/<venue>/<field>?marks=true` adds `marks`: the scope's own submissions there with each paper's identifier, title, mean and outcome (`null` above 1,000). Score standing v0.2.0 uses both to draw an organisation's papers on each of its venues' distributions.",
+  },
+  {
+    date: '2026-11-17',
     text: "Plugins can have their own backend: a manifest's `network` origins are the only places its frames may connect to, and the `identity` permission lets a plugin ask for a short-lived token (`pp.identity.token()`) naming the signed-in reader to that backend, which verifies it against `/.well-known/jwks.json` without ever seeing their session. Only the person can approve `identity`, in their browser, even for a plugin the site installs for everyone; you can't. A manifest's optional `bot` names the bot whose files on pages it shows. When you build a plugin with a backend, read `/plugins.md`, \"Your own backend\".",
   },
   {

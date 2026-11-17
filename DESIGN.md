@@ -977,8 +977,9 @@ Built 2026-11-16 (`handoffs/plugins.md` Phase 2). A plugin is a public repo (or 
 - **The first plugin outside this repo** (built 2026-11-17, `handoffs/plugins.md` Phase 6) is score standing,
   `github.com/benedict-armstrong/potentialpaper-score-standing` (id `benedict-armstrong/score-standing`): the
   acceptodds "where you stand" figure for review scores, a histogram and a kernel-density curve, on papers (aside:
-  the paper's mean at each venue it went to) and venues (main: the whole distribution, split by decision once
-  decisions are out). Vite and TypeScript with `dist/` committed and CI that fails if it is stale; it reads only
+  the paper's mean at each venue it went to), venues (main: the whole distribution, split by decision once
+  decisions are out) and, since v0.2.0, organisations (main: each venue's whole distribution, with the org's
+  submissions as open circles on it, named on hover). Vite and TypeScript with `dist/` committed and CI that fails if it is stale; it reads only
   `scope.scores` and `reviews.forPaper`, caches each field in its own IndexedDB by `computedAt`, and needed no
   host code of its own. It is the pattern to point plugin authors at.
 
@@ -1022,7 +1023,11 @@ Arbitrary JavaScript on the main origin could act as any signed-in user. So:
     sorted, with 20 fixed-width bins between the form's range and the same split by outcome (accepted, rejected,
     withdrawn, pending). The venue stays in the key, since a 6 at one venue is no 6 at another. Served at
     `GET /api/v1/pages/{identifier}/scores` (venues, fields, counts) and `…/scores/{venue}/{field}` (the numbers),
-    public, ETagged and cached a minute, and by `scope.scores`. Curve-fitting is the client's. The site setting
+    public, ETagged and cached a minute, and by `scope.scores`. Curve-fitting is the client's. Each venue in these
+    answers names its own page (`venue.page`: the venue page whose `sources` list it), since a topic's or an org's
+    numbers are only its own papers'. `?marks=true` (`scope.scores(…, { marks: true })`) adds the scope's own
+    submissions in the field by name (paper identifier, title, mean, outcome), read live with the statistics' rules,
+    up to 1,000 a field, so a plugin can mark an org's papers on its venue's distribution. The site setting
     `plugins.venueStats.hideUntil` (`never`, the default, or `decisions`) withholds a venue's numbers until it has
     decided on a submission.
   - **Bulk (B)**, built: `GET /api/v1/pages/{identifier}/papers?fields=submissions,scores,status` streams a scope's

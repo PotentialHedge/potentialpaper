@@ -1,7 +1,8 @@
 # Handoff: pages above the paper (venues, topics, organisations, people)
 
-Status: plan, 2026-11-16. Phases 1 (the page model), 2 (venue pages), 3 (user pages), 4 (organisation pages) and 5
-(topic pages) are built; see the Log. Read with `handoffs/plugins.md`: plugins work on every kind of
+Status: plan, 2026-11-16. Every phase is built: 1 (the page model), 2 (venue pages), 3 (user pages), 4 (organisation
+pages) and 5 (topic pages); see the Log. Score standing's org view, which Phase 4 unblocked, is built too
+(`handoffs/plugins.md`, Phase 6's org view). What remains is "Later" and the open questions. Read with `handoffs/plugins.md`: plugins work on every kind of
 page this plan adds.
 
 ## Goal

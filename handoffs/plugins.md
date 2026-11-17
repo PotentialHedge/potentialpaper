@@ -1,7 +1,9 @@
 # Handoff: settings.json, plugins from GitHub, data for plugins, and the score-standing plugin
 
-Status: plan, 2026-11-16. Phases 1 (settings.json), 2 (the plugin host), 3 (discovery and the plugin pages), 4 (data for plugins, A and B),
-5 (plugins with their own backend, D) and 6's paper and venue views (score standing v0.1.0) are built; see the Log.
+Status: plan, 2026-11-16. Every phase is built: 1 (settings.json), 2 (the plugin host), 3 (discovery and the plugin
+pages), 4 (data for plugins, A and B), 5 (plugins with their own backend, D) and 6 (score standing: paper and venue
+views in v0.1.0, the org view in v0.2.0); see the Log. What remains is "Later (v0.2)" of Phase 6, before/after
+rebuttal (a `reviews.history` RPC), and the open question of `plugins.default`.
 
 ## Goal
 
@@ -877,3 +879,92 @@ For later phases:
 - the `bot` listing, for a known bot with its grants and for a person's handle.
 
 These ran against this worktree's own database, `potentialpaper_test_plugins5`, through an untracked `.env`.
+
+### Phase 6: score standing, the org view (2026-11-17, branch `plugins-phase-6-org`)
+
+Built:
+
+- **The host API, for every plugin** (`server/scope-stats.ts`, the field route, `host.ts`, the SDK):
+  - **From a venue id to its page:** every `ScoreSummary.venue` (the list and the field) carries `page`, the venue's
+    own page summary, or `null` (`venuePagesOf`). That is the venue page whose `page_scope_names` hold the venue id
+    (its `venue.json` `sources`), not merged, the deepest first. Its statistics of the venue are the whole venue's,
+    where a topic's or an org's are only its own papers'.
+  - **Named means:** `GET /api/v1/pages/{identifier}/scores/{venue}/{field}?marks=true` adds `marks`, the scope's own
+    submissions in that field, ascending by mean: `{ identifier, address, title, mean, outcome }`
+    (`scopeScoreMarks`). The submissions and means are the statistics' own (the same `scopeSubmissionsSql` and score
+    rule), read live from the tables. The field's `count` gates it: above `MAX_MARKS` (1,000), `marks` is `null`
+    without a query. When `hideUntil` withholds the field, `marks` is `[]`. A bad value is a 400.
+  - **RPC:** `scope.scores(identifier, venue, field, { marks: true })` (param `marks`, only with a field), in
+    `pp.js` and `pp.d.ts` (`ScoreMark`, `venue.page`).
+  - **Docs:** `/plugins.md` (the method's line and the field route, with how to draw a scope's papers on its venue),
+    `/openapi.json` (the `marks` query, `venue.page` in the schemas, which are the routes' own zod), `llms.txt`, an
+    `/agent/updates` notice, DESIGN.md §10 (A, and the plugin's line) and IMPLEMENTATION.md Milestone 8.
+- **Score standing v0.2.0** (`github.com/benedict-armstrong/potentialpaper-score-standing`, tag `v0.2.0`, CI green on
+  `main` and the tag, `dist/` committed):
+  - On an org (`orgTabs`): a tab per venue the org's papers went to (the org's list, most submissions first).
+  - Each tab's distribution comes from the venue's own page (`venue.page`). The panel asks that page's list for the
+    venue (small, once per load) for its `computedAt` and `hidden`. It then fetches the field from there, and the
+    org's field with `{ marks: true }`, both cached by `computedAt` as before.
+  - The figure: open circles on the curve at each mark (`yAt`), and one above each histogram bar that holds marks,
+    sized by how many. Hover names the marks within 6 px (title, mean, band, outcome; four, then "and N more"), with
+    the "N papers below" readout. Up and down arrows step from one marked paper (or bar) to the next. A click or
+    Enter on a named paper opens it (`ui.openUrl`).
+  - Text: the caption says "N of <org>'s submissions among M at <venue>", and the accessible name adds "<org>'s N
+    submissions marked". The screen-reader summary adds their count, median and band, and each paper, best first
+    (ten).
+  - A venue with no page of its own draws the org's own distribution, still marked. With over 1,000 marks, the
+    venue is drawn with a note and no names. A withheld venue gets the note as on a venue page.
+  - Paper and venue views are unchanged. `pp.d.ts` is the host's new copy. Tests: 38 (7 new: `orgTabs`,
+    `placeMarks`, `marksNear`, `markText`, the summary; the org panel end to end, with the fake host now filtering
+    a venue's list and answering marks, plus `ui.openUrl`, including the no-page, too-many and withheld cases).
+
+Calls I made where the plan left room:
+
+- **`venue.page` on the summary rather than `page.resolve` accepting venue ids.** The plugin has the summary in hand
+  already, and so has any other plugin or backend reading the scores. `page.resolve` stays identifiers only, since a
+  venue id isn't a page's identifier and would blur what that call promises.
+- **Marks on the field route, not in `scope_stats`.** Storing a paper id beside each of ICLR's 40k means per field
+  would grow every venue's rows for the sake of small scopes. Read live for one scope's submissions at one venue, it
+  is one grouped query over at most 1,000 submissions, gated by the stored `count` before it runs. The live read can
+  lag or lead the stored values by the few seconds of the debounce; the test checks they agree when caught up.
+- **The cap is 1,000** (`MAX_MARKS`), beyond which names stop being readable on a 300 px curve anyway; `null` (not a
+  truncated list) so a client never draws a misleading subset.
+- **What a mark carries:** the paper's public identifier, address, title, mean and outcome, all public on the paper's
+  page and the org's members route already. No author names: why a paper is an org's stays private (pages Phase 4).
+- **A submission is a mark**, as it is a value in the statistics. A paper sent twice to one venue would be two marks;
+  a paper at two venues shows on each venue's tab.
+- **The histogram shows marks too**, as one circle per bar (the plan names only the curve). The two figures sit side
+  by side, so a bar the org's papers fall in would otherwise read as unmarked.
+- **The org's distribution is not drawn**, only the venue's with the marks, as the plan says; on a venue without a
+  page the org's own is the only one there is.
+- **The org view keeps `splitByDecision`**: the venue's curve splits by outcome as on its page, and each mark's
+  outcome is in its name rather than its colour, so the circles stay one style (accent) in both themes.
+- **The release is a minor version** with no new permission, so installed readers get "Update" without a new
+  consent prompt.
+
+For later phases:
+
+- Phase 6's "Later": before/after rebuttal needs `reviews.history` in the host.
+- `plugins.default` is still open; score standing is a candidate.
+- Topics: score standing doesn't declare them, but `venue.page` and `marks` work on a topic too, so a topic view
+  is a manifest line and `orgTabs` under another name, plus `page.hasScores` in `KINDS.topic.contextKeys` (pages
+  Phase 5's note).
+
+Checks: typecheck, lint, prettier (`config/institution-ror.json` was unformatted before this phase) and `next build`
+pass. Unit tests: 407 pass. The `scope.scores` case in `tests/unit/plugins.test.ts` now covers `marks` and its refusal
+without a field. `page-git.test.ts`'s fast-check merge property failed once and passed on rerun, as before.
+
+Integration: 306 of 314 pass, 1 skipped (the network test). The 7 failures are the same as before this phase: six in
+`pdf-ingest.test.ts` (no poppler) and one in `follows.test.ts`.
+
+- New in `tests/integration/scope-stats.test.ts`: an org with two printed addresses lists the venue with
+  `venue.page`, the venue page gives the whole field, and `?marks=true` names the org's two submissions, agreeing
+  with its `values`. On the edition, every submission is marked, and `marks=yes` is a 400. Above the cap gives
+  `null`. A venue with no page gets none, and a withheld field gives `marks: []`.
+- The test helper's route for the field now matches a query string.
+- `PLUGIN_NETWORK_TESTS=1` `score-standing.test.ts` passes against `v0.2.0` from GitHub. It now checks the release's
+  CSS has the marks, that the panel shows on an org with scored papers and not on one without, that the org's list
+  names `venue:iclr/2027`, whose field equals the paper view's, and the org's two papers by name and mean.
+
+These ran against this worktree's own database, `potentialpaper_test_plugins6org`, through an untracked `.env`. The
+plugin repo: 38 tests, typecheck and build pass, and CI is green on `main` and on `v0.2.0`.

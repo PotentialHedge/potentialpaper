@@ -129,8 +129,9 @@ grouped display, stances and the graph are still to come.
   `plugins.venueStats.hideUntil`, and `/openapi.json` for the public page routes.
 - Built 2026-11-17 (its Phase 6), the first third-party extension runs: score standing,
   `github.com/benedict-armstrong/potentialpaper-score-standing` (v0.1.0), the histogram and curve of a venue's
-  review scores on papers and venues, from `scope.scores` alone, with no host code of its own. Its org view can now be built:
-  organisation pages have members (`handoffs/pages.md` Phase 4).
+  review scores on papers and venues, from `scope.scores` alone, with no host code of its own. Its org view followed
+  as v0.2.0 (2026-11-17): each venue's whole distribution with the org's papers as named open circles, for which the
+  host API grew for every plugin (`venue.page` on score summaries, `?marks=true` on a field).
 - Built 2026-11-17 (its Phase 5), plugins with their own backend (D): the `identity` permission
   (`pp.identity.token()`/`fetch`, ES256 tokens with a pairwise `sub`, audience the plugin's id, keys at
   `/.well-known/jwks.json`, `npm run identity:keys`), asked of every reader even for a site default, the manifest's
