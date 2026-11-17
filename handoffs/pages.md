@@ -415,3 +415,120 @@ one `follows.test.ts`); `comments.test.ts` failed once on a random UUID containi
 against this worktree's own database, `potentialpaper_test_pages3`, through an untracked `.env`. A smoke run of
 `next start` served `/u/<handle>` (no real name in the HTML with the defaults, Activity and Comments tabs) and
 redirected the old handle with a 307.
+
+### Phase 4: organisation pages (2026-11-17, branch `pages-phase-4`)
+
+Built:
+
+- **The `orgs` bot** (`server/org-pages.ts`, `npm run orgs:sync [-- --domain <d>… | --all]`). Migration
+  `0038_org_pages.sql` creates its account and grants it `org.json` on org pages.
+  - **What an institution is:** a name on the sign-up allowlist (`config/institution-domains.json` with the
+    `institution_domains` table over it), with every domain the list gives that name (shortest first, at most 20).
+    Its ROR id comes from the new `config/institution-ror.json`, which `npm run institutions:build` now writes. The
+    flag `--ror-only` writes just that file for the list as it is; it holds 36,119 domains, each matched only where
+    ROR's name agrees with the list's.
+  - **Which institutions get a page:** by default, the ones in use. That means a confirmed address, an address printed
+    on a paper's page 1, or a domain an admin added. `ensureOrgPageFor` also makes a page at sign-up and when an
+    address is confirmed, and `pdfs:ingest` syncs after each pass that read PDFs.
+  - **Its key** is the name as a slug when it is short and Latin (`eth-zurich`). Otherwise it is the label of the
+    institution's shortest domain (`mit`), then the whole domain (`ucl-ac-uk`). A key another page already holds is
+    skipped. An institution's page is the top-level org page whose `org.json` lists one of its domains, so a page
+    keeps its key whatever the list later calls it.
+  - **What it writes:** like `venues`, it never removes anything or overwrites a name. On a page whose `org.json` is
+    there, it only adds missing domains and a missing ROR id (`orgFileUpdate`).
+  - **Without its grant** the script refuses with the `bots:grant` command to run, and the sign-up hook does nothing.
+- **Membership** (`server/page-members.ts`), what `scope_stats` and the score-standing org view need:
+  - **How a paper gets on an org:** through a confirmed author claim by a verified, non-bot account that shows its
+    institution, from each confirmed address (weight 1). Also through each address printed on page 1 of the paper's
+    current PDF (`pdf_documents.emails`, weight 0.5).
+  - **How the names match:** each such address gives a source `domain:<d>` for every domain from the address's own up
+    to its last two labels (the SQL function `domain_suffixes`). An org answers to `domain:<d>` for each `org.json`
+    domain (`sourcesOf`). Both kinds of source share one `via`, `affiliation`, which is the only thing
+    `page_members.via` and the public routes show.
+  - **Keeping it current:** these come from tables, not from repos. Triggers on `author_claims`, `affiliations`,
+    `accounts` (`show_institution`, verified, bot) and `pdf_documents.emails` queue the papers affected
+    (`org_members_due`). The worker's new `org-members` task (`syncDueAffiliations`, run before `scope-stats`) brings
+    those papers up to date in batches, marking their scopes before and after.
+  - **On the paper's own events and on rebuild:** a paper's event rewrites its affiliation sources too. The consumer's
+    `reset` writes every paper's affiliation sources, so a rebuild also covers papers that have a claim but no repo.
+    `page_member_sources` gained `weight`, and the joins carry it into `page_members.weight`.
+  - **Roll-up:** papers roll up from departments through `page_ancestors`, already built (an `org:a/b` page's parent
+    is `org:a`).
+- **Members and rules** (`server/org-roles.ts`, `check.ts`):
+  - **Who is a member:** an account with a confirmed address at one of the org's domains, or under one. This counts on
+    the page and on every org above it by key, read from `page_current`, so a new domain counts at once.
+  - **What members may do:** members are the owners. They write `members/` and `org.json`, whether or not they show
+    their institution, since writing there is their own act.
+  - **Domains:** `checkOrgDomains` refuses widening or removing a top-level org's domains (including deleting its
+    `org.json`) to anyone but admins and the bot. A department's domains must be its organisation's or under them.
+- **Departments and labs:** members (and admins) make them at `/new/org/<key>` (a form) or with
+  `POST /api/v1/pages/{identifier}/children` `{ slug, name, domains? }`. `createOrgChild` checks the domains before it
+  makes the page, commits `org.json` as the member, and removes the page if that commit is refused.
+- **The page** (`components/pages/org-panels.tsx`, `lib/panels.ts`):
+  - `org.main`: `about` (the org above it, domains, ROR), `departments` (each with its rolled-up paper count, and the
+    "Add a department or lab" link), members, community.
+  - `org.aside`: `people` (handles of members who show it as their institution), `venues` and `topics` (pages its
+    papers are directly in, by paper count, from `scopeOverlap`), links, backlinks.
+  - `org.tabs`: papers, rolled up.
+  - Everything is read once by the route (`orgOverview`). `GET /api/v1/pages/{identifier}/org` gives the same
+    (public, a minute's cache, in `/openapi.json`).
+- **The institution switch, unified:** `accounts.show_institution` is now the one switch, and
+  `user.show.institution` is gone from the settings (a file naming it gets an unknown-key warning).
+  - What it governs: comments, the person's page, the org's people list and claim-based membership.
+  - `profile.json` still says `show.institution`, now mirrored from the column. `updateProfile` syncs it when the
+    column changes.
+  - The profile form, `/profile` and the settings descriptions say what showing it does.
+- Docs: DESIGN.md §4.3 (organisation pages), §4.9 (data from tables: the queue and task), §5.3 (one institution
+  switch) and §10 (the `orgs` bot); IMPLEMENTATION.md; `llms.txt` and an `/agent/updates` notice.
+
+Calls I made where the plan left room:
+
+- **`show_institution`, not `user.show.institution`.**
+  - _Why the column wins:_ both settings meant "my institution is public", and the column already put it beside the
+    handle on every comment. A second setting that hid it only on the page could only disagree with the first.
+  - _Why not a setting:_ the column is what SQL can join for membership and people lists over many accounts, and it
+    is what onboarding asks explicitly. A settings document would have to be parsed per account.
+  - _Effect:_ the page's institution item now follows the profile.
+- **Not every institution gets a page by default.** The list has about 55k names (schools, ministries). Making every
+  page is opt-in (`--all`); the default covers what is in use, and new members' institutions appear on their own.
+- **An institution is a name on the list.** Two institutions with the same name in different countries (a "Ministry
+  of Education") share a page. ROR ids can't separate them, as the list has none of its own.
+- **Members needn't show their institution to write.** They must show it to be listed or to bring their papers.
+- **Printed addresses count at weight 0.5** (the schema's "counts for less than certain"). Nothing reads weights yet.
+- **Org children are at most 3 levels deep** (`maxDepth`). A department with no domains of its own gets papers only
+  from labs under it.
+- **The "Add a department or lab" link shows to everyone,** since the page is one cached HTML for all readers. The form
+  page checks membership.
+- **Org page people show handles only,** whatever `user.show.realName` says. Those rules live in `server/user-pages.ts`
+  (`orgPeople`), as Phase 3 asked of any people list.
+
+For later phases:
+
+- **Score standing's org view:** `page.hasScores` is now true on an org with scored papers, and `scope.scores(org)`
+  lists its venues. What plugins Phase 6's Log said the view still needs (a way from a venue id to its venue page, and
+  named marks) is unchanged.
+- **Phase 5 (topics):** `scopeOverlap(scopeId, 'venue' | 'org')` gives "venues where it is common" and "orgs active in
+  it" directly.
+- **A person's page** could link each shown institution to its org page; not done.
+- **The web editor is still paper-only:** members write `members/` by `git push` (`/git/org/<key>.git`).
+
+Checks: typecheck, lint and `next build` pass. Unit tests: 395 pass. `user-pages.test.ts` has a new case: the
+institution is not a setting.
+
+Integration: 290 of 297 pass, 1 skipped (the network plugin test). The 7 failures are the same as before this phase:
+six in `pdf-ingest.test.ts` (no poppler) and one in `follows.test.ts`.
+
+- 6 of them are new, in `tests/integration/org-pages.test.ts`:
+  - the bot: domains, ROR, idempotence, never renaming, key fallback, "in use", the sign-up hook, and the missing
+    grant;
+  - claim membership following `show_institution` both ways through the queue;
+  - printed subdomain addresses at weight 0.5;
+  - `via` `affiliation` in the public members route;
+  - departments by API (domains under the parent, non-members refused), roll-up, and a rebuild giving identical rows
+    with a repo-less claimed paper;
+  - members writing `members/` and `org.json` but not top-level domains, admins may;
+  - people listed only when shown, the `/org` route, and `profile.json` following the profile.
+- `user-pages.test.ts` was updated for the single switch.
+- The test fixture allowlist gained `mit.edu`, and a ROR fixture was added (`INSTITUTION_ROR_PATH`).
+
+These ran against this worktree's own database, `potentialpaper_test_pages4`, through an untracked `.env`.
