@@ -1,7 +1,7 @@
 # Handoff: settings.json, plugins from GitHub, data for plugins, and the score-standing plugin
 
-Status: plan, 2026-11-16. Phases 1 (settings.json), 2 (the plugin host), 3 (discovery and the plugin pages), 4 (data for plugins, A and B)
-and 6's paper and venue views (score standing v0.1.0) are built; see the Log.
+Status: plan, 2026-11-16. Phases 1 (settings.json), 2 (the plugin host), 3 (discovery and the plugin pages), 4 (data for plugins, A and B),
+5 (plugins with their own backend, D) and 6's paper and venue views (score standing v0.1.0) are built; see the Log.
 
 ## Goal
 
@@ -785,3 +785,95 @@ new test run by `PLUGIN_NETWORK_TESTS=1`; the 7 failures are the same as before 
 `pdf-ingest.test.ts` (no poppler) and one in `follows.test.ts`. These ran against this worktree's own database,
 `potentialpaper_test_plugins6`, through an untracked `.env`. The plugin repo: 31 tests, typecheck and build pass,
 and CI is green on `main` and on the `v0.1.0` tag.
+
+### Phase 5: plugins with their own backend, D (2026-11-17, branch `plugins-phase-5`)
+
+Already in place from Phase 2, and left as it was: `network` origins go into the plugin's CSP `connect-src`
+(`pluginCsp`), the consent prompt lists them, and a new origin asks again (`missingConsent` compares the grant's
+`network`). Built:
+
+- **The `identity` permission** (`PERMISSIONS`, so it appears in the prompt, `/settings/plugins` and the guide's table
+  by itself): "Tell its own backend who you are: your handle, in a short-lived token signed by this site that only
+  this plugin's backend accepts". A manifest asking for it with no `network` gets a warning.
+- **Tokens** (`server/plugins/identity.ts`): ES256 JWTs, `kid` the key's RFC 7638 thumbprint, claims `iss` (the site's
+  origin), `aud` (the plugin id), `sub`, `handle`, `plugin`, `iat`, `nbf` (−30 s), `exp` (+300 s) and `jti`.
+  - `sub` is pairwise: `p_` + an HMAC of the account and plugin ids, keyed by `PLUGIN_SUBJECT_SECRET` or, without it,
+    `BETTER_AUTH_SECRET`. It is stable across handle changes and differs per plugin.
+  - `POST /api/v1/me/plugins/identity` `{ plugin, dev? }` needs a browser session (`requireSession`), and the plugin
+    must be installed, `ready`, ask for `identity` and have it approved. Answers are `no-store`.
+  - A plugin loaded from localhost (`dev: true`) gets `aud: "dev:<id>"` and `dev: true`, with no install check.
+- **The RPC:** `identity.token` (permission `identity`) in `HOST_METHODS`, `HostServices.identityToken`. `PluginFrame`
+  asks the route and keeps a token per plugin while it has over a minute left. Signed out, it fails with
+  `Unavailable`; a 403 becomes `PermissionDenied`. The SDK has `pp.identity.token()` and `pp.identity.fetch(url,
+init)`, which adds `Authorization: Bearer …`. `pp.d.ts` has `IdentityToken`.
+- **Keys:** table `identity_keys` (migration `0040`), the private and public JWKs. The first key is made on first use.
+  The newest unretired key signs, and every unretired key is served at **`/.well-known/jwks.json`** (public, CORS
+  `*`, cached five minutes). `npm run identity:keys [-- rotate | retire <kid>]` manages them; retiring the last key is
+  refused.
+- **`identity` is personal** (`PERSONAL_PERMISSIONS` in `lib/plugins/installed.ts`): a site default that asks for it
+  runs (status `ready`) with `missing.permissions: ["identity"]` until the reader approves it. `runningPermissions`
+  gives what the frame's calls are checked against. The panel shows a short approval prompt above the frame
+  (`ConsentPrompt personal`), and `/settings/plugins` offers Approve and Withdraw for it.
+- **The manifest's `bot`** (a handle, optional). `GET /plugins/installed` gives each plugin `bot: { handle, known,
+grants }` from `accounts` (`is_bot`) and `bot_grants`. The consent prompt and `/settings/plugins` say "Shows data
+  that the bot @x writes on pages, which this site lets it write to `<pattern>` on <kind> pages", or that the site
+  has no such bot (`components/plugins/BotNote.tsx`).
+- **The example:** `examples/plugins/notes`, a reader's private notes on any page, kept by its own backend.
+  `examples/plugins/notes-backend` holds `server.mjs` (Node, no dependencies) and `verify.mjs`. `verify.mjs` checks
+  the signature, `alg`, `iss`, `aud`, `exp` and `nbf` with Node's crypto, and fetches the JWKS again on an unknown
+  `kid`: once per kid a minute, and at most once a second. The integration test verifies the site's tokens with
+  this same file.
+- **Docs:** `/plugins.md` has "Your own backend" (`network`, `identity` and verifying it, with a `jose` snippet, the dev
+  audience, and writing to pages as a bot), the `bot` field and `identity.token` in the method table. `/openapi.json`
+  has `/.well-known/jwks.json`. There are `llms.txt` and `/agent/updates` lines, DESIGN.md §10 (data for plugins D,
+  consent, the methods), IMPLEMENTATION.md Milestone 8, DEPLOY.md ("Plugins' identity keys", rotation) and
+  `PLUGIN_SUBJECT_SECRET` in both env examples.
+
+Calls I made where the plan left room:
+
+- **ES256, not EdDSA:** every JWT library verifies it, and Node signs it with no dependency.
+- **Keys live in Postgres, made on first use**, rather than in an env var, so there is nothing to set up and rotation
+  is a script. The private key sits in the database beside everything else the site trusts.
+- **A pairwise `sub`, plus the handle.** The plan says "naming the user". The handle names them, as the prompt says.
+  `sub` gives backends a stable key that survives a handle change and can't join users across plugins. Account ids
+  stay private.
+- **Five-minute tokens**, with no refresh tokens: the frame asks again, and the host's cache keeps that cheap.
+- **Only the reader can give `identity`.** Telling a third party who someone is isn't an admin's call, so a site
+  default goes without it until each reader approves.
+- **Only a browser session gets a token.** An agent's API token is refused: the frame's host asks for the token, and
+  an agent acting as the person has no frame to ask for.
+- **Dev tokens are minted for any id** but carry `dev:` in `aud`, so the published backend refuses them. The token
+  still names the reader's handle to a localhost plugin the reader loaded themselves.
+- **`bot` is informational and unverified.** No bot belongs to a plugin yet (registration is Milestone 7), so the
+  prompt says what the plugin claims to show and what the site lets that bot write. It doesn't say the bot is the
+  plugin's. Changing `bot` in an update doesn't ask for consent again, since it grants nothing.
+- **Nothing from Milestone 7 was pulled forward.** No plugin needs bot registration, bot tokens or webhooks yet.
+  Bots can still only be granted `reviews/<source>/**` (and kind files), so the guide calls `extensions/<plugin
+id>/` reserved, not grantable.
+- **The example's backend origin** (`https://notes.potentialpaper.example`) is a placeholder. The example runs for
+  real only from localhost, and its README says to change it.
+
+For later phases:
+
+- Score standing's org view (Phase 6's list) is unchanged by this phase.
+- Milestone 7 (bots for outsiders): a registration could tie a bot to a plugin id, so the prompt can say "its own
+  bot". Grants of `extensions/<plugin id>/**` need `grantProblem` to allow them.
+- A backend that wants the reader's consent for more (writing on their behalf) would need scoped tokens; nothing
+  asks for that yet.
+Checks: typecheck, lint, prettier and `next build` pass (the build lists `/.well-known/jwks.json` and
+`/api/v1/me/plugins/identity`). Unit tests: 407 pass, 3 of them new in `tests/unit/plugins.test.ts`: the manifest's
+`identity` and `bot`; consent for `identity` on a site default and `runningPermissions`; and `identity.token` behind
+its permission, with the real SDK's `pp.identity.fetch` sending the bearer token. Integration: 305 of 313 pass, 1
+skipped (the network plugin test). The 7 failures are the same as before this phase: six in `pdf-ingest.test.ts` (no
+poppler) and one in `follows.test.ts`. 5 tests are new, in `tests/integration/plugin-identity.test.ts`, and each
+token in them is checked by the example backend's `verify.mjs`:
+
+- an approved plugin's token: its claims, pairwise `sub` and JWKS, refused when the token is for another audience or
+  issuer, forged or expired, and refused before approval;
+- refusals: signed out, an agent's API token, a plugin not asking for `identity`, an uninstalled one, and the dev
+  audience;
+- a site default running without `identity` until the reader approves it;
+- key rotation, with the verifier fetching the keys again, and retirement;
+- the `bot` listing, for a known bot with its grants and for a person's handle.
+
+These ran against this worktree's own database, `potentialpaper_test_plugins5`, through an untracked `.env`.
