@@ -152,12 +152,14 @@ function PluginPanel({
   slot,
   viewer,
   inTabs,
+  submission,
 }: {
   plugin: ReadyPlugin;
   panel: PanelContribution;
   slot: string;
   viewer: { signedIn: boolean; isOwner: boolean };
   inTabs: boolean;
+  submission?: PanelSubmission;
 }) {
   const page = usePluginPage();
   const connection = useRef<Connection | null>(null);
@@ -171,7 +173,12 @@ function PluginPanel({
         )}
         <PluginFrame
           plugin={plugin}
-          surface={{ type: 'panel', id: panel.id, slot }}
+          surface={{
+            type: 'panel',
+            id: panel.id,
+            slot,
+            ...(submission && { submission: { venue: submission.venue } }),
+          }}
           page={page}
           viewer={viewer}
           title={`${panel.title} (${plugin.plugin.manifest.name})`}
@@ -195,11 +202,17 @@ function PluginPanel({
   );
   const aside = slot.endsWith('.aside');
   return (
-    <section data-plugin={plugin.plugin.id} className={aside ? ui.box : 'mt-6'}>
+    <section data-plugin={plugin.plugin.id} className={aside ? ui.box : submission ? 'mt-4' : 'mt-6'}>
       {header}
       {body}
     </section>
   );
+}
+
+/** The submission a `paper.submission` panel is drawn under: its venue, and whether it has scores (`page.hasScores`). */
+export interface PanelSubmission {
+  venue: { id: string; name: string };
+  hasScores: boolean;
 }
 
 export interface SlotPanel {
@@ -211,14 +224,16 @@ export interface SlotPanel {
 /**
  * The plugin panels for a slot of the current page (`<kind>.main`, `.aside`, `.tabs`), in install order, as
  * `{ id, title, node }` for `ArrangedPanels` to arrange with the built-in ones. Empty off a page, and until the
- * plugin list arrives.
+ * plugin list arrives. In `paper.submission`, `submission` is the one they are drawn under, and `page.hasScores`
+ * is whether it has scores.
  */
-export function usePluginPanels(slot: string | undefined): SlotPanel[] {
+export function usePluginPanels(slot: string | undefined, submission?: PanelSubmission): SlotPanel[] {
   const page = usePluginPage();
   const { plugins, viewer } = usePlugins(page && slot ? page.page.identifier : null);
   return useMemo(() => {
     if (!page || !slot) return [];
-    const context = pageWhenContext(page.kind, { ...page.facts, ...viewer });
+    const facts = submission ? { ...page.facts, hasScores: submission.hasScores } : page.facts;
+    const context = pageWhenContext(page.kind, { ...facts, ...viewer });
     const out: SlotPanel[] = [];
     for (const p of plugins) {
       if ((p.status !== 'ready' && p.status !== 'consent') || !p.plugin) continue;
@@ -237,11 +252,12 @@ export function usePluginPanels(slot: string | undefined): SlotPanel[] {
               slot={slot}
               viewer={viewer}
               inTabs={slot.endsWith('.tabs')}
+              submission={submission}
             />
           ),
         });
       }
     }
     return out;
-  }, [page, slot, plugins, viewer]);
+  }, [page, slot, plugins, viewer, submission]);
 }

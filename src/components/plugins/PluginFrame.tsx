@@ -152,7 +152,7 @@ function frameContext({ plugin: p, page: pg, viewer: v, surface: s }: Latest): F
     },
     surface:
       s.type === 'panel'
-        ? { type: 'panel', panel: s.id, slot: s.slot ?? '' }
+        ? { type: 'panel', panel: s.id, slot: s.slot ?? '', ...(s.submission && { submission: s.submission }) }
         : { type: 'page', page: s.id, path: s.path ?? [] },
     page: pg?.page ?? null,
     scopes: pg?.scopes ?? [],
@@ -171,6 +171,8 @@ export interface PluginSurface {
   /** A panel's slot (`venue.main`); a page's path after its id. */
   slot?: string;
   path?: string[];
+  /** A `paper.submission` panel's submission, by its venue. */
+  submission?: { venue: { id: string; name: string } };
 }
 
 export function PluginFrame({

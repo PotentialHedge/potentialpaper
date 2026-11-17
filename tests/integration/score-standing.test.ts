@@ -236,7 +236,8 @@ describe.skipIf(!NETWORK)('score standing, installed from GitHub', () => {
       return slot && whenHolds(panel.when, context) ? slot : null;
     };
     expect(PAGE_KINDS.filter((k) => panelSlot(panel, k))).toEqual(['paper', 'venue', 'org']);
-    expect(await shows('arxiv:2701.00001')).toBe('aside');
+    // v0.3.0 and later: under each of the paper's submissions with scores.
+    expect(await shows('arxiv:2701.00001')).toBe('submission');
     expect(await shows('venue:iclr/2027')).toBe('main');
     expect(await shows('venue:iclr')).toBe('main');
     expect(await shows('topic:linear-attention')).toBeNull();
