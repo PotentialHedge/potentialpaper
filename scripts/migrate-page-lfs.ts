@@ -22,7 +22,7 @@ async function main() {
     return;
   }
   const db = getDb();
-  const refs = await db.select({ paperId: pageRefs.paperId, head: pageRefs.head }).from(pageRefs);
+  const refs = await db.select({ paperId: pageRefs.pageId, head: pageRefs.head }).from(pageRefs);
   let moved = 0;
   let failed = 0;
   for (const [index, { paperId, head }] of refs.entries()) {

@@ -92,11 +92,11 @@ export interface GitIdentity {
  * what a settings page or the clone instructions can show.
  */
 export async function gitIdentity(
-  paperId: string,
+  pageId: string,
   actor: Actor & { kind: 'account' },
   database: Database = getDb(),
 ): Promise<GitIdentity> {
-  const id = await authorIdOf(database, actor, await rolesOf(database, actor, paperId));
+  const id = await authorIdOf(database, actor, await rolesOf(database, actor, pageId));
   return identityOf(id);
 }
 
@@ -134,17 +134,17 @@ class Objects {
 
   constructor(
     private db: Reader,
-    private paperId: string,
+    private pageId: string,
     readonly incoming: ReadonlyMap<string, IncomingObject>,
   ) {}
 
   async get(oid: string): Promise<IncomingObject | null> {
-    return this.incoming.get(oid) ?? (await readObject(this.db, this.paperId, oid));
+    return this.incoming.get(oid) ?? (await readObject(this.db, this.pageId, oid));
   }
 
   /** Whether the page itself has the object, wherever else it is. */
   async stored(oid: string): Promise<boolean> {
-    return (await readObject(this.db, this.paperId, oid)) !== null;
+    return (await readObject(this.db, this.pageId, oid)) !== null;
   }
 
   async must(oid: string, type: GitObjectType): Promise<Buffer> {
@@ -378,7 +378,7 @@ async function pushedChain(objects: Objects, head: string, tip: string): Promise
  */
 async function checkPushed(
   db: Reader,
-  paperId: string,
+  pageId: string,
   objects: Objects,
   chain: readonly Omit<Pushed, 'commit' | 'files'>[],
   headFiles: FileTree,
@@ -392,12 +392,12 @@ async function checkPushed(
     await about(item.oid, async () => {
       const commit = await checkCommitText(item.body, item.raw, {
         ...text,
-        isCommit: async (oid) => earlier.has(oid) || (await readObject(db, paperId, oid))?.type === 'commit',
+        isCommit: async (oid) => earlier.has(oid) || (await readObject(db, pageId, oid))?.type === 'commit',
       });
       const files = await treeFiles(objects, item.raw.tree);
       urls.push(
         await checkTree(db, {
-          paperId,
+          pageId,
           roles: text.roles,
           before,
           after: files,
@@ -424,7 +424,7 @@ async function checkPushed(
  * `validation_error` (422), `forbidden` (403), `rate_limited` (429), `page_busy` (503), `paper_merged`.
  */
 export async function receiveCommits(
-  paperId: string,
+  pageId: string,
   actor: Actor & { kind: 'account' },
   update: RefUpdate,
   incoming: ReadonlyMap<string, IncomingObject>,
@@ -437,7 +437,7 @@ export async function receiveCommits(
   if (update.new === ZERO_OID) throw refuse("a page's history can't be deleted");
   if (!OID.test(update.new)) throw refuse(`${update.new} is not a commit id`);
 
-  const head = await readHead(database, paperId);
+  const head = await readHead(database, pageId);
   if (!head) throw refuse('this page has no history yet; it starts with its first edit on the site', undefined, 409);
   if (update.old !== head) {
     throw refuse(
@@ -449,24 +449,24 @@ export async function receiveCommits(
   }
   if (update.new === head) return { status: 'unchanged', oid: head };
 
-  const objects = new Objects(database, paperId, incoming);
+  const objects = new Objects(database, pageId, incoming);
   const chain = await pushedChain(objects, head, update.new);
   for (let i = 0; i < chain.length; i += 1) await takeCommit(actor, rateLimit);
 
   // Roles first, downloads last: everything that can refuse the push without GitHub runs before the copies.
-  const roles = await rolesOf(database, actor, paperId);
-  await checkPaper(database, paperId);
+  const roles = await rolesOf(database, actor, pageId);
+  await checkPaper(database, pageId);
   const id = await authorIdOf(database, actor, roles);
-  const headFiles = await readFiles(database, paperId, (await readCommit(database, paperId, head)).tree);
-  const early = await checkPushed(database, paperId, objects, chain, headFiles, { id, roles, now });
+  const headFiles = await readFiles(database, pageId, (await readCommit(database, pageId, head)).tree);
+  const early = await checkPushed(database, pageId, objects, chain, headFiles, { id, roles, now });
   const snapshots = await copyDemos(database, early.urls.flat());
 
   try {
     return await database.transaction(async (tx) => {
-      const lockedRoles = await rolesOf(tx, actor, paperId);
-      await checkPaper(tx, paperId);
-      await lockPage(tx, paperId);
-      if ((await readHead(tx, paperId)) !== head) {
+      const lockedRoles = await rolesOf(tx, actor, pageId);
+      await checkPaper(tx, pageId);
+      await lockPage(tx, pageId);
+      if ((await readHead(tx, pageId)) !== head) {
         throw refuse(
           'the page changed while the push was checked; git pull --rebase, then push again',
           undefined,
@@ -478,7 +478,7 @@ export async function receiveCommits(
         throw refuse('your identity on this page changed during the push; push again', undefined, 503, 'page_busy');
       }
       // The same checks under the lock, as a web edit's, and to hand each commit its demos' copies.
-      const { pushed, urls } = await checkPushed(tx, paperId, objects, chain, headFiles, {
+      const { pushed, urls } = await checkPushed(tx, pageId, objects, chain, headFiles, {
         id,
         roles: lockedRoles,
         now,
@@ -493,7 +493,7 @@ export async function receiveCommits(
         const recorded = await about(item.oid, () =>
           recordCommit(
             tx as Writer,
-            paperId,
+            pageId,
             { oid: item.oid, type: 'commit', body: item.body },
             item.commit,
             [...blobs, ...trees],
@@ -503,7 +503,7 @@ export async function receiveCommits(
         commits.push({ oid: item.oid, ...recorded });
       }
       const last = pushed[pushed.length - 1];
-      await writeCurrent(tx, paperId, last.oid, last.commit);
+      await writeCurrent(tx, pageId, last.oid, last.commit);
       return { status: 'committed', oid: last.oid, commits };
     });
   } catch (err) {

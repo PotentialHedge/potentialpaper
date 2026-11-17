@@ -39,25 +39,25 @@ export interface IndexReport {
   removed: number;
 }
 
-/** Brings `paperId`'s search documents up to commit `head`. */
-export async function indexPage(database: Database, paperId: string, head: string): Promise<IndexReport> {
-  const commit = await readCommit(database, paperId, head);
-  const files = await readFiles(database, paperId, commit.tree);
+/** Brings `pageId`'s search documents up to commit `head`. */
+export async function indexPage(database: Database, pageId: string, head: string): Promise<IndexReport> {
+  const commit = await readCommit(database, pageId, head);
+  const files = await readFiles(database, pageId, commit.tree);
   const wanted = new Map([...files].filter(([path, blob]) => blob !== EMPTY_BLOB && isIndexed(path)));
 
   return database.transaction(async (tx) => {
     // One indexer at a time per page, so two workers that both took a page (a lease lost mid-batch) can't
     // interleave their deletes and inserts.
-    await tx.execute(sql`select pg_advisory_xact_lock(hashtextextended(${`search:${paperId}`}, 0))`);
+    await tx.execute(sql`select pg_advisory_xact_lock(hashtextextended(${`search:${pageId}`}, 0))`);
     const { rows } = await tx.execute<Row>(
-      sql`select distinct path, encode(blob_oid, 'hex') as blob from search_docs where paper_id = ${paperId}`,
+      sql`select distinct path, encode(blob_oid, 'hex') as blob from search_docs where page_id = ${pageId}`,
     );
     const held = new Map(rows.map((row) => [row.path, row.blob]));
 
     const stale = [...held.keys()].filter((path) => wanted.get(path) !== held.get(path));
     if (stale.length > 0) {
       await tx.execute(
-        sql`delete from search_docs where paper_id = ${paperId} and path = any(${sql.param(stale)}::text[])`,
+        sql`delete from search_docs where page_id = ${pageId} and path = any(${sql.param(stale)}::text[])`,
       );
     }
 
@@ -65,14 +65,14 @@ export async function indexPage(database: Database, paperId: string, head: strin
     for (const [path, blob] of wanted) {
       if (held.get(path) === blob) continue;
       indexed += 1;
-      const text = (await readText(tx, paperId, blob)) ?? '';
+      const text = (await readText(tx, pageId, blob)) ?? '';
       const docs = indexFile(path, text) ?? [];
       const scope = searchScopeOf(path);
       if (!scope) continue;
       for (const [n, doc] of docs.entries()) {
         await tx.execute(sql`
-          insert into search_docs (paper_id, path, n, blob_oid, kind, scope, text, fields)
-          values (${paperId}, ${path}, ${n}, ${toBytes(blob)}, ${doc.kind}, ${scope},
+          insert into search_docs (page_id, path, n, blob_oid, kind, scope, text, fields)
+          values (${pageId}, ${path}, ${n}, ${toBytes(blob)}, ${doc.kind}, ${scope},
                   ${doc.text.replace(MARKS, ' ')}, ${JSON.stringify(doc.fields ?? {})}::jsonb)
         `);
       }
@@ -83,8 +83,8 @@ export async function indexPage(database: Database, paperId: string, head: strin
 
 export const searchConsumer: Consumer = {
   name: 'search',
-  async handle(paperId, head, { database }) {
-    await indexPage(database, paperId, head);
+  async handle(pageId, head, { database }) {
+    await indexPage(database, pageId, head);
   },
   async reset({ database }) {
     await database.execute(sql`truncate search_docs`);

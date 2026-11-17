@@ -29,19 +29,19 @@ export function toBytes(oid: string): Buffer {
   return Buffer.from(oid, 'hex');
 }
 
-export async function readHead(db: Reader, paperId: string): Promise<string | null> {
-  const [row] = await db.select({ head: pageRefs.head }).from(pageRefs).where(eq(pageRefs.paperId, paperId));
+export async function readHead(db: Reader, pageId: string): Promise<string | null> {
+  const [row] = await db.select({ head: pageRefs.head }).from(pageRefs).where(eq(pageRefs.pageId, pageId));
   return row ? row.head.toString('hex') : null;
 }
 
 const COMMIT_PAGE = 2000;
 
 /** A page's repo in Postgres. Given a transaction that can write, it can store objects too. */
-export function pageRepo(database: Writer, paperId: string): WritableGitRepo;
-export function pageRepo(database: Reader, paperId: string): GitRepo;
-export function pageRepo(database: Reader | Writer, paperId: string): GitRepo | WritableGitRepo {
+export function pageRepo(database: Writer, pageId: string): WritableGitRepo;
+export function pageRepo(database: Reader, pageId: string): GitRepo;
+export function pageRepo(database: Reader | Writer, pageId: string): GitRepo | WritableGitRepo {
   const repo: GitRepo = {
-    head: () => readHead(database, paperId),
+    head: () => readHead(database, pageId),
     async *commits() {
       // Keyset pages on the primary key, so a long history never sits in one result.
       let after: Buffer | null = null;
@@ -51,7 +51,7 @@ export function pageRepo(database: Reader | Writer, paperId: string): GitRepo | 
           .from(pageObjects)
           .where(
             and(
-              eq(pageObjects.paperId, paperId),
+              eq(pageObjects.pageId, pageId),
               eq(pageObjects.type, 'commit'),
               after ? gt(pageObjects.oid, after) : undefined,
             ),
@@ -69,7 +69,7 @@ export function pageRepo(database: Reader | Writer, paperId: string): GitRepo | 
       const rows = await database
         .select({ oid: pageObjects.oid, type: pageObjects.type, body: pageObjects.body })
         .from(pageObjects)
-        .where(and(eq(pageObjects.paperId, paperId), inArray(pageObjects.oid, oids.map(toBytes))));
+        .where(and(eq(pageObjects.pageId, pageId), inArray(pageObjects.oid, oids.map(toBytes))));
       for (const row of rows) found.set(row.oid.toString('hex'), { type: row.type, body: row.body });
       return found;
     },
@@ -78,7 +78,7 @@ export function pageRepo(database: Reader | Writer, paperId: string): GitRepo | 
       const rows = await database
         .select({ oid: pageObjects.oid, bytes: sql<number>`octet_length(${pageObjects.body})` })
         .from(pageObjects)
-        .where(and(eq(pageObjects.paperId, paperId), inArray(pageObjects.oid, oids.map(toBytes))));
+        .where(and(eq(pageObjects.pageId, pageId), inArray(pageObjects.oid, oids.map(toBytes))));
       return new Map(rows.map((row) => [row.oid.toString('hex'), Number(row.bytes)]));
     },
   };
@@ -89,7 +89,7 @@ export function pageRepo(database: Reader | Writer, paperId: string): GitRepo | 
       if (objects.length === 0) return;
       await database
         .insert(pageObjects)
-        .values(objects.map(({ oid, type, body }) => ({ paperId, oid: toBytes(oid), type, body })))
+        .values(objects.map(({ oid, type, body }) => ({ pageId, oid: toBytes(oid), type, body })))
         .onConflictDoNothing();
     },
   };

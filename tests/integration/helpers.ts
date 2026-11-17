@@ -36,6 +36,36 @@ import * as myMentions from '@/app/api/v1/me/mentions/route';
 import * as myPapers from '@/app/api/v1/me/papers/route';
 import * as myCoAuthors from '@/app/api/v1/me/papers/co-authors/route';
 import * as follows from '@/app/api/v1/follows/route';
+import * as mySettings from '@/app/api/v1/me/settings/route';
+import * as siteSettings from '@/app/api/v1/settings/route';
+import * as installedPlugins from '@/app/api/v1/plugins/installed/route';
+import * as myPlugins from '@/app/api/v1/me/plugins/route';
+import * as pluginGrants from '@/app/api/v1/me/plugins/grants/route';
+import * as pluginIdentity from '@/app/api/v1/me/plugins/identity/route';
+import { forgetIdentityKey } from '@/server/plugins/identity';
+import * as pluginStorage from '@/app/api/v1/me/plugins/storage/route';
+import * as pluginUpdates from '@/app/api/v1/me/plugins/updates/route';
+import * as discoverPlugins from '@/app/api/v1/plugins/discover/route';
+import * as pageSummary from '@/app/api/v1/pages/[identifier]/route';
+import * as pageFiles from '@/app/api/v1/pages/[identifier]/files/route';
+import * as pageMembersRoute from '@/app/api/v1/pages/[identifier]/members/route';
+import * as pageSubmissions from '@/app/api/v1/pages/[identifier]/submissions/route';
+import * as pageClaim from '@/app/api/v1/pages/[identifier]/claim/route';
+import * as venuePapersRoute from '@/app/api/v1/pages/[identifier]/venue-papers/route';
+import * as orgOverviewRoute from '@/app/api/v1/pages/[identifier]/org/route';
+import * as orgChildrenRoute from '@/app/api/v1/pages/[identifier]/children/route';
+import * as pageScoresRoute from '@/app/api/v1/pages/[identifier]/scores/route';
+import * as pageScoreFieldRoute from '@/app/api/v1/pages/[identifier]/scores/[venue]/[field]/route';
+import * as pagePapersRoute from '@/app/api/v1/pages/[identifier]/papers/route';
+import * as topicsRoute from '@/app/api/v1/topics/route';
+import * as changesRoute from '@/app/api/v1/changes/route';
+import * as topicRoute from '@/app/api/v1/pages/[identifier]/topic/route';
+import * as paperTopicsRoute from '@/app/api/v1/pages/[identifier]/topics/route';
+import * as topicPapersRoute from '@/app/api/v1/pages/[identifier]/topic-papers/route';
+import * as suggestionsRoute from '@/app/api/v1/pages/[identifier]/suggestions/route';
+import * as renameRoute from '@/app/api/v1/pages/[identifier]/rename/route';
+import * as mergeRoute from '@/app/api/v1/pages/[identifier]/merge/route';
+import * as protectionRoute from '@/app/api/v1/pages/[identifier]/protection/route';
 import { getDb, getPool } from '@/db';
 import { clearDevOutbox, devOutbox } from '@/server/mail';
 
@@ -43,11 +73,12 @@ export const ORIGIN = 'http://test.local';
 
 export async function resetDatabase(): Promise<void> {
   await getDb().execute(sql`
-    truncate table paper_follows, search_docs, bot_grants, comment_mentions, comment_aliases, comments, lfs_objects, ssh_keys, evidence_files, agent_posts, agent_files, api_tokens, agent_codes, author_claims, demo_pins, demo_snapshots, submission_notes, submissions, venues, pdf_documents, consumer_cursors, page_events, page_current, page_revisions, page_refs, page_objects, commit_identities, paper_lookup_misses, paper_identifiers, papers, institution_domains, affiliations, accounts, rate_limit_buckets,
+    truncate table identity_keys, topic_suggestions, page_protection, org_members_due, page_redirects, scope_stats, scope_state, page_claims, plugin_refs, plugin_snapshots, user_plugin_grants, user_plugin_storage, site_settings, user_settings, page_links, page_members, page_member_sources, page_scope_names, page_parents, page_ancestors, pages, paper_follows, search_docs, bot_grants, comment_mentions, comment_aliases, comments, lfs_objects, ssh_keys, evidence_files, agent_posts, agent_files, api_tokens, agent_codes, author_claims, demo_pins, demo_snapshots, submission_notes, submissions, venues, pdf_documents, consumer_cursors, page_events, page_current, page_revisions, page_refs, page_objects, commit_identities, paper_lookup_misses, paper_identifiers, papers, institution_domains, affiliations, accounts, rate_limit_buckets,
       session, account, verification, "user"
     restart identity cascade
   `);
   clearDevOutbox();
+  forgetIdentityKey();
 }
 
 export async function closePool(): Promise<void> {
@@ -88,6 +119,35 @@ const ROUTES: [RegExp, any][] = [
   [/^\/me\/papers$/, myPapers],
   [/^\/me\/papers\/co-authors$/, myCoAuthors],
   [/^\/follows(\?.*)?$/, follows],
+  [/^\/me\/settings$/, mySettings],
+  [/^\/plugins\/installed(\?.*)?$/, installedPlugins],
+  [/^\/me\/plugins(\?.*)?$/, myPlugins],
+  [/^\/me\/plugins\/grants(\?.*)?$/, pluginGrants],
+  [/^\/me\/plugins\/identity$/, pluginIdentity],
+  [/^\/me\/plugins\/storage(\?.*)?$/, pluginStorage],
+  [/^\/me\/plugins\/updates(\?.*)?$/, pluginUpdates],
+  [/^\/plugins\/discover(\?.*)?$/, discoverPlugins],
+  [/^\/pages\/(?<identifier>[^/?]+)\/files$/, pageFiles],
+  [/^\/pages\/(?<identifier>[^/?]+)\/members(\?.*)?$/, pageMembersRoute],
+  [/^\/pages\/(?<identifier>[^/?]+)\/submissions$/, pageSubmissions],
+  [/^\/pages\/(?<identifier>[^/?]+)\/claim$/, pageClaim],
+  [/^\/pages\/(?<identifier>[^/?]+)\/org$/, orgOverviewRoute],
+  [/^\/pages\/(?<identifier>[^/?]+)\/children$/, orgChildrenRoute],
+  [/^\/pages\/(?<identifier>[^/?]+)\/venue-papers(\?.*)?$/, venuePapersRoute],
+  [/^\/pages\/(?<identifier>[^/?]+)\/scores(\?.*)?$/, pageScoresRoute],
+  [/^\/pages\/(?<identifier>[^/?]+)\/scores\/(?<venue>[^/?]+)\/(?<field>[^/?]+)(\?.*)?$/, pageScoreFieldRoute],
+  [/^\/pages\/(?<identifier>[^/?]+)\/papers(\?.*)?$/, pagePapersRoute],
+  [/^\/pages\/(?<identifier>[^/?]+)\/topic$/, topicRoute],
+  [/^\/pages\/(?<identifier>[^/?]+)\/topics$/, paperTopicsRoute],
+  [/^\/pages\/(?<identifier>[^/?]+)\/topic-papers(\?.*)?$/, topicPapersRoute],
+  [/^\/pages\/(?<identifier>[^/?]+)\/suggestions(\?.*)?$/, suggestionsRoute],
+  [/^\/pages\/(?<identifier>[^/?]+)\/rename$/, renameRoute],
+  [/^\/pages\/(?<identifier>[^/?]+)\/merge$/, mergeRoute],
+  [/^\/pages\/(?<identifier>[^/?]+)\/protection$/, protectionRoute],
+  [/^\/pages\/(?<identifier>[^/?]+)$/, pageSummary],
+  [/^\/topics(\?.*)?$/, topicsRoute],
+  [/^\/changes(\?.*)?$/, changesRoute],
+  [/^\/settings$/, siteSettings],
   [/^\/me\/password$/, password],
   [/^\/me\/affiliations$/, affiliations],
   [/^\/me\/affiliations\/(?<id>[^/]+)$/, affiliation],
@@ -118,7 +178,7 @@ export function commitFiles(
 export async function api(
   method: string,
   path: string,
-  opts: { cookie?: string; token?: string; body?: unknown; form?: FormData; origin?: string } = {},
+  opts: { cookie?: string; token?: string; body?: unknown; text?: string; form?: FormData; origin?: string } = {},
 ): Promise<ApiResult> {
   const headers: Record<string, string> = { origin: opts.origin ?? ORIGIN };
   if (opts.cookie) headers.cookie = opts.cookie;
@@ -127,7 +187,7 @@ export async function api(
   const request = new Request(new URL(`/api/v1${path}`, ORIGIN), {
     method,
     headers,
-    body: opts.form ?? (opts.body === undefined ? undefined : JSON.stringify(opts.body)),
+    body: opts.form ?? opts.text ?? (opts.body === undefined ? undefined : JSON.stringify(opts.body)),
   });
   for (const [pattern, module] of ROUTES) {
     const match = pattern.exec(path);

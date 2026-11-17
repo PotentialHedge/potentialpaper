@@ -29,6 +29,7 @@ export const API_ERROR_CODES = [
   'page_busy',
   'claim_taken',
   'claim_decided',
+  'page_exists',
   'method_not_allowed',
   'internal_error',
   // A push (`server/pages/receive.ts`).
@@ -39,6 +40,13 @@ export const API_ERROR_CODES = [
   'invalid_ssh_key',
   'ssh_key_taken',
   'too_many_ssh_keys',
+  // Plugins (`server/plugins/`).
+  'plugin_changed',
+  'storage_full',
+  // Pages above the paper (`handoffs/pages.md` Phase 5).
+  'page_merged',
+  'page_protected',
+  'topic_exists',
 ] as const;
 
 export type ApiErrorCode = (typeof API_ERROR_CODES)[number];

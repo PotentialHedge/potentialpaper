@@ -210,7 +210,7 @@ describe('a page with Git LFS', () => {
       `version https://git-lfs.github.com/spec/v1\noid sha256:${sha256(GIF)}\nsize ${GIF.length}\n`,
     );
     expect(JSON.parse((await readText(db, paperId, files.get('thumbnail.json')))!)).toEqual({ alt: 'A dot' });
-    const [current] = await db.select().from(pageCurrent).where(eq(pageCurrent.paperId, paperId));
+    const [current] = await db.select().from(pageCurrent).where(eq(pageCurrent.pageId, paperId));
     expect(current.thumbnail).toMatchObject({ sha256: sha256(GIF), type: 'image/gif', alt: 'A dot' });
     expect(current.thumbnail!.url).toMatch(/^\/thumbnails\//);
   });
@@ -275,7 +275,7 @@ describe.skipIf(!LFS_BIN)('git lfs, end to end', () => {
     expect(pushed).toMatchObject({ ok: true });
     expect(pushed.output).not.toMatch(/[Ll]ocking/);
     expect(requests.some((r) => r.startsWith('PUT ') && r.includes('/info/lfs/objects/'))).toBe(true);
-    const [current] = await getDb().select().from(pageCurrent).where(eq(pageCurrent.paperId, paperId));
+    const [current] = await getDb().select().from(pageCurrent).where(eq(pageCurrent.pageId, paperId));
     expect(current.thumbnail).toMatchObject({ sha256: sha256(GIF), caption: 'A dot' });
     expect(current.versions![0]).toMatchObject({ id: 'v_camready', pdf: { sha256: sha256(PDF), bytes: PDF.length } });
 

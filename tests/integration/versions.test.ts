@@ -106,7 +106,7 @@ describe('versions', () => {
     });
     expect(adas.status).toBe(200);
     expect(adas.body.merged).toBe(true);
-    const [row] = await getDb().select().from(pageCurrent).where(eq(pageCurrent.paperId, paperId));
+    const [row] = await getDb().select().from(pageCurrent).where(eq(pageCurrent.pageId, paperId));
     expect(row.versions?.map((v) => [v.label, v.status, v.note ?? null])).toEqual([
       ['SPIGM @ ICML 2026', 'accepted', 'Four pages; the first experiments.'],
       ['ICLR 2027', 'accepted', null],
@@ -118,7 +118,7 @@ describe('versions', () => {
       summary: 'Add the versions “SPIGM @ ICML 2026”, “ICLR 2027”',
       evidence: ['https://openreview.net/forum?id=zI2IeuDcoS'],
     });
-    const [event] = await getDb().select().from(pageEvents).where(eq(pageEvents.paperId, paperId)).limit(1);
+    const [event] = await getDb().select().from(pageEvents).where(eq(pageEvents.pageId, paperId)).limit(1);
     expect(event.payload.evidence).toEqual(['https://openreview.net/forum?id=zI2IeuDcoS']);
     await rebuildAllPages();
     expect((await history())[0].evidence).toEqual(['https://openreview.net/forum?id=zI2IeuDcoS']);

@@ -13,36 +13,36 @@ export { readHead, toBytes } from '../git/repo';
 
 export async function readObject(
   db: Reader,
-  paperId: string,
+  pageId: string,
   oid: string,
 ): Promise<{ type: GitObjectType; body: Buffer } | null> {
-  const [found] = (await pageRepo(db, paperId).read([oid])).values();
+  const [found] = (await pageRepo(db, pageId).read([oid])).values();
   return found ?? null;
 }
 
-async function mustRead(db: Reader, paperId: string, oid: string, type: GitObjectType): Promise<Buffer> {
-  const found = await readObject(db, paperId, oid);
-  if (!found || found.type !== type) throw new Error(`page ${paperId} has no ${type} ${oid}`);
+async function mustRead(db: Reader, pageId: string, oid: string, type: GitObjectType): Promise<Buffer> {
+  const found = await readObject(db, pageId, oid);
+  if (!found || found.type !== type) throw new Error(`page ${pageId} has no ${type} ${oid}`);
   return found.body;
 }
 
-export async function readCommit(db: Reader, paperId: string, oid: string): Promise<Commit> {
-  return parseCommit(await mustRead(db, paperId, oid, 'commit'));
+export async function readCommit(db: Reader, pageId: string, oid: string): Promise<Commit> {
+  return parseCommit(await mustRead(db, pageId, oid, 'commit'));
 }
 
 /** A commit if `oid` is one in this page's repo, for ids that come from outside. */
-export async function findCommit(db: Reader, paperId: string, oid: string): Promise<Commit | null> {
+export async function findCommit(db: Reader, pageId: string, oid: string): Promise<Commit | null> {
   if (!/^[0-9a-f]{40}$/.test(oid)) return null;
-  const found = await readObject(db, paperId, oid);
+  const found = await readObject(db, pageId, oid);
   return found?.type === 'commit' ? parseCommit(found.body) : null;
 }
 
 /** Every file in a tree, by path. */
-export async function readFiles(db: Reader, paperId: string, tree: string, prefix = ''): Promise<Map<string, string>> {
+export async function readFiles(db: Reader, pageId: string, tree: string, prefix = ''): Promise<Map<string, string>> {
   const files = new Map<string, string>();
-  for (const entry of parseTree(await mustRead(db, paperId, tree, 'tree'))) {
+  for (const entry of parseTree(await mustRead(db, pageId, tree, 'tree'))) {
     if (entry.isTree) {
-      for (const [path, oid] of await readFiles(db, paperId, entry.oid, `${prefix}${entry.name}/`)) {
+      for (const [path, oid] of await readFiles(db, pageId, entry.oid, `${prefix}${entry.name}/`)) {
         files.set(path, oid);
       }
     } else {
@@ -56,19 +56,19 @@ export async function readFiles(db: Reader, paperId: string, tree: string, prefi
  * Every file under folder `dir` (`reviews/openreview/abc`), by full path, reading only the trees on the way
  * there and below it. Empty if there is no such folder.
  */
-export async function readFolder(db: Reader, paperId: string, tree: string, dir: string): Promise<Map<string, string>> {
+export async function readFolder(db: Reader, pageId: string, tree: string, dir: string): Promise<Map<string, string>> {
   let at = tree;
   for (const name of dir.split('/')) {
-    const entry = parseTree(await mustRead(db, paperId, at, 'tree')).find((e) => e.name === name);
+    const entry = parseTree(await mustRead(db, pageId, at, 'tree')).find((e) => e.name === name);
     if (!entry?.isTree) return new Map();
     at = entry.oid;
   }
-  return readFiles(db, paperId, at, `${dir}/`);
+  return readFiles(db, pageId, at, `${dir}/`);
 }
 
-export async function readText(db: Reader, paperId: string, blob: string | undefined): Promise<Version> {
+export async function readText(db: Reader, pageId: string, blob: string | undefined): Promise<Version> {
   if (!blob) return null;
-  return (await mustRead(db, paperId, blob, 'blob')).toString('utf8');
+  return (await mustRead(db, pageId, blob, 'blob')).toString('utf8');
 }
 
 export interface ChangedFile {
@@ -88,26 +88,22 @@ export function changedFiles(before: ReadonlyMap<string, string>, after: Readonl
 
 /** What changed between two commits of a page, or since nothing at all when `from` is `null`. */
 export async function diffCommits(
-  paperId: string,
+  pageId: string,
   from: string | null,
   to: string,
   database: Database = getDb(),
 ): Promise<FileDiff[] | null> {
   const [start, end] = await Promise.all([
-    from ? findCommit(database, paperId, from) : null,
-    findCommit(database, paperId, to),
+    from ? findCommit(database, pageId, from) : null,
+    findCommit(database, pageId, to),
   ]);
   if (!end || (from && !start)) return null;
-  const before = start ? await readFiles(database, paperId, start.tree) : new Map<string, string>();
-  const after = await readFiles(database, paperId, end.tree);
+  const before = start ? await readFiles(database, pageId, start.tree) : new Map<string, string>();
+  const after = await readFiles(database, pageId, end.tree);
   const diffs: FileDiff[] = [];
   for (const file of changedFiles(before, after)) {
     diffs.push(
-      diffFile(
-        file.path,
-        await readText(database, paperId, file.before),
-        await readText(database, paperId, file.after),
-      ),
+      diffFile(file.path, await readText(database, pageId, file.before), await readText(database, pageId, file.after)),
     );
   }
   return diffs;
@@ -128,7 +124,7 @@ export interface PublicRevision {
 
 /** A page's history, newest first. **Public:** it never selects `account_id`. */
 export async function pageHistory(
-  paperId: string,
+  pageId: string,
   options: { limit?: number; beforeSeq?: number; database?: Database } = {},
 ): Promise<PublicRevision[]> {
   const { limit = 50, beforeSeq, database = getDb() } = options;
@@ -145,7 +141,7 @@ export async function pageHistory(
       at: pageRevisions.at,
     })
     .from(pageRevisions)
-    .where(and(eq(pageRevisions.paperId, paperId), beforeSeq ? lt(pageRevisions.seq, beforeSeq) : undefined))
+    .where(and(eq(pageRevisions.pageId, pageId), beforeSeq ? lt(pageRevisions.seq, beforeSeq) : undefined))
     .orderBy(desc(pageRevisions.seq))
     .limit(limit);
   return rows.map((row) => ({ ...row, oid: row.oid.toString('hex') }));

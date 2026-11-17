@@ -5,7 +5,7 @@ import { authenticateGitPush, GIT_REALM } from '../auth';
 import { storeLfsUpload } from '../files';
 import { findLfsObjects } from '../lfs';
 import { checkPaper } from '../pages/check';
-import { clonePath, findRepo, type GitAddress } from '../pages/clone';
+import { findRepo, type GitAddress, pageClonePath } from '../pages/clone';
 import { MAX_LFS_PDF_BYTES } from '../pages/rules';
 import { siteUrl } from '../site';
 
@@ -130,11 +130,11 @@ export async function lfsBatch(req: Request, address: GitAddress, database: Data
 
   try {
     await authenticateGitPush(req);
-    await checkPaper(database, repo.paperId);
+    await checkPaper(database, repo.pageId);
   } catch (err) {
     return fromApiError(err);
   }
-  const href = (oid: string) => `${siteUrl()}${clonePath(address.id, `/info/lfs/objects/${oid}`)}`;
+  const href = (oid: string) => `${siteUrl()}${pageClonePath(address.page, `/info/lfs/objects/${oid}`)}`;
   const objects = batch.objects.map(({ oid, size }) => {
     const object = known.get(oid);
     // Already here: nothing to send.
@@ -171,7 +171,7 @@ export async function lfsUpload(req: Request, address: GitAddress, database: Dat
   let accountId: string;
   try {
     accountId = (await authenticateGitPush(req)).account.id;
-    await checkPaper(database, repo.paperId);
+    await checkPaper(database, repo.pageId);
   } catch (err) {
     return fromApiError(err);
   }

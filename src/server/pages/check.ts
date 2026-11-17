@@ -1,6 +1,7 @@
 import { randomBytes } from 'node:crypto';
 import { and, eq } from 'drizzle-orm';
-import { accounts, authorClaims, botGrants, commitIdentities, papers } from '@/db/schema';
+import { accounts, authorClaims, botGrants, commitIdentities, pages, papers } from '@/db/schema';
+import { isUnderDomain, KINDS, orgFileSchema, type PageKind, partsOf } from '@/lib/kinds';
 import { parseReviewPath, SUBMISSION_FILE } from '@/lib/review-files';
 import { cleanEvidence } from '@/lib/evidence';
 import { MAX_LINKS, parseLinkFile } from '@/lib/paper-links';
@@ -11,9 +12,11 @@ import { findLfsObjects, PDF_TYPE } from '../lfs';
 import { consume, rateLimitHeaders, type RateLimitConfig } from '../ratelimit';
 import { SYSTEM_AUTHOR_ID, type FileTree } from './git-objects';
 import type { Writer } from './projections';
+import { mustPage, type PageRow } from './kinds';
 import { changedFiles, type Reader } from './repo';
 import {
   contentProblem,
+  grantCovers,
   isDemoPath,
   isLinkPath,
   isReviewPath,
@@ -28,7 +31,6 @@ import {
   MAX_SECTIONS,
   METADATA_PATH,
   normalizePath,
-  PAGE_PARTS,
   PAPER_PDF_PATH,
   parseLfsPointer,
   pathDenied,
@@ -45,6 +47,9 @@ import {
   versionPdfIdOf,
 } from './rules';
 import { prekProblem } from './starter';
+import { pageClaimRoles } from '../page-claims';
+import { domainsAbove, isOrgMember } from '../org-roles';
+import { checkProtection, isEstablished } from '../page-protection';
 
 /**
  * Whether a change to a page's tree is allowed: who is making it, what it writes, and what the whole tree
@@ -63,9 +68,55 @@ export type Actor = { kind: 'system' } | { kind: 'account'; accountId: string; i
 
 export const SYSTEM_ACTOR: Actor = { kind: 'system' };
 
-export type ActorRoles = Roles & { bot: boolean; claimIdentity: string | null };
+/**
+ * `established`: verified long enough ago that a page under `established` protection lets them edit
+ * (`page-protection.ts`).
+ */
+export type ActorRoles = Roles & { bot: boolean; claimIdentity: string | null; kind: PageKind; established: boolean };
 
-export async function rolesOf(db: Reader, actor: Actor, paperId: string): Promise<ActorRoles> {
+/** Who the actor is on a page of a kind other than a paper: a user page's account, a venue's organisers. */
+async function keyedRoles(db: Reader, actor: Actor, page: PageRow): Promise<ActorRoles> {
+  const none = { owner: false, claimed: false, claimIdentity: null, kind: page.kind, established: false };
+  if (actor.kind === 'system') {
+    const { claimed } = await pageClaimRoles(db, page, null);
+    return { ...none, claimed, system: true, admin: false, verified: false, bot: false };
+  }
+  const [account] = await db
+    .select({ isBot: accounts.isBot, verifiedAt: accounts.verifiedAt, handle: accounts.handle })
+    .from(accounts)
+    .where(eq(accounts.id, actor.accountId));
+  if (!account) throw new ApiError(404, 'not_found', 'no such account');
+  const grants = account.isBot
+    ? (
+        await db
+          .select({ pattern: botGrants.pattern })
+          .from(botGrants)
+          .where(and(eq(botGrants.accountId, actor.accountId), eq(botGrants.kind, page.kind)))
+      ).map((row) => row.pattern)
+    : [];
+  // A venue's confirmed organisers, here or on the series above it (`page-claims.ts`).
+  const claims = await pageClaimRoles(db, page, account.isBot ? null : actor.accountId);
+  // An org's verified members, by address, here or on an org above it (`org-roles.ts`).
+  const member = !account.isBot && account.verifiedAt !== null && (await isOrgMember(db, page, actor.accountId));
+  return {
+    ...none,
+    system: false,
+    admin: actor.isAdmin,
+    verified: account.isBot || account.verifiedAt !== null,
+    established: isEstablished(account.verifiedAt),
+    // A user page is its account's, and its agents' tokens act as the account.
+    owner: (page.kind === 'user' && !account.isBot && account.handle === page.key) || claims.owner || member,
+    claimed: claims.claimed,
+    bot: account.isBot,
+    grants,
+  };
+}
+
+/** Who the actor is on the page: its roles under the path rules of its kind (`rules.ts`). */
+export async function rolesOf(db: Reader, actor: Actor, pageId: string): Promise<ActorRoles> {
+  const page = await mustPage(db, pageId);
+  if (page.kind !== 'paper') return keyedRoles(db, actor, page);
+  const paperId = pageId;
   const confirmed = await db
     .select({ accountId: authorClaims.accountId, identityId: authorClaims.identityId })
     .from(authorClaims)
@@ -76,10 +127,12 @@ export async function rolesOf(db: Reader, actor: Actor, paperId: string): Promis
       system: true,
       admin: false,
       verified: false,
-      confirmedAuthor: false,
+      owner: false,
       claimed,
       bot: false,
       claimIdentity: null,
+      kind: 'paper',
+      established: false,
     };
   }
   const claim = confirmed.find((c) => c.accountId === actor.accountId);
@@ -91,19 +144,24 @@ export async function rolesOf(db: Reader, actor: Actor, paperId: string): Promis
   // A bot's grants are rows (DESIGN.md §10), checked by the same path rules as everyone's roles.
   const grants = account.isBot
     ? (
-        await db.select({ pattern: botGrants.pattern }).from(botGrants).where(eq(botGrants.accountId, actor.accountId))
+        await db
+          .select({ pattern: botGrants.pattern })
+          .from(botGrants)
+          .where(and(eq(botGrants.accountId, actor.accountId), eq(botGrants.kind, 'paper')))
       ).map((row) => row.pattern)
     : [];
   return {
     system: false,
     admin: actor.isAdmin,
     verified: account.isBot || account.verifiedAt !== null,
-    confirmedAuthor: claim !== undefined,
+    established: isEstablished(account.verifiedAt),
+    owner: claim !== undefined,
     claimed,
     bot: account.isBot,
     grants,
     // On their own paper an author is always named, never their handle (DESIGN.md §5.3).
     claimIdentity: claim?.identityId ?? null,
+    kind: 'paper',
   };
 }
 
@@ -154,9 +212,20 @@ export async function takeCommit(actor: Actor, rateLimit: RateLimitConfig = COMM
   }
 }
 
-/** The paper is there, and is not merged into another (whose page is the one to edit). */
-export async function checkPaper(db: Reader, paperId: string, migration = false): Promise<void> {
-  const [paper] = await db.select({ mergedInto: papers.mergedInto }).from(papers).where(eq(papers.id, paperId));
+/**
+ * The page is there and not merged into another, whose page is the one to edit: a paper (`papers.merged_into`) or a
+ * topic (`pages.merged_into`, `topic-pages.ts`).
+ */
+export async function checkPaper(db: Reader, pageId: string, migration = false): Promise<void> {
+  const page = await mustPage(db, pageId);
+  if (page.kind !== 'paper') {
+    const [row] = await db.select({ mergedInto: pages.mergedInto }).from(pages).where(eq(pages.id, pageId));
+    if (row?.mergedInto && !migration) {
+      throw new ApiError(409, 'page_merged', 'this page was merged into another', { into: row.mergedInto });
+    }
+    return;
+  }
+  const [paper] = await db.select({ mergedInto: papers.mergedInto }).from(papers).where(eq(papers.id, pageId));
   if (!paper) throw new ApiError(404, 'not_found', 'no such paper');
   if (paper.mergedInto && !migration) {
     throw new ApiError(409, 'paper_merged', 'this paper was merged into another', { into: paper.mergedInto });
@@ -175,33 +244,35 @@ export function checkEvidence(urls: readonly string[]): string[] {
  * when its content is known, whether that content is valid. Cheap, so `commitPage` runs it on the changes
  * it is asked for before anything else, and `checkTree` on every path a tree changes.
  */
-export function checkPath(path: string, content: string | null | undefined, roles: Roles, migration: boolean): void {
-  const denied = migration ? null : pathDenied(path, roles);
+export function checkPath(
+  path: string,
+  content: string | null | undefined,
+  roles: Roles & { kind?: PageKind },
+  migration: boolean,
+): void {
+  const kind = roles.kind ?? 'paper';
+  const denied = migration ? null : pathDenied(path, roles, kind);
   if (denied) throw new ApiError(403, 'forbidden', denied, { path });
   if (content === null) return;
   // A file that has no place in the layout can still be deleted, so that such a page can be cleaned up.
-  const misplaced = layoutProblem(path);
+  const misplaced = layoutProblem(path, kind);
   if (misplaced) throw new ApiError(422, 'validation_error', `${path}: ${misplaced}`, { path });
   if (content === undefined) return;
-  const invalid = fileProblem(path, content);
+  const invalid = fileProblem(path, content, kind);
   if (invalid) throw invalidContent(path, invalid);
 }
 
 /** Refuses up front what a commit of these paths would be refused for who is asking, before slow work such as storing an upload. */
-export async function checkMayWrite(
-  db: Reader,
-  paperId: string,
-  actor: Actor,
-  paths: readonly string[],
-): Promise<void> {
-  const roles = await rolesOf(db, actor, paperId);
-  await checkPaper(db, paperId);
+export async function checkMayWrite(db: Reader, pageId: string, actor: Actor, paths: readonly string[]): Promise<void> {
+  const roles = await rolesOf(db, actor, pageId);
+  await checkPaper(db, pageId);
   for (const path of paths) checkPath(path, undefined, roles, false);
+  await checkProtection(db, pageId, roles, paths);
 }
 
 /** Why this can't be the file's content, or `null`: `contentProblem`, and the page's fixed `prek.toml`. */
-export function fileProblem(path: string, content: string): string | null {
-  return path === PREK_PATH ? prekProblem(content) : contentProblem(path, content);
+export function fileProblem(path: string, content: string, kind: PageKind = 'paper'): string | null {
+  return path === PREK_PATH ? prekProblem(content) : contentProblem(path, content, kind);
 }
 
 export function invalidContent(path: string, problem: string): ApiError {
@@ -230,11 +301,13 @@ export function checkChangeCount(paths: readonly string[]): void {
  * What only shows once the changes meet what's in the repo: a file can't also be a directory, and the
  * directories of links, versions and sections have their limits.
  */
-function checkTreeShape(files: FileTree): void {
+function checkTreeShape(files: FileTree, kind: PageKind): void {
   if (!files.has(METADATA_PATH)) {
     throw new ApiError(422, 'validation_error', `a page keeps its ${METADATA_PATH}`, { path: METADATA_PATH });
   }
   const paths = [...files.keys()];
+  checkPathsShape(files, paths, kind);
+  if (kind !== 'paper') return;
   const reviewFiles = paths.filter(isReviewPath);
   if (files.size - reviewFiles.length > MAX_FILES) {
     throw new ApiError(422, 'validation_error', `a page can have at most ${MAX_FILES} files`);
@@ -284,7 +357,14 @@ function checkTreeShape(files: FileTree): void {
   if (files.has(PAPER_PDF_PATH) !== files.has(PDF_PATH)) {
     throw new ApiError(422, 'validation_error', `${PAPER_PDF_PATH} and ${PDF_PATH} go together`, { path: PDF_PATH });
   }
-  for (const part of PAGE_PARTS) {
+}
+
+/** What every kind's tree keeps to: its files' count, sections per part, and no path both a file and a folder. */
+function checkPathsShape(files: FileTree, paths: readonly string[], kind: PageKind): void {
+  if (kind !== 'paper' && files.size > MAX_FILES) {
+    throw new ApiError(422, 'validation_error', `a page can have at most ${MAX_FILES} files`);
+  }
+  for (const part of partsOf(kind)) {
     if (paths.filter((path) => sectionName(path, part)).length > MAX_SECTIONS) {
       throw new ApiError(422, 'validation_error', `a part can have at most ${MAX_SECTIONS} sections`);
     }
@@ -366,9 +446,63 @@ async function checkLfsFiles(changed: readonly string[], after: FileTree, text: 
   }
 }
 
+async function orgDomains(files: FileTree, text: TextOf): Promise<string[]> {
+  const blob = files.get(KINDS.org.kindFile);
+  if (!blob) return [];
+  try {
+    const parsed = orgFileSchema.safeParse(JSON.parse((await text(blob)) ?? 'null'));
+    return parsed.success ? (parsed.data.domains ?? []) : [];
+  } catch {
+    return [];
+  }
+}
+
+/**
+ * An org's `domains` say who its members are and which papers are its own, so they are not anyone's to widen
+ * (`handoffs/pages.md` Phase 4). A top-level org's come from the institution allowlist: only admins and the `orgs`
+ * bot change them. A department's or lab's are its organisation's or under them (`inf.ethz.ch` under `ethz.ch`), so
+ * its members can't take in another institution's people or papers.
+ */
+async function checkOrgDomains(db: Reader, check: TreeCheck): Promise<void> {
+  const { roles } = check;
+  if (roles.system || roles.admin) return;
+  const path = KINDS.org.kindFile;
+  const page = await mustPage(db, check.pageId);
+  const after = await orgDomains(check.after, check.text);
+  if (!page.key.includes('/')) {
+    const granted = roles.grants?.some((pattern) => grantCovers(pattern, path)) ?? false;
+    if (granted) return;
+    const before = await orgDomains(check.before, check.text);
+    const same = before.length === after.length && before.every((domain) => after.includes(domain));
+    if (!same) {
+      throw new ApiError(
+        403,
+        'forbidden',
+        `${path}: only admins and the orgs bot change a top-level organisation's domains`,
+        { path },
+      );
+    }
+    return;
+  }
+  const above = await domainsAbove(db, page);
+  for (const domain of after) {
+    if (!above.some((under) => isUnderDomain(domain, under))) {
+      throw new ApiError(
+        422,
+        'validation_error',
+        above.length > 0
+          ? `${path}: ${domain} is not one of its organisation's domains or under one (${above.join(', ')})`
+          : `${path}: ${domain}: its organisation has no domains for a department's to be under`,
+        { path },
+      );
+    }
+  }
+}
+
 export interface TreeCheck {
-  paperId: string;
-  roles: Roles;
+  pageId: string;
+  /** The roles of whoever commits, on this page; `kind` is the page's (a paper's when absent). */
+  roles: Roles & { kind?: PageKind; established?: boolean };
   /** The parent's files, or none for a page's first commit. */
   before: FileTree;
   /** The files the commit will have. */
@@ -406,6 +540,8 @@ export async function checkTree(db: Reader, check: TreeCheck): Promise<string[]>
     }
     checkPath(path, after.has(path) ? undefined : null, roles, migration);
   }
+  // A protected page holds back the community's paths from those below its level (`page-protection.ts`).
+  if (!migration) await checkProtection(db, check.pageId, roles, changed);
   for (const path of changed) {
     const blob = after.get(path);
     if (blob === undefined) continue;
@@ -420,15 +556,21 @@ export async function checkTree(db: Reader, check: TreeCheck): Promise<string[]>
             : 'is not UTF-8 text',
       );
     }
-    const invalid = fileProblem(path, content);
+    const invalid = fileProblem(path, content, roles.kind);
     if (invalid) throw invalidContent(path, invalid);
   }
 
-  checkTreeShape(after);
+  const kind = roles.kind ?? 'paper';
+  checkTreeShape(after, kind);
+  if (kind === 'org' && changed.includes(KINDS.org.kindFile)) {
+    await checkOrgDomains(db, check);
+  }
+  // Pages of other kinds have no title links, PDFs, pictures or demos (`lib/kinds.ts`'s file types).
+  if (kind !== 'paper') return [];
   if (changed.some(isLinkPath)) await checkLinkLabels(after, text);
   await checkLfsFiles(changed, after, text, db);
   return checkDemos(db, {
-    paperId: check.paperId,
+    pageId: check.pageId,
     roles,
     changed,
     headFiles: before,

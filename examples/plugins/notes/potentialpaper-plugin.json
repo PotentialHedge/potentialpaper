@@ -1,0 +1,30 @@
+{
+  "id": "potentialhedge/notes",
+  "name": "Private notes",
+  "version": "1.0.0",
+  "apiVersion": 1,
+  "description": "Your own notes on any page, kept by the plugin's backend under the identity the site vouches for. The example of a plugin with a backend.",
+  "author": "PotentialPaper",
+  "main": "index.html",
+  "permissions": ["identity"],
+  "network": ["https://notes.potentialpaper.example"],
+  "contributes": {
+    "panels": [
+      {
+        "id": "notes",
+        "title": "My notes",
+        "kinds": ["paper", "venue", "topic", "org"],
+        "slot": "aside",
+        "when": "signedIn"
+      }
+    ],
+    "settings": {
+      "backend": {
+        "type": "string",
+        "default": "",
+        "maxLength": 200,
+        "description": "Use another backend than the one the plugin ships with (an origin listed in its network). Empty: the shipped one."
+      }
+    }
+  }
+}

@@ -32,13 +32,13 @@ export function sectionPaths(files: Iterable<string>, part: PagePart): string[] 
  */
 export async function readSections(
   db: Reader,
-  paperId: string,
+  pageId: string,
   files: ReadonlyMap<string, string>,
   part: PagePart,
 ): Promise<SectionFile[]> {
   const out: SectionFile[] = [];
   for (const path of sectionPaths(files.keys(), part)) {
-    const text = (await readText(db, paperId, files.get(path))) ?? '';
+    const text = (await readText(db, pageId, files.get(path))) ?? '';
     if (text.trim() !== '') out.push({ path, name: sectionName(path, part)!, text });
   }
   return out;

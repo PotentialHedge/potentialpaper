@@ -34,8 +34,8 @@ async function main() {
       sha256: sql<string | null>`${pageCurrent.pdf} ->> 'sha256'`,
     })
     .from(paperIdentifiers)
-    .leftJoin(pageRefs, eq(pageRefs.paperId, paperIdentifiers.paperId))
-    .leftJoin(pageCurrent, eq(pageCurrent.paperId, paperIdentifiers.paperId))
+    .leftJoin(pageRefs, eq(pageRefs.pageId, paperIdentifiers.paperId))
+    .leftJoin(pageCurrent, eq(pageCurrent.pageId, paperIdentifiers.paperId))
     .where(eq(paperIdentifiers.scheme, 'openreview'));
   const pages = new Map(known.map((row) => [row.value, row]));
 

@@ -81,7 +81,7 @@ async function connection(): Promise<Client> {
 
 /** An event written by hand, as `recordCommit` writes one, in whatever transaction `client` is in. */
 async function insertEvent(client: Client, paperId: string, seq: number, oid: string): Promise<void> {
-  await client.query(`insert into page_events (paper_id, seq, type, payload) values ($1, $2, 'page.committed', $3)`, [
+  await client.query(`insert into page_events (page_id, seq, type, payload) values ($1, $2, 'page.committed', $3)`, [
     paperId,
     seq,
     JSON.stringify({ oid }),

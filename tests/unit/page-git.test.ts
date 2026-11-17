@@ -181,12 +181,12 @@ describe('paths', () => {
 });
 
 describe('who may write where', () => {
-  const nobody: Roles = { system: false, admin: false, verified: false, confirmedAuthor: false, claimed: false };
+  const nobody: Roles = { system: false, admin: false, verified: false, owner: false, claimed: false };
   const roles = {
     system: { ...nobody, system: true },
     admin: { ...nobody, admin: true },
     verified: { ...nobody, verified: true },
-    author: { ...nobody, verified: true, confirmedAuthor: true, claimed: true },
+    author: { ...nobody, verified: true, owner: true, claimed: true },
     verifiedOnClaimed: { ...nobody, verified: true, claimed: true },
     unverified: nobody,
   };

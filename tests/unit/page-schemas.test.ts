@@ -5,7 +5,7 @@ import { contentProblem, layoutProblem, parsePdfSource, parseThumbnailWords, pat
 import { PAGE_SCHEMA_NAMES, pageJsonSchema } from '@/server/pages/schemas';
 import { missingStarterFiles, prekConfig, prekProblem, starterFiles } from '@/server/pages/starter';
 
-const roles = { system: false, admin: false, verified: true, confirmedAuthor: false, claimed: false };
+const roles = { system: false, admin: false, verified: true, owner: false, claimed: false };
 
 describe('page file schemas', () => {
   it('makes a closed JSON Schema for each kind of file, with its fields described', () => {

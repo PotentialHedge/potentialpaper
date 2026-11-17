@@ -12,6 +12,7 @@ import {
 import type { Consumer } from './consumers/types';
 import { pageRepo } from './git/repo';
 import { readCommit, readFolder } from './pages/repo';
+import { markPaperScopes } from './scope-stats';
 
 /**
  * The review projection (DESIGN.md §4.9): the `reviews` outbox consumer, which brings a page's rows in
@@ -82,9 +83,9 @@ async function changedAt(
   const { rows } = await database.execute<{ dir: string; at: Date | string }>(sql`
     select d.dir, max(r.at) as at
       from unnest(${sql.param(dirs)}::text[]) as d(dir)
-      join page_revisions r on r.paper_id = ${paperId}
+      join page_revisions r on r.page_id = ${paperId}
        and r.seq <= coalesce((select seq from page_revisions
-                               where paper_id = ${paperId} and oid = decode(${head}, 'hex')), 2147483647)
+                               where page_id = ${paperId} and oid = decode(${head}, 'hex')), 2147483647)
        and exists (select 1 from unnest(r.paths) as p(path) where starts_with(p.path, d.dir || '/'))
      group by d.dir
   `);
@@ -159,6 +160,7 @@ export async function projectReviews(database: Database, paperId: string, head: 
           number: s.number,
           status: s.status,
           decision: s.decision,
+          keywords: s.keywords ?? [],
           url: s.url,
           fetchedAt: item.changedAt,
         })
@@ -169,6 +171,7 @@ export async function projectReviews(database: Database, paperId: string, head: 
             number: s.number,
             status: s.status,
             decision: s.decision,
+            keywords: s.keywords ?? [],
             url: s.url,
             fetchedAt: item.changedAt,
           },
@@ -207,12 +210,16 @@ export async function projectReviews(database: Database, paperId: string, head: 
       )
       .returning({ id: submissions.id });
     report.removed = gone.length;
+    // The paper's scopes' score statistics are due again (`scope-stats.ts`).
+    await markPaperScopes(tx, paperId);
     return report;
   });
 }
 
 export const reviewsConsumer: Consumer = {
   name: 'reviews',
+  // Submissions and their reviews are a paper's files.
+  kinds: ['paper'],
   async handle(paperId, head, { database }) {
     await projectReviews(database, paperId, head);
   },

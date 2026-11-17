@@ -1,6 +1,7 @@
 import { and, eq, sql } from 'drizzle-orm';
 import { getDb, type Database } from '@/db';
 import { accounts, botGrants } from '@/db/schema';
+import type { PageKind } from '@/lib/kinds';
 import type { Actor } from './pages/check';
 import { grantProblem } from './pages/rules';
 
@@ -40,35 +41,53 @@ export async function ensureBot(handle: string, database: Database = getDb()): P
 
 export interface Grant {
   handle: string;
+  /** The kind of page the pattern applies to. */
+  kind: PageKind;
   pattern: string;
   shown: boolean;
   grantedBy: string;
   createdAt: Date;
 }
 
-/** Grants a bot a path pattern (`grantProblem` says which are allowed). Granting it again changes `shown`. */
+/**
+ * Grants a bot a path pattern on pages of a kind, a paper's by default (`grantProblem` says which are allowed).
+ * Granting it again changes `shown`.
+ */
 export async function grantBot(
   handle: string,
   pattern: string,
-  { grantedBy, shown = true, database = getDb() }: { grantedBy: string; shown?: boolean; database?: Database },
+  {
+    grantedBy,
+    shown = true,
+    kind = 'paper',
+    database = getDb(),
+  }: { grantedBy: string; shown?: boolean; kind?: PageKind; database?: Database },
 ): Promise<void> {
-  const problem = grantProblem(pattern);
+  const problem = grantProblem(pattern, kind);
   if (problem) throw new Error(problem);
   const actor = await botActor(handle, database);
   if (actor.kind !== 'account') throw new Error('unreachable');
   await database
     .insert(botGrants)
-    .values({ accountId: actor.accountId, pattern, shown, grantedBy })
-    .onConflictDoUpdate({ target: [botGrants.accountId, botGrants.pattern], set: { shown, grantedBy } });
+    .values({ accountId: actor.accountId, kind, pattern, shown, grantedBy })
+    .onConflictDoUpdate({
+      target: [botGrants.accountId, botGrants.kind, botGrants.pattern],
+      set: { shown, grantedBy },
+    });
 }
 
 /** Takes a grant back. Whether there was one. */
-export async function revokeGrant(handle: string, pattern: string, database: Database = getDb()): Promise<boolean> {
+export async function revokeGrant(
+  handle: string,
+  pattern: string,
+  database: Database = getDb(),
+  kind: PageKind = 'paper',
+): Promise<boolean> {
   const actor = await botActor(handle, database);
   if (actor.kind !== 'account') throw new Error('unreachable');
   const removed = await database
     .delete(botGrants)
-    .where(and(eq(botGrants.accountId, actor.accountId), eq(botGrants.pattern, pattern)))
+    .where(and(eq(botGrants.accountId, actor.accountId), eq(botGrants.kind, kind), eq(botGrants.pattern, pattern)))
     .returning({ pattern: botGrants.pattern });
   return removed.length > 0;
 }
@@ -77,6 +96,7 @@ export async function listGrants(database: Database = getDb()): Promise<Grant[]>
   return database
     .select({
       handle: accounts.handle,
+      kind: botGrants.kind,
       pattern: botGrants.pattern,
       shown: botGrants.shown,
       grantedBy: botGrants.grantedBy,
@@ -84,5 +104,5 @@ export async function listGrants(database: Database = getDb()): Promise<Grant[]>
     })
     .from(botGrants)
     .innerJoin(accounts, eq(accounts.id, botGrants.accountId))
-    .orderBy(accounts.handle, botGrants.pattern);
+    .orderBy(accounts.handle, botGrants.kind, botGrants.pattern);
 }

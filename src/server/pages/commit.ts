@@ -17,8 +17,10 @@ import {
   checkTree,
   fileProblem,
   rolesOf,
+  SYSTEM_ACTOR,
   takeCommit,
 } from './check';
+import type { KeyedKind } from '@/lib/kinds';
 import { buildTrees, type Commit, type EditKind, encodeCommit, gitObject, type GitObject } from './git-objects';
 import { mergeFile, type Version } from './merge';
 import { lockPage, writeCurrent, writeRevision, type Writer } from './projections';
@@ -33,6 +35,8 @@ import {
   normalizePath,
   PREK_PATH,
 } from './rules';
+import { insertPage, mustPage, type PageRow } from './kinds';
+import { refreshPages } from './refresh';
 import { starterFiles } from './starter';
 
 export { type Actor, COMMIT_RATE_LIMIT, newIdentity, SYSTEM_ACTOR } from './check';
@@ -82,13 +86,21 @@ export interface CommitOptions {
   migration?: boolean;
 }
 
-/** The first commit's snapshot of the paper (DESIGN.md §4.2), with the layout the repo starts in (`rules.ts`). Stable, so that it hashes the same when unchanged. */
-async function metadataSnapshot(tx: Writer, paperId: string): Promise<string> {
-  const [paper] = await tx.select().from(papers).where(eq(papers.id, paperId));
+/**
+ * The first commit's snapshot (DESIGN.md §4.2), with the layout the repo starts in (`rules.ts`). Stable, so that it
+ * hashes the same when unchanged. A paper's is the paper; any other kind's says what the page is, its kind and key,
+ * since what it holds is in its kind file.
+ */
+async function metadataSnapshot(tx: Writer, pageId: string): Promise<string> {
+  const page = await mustPage(tx, pageId);
+  if (page.kind !== 'paper') {
+    return `${JSON.stringify({ layout: LAYOUT_VERSION, kind: page.kind, key: page.key }, null, 2)}\n`;
+  }
+  const [paper] = await tx.select().from(papers).where(eq(papers.id, pageId));
   const identifiers = await tx
     .select({ scheme: paperIdentifiers.scheme, value: paperIdentifiers.value })
     .from(paperIdentifiers)
-    .where(eq(paperIdentifiers.paperId, paperId));
+    .where(eq(paperIdentifiers.paperId, pageId));
   identifiers.sort((a, b) => `${a.scheme}:${a.value}`.localeCompare(`${b.scheme}:${b.value}`, 'en'));
   const { title, authors, abstract, year, venue, source, metadataLicense, abstractLicense } = paper;
   const license = { metadata: metadataLicense, abstract: abstractLicense };
@@ -115,18 +127,18 @@ function normalizeChanges(changes: readonly FileChange[], migration: boolean): F
  * Moves the head, only if it is still where the commit started. The page's lock already means it is, and
  * this is what stops a writer that got around the lock from losing someone's commit.
  */
-export async function moveHead(tx: Writer, paperId: string, expected: string | null, next: string): Promise<boolean> {
+export async function moveHead(tx: Writer, pageId: string, expected: string | null, next: string): Promise<boolean> {
   const moved = expected
     ? await tx
         .update(pageRefs)
         .set({ head: toBytes(next) })
-        .where(and(eq(pageRefs.paperId, paperId), eq(pageRefs.head, toBytes(expected))))
-        .returning({ paperId: pageRefs.paperId })
+        .where(and(eq(pageRefs.pageId, pageId), eq(pageRefs.head, toBytes(expected))))
+        .returning({ pageId: pageRefs.pageId })
     : await tx
         .insert(pageRefs)
-        .values({ paperId, head: toBytes(next) })
+        .values({ pageId, head: toBytes(next) })
         .onConflictDoNothing()
-        .returning({ paperId: pageRefs.paperId });
+        .returning({ pageId: pageRefs.pageId });
   return moved.length === 1;
 }
 
@@ -138,26 +150,26 @@ export async function moveHead(tx: Writer, paperId: string, expected: string | n
  */
 export async function recordCommit(
   tx: Writer,
-  paperId: string,
+  pageId: string,
   object: GitObject,
   commit: Commit,
   others: readonly GitObject[],
   pins: readonly DemoPin[],
 ): Promise<{ seq: number; paths: string[] }> {
-  await pageRepo(tx, paperId).write([...others, object]);
-  if (!(await moveHead(tx, paperId, commit.parent, object.oid))) {
+  await pageRepo(tx, pageId).write([...others, object]);
+  if (!(await moveHead(tx, pageId, commit.parent, object.oid))) {
     throw new ApiError(503, 'page_busy', 'the page changed during the edit; try again');
   }
-  await pinDemos(tx, paperId, object.oid, pins);
+  await pinDemos(tx, pageId, object.oid, pins);
 
   const [last] = await tx
     .select({ seq: max(pageRevisions.seq) })
     .from(pageRevisions)
-    .where(eq(pageRevisions.paperId, paperId));
+    .where(eq(pageRevisions.pageId, pageId));
   const seq = (last?.seq ?? 0) + 1;
-  const { paths, bytesDelta } = await writeRevision(tx, paperId, seq, object.oid, commit);
+  const { paths, bytesDelta } = await writeRevision(tx, pageId, seq, object.oid, commit);
   await tx.insert(pageEvents).values({
-    paperId,
+    pageId,
     seq,
     type: 'page.committed',
     payload: {
@@ -174,7 +186,7 @@ export async function recordCommit(
     },
   });
   // Wakes the consumer worker (`server/consumers/worker.ts`) once this transaction commits; never if it doesn't.
-  await tx.execute(sql`select pg_notify(${EVENTS_CHANNEL}, ${paperId})`);
+  await tx.execute(sql`select pg_notify(${EVENTS_CHANNEL}, ${pageId})`);
   return { seq, paths };
 }
 
@@ -192,7 +204,7 @@ export function busyError(err: unknown): unknown {
  * Whatever the merge gives is then checked as a whole tree (`checkTree`).
  */
 export async function commitPage(
-  paperId: string,
+  pageId: string,
   baseOid: string | null,
   actor: Actor,
   changes: readonly FileChange[],
@@ -207,33 +219,33 @@ export async function commitPage(
 
   // Roles first and downloads last: what is refused for who is asking, or for what it says, never waits
   // for GitHub. The same checks run again under the lock, on the tree the merge makes.
-  const early = await rolesOf(database, actor, paperId);
-  await checkPaper(database, paperId, migration);
+  const early = await rolesOf(database, actor, pageId);
+  await checkPaper(database, pageId, migration);
   for (const { path, content } of wanted) checkPath(path, content, early, migration);
-  const snapshots = await copyDemos(database, await newDemoUrls(database, paperId, wanted));
+  const snapshots = await copyDemos(database, await newDemoUrls(database, pageId, wanted));
 
   try {
     return await database.transaction(async (tx) => {
-      const roles = await rolesOf(tx, actor, paperId);
+      const roles = await rolesOf(tx, actor, pageId);
       for (const { path, content } of wanted) checkPath(path, content === null ? null : undefined, roles, migration);
-      await checkPaper(tx, paperId, migration);
+      await checkPaper(tx, pageId, migration);
 
-      await lockPage(tx, paperId);
-      const head = await readHead(tx, paperId);
+      await lockPage(tx, pageId);
+      const head = await readHead(tx, pageId);
 
-      const baseCommit = baseOid ? await findCommit(tx, paperId, baseOid) : null;
+      const baseCommit = baseOid ? await findCommit(tx, pageId, baseOid) : null;
       if (baseOid && !baseCommit) throw new ApiError(422, 'validation_error', 'the base is not a commit of this page');
-      const baseFiles = baseCommit ? await readFiles(tx, paperId, baseCommit.tree) : new Map<string, string>();
-      const headCommit = head ? await readCommit(tx, paperId, head) : null;
-      const headFiles = headCommit ? await readFiles(tx, paperId, headCommit.tree) : new Map<string, string>();
+      const baseFiles = baseCommit ? await readFiles(tx, pageId, baseCommit.tree) : new Map<string, string>();
+      const headCommit = head ? await readCommit(tx, pageId, head) : null;
+      const headFiles = headCommit ? await readFiles(tx, pageId, headCommit.tree) : new Map<string, string>();
 
       const blobs: GitObject[] = [];
       const files = new Map(headFiles);
       const written = new Map<string, string>();
       const conflicts: Conflict[] = [];
       for (const { path, content } of wanted) {
-        const base = await readText(tx, paperId, baseFiles.get(path));
-        const theirs = await readText(tx, paperId, headFiles.get(path));
+        const base = await readText(tx, pageId, baseFiles.get(path));
+        const theirs = await readText(tx, pageId, headFiles.get(path));
         const merge = mergeFile(base, content, theirs);
         if (!merge.ok) {
           conflicts.push({ path, base, ours: content, theirs });
@@ -267,9 +279,9 @@ export async function commitPage(
       const before = new Map(headFiles);
       if (isFirstCommit) {
         const start: [string, () => Promise<string>][] = [
-          [METADATA_PATH, () => metadataSnapshot(tx, paperId)],
+          [METADATA_PATH, () => metadataSnapshot(tx, pageId)],
           [GITATTRIBUTES_PATH, async () => GITATTRIBUTES],
-          ...starterFiles()
+          ...starterFiles(roles.kind)
             .filter(([path]) => !changes.some((change) => change.path === path))
             .map(([path, content]): [string, () => Promise<string>] => [path, async () => content]),
         ];
@@ -283,11 +295,11 @@ export async function commitPage(
         }
       }
       const added = await checkTree(tx, {
-        paperId,
+        pageId,
         roles,
         before,
         after: files,
-        text: async (blob) => written.get(blob) ?? readText(tx, paperId, blob),
+        text: async (blob) => written.get(blob) ?? readText(tx, pageId, blob),
         newBlobBytes: new Map(blobs.map((blob) => [blob.oid, blob.body.length])),
         migration,
       });
@@ -307,13 +319,13 @@ export async function commitPage(
       const object = gitObject('commit', encodeCommit(commit));
       const { seq, paths } = await recordCommit(
         tx,
-        paperId,
+        pageId,
         object,
         commit,
         [...blobs, ...trees],
         pinsFor(added, snapshots),
       );
-      await writeCurrent(tx, paperId, object.oid, commit);
+      await writeCurrent(tx, pageId, object.oid, commit);
       return { status: 'committed', oid: object.oid, seq, paths, merged: head !== baseOid };
     });
   } catch (err) {
@@ -322,26 +334,50 @@ export async function commitPage(
 }
 
 /**
+ * Makes a page of a kind other than a paper (`lib/kinds.ts`), or returns the one there is, with its repo started:
+ * the system's first commit, of its `.potentialpaper/metadata.json` (`{ layout, kind, key }`), `.gitattributes`
+ * and `prek.toml`. A paper's repo starts with its first edit (DESIGN.md §4.2); another kind's page is made on
+ * purpose, so it has a repo to clone and push to from the start. What it says is its kind file and sections,
+ * written by whoever the kind's path rules let (`rules.ts`).
+ */
+export async function createPage(
+  kind: KeyedKind,
+  key: string,
+  database: Database = getDb(),
+): Promise<PageRow & { head: string }> {
+  const page = await insertPage(kind, key, database);
+  const head = await readHead(database, page.id);
+  if (head) return { ...page, head };
+  const result = await commitPage(page.id, null, SYSTEM_ACTOR, [], `Start the ${kind} page ${key}`, { database });
+  // Its address may have been answered "not found" and cached.
+  await refreshPages({ kind, key });
+  return { ...page, head: result.oid! };
+}
+
+/**
  * Undoes one commit, keeping everything since: the files as they were before it, merged from it onto the
  * head, which is what `git revert` does. Goes through `commitPage`, so reverting needs the same permissions
  * as writing those paths. The first commit's metadata and `.gitattributes` stay, because a page always has them.
  */
 export async function revertCommit(
-  paperId: string,
+  pageId: string,
   target: string,
   actor: Actor,
   summary?: string,
   options: Omit<CommitOptions, 'kind' | 'reverts'> = {},
 ): Promise<CommitResult> {
   const database = options.database ?? getDb();
-  const commit = await findCommit(database, paperId, target);
+  const commit = await findCommit(database, pageId, target);
   if (!commit) throw new ApiError(404, 'not_found', 'no such commit on this page');
 
-  const parent = commit.parent ? await readCommit(database, paperId, commit.parent) : null;
-  const before = parent ? await readFiles(database, paperId, parent.tree) : new Map<string, string>();
+  const parent = commit.parent ? await readCommit(database, pageId, commit.parent) : null;
+  const before = parent ? await readFiles(database, pageId, parent.tree) : new Map<string, string>();
   // The first commit's starter files are the system's, as its metadata is, unless the commit wrote in one.
-  const started = new Map(starterFiles().map(([path, text]) => [path, gitObject('blob', Buffer.from(text)).oid]));
-  const changed = changedFiles(before, await readFiles(database, paperId, commit.tree)).filter(
+  const page = await mustPage(database, pageId);
+  const started = new Map(
+    starterFiles(page.kind).map(([path, text]) => [path, gitObject('blob', Buffer.from(text)).oid]),
+  );
+  const changed = changedFiles(before, await readFiles(database, pageId, commit.tree)).filter(
     (file) =>
       (parent || (file.path !== METADATA_PATH && started.get(file.path) !== file.after)) &&
       file.path !== GITATTRIBUTES_PATH &&
@@ -349,7 +385,7 @@ export async function revertCommit(
   );
   // A commit from before the page's files were laid out as they are now (`layout-migration.ts`) would put
   // back files that have no place any more. Its text is still in the history and the diff, to copy from.
-  const misplaced = changed.find((file) => layoutProblem(file.path));
+  const misplaced = changed.find((file) => layoutProblem(file.path, page.kind));
   if (misplaced) {
     throw new ApiError(
       422,
@@ -360,9 +396,9 @@ export async function revertCommit(
   }
   const changes: FileChange[] = [];
   for (const file of changed) {
-    changes.push({ path: file.path, content: await readText(database, paperId, file.before) });
+    changes.push({ path: file.path, content: await readText(database, pageId, file.before) });
   }
-  return commitPage(paperId, target, actor, changes, summary ?? `Revert "${commit.summary}"`, {
+  return commitPage(pageId, target, actor, changes, summary ?? `Revert "${commit.summary}"`, {
     ...options,
     kind: 'revert',
     reverts: target,

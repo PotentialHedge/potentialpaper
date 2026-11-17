@@ -115,6 +115,17 @@ export function resolveRest(
   return best && { commit: best.commit, folder: best.folder };
 }
 
+/** A repo's tags, each with the commit it names (an annotated tag's peeled commit), through git's ref listing. */
+export async function listTags(owner: string, repo: string): Promise<Map<string, string>> {
+  const refs = await listRefs({ kind: 'repo', owner, repo, rest: '' });
+  const tags = new Map<string, string>();
+  for (const [name, commit] of refs) {
+    if (!name.startsWith('refs/tags/') || name.endsWith('^{}')) continue;
+    tags.set(name.slice('refs/tags/'.length), refs.get(`${name}^{}`) ?? commit);
+  }
+  return tags;
+}
+
 export async function resolveCommit(source: DemoSource): Promise<{ commit: string; folder: string }> {
   const refs = await listRefs(source);
   const rest = source.kind === 'repo' ? source.rest : '';

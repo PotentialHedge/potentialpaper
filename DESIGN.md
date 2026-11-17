@@ -126,8 +126,9 @@ A page's history is a **real git repository**: real blobs, trees and commits wit
 and a stock `git clone` works. The objects are rows in Postgres instead of files on disk.
 
 ```
-page_refs(paper_id pk, head oid)                       -- the only mutable part of a repo
-page_objects(paper_id, oid, type, body, pk(paper_id, oid))
+pages(id pk, kind, key, unique(kind, key))             -- every page of every kind; a paper's id is its paper id
+page_refs(page_id pk, head oid)                        -- the only mutable part of a repo
+page_objects(page_id, oid, type, body, pk(page_id, oid))
 ```
 
 Git's object format is simple enough that hashing and writing objects takes roughly 200 lines of
@@ -172,7 +173,7 @@ there are no hooks, and tools that expect files on disk need a clone first. Noth
 gives a normal repo.
 
 **Scale check.** At the measured 23 KB per page, one million actively edited pages come to about
-23 GB, which one Postgres handles comfortably. The primary key leads with `paper_id`, so hash
+23 GB, which one Postgres handles comfortably. The primary key leads with `page_id`, so hash
 partitioning remains available later.
 
 ### 4.2 A repo exists only after the first edit
@@ -205,6 +206,82 @@ reviews/<source>/<submission>/forms.json        the venue's forms for its notes
 reviews/<source>/<submission>/notes/<id>.json   one review, decision or comment
 extensions/<id>/...             reserved: data owned by one extension (section 10)
 ```
+
+**Pages of every kind** (decided 2026-11-16, built in `handoffs/pages.md` Phase 1). A paper is the first kind of
+page; venues (`/v/iclr/2027`), topics (`/t/<slug>`), organisations (`/o/<slug>`) and people (`/u/<handle>`) are
+pages built the same way, each a repo with the same shape: `.gitattributes`, `prek.toml` and
+`.potentialpaper/metadata.json` (`{ layout, kind, key }`) for the system; its parts' sections, the owners'
+(`author/` on a paper, `organizers/`, `members/`, `about/`) and `community/` (all but a user's); each part's
+`links.jsonl` (§8); its kind file (`venue.json`, `topic.json`, `org.json`, `profile.json`); and `extensions/`. The
+kind registry, `src/lib/kinds.ts`, declares each kind's address, kind file and schema, parts, slots
+(`<kind>.main`, `<kind>.aside`, `<kind>.tabs`), file types and plugin context keys, and `rules.ts` takes the
+page's kind. Every table of the page store is keyed by `page_id` (`pages(id, kind, key)`); a paper's page id is its
+paper id. Other kinds' pages are made by `createPage` (`npm run pages:create`), which starts their repo with the
+system's commit, and are cloned and pushed at `/git/<kind>/<key>.git` (or over SSH at their own address).
+
+**Venue pages** (built in `handoffs/pages.md` Phase 2). A series (`/v/iclr`) lists its editions over time; an
+edition (`/v/iclr/2027`) has its dates and where its submissions come from, its organisers' and community sections,
+and its submissions by status with filters (status, decision, words in the title), which a series rolls up from its
+editions. The `venues` bot, granted `venue.json` on venue pages, makes both pages for every venue an import knows
+(`venues` rows → the edition's `sources`), and only ever adds a missing source to a `venue.json` someone wrote. A
+venue's owners are its confirmed organisers (`page_claims`, the author claim flow with the venue as what is claimed,
+decided by an admin); a series' organisers also own its editions. They write `organizers/` and `venue.json` under
+their own handle's identity, since organising is a public role.
+A venue's page also shows its review scores (`scores`, from `scope_stats`, §10): the first score field as a
+histogram stacked by outcome, and every field's median, middle half and medians by decision, per venue on a series.
+
+**User pages** (built in `handoffs/pages.md` Phase 3). Every account has a page at `/u/<handle>`, keyed by its
+handle and made with the account by a trigger on `accounts` (migration `0037`, which also made one for every existing
+account); its repo starts at sign-up (`npm run users:pages` starts the rest). A handle change moves the page's key in
+the same transaction and leaves a redirect (`page_redirects`): `/u/<old>` and `user:<old>` lead to the page until
+another account takes the old handle. The page shows its handle, its `about/` and its links, and of the rest only what
+the account turned on (§5.3): its real name, institutions, the papers it is a confirmed author of, its activity
+(commits under its handle, from the outbox) and its comments under its handle, each a `user.show.*` setting
+(`lib/user-pages.ts`). Its `profile.json` repeats the choices, never the values, and is written only by the site
+from those settings. A person's own links may also go elsewhere (`homepage`, `orcid`, `scholar`, to https addresses)
+and to their work (`wrote`, to a paper), §8.
+
+**Organisation pages** (built in `handoffs/pages.md` Phase 4). An institution (`/o/eth-zurich`) and its departments
+and labs (`/o/eth-zurich/inf`, up to three levels) each have a page whose `org.json` holds its name, its email
+`domains`, other `parents` and its ROR id. The `orgs` bot, granted `org.json` on org pages (migration `0038`), makes a
+page per institution on the sign-up allowlist (§5.1; an institution is a name there, with every domain the list gives
+it, and its ROR id from `config/institution-ror.json`): the institutions in use by `npm run orgs:sync` (a confirmed
+address, an address printed on a paper's page 1, a domain an admin added; `--all` for every one), and a new member's
+when their address is confirmed. It only ever adds missing domains and a missing ROR id to an `org.json` someone
+wrote. Departments and labs are made by the institution's verified members (`/new/org/<key>`,
+`POST /api/v1/pages/{identifier}/children`). **Members** are the accounts with a confirmed address at one of the
+org's domains or under one (`inf.ethz.ch` under `ethz.ch`), on the page or an org above it by address; they own
+`members/` and `org.json`. A top-level org's domains are changed only by admins and the bot, and a department's must
+be its organisation's or under them, so nobody widens an org to take in another institution's people or papers.
+**Its papers** (`page_members`, `via` `affiliation`, §4.9) are those with a confirmed author claim by a verified
+member who shows their institution (weight 1), and those whose page 1 prints an address at one of its domains or
+under one (weight 0.5), rolled up from its departments. The page lists its departments and labs, the members who show
+it as their institution (by handle; §5.3), the venues and topics its papers are at by count, and its papers.
+
+**Topic pages** (built in `handoffs/pages.md` Phase 5). A topic (`/t/linear-attention`, `topic:linear-attention`) is a
+research idea at the size of a Wikipedia article, not a field. There is no seeded list and no bot writes them: anyone
+verified makes one (`/new/topic`, `POST /api/v1/topics`), or makes it from a paper's "Add a topic", which links the
+paper and makes the topic if no topic has that name or alias. Names are checked first: two names are the same when
+they differ only in case, accents, punctuation and plurals (`lib/topics.ts`), and a name or alias another topic has
+is refused (`topic_exists`); the forms list similar topics as one types. Its `topic.json` holds its name, aliases and
+optional `broader` topics (a loose DAG, by slug, each a topic that exists); its article is `community/` ("What it
+is", "Key ideas", "History", "Open problems" as the editor's starting headings); `related` links (§8) name related
+topics. **A paper is in a topic** through its own labeled link, `in-topic` or `introduces-topic`, in its
+`community/links.jsonl`, or its `author/links.jsonl` when one of its confirmed authors adds it; a topic's papers roll
+up from the topics it is broader than. The page reads as an article: its names and where to edit it, the article,
+where it started (the papers that introduced it); beside them its broader, narrower and related topics, the venues
+and organisations its papers are at by count, and its links; below, its papers, sortable by date, venue and review
+score (the mean of the venue's first score field, compared by where it sits in the venue's range, as scales differ),
+and **"might belong here"**: `topic_suggestions`, which the `topic-suggestions` consumer keeps from OpenReview
+keywords (now kept in `submission.json`), and the topic's names in titles and abstracts. A person confirms one (the
+paper is linked, as their edit) or dismisses it, and a dismissal is remembered: the machine never rewrites a decided
+row. **Editing** the names, broader and related topics and the article is one commit (`/t/<slug>/edit`,
+`PATCH /api/v1/pages/{identifier}/topic`), as a push would be. **Renaming** moves the page's key and leaves its old
+slug in `page_redirects`; **merging** folds the duplicate's names (as aliases), broader topics, sections and links
+into the survivor in one commit and marks the duplicate `pages.merged_into`, so its address and identifier lead to
+the survivor and it takes no more commits, while its history stays. Either way the page answers to its old
+identifiers: membership (`page_scope_names`) and "what links here" count links that name them (`formerKeys`). Both
+are open to the community, under page protection, and show in `/changes` (§7).
 
 **Sections** are named `NN-slug.md` or `NN-slug.html`: two digits, then a lower-case ASCII slug.
 They show in the order of their names, which is the order `ls` lists them in. A section's title is the
@@ -341,9 +418,9 @@ Details that have to be right:
 Reads never touch git objects.
 
 ```
-page_current(paper_id pk, head, author_html, community_html, resources jsonb, updated_at)
-page_revisions(paper_id, seq, oid, account_id, kind, summary, paths[], bytes_delta, at, pk(paper_id, seq))
-page_links(id, source_paper, target_paper, label, origin, note, ..., revision)
+page_current(page_id pk, head, author_html, community_html, ..., kind_file jsonb, name, updated_at)
+page_revisions(page_id, seq, oid, account_id, kind, summary, paths[], bytes_delta, at, pk(page_id, seq))
+page_links(page_id, path, link_id, target, target_kind, target_page_id, label, origin, note, ...)
 ```
 
 Markdown is rendered and sanitized **at commit time** and stored as HTML. Raw HTML in Markdown is
@@ -471,15 +548,34 @@ rebuilding a consumer's data is resetting its cursor to zero.
 
 Now: one worker process (a compose service, like `ingest`) reads `page_events` in order, woken by
 `LISTEN/NOTIFY` from the commit, with a poll as a fallback. Later, the same consumers can sit behind a
-queue (Kafka, NATS or a cloud queue), partitioned by `paper_id` so each page's events stay in order.
+queue (Kafka, NATS or a cloud queue), partitioned by `page_id` so each page's events stay in order.
 This is how GitHub's code search is fed: pushes go to Kafka, and crawlers turn them into documents.
+
+A consumer whose data depends on other consumers' rows rather than on the repo can't simply read the same events,
+since each consumer has its own cursor and may run first. Score statistics (`scope_stats`, §10) are the first: the
+review projection and the membership consumer **mark** the scopes they affect, in the transaction that changes their
+rows (`scope_state`: `changed_at`, and a `due_at` a few seconds ahead, debounced but never more than a minute past
+the first change), and the worker recomputes due scopes after each pass. Its own `scope-stats` consumer only marks,
+so `consumers:rebuild -- scope-stats` still starts it over.
+
+Topic suggestions (`topic_suggestions`) are kept by the `topic-suggestions` consumer, which handles papers and
+topics: a topic's event matches its names against every paper, a paper's event matches the paper against every
+topic. Its rows have a status, and only `open` ones are ever rewritten (its reset deletes those alone), so what people
+decided survives a rebuild.
+
+Data that comes from tables rather than repos is the other case. An org's papers come from author claims, confirmed
+addresses, `show_institution` and the addresses read off PDFs, none of which is a commit to the paper's page. Triggers
+on those tables put the affected papers in a queue (`org_members_due`, migration `0038`), and the worker's
+`org-members` task brings their membership up to date after each pass (before the statistics, which it marks). The
+`members` consumer's reset writes every paper's affiliation sources from the tables, so a rebuild covers papers that
+have no repo too.
 
 ### 4.10 Search
 
 Decided 2026-11-16. Everything in a repo is searchable, whoever wrote it:
 
 ```
-search_docs(paper_id, path, blob_oid, kind, text, fields jsonb, tsv tsvector)   -- GIN on tsv
+search_docs(page_id, path, blob_oid, kind, text, fields jsonb, tsv tsvector)   -- GIN on tsv
 ```
 
 The search consumer (§4.9) writes it from each file's indexer (§4.8): a section's text, a review's
@@ -506,8 +602,8 @@ are `page_objects`.
 | Seam                                                                                                | Now                                   | Upgrade when it hurts                                                                                      |
 | --------------------------------------------------------------------------------------------------- | ------------------------------------- | ---------------------------------------------------------------------------------------------------------- |
 | **One object store interface** (`GitRepo`, `server/git/repo.ts`): nothing else reads `page_objects` | Object bodies are Postgres rows       | Bodies to R2 as packs, a pack manifest per repo in Postgres, refs stay in `page_refs` (~100 GB of objects) |
-| **The repo is the unit**: every table keyed by `paper_id` first, one repo per transaction           | One Postgres                          | Partition or shard by `paper_id` (e.g. Citus), several writers                                             |
-| **Derived data through the outbox** (§4.9)                                                          | One worker reading `page_events`      | A queue partitioned by `paper_id`                                                                          |
+| **The repo is the unit**: every table keyed by `page_id` first, one repo per transaction            | One Postgres                          | Partition or shard by `page_id` (e.g. Citus), several writers                                              |
+| **Derived data through the outbox** (§4.9)                                                          | One worker reading `page_events`      | A queue partitioned by `page_id`                                                                           |
 | **Search behind `server/search.ts`** (§4.10)                                                        | Postgres full text on `search_docs`   | An external search engine fed by the same consumer                                                         |
 | **File types and bot grants are data** (§4.8, §10)                                                  | A registry in code, grants in a table | Types from extensions                                                                                      |
 
@@ -595,6 +691,30 @@ that paper uses a separate per-claim author identity, shown with the name on the
 Their handle never appears on that paper, so nothing publicly connects a pseudonymous handle to a real
 name. Stances on links touching your own paper don't count towards totals.
 
+**What a person's page shows** (`/u/<handle>`, §4.3; built in `handoffs/pages.md` Phase 3) is the account's choice,
+item by item, in its own settings.json (`user.show.*`, which the site layer can't set for everyone):
+
+| Item                              | Default | Why                                                                            |
+| --------------------------------- | ------- | ------------------------------------------------------------------------------ |
+| Real name (`user.show.realName`)  | off     | Real names are optional; the handle need not say who someone is                |
+| Institution (`show_institution`)  | off     | At a small institution it can identify someone on its own                      |
+| Papers authored (`claimedPapers`) | off     | It ties the handle to the names on those papers, which nothing else does       |
+| Activity (`user.show.activity`)   | on      | Edits and links under the handle are public under it on each page already      |
+| Comments (`user.show.comments`)   | on      | The same; anonymous ones and those on the person's own papers are never listed |
+
+Edits under a per-claim author identity are never listed, whatever the settings say, and neither are comments on a
+paper the account is a confirmed author of. The rule lives in one place, `server/user-pages.ts`'s `userPageView`,
+which the page, plugins' `page.read` and the public routes all read. The page's bylines elsewhere (comments, My
+papers) follow `real_name` as above.
+
+**The institution is one choice everywhere** (`handoffs/pages.md` Phase 4): `show_institution`, asked at onboarding
+and changed on the profile, shows it beside the handle on comments and edits, on the person's page, and on their
+organisation's page, which then lists the handle among its people and counts the papers they are a confirmed author
+of. There is no separate `user.show.institution`, so the institution is never public in one place and hidden in
+another. An org page lists only handles; a real name stays on the person's own page as `user.show.realName` says.
+Which papers came to an org through a member's claim and which through a printed address is not said anywhere
+public (both are `via` `affiliation`).
+
 **Known limits.** Writing style and timing can still identify people, and this protects against casual
 linking rather than a determined investigator. Someone who hasn't claimed their paper can still praise
 it under a handle, so claiming stays voluntary and that gap has to be handled by normal patrolling. The
@@ -631,6 +751,9 @@ author_claims(paper_id, author_index, account_id, method, evidence jsonb, status
   it grants no edit rights, because acting as the named author would reveal the claim.
 - Any confirmed author can edit the section. It displays "maintained by" with their names as listed
   on the paper, never their handles (section 5.3), and history shows who did what.
+- **Claims on other pages** (built 2026-11-16, `handoffs/pages.md` Phase 2): a venue's organisers claim it the same
+  way, in their own words, and an admin decides (`page_claims`, `npm run claims:decide`). A series' organisers own
+  its editions. Unlike authorship, organising is a public role, so their commits carry their own identity.
 
 ### Content
 
@@ -653,10 +776,17 @@ below it.
   their author identity with a badge (section 5.3). Authors have no special power here.
 - **Anti-vandalism is the real product.** Wikipedia works because patrolling is cheap, so these are
   v1 and not extras:
-  - `/changes`, a filterable feed of all edits
+  - `/changes`, a filterable feed of all edits. Built (`handoffs/pages.md` Phase 5, `server/changes.ts`): every
+    commit to every page newest first in the outbox's order, by kind of page, bots hidden unless asked, and "moves
+    papers" for changes to a topic's broader topics, merges and renames; also `GET /api/v1/changes`. Who made each
+    change shows as the page's history shows it (a handle, a confirmed author's name on their paper, the system)
   - watchlists with email digest
   - one-click revert
-  - per-page protection levels
+  - per-page protection levels. Built (`page_protection`, `server/page-protection.ts`): `established` (only
+    accounts whose institutional address was confirmed at least four days ago) and `admins`, set by admins
+    (`npm run pages:protect`, `PUT /api/v1/pages/{identifier}/protection`), optionally until a date. Checked in
+    `checkTree`, so a push is held as a web edit is. It holds what the community writes; owners keep their own part
+    and bots their grants
   - rate limits that are tighter for new accounts
   - reports and account blocks
 - **Institutional email is a strong anti-sockpuppet measure**, and also why a block means something.
@@ -668,7 +798,7 @@ below it.
 ### Format
 
 A link is a statement made **on the source page about the target**. It lives as one line in that
-page's `links.jsonl`, so it gets history, revert and blame with no extra machinery:
+page's `<part>/links.jsonl` (`community/links.jsonl`, `author/links.jsonl`), so it gets history, revert and blame with no extra machinery:
 
 ```json
 {
@@ -682,7 +812,8 @@ page's `links.jsonl`, so it gets history, revert and blame with no extra machine
 }
 ```
 
-- `to` is a public identifier, never an internal id, so a clone means something on its own.
+- `to` is a public identifier, never an internal id, so a clone means something on its own: a paper's
+  (`arxiv:…`, `doi:…`) or any other kind's (`venue:iclr/2027`, `topic:linear-attention`, `org:eth`, `user:alice`).
 - `page_links` is the query index, derived from git and rebuildable. It answers "what links here",
   which is shown on the target page as well as the source.
 - `origin` comes from the path: `author/` links show as author-asserted and `community/` links as
@@ -709,6 +840,18 @@ Labels are data, in a table, with a reading in each direction:
 | `concurrent-with`    | concurrent with    | (symmetric)       | discourse |                |               |
 | `same-idea-as`       | same idea as       | (symmetric)       | discourse |                |               |
 | `related`            | related to         | (symmetric)       | discourse |                |               |
+| `in-topic`           | is about           | covered by        | topic     |                |               |
+| `introduces-topic`   | introduces         | introduced by     | topic     |                |               |
+| `wrote`              | wrote              | written by        | person    |                |               |
+| `homepage`           | homepage           | homepage of       | person    |                |               |
+| `orcid`              | ORCID              | ORCID of          | person    |                |               |
+| `scholar`            | Google Scholar     | Google Scholar of | person    |                |               |
+
+Built 2026-11-16 (`handoffs/pages.md` Phase 1): the vocabulary is `src/lib/labeled-links.ts`, where each label
+also says which kinds it goes from and to (the classic labels paper to paper, `related` between any kinds, the
+topic labels paper to topic, the person labels from a user page only, `homepage`, `orcid` and `scholar` to an https
+address rather than a page, which no page's "what links here" lists). `page_links` is kept by the `links` outbox consumer (`server/page-links.ts`), not in
+the commit's transaction, and the paper page and every other kind show "Links" and "What links here".
 
 - Contested labels **require a note**, because that is where the content is.
 - **No `plagiarizes` or `scoops` label.** These allege misconduct against named people, and a
@@ -758,41 +901,153 @@ Wikipedia talk page.
 
 ## 10. Extensions (later, but shaped from day one)
 
-**Goal:** anyone can add a feature with nothing more than a public GitHub repo.
+**Goal:** anyone can add a feature with nothing more than a public GitHub repo. A plugin adds panels to any kind of
+page (a paper, a venue, a topic, an org, a person: `handoffs/pages.md`), readers find and install the ones they
+want, and each reader's site and plugin preferences live in one `settings.json`. Decided with Benedict on
+2026-11-16; `handoffs/plugins.md` is the plan and its phases, and where it and this section differ, it wins.
+
+### settings.json
+
+Built 2026-11-16 (`handoffs/plugins.md` Phase 1). One document per account, layered as in VS Code:
+
+- **Layers:** defaults ← site ← user. Defaults come from the core settings (`lib/settings/core.ts`, zod, one
+  entry per key with its default and description) and from each installed plugin's `contributes.settings`. The
+  site layer is one `site_settings` row, set by admins with `npm run settings:site`, so it changes without a deploy.
+  The user layer is the account's `user_settings` row. A signed-out reader's document lives in localStorage and is
+  offered for import when they sign in.
+- **Keys are dotted** (`paper.panels.hidden`); a plugin's are namespaced by its id
+  (`benedict-armstrong/score-standing.view`). The document holds only what differs from the layer below.
+- **The text is kept as written** (JSONC, so comments and key order survive) and parsed when read. Values are
+  checked when read and never trusted when written: a bad value reads as the layer below, so a hand-edited file
+  never breaks a page. `PUT /api/v1/me/settings` takes the file itself and reports every problem, each on a line
+  naming its key; unknown keys are kept, with a warning, so a file can name a plugin's settings before the plugin
+  is installed. Agents and scripts use the same route.
+- `/schemas/settings.json` is its JSON Schema: the core keys and the requesting account's installed plugins' keys.
+  `/settings` has a form made from the schema, the raw file with the same checks, and Export and Import.
+- **Settings are preferences.** Remembered state (dismissed prompts, a plugin's cache) stays out of the document,
+  and so does consent (below).
+- The first core keys are `<kind>.panels.hidden` and `<kind>.panels.order`: a reader turns panels off or reorders
+  them within their slots (§4.8), built-in ones by id and plugins' as `<plugin id>.<panel id>`. Pages stay the same
+  HTML for every reader, so these apply in the browser after load. Then `plugins`, `plugins.default` and
+  `plugins.blocked` (below).
 
 ### The model
 
-A repo has a manifest and built files at a commit:
+Built 2026-11-16 (`handoffs/plugins.md` Phase 2). A plugin is a public repo (or a folder of one) with a
+`potentialpaper-plugin.json` manifest and built files committed to it. We never run a build.
 
-```json
-{
-  "id": "ben.replication-tracker",
-  "name": "Replication tracker",
-  "version": "0.3.0",
-  "entry": "dist/index.html",
-  "permissions": ["paper.read", "links.read", "repo.extensionData.write"],
-  "contributes": {
-    "paperPanels": [{ "title": "Replications", "slot": "paper.aside" }],
-    "fenceRenderers": ["replication-table"],
-    "fileRenderers": [{ "glob": "reviews/*/*/**", "slot": "paper.tabs" }],
-    "linkLabels": [{ "id": "formalizes", "reads": "formalizes", "inverse": "formalized by" }],
-    "pages": [{ "path": "/x/replications", "title": "Replications" }]
-  }
-}
-```
-
-Registering means giving us a repo URL. We pin the **commit SHA**, snapshot those files to R2, and
-never run a build. Updates are explicit, and new permissions need new consent.
+- **The manifest** (`lib/plugins/manifest.ts`, zod; JSON Schema at `/schemas/plugin-manifest.json`) names an `id`
+  (`<GitHub owner>/<name>`, and the owner must be the repo's), `name`, `version` (semver), `apiVersion` (1), `main`
+  (an HTML file), `permissions` (`page.read`, `scope.read`, `reviews.read`, `identity`), `network` (https origins
+  its own backend lives at), an optional `bot` (the bot whose files on pages it shows) and what it `contributes`: `panels` (`{ id, title, kinds, slot, when? }`; `slot` is `main`, `aside` or
+  `tab`, one for every kind or one per kind, `{ "paper": "aside", "*": "main" }`), `pages` (whole pages at
+  `/x/<owner>/<name>/<page>`), `settings` (`SettingSpec`s, keyed `<plugin id>.<name>` in settings.json) and
+  `commands` (in each of its panels' menus). The validator reports every problem in one pass, each on a line naming
+  its field; unknown fields are warnings, so a newer manifest still loads on an older host.
+- **`when` conditions** (`lib/plugins/when.ts`), VS Code's clauses cut down: `page.hasScores`,
+  `page.kind == venue && signedIn`. Each kind offers its context keys in the kind registry (`KindInfo.contextKeys`:
+  `page.kind`, `signedIn`, `viewer.isOwner`, and `page.hasScores`/`page.hasSubmissions` where they mean something). A
+  panel whose condition is false starts no frame.
+- **Sources** (`lib/plugins/sources.ts`): `github:<owner>/<repo>[/<folder>][@<ref>]`, also typed as `owner/repo` or a
+  GitHub link. Installing resolves the ref to a **commit** (git's ref listing, as demos do: no token, no rate limit),
+  copies the kept files at that commit once into the demos' store (R2), and pins the ref (`plugin_refs`), so a moving
+  branch changes nothing: updates are explicit. Kept are files of the content domain's types (the demos' list, which
+  has `png`, `woff2` and `wasm`), outside dot-folders and `node_modules`; at most 500 files, 20 MB, 10 MB each. The
+  manifest is checked when the copy is taken (`plugin_snapshots`), and a copy with errors is refused.
+- **Installed plugins** (`lib/plugins/installed.ts`) are the site's `plugins.default` and the reader's `plugins`
+  key (`{ "<source>": { "enabled": true, "ref": "v1.0.0" } }`). `POST /api/v1/me/plugins` installs by source and edits
+  the key, keeping the rest of the file; `GET /api/v1/plugins/installed` lists them for a page, each with the commit it
+  runs and its status: `ready`, `consent`, `blocked`, `disabled` or `error`.
+- **Dev mode:** a source of `http://localhost:<port>/` (kept in that browser's localStorage, `pp.plugins.dev`) runs
+  unpinned from the author's dev server, in their browser only, with what it asks for.
+- **Releases and updates** (built 2026-11-16, `handoffs/plugins.md` Phase 3): a plugin is released by tagging its
+  repo `v` + its manifest's `version`. Installing by `owner/repo` with no ref takes the newest release (the default
+  branch if it has none). A reader whose plugin runs an older version than the newest release (prereleases are never
+  offered) sees "Update" on `/settings/plugins` (`GET /api/v1/me/plugins/updates`, tags from git's ref listing,
+  cached ten minutes per repo). Updating sets that reader's entry's `ref` to the new tag, so it moves them alone; the
+  site-wide pin of a ref never moves. The new commit is copied first, so a broken release changes nothing. If it asks
+  for a permission or network origin their grant lacks, the update only describes it (`consent`) until they approve
+  it in a browser, which switches and grants at once.
+- **`/settings/plugins`**: the installed plugins (on and off, version and commit, update, what each may do with
+  approve and withdraw, its settings as a form drawn from its `SettingSpec`s, remove), Discover, add by source, and
+  load from localhost. `/settings` links there, and its hidden/order lists offer installed plugins' panels too.
+- **`/plugins.md`**, linked from `llms.txt`, is the guide for agents: the manifest, the SDK (its method, permission
+  and `when` tables are made from the code), the data routes, the dev loop and publishing. A README says "Read
+  https://…/plugins.md and build me a PotentialPaper plugin."
+- **The first plugin outside this repo** (built 2026-11-17, `handoffs/plugins.md` Phase 6) is score standing,
+  `github.com/benedict-armstrong/potentialpaper-score-standing` (id `benedict-armstrong/score-standing`): the
+  acceptodds "where you stand" figure for review scores, a histogram and a kernel-density curve, on papers (aside:
+  the paper's mean at each venue it went to), venues (main: the whole distribution, split by decision once
+  decisions are out) and, since v0.2.0, organisations (main: each venue's whole distribution, with the org's
+  submissions as open circles on it, named on hover). Vite and TypeScript with `dist/` committed and CI that fails if it is stale; it reads only
+  `scope.scores` and `reviews.forPaper`, caches each field in its own IndexedDB by `computedAt`, and needed no
+  host code of its own. It is the pattern to point plugin authors at.
 
 ### Security is what shapes everything
 
 Arbitrary JavaScript on the main origin could act as any signed-in user. So:
 
-- Extensions run in **`<iframe sandbox="allow-scripts">`** on a **separate registrable domain** we
-  own, with no cookies from the main site and a strict CSP.
-- The **only** bridge is a typed `postMessage` RPC, and each call is checked against the permissions
-  the user granted.
-- Writes go through `commitPage` like any others and record the extension in a trailer.
+- **Each plugin runs on its own origin**, `plugin-<hash>.ppusercontent.com/<commit>/…`, where the label is a
+  stable hash of the plugin id, on a different site from the app (`server/plugins/serve.ts`, beside the demos'). Its
+  frame is `sandbox="allow-scripts allow-same-origin"`: the same-origin flag is safe only because the origin is the
+  plugin's own, and it lets a plugin keep its own IndexedDB cache across versions. Its CSP is `default-src 'self'`,
+  scripts from itself and the SDK (and `'wasm-unsafe-eval'`), inline styles, `connect-src 'self'` plus the
+  manifest's `network` origins, and `frame-ancestors` the site. Files are cached for good: a commit never changes.
+- The **only** bridge is a typed, versioned `postMessage` RPC (`lib/plugins/protocol.ts`, Presio's envelopes over a
+  `MessagePort`): the frame says hello, the page checks the message's window and origin and answers with a port and
+  the context. Each call is checked against the permissions the user granted (`lib/plugins/host.ts`). A plugin never
+  touches the host's DOM or session; it declares what it adds, and the host draws it (`components/plugins/`).
+  Methods: `context.get` (the page, its scopes, the viewer, the theme), `settings.get`/`set` (own keys only) and a
+  `settings.change` event, `storage.get`/`set` (64 KB per account and plugin, in Postgres; localStorage when signed
+  out), `page.read`, `page.members`, `page.resolve`, `reviews.forPaper`, `scope.scores`, `scope.papers`,
+  `identity.token`, `ui.setHeight` and `ui.openUrl`; theme
+  tokens are sent at boot and on change. Frames start when scrolled near. The SDK is one file,
+  `https://ppusercontent.com/sdk/v1/pp.js`, with `pp.d.ts` beside it; `examples/plugins/hello/` uses it.
+- The reads go through public routes anyone can call, `GET /api/v1/pages/<identifier>` and its `/files`, `/members`
+  and `/submissions`, so a plugin's own backend reads the same data; they give only what the page shows the public
+  (a user page's `about/` and links, and only the items its account shows, `userPageView`, §5.3).
+- **Consent is not in settings.json.** The document lists installed plugins (the `plugins` key), and a hand-edited
+  file can add one, but a grant row (`user_plugin_grants`: plugin id, SHA, permissions, network origins) records
+  what was approved. A plugin whose manifest asks for anything its grant lacks shows an approval prompt instead of
+  running, listing its permissions and network origins in plain words, so an update that asks for more asks again.
+  Only a browser session can approve, never an agent's token. A site default runs with what it asks for: the admin
+  who added it approved it. The exception is `identity` (below), which only the reader can give: a site default
+  that asks for it runs without it until they approve it. The prompt also names the bot a manifest's `bot` names and
+  what the site lets that bot write, or says the site has no such bot; naming one grants nothing.
+- **Plugins never write state other users share.** Shared state that clients can write can be poisoned by anyone.
+  Data comes three ways: aggregates the site computes per scope (a `scope_stats` consumer, §4.9), generic bulk
+  reads of a scope's papers with ETags, and a plugin's own backend (its `network` origins, or a bot, below).
+  Per-user plugin storage is fine.
+  - **Aggregates (A)**, built: `scope_stats` keeps, per scope (a venue, topic or org, rolled up through
+    `page_ancestors`), venue and score field of the venue's review forms, every submission's mean over its reviews,
+    sorted, with 20 fixed-width bins between the form's range and the same split by outcome (accepted, rejected,
+    withdrawn, pending). The venue stays in the key, since a 6 at one venue is no 6 at another. Served at
+    `GET /api/v1/pages/{identifier}/scores` (venues, fields, counts) and `…/scores/{venue}/{field}` (the numbers),
+    public, ETagged and cached a minute, and by `scope.scores`. Curve-fitting is the client's. Each venue in these
+    answers names its own page (`venue.page`: the venue page whose `sources` list it), since a topic's or an org's
+    numbers are only its own papers'. `?marks=true` (`scope.scores(…, { marks: true })`) adds the scope's own
+    submissions in the field by name (paper identifier, title, mean, outcome), read live with the statistics' rules,
+    up to 1,000 a field, so a plugin can mark an org's papers on its venue's distribution. The site setting
+    `plugins.venueStats.hideUntil` (`never`, the default, or `decisions`) withholds a venue's numbers until it has
+    decided on a submission.
+  - **Bulk (B)**, built: `GET /api/v1/pages/{identifier}/papers?fields=submissions,scores,status` streams a scope's
+    papers as NDJSON, each with every submission, its status and decision, and every review's score vector with its
+    licence and link; gzipped, ETagged on the scope's `changed_at`, in chunks by cursor (`limit`, `after`,
+    `X-Next-Cursor`), and `scope.papers` over the RPC. Both are described at `/openapi.json`.
+  - **A plugin's own backend (D)**, built 2026-11-17 (`handoffs/plugins.md` Phase 5): the manifest's `network`
+    origins are its frames' only `connect-src` beyond their own origin, named in the approval prompt, and a new one
+    asks again. The backend gets no session. To know who the reader is, a plugin asks for `identity`:
+    `pp.identity.token()` gives an ES256 JWT the site signs (`server/plugins/identity.ts`), good for five minutes,
+    with `iss` the site's origin, `aud` the plugin's id, `sub` a pairwise subject (an HMAC of the account and the
+    plugin, so backends can't join their users by it, stable across handle changes) and `handle`. Only a browser
+    session can get one (`POST /api/v1/me/plugins/identity`, which the frame's host calls), for an installed, running
+    plugin whose `identity` the reader approved; a plugin loaded from localhost gets `aud` `dev:<id>`, which no
+    published backend accepts. The keys (`identity_keys`, made on first use, `npm run identity:keys` to rotate and
+    retire) are published at `/.well-known/jwks.json`, every live key at once so tokens verify across a rotation.
+    `examples/plugins/notes` and its `notes-backend` are the pattern: notes per reader kept by the plugin's backend,
+    verified with Node's own crypto. A backend that puts data on pages for everyone does it as a bot (below).
+- Writes go through `commitPage` like any others and record the extension in a trailer. A plugin's writes for
+  everyone are its bot's (below), named in its manifest's `bot`.
 
 VS Code makes the same trade: extensions get APIs and webviews, not the host's DOM. So "almost
 arbitrary" means adding panels, tabs, whole pages, renderers, labels and commands. It doesn't include
@@ -800,8 +1055,12 @@ restyling the host page or reading its session. That limit is what makes it safe
 
 ### Trust levels
 
-Each user installs what they want, and it affects only them. Admins can review specific versions and
-make them default for everyone, by script. A kill switch disables any extension site-wide.
+Each user installs what they want, and it affects only them. Discovery (`GET /api/v1/plugins/discover`, ported from
+Presio) lists public, unarchived repos with the GitHub topic `potentialpaper-plugin`, most starred first; the server
+asks GitHub's search once per five minutes for everyone (with `GITHUB_TOKEN` when set) and serves the last list
+while GitHub fails. Being listed is no endorsement: every plugin still asks before it runs. The site layer of settings.json holds `plugins.default` (sources installed for everyone,
+which a user can turn off) and `plugins.blocked`, the kill switch (ids, or ids at a SHA). Both are read from the
+site layer only (`siteOnly` in `lib/settings/core.ts`): a user's file naming them changes nothing, with a warning.
 
 ### Server-side extensions: bots
 
@@ -825,21 +1084,25 @@ Decided 2026-11-16: bots are how data gets onto pages, and they work like GitHub
   of the bot's.
 
 Our own OpenReview import is the first bot, `openreview`, and goes through exactly this route, which keeps
-the route honest. The activity feed hides bot commits by default.
+the route honest. The second is `venues` (`npm run venues:sync`), granted `venue.json` on venue pages: it makes a
+series' and an edition's pages from the venues the imports know. The third is `orgs` (`npm run orgs:sync`), granted
+`org.json` on org pages: it makes an institution's page from the sign-up allowlist, with its domains and ROR id
+(§4.3). The activity feed hides bot commits by default.
 
 ### What to do now, so this stays cheap
 
-| Build now                                                                | Why                                         |
-| ------------------------------------------------------------------------ | ------------------------------------------- |
-| API first; the UI uses `/api/v1` with OpenAPI                            | The extension API is mostly this            |
-| Event outbox written by every commit                                     | Feeds, webhooks and extensions share it     |
-| Paper page assembled from named slots (`paper.aside`, `paper.tabs`, ...) | Built-in panels become the first extensions |
-| Fence renderer registry in Markdown                                      | Rendered output has somewhere to attach     |
-| Path permissions, with `extensions/` reserved                            | Extension data has a defined, safe home     |
-| File types with schema, indexer and renderer (§4.8)                      | Renderers from extensions plug in by path   |
-| Bot grants on path patterns, as data                                     | Third-party bots need no code from us       |
-| Labels stored as data                                                    | Namespaced labels need no schema change     |
-| Strict CSP from the start                                                | Retrofitting CSP is painful                 |
+| Build now                                                                | Why                                                            |
+| ------------------------------------------------------------------------ | -------------------------------------------------------------- |
+| API first; the UI uses `/api/v1` with OpenAPI                            | The extension API is mostly this                               |
+| Event outbox written by every commit                                     | Feeds, webhooks and extensions share it                        |
+| Paper page assembled from named slots (`paper.aside`, `paper.tabs`, ...) | Built-in panels become the first extensions                    |
+| Fence renderer registry in Markdown                                      | Rendered output has somewhere to attach                        |
+| Path permissions, with `extensions/` reserved                            | Extension data has a defined, safe home                        |
+| File types with schema, indexer and renderer (§4.8)                      | Renderers from extensions plug in by path                      |
+| Bot grants on path patterns, as data                                     | Third-party bots need no code from us                          |
+| Labels stored as data                                                    | Namespaced labels need no schema change                        |
+| Strict CSP from the start                                                | Retrofitting CSP is painful                                    |
+| Built-in panels by stable id (`lib/panels.ts`), arranged by settings     | Plugin panels join the same slots and order (built 2026-11-16) |
 
 ## 11. Attribution, licensing, legal
 

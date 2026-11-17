@@ -1,11 +1,22 @@
 import { z } from 'zod';
+import {
+  ALL_PARTS,
+  KINDS,
+  orgFileSchema,
+  PAGE_KINDS,
+  type PageKind,
+  profileFileSchema,
+  topicFileSchema,
+  venueFileSchema,
+} from '@/lib/kinds';
+import { labeledLinkSchema, LINK_LABELS } from '@/lib/labeled-links';
 import { linkFileSchema } from '@/lib/paper-links';
 import { formsFileSchema, noteFileSchema, submissionFileSchema } from '@/lib/review-files';
 import { scoreOf } from '@/lib/submissions';
 import { versionFileSchema } from '@/lib/versions';
 import { leadingHtmlTitle } from './html';
 import { leadingTitle } from './markdown';
-import { type PagePart, pdfSourceSchema, sectionName, thumbnailWordsSchema } from './rules';
+import { pdfSourceSchema, sectionName, thumbnailWordsSchema } from './rules';
 
 /**
  * The file types of a page repo (DESIGN.md §4.8): the contract between whoever writes a file (people, bots) and
@@ -18,7 +29,9 @@ import { type PagePart, pdfSourceSchema, sectionName, thumbnailWordsSchema } fro
  *   can change shape names its version inside the file (`"schema": "review/1"`), and a new version is a new entry;
  * - **an indexer**, which turns a file into search documents (§4.10; the search consumer stores them);
  * - **a renderer**: which built-in panel shows files of the type, and in which of the page's slots. Renderers from
- *   extensions come later (§10), and plug in by the same pattern.
+ *   extensions come later (§10), and plug in by the same pattern;
+ * - **the kinds of page** it may be on (`lib/kinds.ts`, `handoffs/pages.md`): every kind's `fileTypes` name the
+ *   types it allows, and a type lists those kinds back (`kinds`), which `kindsOfFileType` reads.
  *
  * What JSON Schema can't say (that a label isn't blank, an address parses) only the site checks.
  *
@@ -43,8 +56,8 @@ export interface IndexedDoc {
  */
 export type SearchScope = 'page' | 'reviews';
 
-/** Where on the paper's page a type is shown: the slots of `components/paper/slots.tsx`, and the title's links. */
-export type RenderSlot = 'paper.title' | 'paper.main' | 'paper.aside' | 'paper.body';
+/** Where on a page a type is shown: one of its kind's slots (`lib/kinds.ts`), as `paper.main` or `venue.aside`. */
+export type RenderSlot = string;
 
 export interface FileType<S extends z.ZodType = z.ZodType> {
   title: string;
@@ -55,8 +68,11 @@ export interface FileType<S extends z.ZodType = z.ZodType> {
   filesRegex: string;
   /** Whether people write it, and so `prek.toml` checks it before a commit (JSON types only). */
   writable: boolean;
-  /** `json` (the default): parsed, then checked against `schema`, which is served as JSON Schema. */
-  format?: 'json' | 'text';
+  /**
+   * `json` (the default): parsed, then checked against `schema`, which is served as JSON Schema. `jsonl`: one JSON
+   * value a line, each checked against `schema` (a line's). `text`: as it is.
+   */
+  format?: 'json' | 'jsonl' | 'text';
   /** Which `in:` scope its search documents belong to; every type with `index` has one. */
   scope?: SearchScope;
   /** The search documents for a valid file. None: it isn't searched. */
@@ -99,16 +115,39 @@ export function sectionText(text: string, html: boolean): string {
 }
 
 /** The part a section file belongs to, from its path (which the registry's pattern already matched). */
-function partOf(path: string): PagePart {
-  return path.startsWith('author/') ? 'author' : 'community';
+function partOf(path: string): string {
+  return path.slice(0, path.indexOf('/'));
+}
+
+const PARTS_GLOB = `{${ALL_PARTS.join(',')}}`;
+const PARTS_RE = `(${ALL_PARTS.join('|')})`;
+
+/** A kind file's type: at the top of the repo, written by people (and on venues and orgs, a bot). */
+function kindFileType<S extends z.ZodType>(kind: PageKind, schema: S): FileType<S> {
+  const file = KINDS[kind].kindFile;
+  return {
+    title: KINDS[kind].title,
+    schema,
+    glob: file,
+    filesRegex: `^${file.replace('.', '\\.')}$`,
+    writable: true,
+    scope: 'page',
+    index: (value) => {
+      const record = value as { name?: unknown; aliases?: unknown };
+      const name = typeof record.name === 'string' ? record.name : null;
+      const aliases = Array.isArray(record.aliases) ? record.aliases.filter((a) => typeof a === 'string') : [];
+      return name ? [{ kind, text: words(name, ...aliases), fields: { name } }] : [];
+    },
+    render: { panel: 'Header', slots: [`${kind}.main`] },
+  };
 }
 
 export const PAGE_SCHEMAS = {
   section: fileType({
     title: 'Section',
     schema: z.string(),
-    glob: '{author,community}/[0-9][0-9]-*.{md,html}',
-    filesRegex: '^(author|community)/\\d{2}-[a-z0-9]+(-[a-z0-9]+)*\\.(md|html)$',
+    glob: `${PARTS_GLOB}/[0-9][0-9]-*.{md,html}`,
+    filesRegex: `^${PARTS_RE}/\\d{2}-[a-z0-9]+(-[a-z0-9]+)*\\.(md|html)$`,
     writable: true,
     format: 'text',
     scope: 'page',
@@ -121,8 +160,29 @@ export const PAGE_SCHEMAS = {
       const title = (html ? leadingHtmlTitle(text) : leadingTitle(text)) || null;
       return [{ kind: 'section', text: sectionText(text, html), fields: { part, title } }];
     },
-    render: { panel: 'Sections', slots: ['paper.main'] },
+    render: { panel: 'Sections', slots: PAGE_KINDS.map((kind) => `${kind}.main`) },
   }),
+  labeledLink: fileType({
+    title: 'Labeled links',
+    scope: 'page',
+    schema: labeledLinkSchema,
+    glob: `${PARTS_GLOB}/links.jsonl`,
+    filesRegex: `^${PARTS_RE}/links\\.jsonl$`,
+    writable: true,
+    format: 'jsonl',
+    index: (link) => [
+      {
+        kind: 'labeled-link',
+        text: words(LINK_LABELS[link.label].reads, link.to, link.note, link.from_anchor, link.to_anchor),
+        fields: { label: link.label, to: link.to },
+      },
+    ],
+    render: { panel: 'Links', slots: PAGE_KINDS.map((kind) => `${kind}.aside`) },
+  }),
+  venue: fileType(kindFileType('venue', venueFileSchema)),
+  topic: fileType(kindFileType('topic', topicFileSchema)),
+  org: fileType(kindFileType('org', orgFileSchema)),
+  profile: fileType({ ...kindFileType('user', profileFileSchema), index: undefined }),
   link: fileType({
     title: 'Link',
     scope: 'page',
@@ -227,7 +287,10 @@ export const PAGE_SCHEMAS = {
 
 export type FileTypeName = keyof typeof PAGE_SCHEMAS;
 
-/** The JSON types: those with a JSON Schema, served at `/schemas/<name>.json` and checked by editors and `prek`. */
+/**
+ * The JSON types: those with a JSON Schema, served at `/schemas/<name>.json` and checked by editors and `prek`. A
+ * `jsonl` type's schema is its line's, so `prek` (which checks whole files) leaves it to the site (`starter.ts`).
+ */
 export type PageSchemaName = {
   [K in FileTypeName]: (typeof PAGE_SCHEMAS)[K] extends { format: 'text' } ? never : K;
 }[FileTypeName];
@@ -249,6 +312,11 @@ export function fileTypeOf(path: string): FileTypeName | null {
   return PATTERNS.find(([, pattern]) => pattern.test(path))?.[0] ?? null;
 }
 
+/** The kinds of page a file type may be on: those whose `fileTypes` name it (`lib/kinds.ts`). */
+export function kindsOfFileType(name: FileTypeName): PageKind[] {
+  return PAGE_KINDS.filter((kind) => KINDS[kind].fileTypes.includes(name));
+}
+
 /** The `in:` scope of the file at this path's search documents, or `null` if it isn't searched. */
 export function searchScopeOf(path: string): SearchScope | null {
   const name = fileTypeOf(path);
@@ -263,6 +331,22 @@ export function indexFile(path: string, text: string): IndexedDoc[] | null {
   const name = fileTypeOf(path);
   if (!name) return null;
   const type: FileType = PAGE_SCHEMAS[name];
+  if (type.format === 'jsonl') {
+    const docs: IndexedDoc[] = [];
+    for (const line of text.split('\n')) {
+      if (line.trim() === '') continue;
+      let value: unknown;
+      try {
+        value = JSON.parse(line);
+      } catch {
+        return null;
+      }
+      const parsed = type.schema.safeParse(value);
+      if (!parsed.success) return null;
+      docs.push(...(type.index ? type.index(parsed.data, path) : []));
+    }
+    return docs;
+  }
   let value: unknown = text;
   if (type.format !== 'text') {
     try {

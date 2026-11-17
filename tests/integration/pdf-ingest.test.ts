@@ -280,9 +280,9 @@ describe('authors by an email on the first page', () => {
       params: Promise.resolve({}),
     });
     responses.push(await found.json());
-    const [current] = await getDb().select().from(pageCurrent).where(eq(pageCurrent.paperId, paperId));
+    const [current] = await getDb().select().from(pageCurrent).where(eq(pageCurrent.pageId, paperId));
     responses.push(current);
-    const objects = await getDb().select().from(pageObjects).where(eq(pageObjects.paperId, paperId));
+    const objects = await getDb().select().from(pageObjects).where(eq(pageObjects.pageId, paperId));
     responses.push(objects.map((o) => o.body.toString('latin1')).join('\n'));
 
     const visible = JSON.stringify(responses);

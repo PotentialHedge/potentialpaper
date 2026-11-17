@@ -60,9 +60,15 @@ const TYPES: Record<string, string> = {
   pdf: 'application/pdf',
 };
 
-export function contentType(path: string): string {
+/** The media type a path's extension stands for, or `null` for an extension that isn't served. */
+export function knownType(path: string): string | null {
   const dot = path.lastIndexOf('.');
-  return (dot === -1 ? undefined : TYPES[path.slice(dot + 1).toLowerCase()]) ?? 'application/octet-stream';
+  const ext = dot === -1 ? '' : path.slice(dot + 1).toLowerCase();
+  return Object.hasOwn(TYPES, ext) ? TYPES[ext] : null;
+}
+
+export function contentType(path: string): string {
+  return knownType(path) ?? 'application/octet-stream';
 }
 
 /** The folder whose `index.html` is the demo: the one the URL names, or the first likely one with an index. */

@@ -172,10 +172,10 @@ describe('git push over HTTPS', () => {
     const third = commit(clone, { 'community/20-more.md': '# More\n\nAnd *more*.\n' }, 'Add a section');
     expect(await push(clone)).toMatchObject({ ok: true });
     expect(await readHead(getDb(), paperId)).toBe(third);
-    const [current] = await getDb().select().from(pageCurrent).where(eq(pageCurrent.paperId, paperId));
+    const [current] = await getDb().select().from(pageCurrent).where(eq(pageCurrent.pageId, paperId));
     expect(current.communityHtml).toContain('A line changed on its own.');
     expect(current.communityHtml).toContain('<em>more</em>');
-    const revisions = await getDb().select().from(pageRevisions).where(eq(pageRevisions.paperId, paperId));
+    const revisions = await getDb().select().from(pageRevisions).where(eq(pageRevisions.pageId, paperId));
     expect(revisions.map((r) => r.oid.toString('hex'))).toEqual(expect.arrayContaining([first, second, third]));
     // A fresh clone has exactly the pushed commits.
     const again = await cloneAs(id, null);
@@ -322,7 +322,7 @@ describe('git push over HTTPS', () => {
     expect(git(['log', '-1', '--format=%an <%ae> %cn', tip], clone)).toBe(
       'a_noether1 <a_noether1@users.invalid> a_noether1',
     );
-    const [current] = await getDb().select().from(pageCurrent).where(eq(pageCurrent.paperId, paperId));
+    const [current] = await getDb().select().from(pageCurrent).where(eq(pageCurrent.pageId, paperId));
     expect(current.authorHtml).toContain('<em>abstractly</em>');
     expect(readFileSync(join(clone, 'author/10-tl-dr.md'), 'utf8')).toContain('Rings');
 

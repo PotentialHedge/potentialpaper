@@ -57,6 +57,8 @@ Most of the risk is here, so it comes before the editor.
 - Section editor with preview, summary and conflict UI; Markdown rendered and sanitized at commit.
 - History, diff and revert pages.
 - `/changes`, watchlist, digest mail, protection levels, new-account rate limits, reports, blocks.
+  Built ahead of the rest (2026-11-17, `handoffs/pages.md` Phase 5): `/changes` (and `GET /api/v1/changes`) and
+  per-page protection levels (`established`, `admins`; `npm run pages:protect`).
 - Redaction script and its public log.
 - **Blocker for the alpha: choose the contribution license** (design section 12, still to discuss).
 - Alpha with a few dozen invited researchers, in one field, on ICLR papers. Most of what matters is
@@ -67,6 +69,10 @@ Most of the risk is here, so it comes before the editor.
 - `links.jsonl` validation, label table, `page_links`, "add a link" form, backlinks on the target.
 - Grouped link display, stances, neighbourhood graph, `/graph`.
 - Citation import and the "How does this connect?" prompt.
+
+Built ahead of the rest of this milestone (2026-11-16, `handoffs/pages.md` Phase 1): `links.jsonl` in each part,
+the label table with `in-topic`, `page_links` and "what links here" on pages of every kind. The "add a link" form,
+grouped display, stances and the graph are still to come.
 
 ## 5. Authors
 
@@ -102,6 +108,60 @@ Most of the risk is here, so it comes before the editor.
 - Move two built-in panels onto the extension API to prove it works. The Submissions panel, a renderer
   for `reviews/**` files (DESIGN.md §4.8), is a natural first.
 - Start with a small set of slots. An acceptodds odds panel makes a good first extension.
+- Planned in `handoffs/plugins.md`, brought forward. Built 2026-11-16 (its Phase 1): settings.json, layered
+  defaults ← site ← user, with `/settings`, `GET`/`PUT /api/v1/me/settings` and `/schemas/settings.json`
+  (DESIGN.md §10).
+- Built 2026-11-16 (its Phase 2), the plugin host: manifest validation (`/schemas/plugin-manifest.json`), sources
+  from GitHub pinned to a commit and copied to R2, a host per plugin on the content domain with its own CSP, the
+  `postMessage` RPC checked against granted permissions, the SDK (`/sdk/v1/pp.js`), consent (`user_plugin_grants`),
+  per-user install (the `plugins` key, `POST /api/v1/me/plugins`), `plugins.default` and the kill switch
+  (`plugins.blocked`), per-user plugin storage, plugin panels in every kind's slots by `when` conditions, plugin
+  pages at `/x/…`, dev plugins from localhost, and `examples/plugins/hello/`. Moving built-in panels onto the API
+  waits for the data routes of Phase 4.
+- Built 2026-11-16 (its Phase 3), discovery and the plugin pages: `GET /api/v1/plugins/discover` (repos with the
+  topic `potentialpaper-plugin`), releases as tags with updates that ask again for new permissions
+  (`/api/v1/me/plugins/updates`), `/settings/plugins` (installed, discover, add by source, load from localhost, each
+  plugin's settings as a form), and `/plugins.md`, the guide for agents building one.
+- Built 2026-11-16 (its Phase 4), data for plugins A and B: `scope_stats` (per scope, venue and score field: sorted
+  means, bins, split by outcome; recomputed when the review projection and membership mark a scope, and rebuilt with
+  `consumers:rebuild -- scope-stats`), `GET /api/v1/pages/{identifier}/scores[/{venue}/{field}]`, the bulk
+  `GET /api/v1/pages/{identifier}/papers` (NDJSON), `scope.scores` and `scope.papers` over the RPC, the site setting
+  `plugins.venueStats.hideUntil`, and `/openapi.json` for the public page routes.
+- Built 2026-11-17 (its Phase 6), the first third-party extension runs: score standing,
+  `github.com/benedict-armstrong/potentialpaper-score-standing` (v0.1.0), the histogram and curve of a venue's
+  review scores on papers and venues, from `scope.scores` alone, with no host code of its own. Its org view followed
+  as v0.2.0 (2026-11-17): each venue's whole distribution with the org's papers as named open circles, for which the
+  host API grew for every plugin (`venue.page` on score summaries, `?marks=true` on a field).
+- Built 2026-11-17 (its Phase 5), plugins with their own backend (D): the `identity` permission
+  (`pp.identity.token()`/`fetch`, ES256 tokens with a pairwise `sub`, audience the plugin's id, keys at
+  `/.well-known/jwks.json`, `npm run identity:keys`), asked of every reader even for a site default, the manifest's
+  `bot` in the approval prompt, `/plugins.md`'s "Your own backend", and `examples/plugins/notes` with its backend.
+  Bot registration by outsiders, bot tokens and webhooks stay with Milestone 7.
+
+## Pages above the paper
+
+Planned in `handoffs/pages.md`: venues, topics, organisations and people as pages of their own, built like a
+paper's. Phase 1 (the page model) is built: `pages`, the page store keyed by `page_id`, the kind registry
+(`lib/kinds.ts`), path rules, commits, clone and push per kind, `page_members` and `page_ancestors`, and generic
+routes and slots (`/v`, `/t`, `/o`, `/u`). Phase 2 (venue pages) is built: the `venues` bot (`npm run venues:sync`),
+a series' editions, an edition's submissions by status with filters (`GET /api/v1/pages/{identifier}/venue-papers`),
+and organiser claims (`page_claims`, `/claim/venue/<key>`). A venue's review scores (its `scores` panel) come from
+`handoffs/plugins.md` Phase 4's `scope_stats`. Phase 3 (user pages) is built: every account's `/u/<handle>`, made and
+moved with it (`page_redirects`), showing only what its `user.show.*` settings turn on (`server/user-pages.ts`), with
+activity and comments under the handle, person links (`homepage`, `orcid`, `scholar`, `wrote`) and
+`npm run users:pages`. Phase 4 (organisation pages) is built: the `orgs` bot (`npm run orgs:sync`, and on confirmed
+addresses and ingest passes) makes institutions' pages from the allowlist with ROR ids (`config/institution-ror.json`,
+`npm run institutions:build -- --ror-only`); members by confirmed address own `members/` and `org.json` and make
+departments and labs (`/new/org/<key>`); an org's papers (`page_members` `via` `affiliation`) come from members'
+claims when they show their institution and from domains printed on page 1, kept up by the worker's `org-members`
+task, and roll up from departments; the page lists people who show it, and venues and topics by count
+(`GET /api/v1/pages/{identifier}/org`). `show_institution` is now the one institution switch (no
+`user.show.institution`). Phase 5 (topic pages) is built: anyone verified makes a topic (`/new/topic`,
+`POST /api/v1/topics`, names and aliases checked for duplicates first) or makes it from a paper's "Add a topic", which
+links the paper (`in-topic`, `introduces-topic`); the page reads as an article with where it started, its broader,
+narrower and related topics, venues and organisations, its papers sortable by date, venue and score, and "might
+belong here" (`topic_suggestions`, from OpenReview keywords, titles and abstracts; dismissals remembered); editing,
+renaming (`page_redirects`) and merging (`pages.merged_into`) are open to the community at `/t/<slug>/edit`.
 
 ## Main risks
 

@@ -31,8 +31,8 @@ export function demoFolders(files: ReadonlyMap<string, string>): Map<string, Map
  * The folder's snapshot id: a hash of the page, the folder and its git blob ids, so it is known without
  * reading the files, and the same folder at another commit is the same snapshot.
  */
-export function pageDemoId(paperId: string, name: string, folder: ReadonlyMap<string, string>): string {
-  const hash = createHash('sha256').update(`${PAGE_SOURCE_PREFIX}${paperId}\0${DEMOS_DIR}/${name}\n`);
+export function pageDemoId(pageId: string, name: string, folder: ReadonlyMap<string, string>): string {
+  const hash = createHash('sha256').update(`${PAGE_SOURCE_PREFIX}${pageId}\0${DEMOS_DIR}/${name}\n`);
   for (const path of [...folder.keys()].sort()) hash.update(`${path}\0${folder.get(path)}\n`);
   return hash.digest('hex').slice(0, 32);
 }
@@ -43,13 +43,13 @@ export function pageDemoId(paperId: string, name: string, folder: ReadonlyMap<st
  */
 export async function pageDemoSnapshot(
   tx: Writer,
-  paperId: string,
+  pageId: string,
   commit: string,
   name: string,
   folder: ReadonlyMap<string, string>,
 ): Promise<DemoSource | null> {
   if (!folder.has('index.html')) return null;
-  const id = pageDemoId(paperId, name, folder);
+  const id = pageDemoId(pageId, name, folder);
   const [known] = await tx
     .select({
       id: demoSnapshots.id,
@@ -64,15 +64,15 @@ export async function pageDemoSnapshot(
   const files: Record<string, DemoFile> = {};
   let totalBytes = 0;
   for (const [path, oid] of folder) {
-    const blob = await readObject(tx, paperId, oid);
-    if (!blob || blob.type !== 'blob') throw new Error(`page ${paperId} has no blob ${oid}`);
+    const blob = await readObject(tx, pageId, oid);
+    if (!blob || blob.type !== 'blob') throw new Error(`page ${pageId} has no blob ${oid}`);
     const sha256 = createHash('sha256').update(blob.body).digest('hex');
     // Bytes first, so a snapshot row never names a file that isn't stored.
     if (!(await hasBlob(sha256))) await putBlob(sha256, blob.body);
     files[path] = { sha256, bytes: blob.body.length, type: contentType(path) };
     totalBytes += blob.body.length;
   }
-  const row = { id, source: `${PAGE_SOURCE_PREFIX}${paperId}`, commit, root: `${DEMOS_DIR}/${name}` };
+  const row = { id, source: `${PAGE_SOURCE_PREFIX}${pageId}`, commit, root: `${DEMOS_DIR}/${name}` };
   await tx
     .insert(demoSnapshots)
     .values({ ...row, files, totalBytes })

@@ -1,3 +1,4 @@
+import { ALL_PARTS, type PageKind } from '@/lib/kinds';
 import { siteUrl } from '../site';
 import type { FileChange } from './commit';
 import { PREK_PATH, sectionName } from './rules';
@@ -33,7 +34,7 @@ const PRETTIER_REV = 'v3.9.9';
  */
 export function prekConfig(origin: string = siteUrl()): string {
   const schemaHooks = PAGE_SCHEMA_NAMES.map((name) => [name, PAGE_SCHEMAS[name]] as const)
-    .filter(([, entry]) => entry.writable)
+    .filter(([, entry]) => entry.writable && (entry as { format?: string }).format !== 'jsonl')
     .map(
       ([name, entry]) =>
         `  { id = "check-jsonschema", name = "${entry.title.toLowerCase()} files", files = '${entry.filesRegex}', ` +
@@ -68,7 +69,7 @@ ${schemaHooks}
 repo = "https://github.com/rbubley/mirrors-prettier"
 rev = "${PRETTIER_REV}"
 hooks = [
-  { id = "prettier", files = '^(author|community)/.*\\.md$' },
+  { id = "prettier", files = '^(${ALL_PARTS.join('|')})/.*\\.md$' },
 ]
 `;
 }
@@ -78,8 +79,12 @@ export function prekProblem(content: string): string | null {
   return content === prekConfig() ? null : 'is the same on every page, and fixed';
 }
 
-/** The files a page's first commit starts with, besides its metadata and `.gitattributes`. */
-export function starterFiles(): [path: string, content: string][] {
+/**
+ * The files a page's first commit starts with, besides its metadata and `.gitattributes`. Only a paper starts
+ * with empty sections; what other kinds start with is decided with each kind's phase (`handoffs/pages.md`).
+ */
+export function starterFiles(kind: PageKind = 'paper'): [path: string, content: string][] {
+  if (kind !== 'paper') return [[PREK_PATH, prekConfig()]];
   return [
     [PREK_PATH, prekConfig()],
     ...(['author', 'community'] as const).flatMap((part) =>

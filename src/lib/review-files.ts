@@ -141,6 +141,9 @@ const noteFormSchema = z.strictObject({
     .meta({ description: "The scores in the submission's summary table, in order. Left out: every score." }),
 });
 
+/** As many keywords as a submission keeps. */
+export const MAX_KEYWORDS = 30;
+
 /** A `reviews/<source>/<submission>/submission.json`. */
 export const submissionFileSchema = z
   .strictObject({
@@ -159,6 +162,9 @@ export const submissionFileSchema = z
       .nullable()
       .meta({ description: `Where it stands: ${SUBMISSION_STATUSES.join(', ')}; null when the source doesn't say.` }),
     decision: shortText().nullable().meta({ description: 'The decision as the venue words it: "Accept (Poster)".' }),
+    keywords: z.array(shortText(200)).max(MAX_KEYWORDS).optional().meta({
+      description: 'The keywords its authors gave the source, as they wrote them. Topic suggestions match them.',
+    }),
     version: z
       .string()
       .regex(VERSION_ID)
@@ -223,6 +229,7 @@ export interface SubmissionFile {
   number: number | null;
   status: SubmissionStatus | null;
   decision: string | null;
+  keywords?: string[];
   version?: string;
   url: string;
   license: string;

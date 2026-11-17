@@ -330,7 +330,7 @@ describe('a bad tree is refused, whoever made it', () => {
     };
     const check = (changes: Record<string, string | null>) =>
       checkTree(getDb(), {
-        paperId,
+        pageId: paperId,
         roles,
         before,
         after: tree(changes),
@@ -382,9 +382,9 @@ describe('a pushed commit', () => {
       .from(pageRevisions)
       .where(eq(pageRevisions.oid, Buffer.from(made.oid, 'hex')));
     expect(revision.accountId).not.toBeNull();
-    const [current] = await getDb().select().from(pageCurrent).where(eq(pageCurrent.paperId, paperId));
+    const [current] = await getDb().select().from(pageCurrent).where(eq(pageCurrent.pageId, paperId));
     expect(current.communityHtml).toContain('Pushed.');
-    const events = await getDb().select().from(pageEvents).where(eq(pageEvents.paperId, paperId));
+    const events = await getDb().select().from(pageEvents).where(eq(pageEvents.pageId, paperId));
     expect(events.at(-1)?.payload).toMatchObject({
       oid: made.oid,
       parent: head,
@@ -544,7 +544,7 @@ describe('a pushed commit', () => {
     try {
       const git = (...args: string[]) => execFileSync('git', args, { cwd: dir }).toString().trim();
       git('init', '-q', '--initial-branch=main');
-      const objects = await getDb().select().from(pageObjects).where(eq(pageObjects.paperId, paperId));
+      const objects = await getDb().select().from(pageObjects).where(eq(pageObjects.pageId, paperId));
       for (const { oid, type, body } of objects) {
         const hex = oid.toString('hex');
         const file = join(dir, '.git/objects', hex.slice(0, 2), hex.slice(2));

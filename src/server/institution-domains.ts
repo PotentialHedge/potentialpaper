@@ -90,6 +90,48 @@ export async function institutionForEmail(
   return institutionForDomain(domain, database);
 }
 
+/**
+ * The whole allowlist, domain to institution name: the generated file, with the table's domains over it. For the
+ * `orgs` bot (`server/org-pages.ts`), which makes an organisation page per institution.
+ */
+export async function allInstitutionDomains(
+  database: Pick<Database, 'select'> = getDb(),
+): Promise<Map<string, string>> {
+  const out = new Map(fileDomains());
+  for (const row of await database.select().from(institutionDomains)) out.set(row.domain, row.name);
+  return out;
+}
+
+/** The domains an admin added by hand (`institution_domains`), which the `orgs` bot always makes pages for. */
+export async function addedInstitutionDomains(database: Pick<Database, 'select'> = getDb()): Promise<string[]> {
+  return (await database.select({ domain: institutionDomains.domain }).from(institutionDomains)).map((r) => r.domain);
+}
+
+const ROR_PATH = 'config/institution-ror.json';
+let rorCached: { path: string; ids: Map<string, string> } | undefined;
+
+/**
+ * The ROR id of the organisation each domain is ROR's for (`config/institution-ror.json`, `INSTITUTION_ROR_PATH`
+ * overrides), written by `npm run institutions:build`; empty when the file isn't there.
+ */
+export function rorIds(): Map<string, string> {
+  const path = process.env.INSTITUTION_ROR_PATH || ROR_PATH;
+  if (rorCached?.path === path) return rorCached.ids;
+  const ids = new Map<string, string>();
+  try {
+    const parsed = JSON.parse(readFileSync(/*turbopackIgnore: true*/ path, 'utf8')) as {
+      ror?: Record<string, unknown>;
+    };
+    for (const [domain, id] of Object.entries(parsed.ror ?? {})) {
+      if (typeof id === 'string' && /^https:\/\/ror\.org\/0[a-z0-9]{8}$/.test(id)) ids.set(domain, id);
+    }
+  } catch (err) {
+    if ((err as NodeJS.ErrnoException).code !== 'ENOENT') throw err;
+  }
+  rorCached = { path, ids };
+  return ids;
+}
+
 /** How many institutions are on the generated list, for telling people who may sign up. */
 export function listedInstitutionCount(): number {
   return new Set(fileDomains().values()).size;

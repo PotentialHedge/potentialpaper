@@ -1,5 +1,6 @@
 import { sql } from 'drizzle-orm';
 import { getDb, type Database } from '@/db';
+import type { PageKind } from '@/lib/kinds';
 import type { Consumer } from './types';
 
 /**
@@ -52,7 +53,8 @@ export interface RunReport {
 interface EventRow extends Record<string, unknown> {
   id: string;
   xid: string;
-  paper_id: string;
+  page_id: string;
+  kind: string;
   head: string | null;
 }
 
@@ -94,10 +96,11 @@ async function takeLease(
 /** The next events past `after` whose transactions have all ended, in cursor order. */
 async function readEvents(database: Database, after: Position, limit: number): Promise<EventRow[]> {
   const result = await database.execute<EventRow>(sql`
-    select e.id::text as id, e.xid::text as xid, e.paper_id,
+    select e.id::text as id, e.xid::text as xid, e.page_id, p.kind,
            coalesce(e.payload ->> 'oid', encode(r.head, 'hex')) as head
       from page_events e
-      left join page_refs r on r.paper_id = e.paper_id
+      join pages p on p.id = e.page_id
+      left join page_refs r on r.page_id = e.page_id
      where (e.xid, e.id) > (${after.xid}::xid8, ${after.id}::bigint)
        and e.xid < pg_snapshot_xmin(pg_current_snapshot())
      order by e.xid, e.id
@@ -154,19 +157,21 @@ export async function runConsumer(consumer: Consumer, options: RunOptions = {}):
       const last = new Map<string, EventRow>();
       const first = new Map<string, number>();
       events.forEach((event, index) => {
-        last.set(event.paper_id, event);
-        if (!first.has(event.paper_id)) first.set(event.paper_id, index);
+        last.set(event.page_id, event);
+        if (!first.has(event.page_id)) first.set(event.page_id, index);
       });
 
       let failure: { index: number; error: string } | null = null;
-      for (const [paperId, event] of last) {
+      for (const [pageId, event] of last) {
         // A page whose repo is gone (deleted since) has nothing to bring up to date.
         if (event.head === null) continue;
+        // A kind it doesn't handle: passed by, as handled.
+        if (consumer.kinds && !consumer.kinds.includes(event.kind as PageKind)) continue;
         try {
-          await consumer.handle(paperId, event.head, { database });
+          await consumer.handle(pageId, event.head, { database });
           report.pages += 1;
         } catch (err) {
-          failure = { index: first.get(paperId)!, error: `page ${paperId} at ${event.head}: ${message(err)}` };
+          failure = { index: first.get(pageId)!, error: `page ${pageId} at ${event.head}: ${message(err)}` };
           break;
         }
       }

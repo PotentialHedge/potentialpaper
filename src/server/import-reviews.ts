@@ -3,6 +3,7 @@ import {
   encodeReviewFile,
   FORMS_SCHEMA,
   formsFilePath,
+  MAX_KEYWORDS,
   NOTE_SCHEMA,
   noteFilePath,
   submissionDir,
@@ -62,6 +63,8 @@ export interface SubmissionInput {
   number: number | null;
   status: SubmissionStatus | null;
   decision: string | null;
+  /** The keywords its authors gave the source. */
+  keywords?: string[];
   url: string;
   notes: NoteInput[];
 }
@@ -95,6 +98,20 @@ export interface ImportOptions {
 /** A bot importing on its own schedule: our scripts, run by an admin, not a request. */
 export const IMPORT_RATE_LIMIT: RateLimitConfig = { burst: 1_000, perSecond: 1_000 };
 
+/** The keywords as a file keeps them: trimmed, each once, no blank ones, at most `MAX_KEYWORDS`; none left out. */
+export function cleanKeywords(keywords: readonly string[] | undefined): { keywords?: string[] } {
+  const seen = new Set<string>();
+  const out: string[] = [];
+  for (const raw of keywords ?? []) {
+    const keyword = raw.replace(/\s+/g, ' ').trim().slice(0, 200);
+    if (!keyword || seen.has(keyword.toLowerCase())) continue;
+    seen.add(keyword.toLowerCase());
+    out.push(keyword);
+    if (out.length === MAX_KEYWORDS) break;
+  }
+  return out.length > 0 ? { keywords: out } : {};
+}
+
 const nonEmpty = (value: string, fallback: string) => (value.trim() ? value : fallback);
 
 /** A submission's folder as the source gives it: each file's path and its content. */
@@ -109,6 +126,7 @@ export function submissionFiles(venue: VenueInput, input: SubmissionInput): Map<
       number: input.number,
       status: input.status,
       decision: input.decision?.trim() ? input.decision.trim().slice(0, 500) : null,
+      ...cleanKeywords(input.keywords),
       url: input.url,
       license: venue.license,
     }),

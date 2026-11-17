@@ -24,7 +24,7 @@ function sections(part: PagePart, files: Record<string, string>): SectionFile[] 
   });
 }
 
-const NOBODY: Roles = { system: false, admin: false, verified: true, confirmedAuthor: false, claimed: false };
+const NOBODY: Roles = { system: false, admin: false, verified: true, owner: false, claimed: false };
 
 describe('the layout', () => {
   it('lets .potentialpaper/ start with a dot, at the top and spelled exactly so', () => {

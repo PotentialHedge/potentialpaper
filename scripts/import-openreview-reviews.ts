@@ -2,6 +2,7 @@ import 'dotenv/config';
 import { DatabaseSync } from 'node:sqlite';
 import { getPool } from '@/db';
 import { IMPORT_RATE_LIMIT, importReviews, type ImportResult, type SubmissionInput } from '@/server/import-reviews';
+import { syncVenuePages } from '@/server/venue-pages';
 import { openReviewForms } from '@/server/venue-sources/iclr-forms';
 import {
   forumUrl,
@@ -23,7 +24,8 @@ import {
  * as JSON. Submissions attach to papers by their OpenReview id, so import the papers first
  * (`papers:import-iclr`). Re-running commits only what changed, so a run that stopped is resumed by running it
  * again (`--from` skips the forums before one, in id order, to get there sooner). The worker's `reviews`
- * consumer then projects the files into the tables the page reads.
+ * consumer then projects the files into the tables the page reads. At the end the `venues` bot makes the venue's
+ * series and edition pages (`/v/iclr`, `/v/iclr/2027`), if they aren't there yet.
  */
 
 const BATCH = 1_000;
@@ -32,6 +34,17 @@ interface SubmissionRow {
   id: string;
   number: number | null;
   venueid: string | null;
+  /** A JSON array, in scrapes that kept the submission's keywords. */
+  keywords?: string | null;
+}
+
+function keywordsOf(row: SubmissionRow): string[] {
+  try {
+    const value: unknown = JSON.parse(row.keywords ?? '[]');
+    return Array.isArray(value) ? value.filter((k): k is string => typeof k === 'string') : [];
+  } catch {
+    return [];
+  }
 }
 
 function toSubmission(row: SubmissionRow, notes: ParsedNote[]): SubmissionInput {
@@ -43,6 +56,7 @@ function toSubmission(row: SubmissionRow, notes: ParsedNote[]): SubmissionInput 
     number: row.number,
     status: submissionStatus(row.venueid, decisionText),
     decision: decisionText,
+    keywords: keywordsOf(row),
     url: forumUrl(row.id),
     notes: notes.map((note) => {
       const input: Partial<ParsedNote> = { ...note };
@@ -78,8 +92,13 @@ async function main() {
     forms: openReviewForms(group),
     license: OPENREVIEW_NOTE_LICENSE,
   };
+  // Older scrapes have no keywords column.
+  const columns = (sqlite.prepare(`select name from pragma_table_info('submissions')`).all() as { name: string }[]).map(
+    (c) => c.name,
+  );
+  const keywords = columns.includes('keywords') ? ', keywords' : '';
   const rows = sqlite
-    .prepare(`select id, number, venueid from submissions where id >= ? order by id`)
+    .prepare(`select id, number, venueid${keywords} from submissions where id >= ? order by id`)
     .all(from) as unknown as SubmissionRow[];
   const started = Date.now();
   const replies = sqlite.prepare(`select raw from replies where forum >= ? and forum <= ? order by forum`);
@@ -115,6 +134,15 @@ async function main() {
       `${totals.private} notes not public`,
   );
   sqlite.close();
+  // The venue's pages, series and edition, as the `venues` bot makes them (`server/venue-pages.ts`).
+  const pages = await syncVenuePages({ venues: [{ id: `${venue.source}:${venue.id}`, name: venue.name }] });
+  console.log(
+    pages.written.length > 0
+      ? `venue pages written: ${pages.written.join(', ')}`
+      : pages.skipped.length > 0
+        ? `no venue page for ${pages.skipped.join(', ')} (only a conference's main edition has one yet)`
+        : 'venue pages up to date',
+  );
   await getPool().end();
 }
 

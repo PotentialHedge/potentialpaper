@@ -71,9 +71,9 @@ describe('the picture', () => {
   });
 
   it("is the card's, as the links are", () => {
-    const roles: Roles = { system: false, admin: false, verified: true, confirmedAuthor: false, claimed: true };
+    const roles: Roles = { system: false, admin: false, verified: true, owner: false, claimed: true };
     expect(pathDenied('thumbnail.png', roles)).toMatch(/confirmed authors/);
-    expect(pathDenied('thumbnail.png', { ...roles, confirmedAuthor: true })).toBeNull();
+    expect(pathDenied('thumbnail.png', { ...roles, owner: true })).toBeNull();
     expect(pathDenied('thumbnail.png', { ...roles, claimed: false })).toBeNull();
   });
 });
@@ -82,7 +82,7 @@ describe('.gitattributes', () => {
   it("is at the top, the system's, and always the same", () => {
     expect(normalizePath(GITATTRIBUTES_PATH)).toEqual({ path: GITATTRIBUTES_PATH });
     expect(normalizePath('community/.gitattributes')).toHaveProperty('problem');
-    const roles: Roles = { system: false, admin: false, verified: true, confirmedAuthor: true, claimed: true };
+    const roles: Roles = { system: false, admin: false, verified: true, owner: true, claimed: true };
     expect(pathDenied(GITATTRIBUTES_PATH, roles)).toMatch(/only the system and admins/);
     expect(contentProblem(GITATTRIBUTES_PATH, GITATTRIBUTES)).toBeNull();
     expect(contentProblem(GITATTRIBUTES_PATH, `${GITATTRIBUTES}*.md filter=x\n`)).toMatch(/fixed/);

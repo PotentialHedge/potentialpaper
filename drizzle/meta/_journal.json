@@ -218,6 +218,76 @@
       "when": 1794850865259,
       "tag": "0030_paper_follows",
       "breakpoints": true
+    },
+    {
+      "idx": 31,
+      "version": "7",
+      "when": 1794852562512,
+      "tag": "0031_settings",
+      "breakpoints": true
+    },
+    {
+      "idx": 32,
+      "version": "7",
+      "when": 1794854374774,
+      "tag": "0032_pages",
+      "breakpoints": true
+    },
+    {
+      "idx": 33,
+      "version": "7",
+      "when": 1794856710451,
+      "tag": "0033_page_links_members",
+      "breakpoints": true
+    },
+    {
+      "idx": 34,
+      "version": "7",
+      "when": 1794858878158,
+      "tag": "0034_plugins",
+      "breakpoints": true
+    },
+    {
+      "idx": 35,
+      "version": "7",
+      "when": 1794861055128,
+      "tag": "0035_venue_pages",
+      "breakpoints": true
+    },
+    {
+      "idx": 36,
+      "version": "7",
+      "when": 1794864253067,
+      "tag": "0036_scope_stats",
+      "breakpoints": true
+    },
+    {
+      "idx": 37,
+      "version": "7",
+      "when": 1794875150850,
+      "tag": "0037_user_pages",
+      "breakpoints": true
+    },
+    {
+      "idx": 38,
+      "version": "7",
+      "when": 1794877165656,
+      "tag": "0038_org_pages",
+      "breakpoints": true
+    },
+    {
+      "idx": 39,
+      "version": "7",
+      "when": 1794879284546,
+      "tag": "0039_topic_pages",
+      "breakpoints": true
+    },
+    {
+      "idx": 40,
+      "version": "7",
+      "when": 1794881895227,
+      "tag": "0040_identity_keys",
+      "breakpoints": true
     }
   ]
 }

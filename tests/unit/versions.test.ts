@@ -117,7 +117,7 @@ describe('versions/<id>.json', () => {
   });
 
   it('is written by anyone verified, and the system', () => {
-    const roles: Roles = { system: false, admin: false, verified: true, confirmedAuthor: false, claimed: true };
+    const roles: Roles = { system: false, admin: false, verified: true, owner: false, claimed: true };
     expect(pathDenied(versionPath('v_aaaaaaaa'), roles)).toBeNull();
     expect(pathDenied(versionPath('v_aaaaaaaa'), { ...roles, system: true, verified: false })).toBeNull();
     expect(pathDenied(versionPath('v_aaaaaaaa'), { ...roles, verified: false })).toMatch(/confirm/);

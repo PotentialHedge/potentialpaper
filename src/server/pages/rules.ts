@@ -1,5 +1,7 @@
 import { z } from 'zod';
 import { DEMO_NAME, DEMOS_DIR, MAX_DEMO_NAME } from '@/lib/demos';
+import { KINDS, type PageKind, partsOf } from '@/lib/kinds';
+import { LINKS_FILE, parseLabeledLinks } from '@/lib/labeled-links';
 import { parseLinkFile } from '@/lib/paper-links';
 import { parseReviewPath, parseReviewFile, REVIEWS_DIR, reviewSourceOf } from '@/lib/review-files';
 import { parseVersionFile, VERSION_ID } from '@/lib/versions';
@@ -25,6 +27,15 @@ import { htmlProblem } from './html';
  *   demos/<name>/index.html         a demo, with its other files beside it
  *   reviews/<source>/<submission>/  a bot's import of a submission and its notes (`lib/review-files.ts`)
  *   extensions/<id>/…               reserved
+ *
+ * Every kind of page (`lib/kinds.ts`) has the same shape: `.gitattributes`, `prek.toml` and `.potentialpaper/` for
+ * the system, its parts' sections (`<part>/NN-slug.md`) and each part's labeled links (`<part>/links.jsonl`), its
+ * kind file, and `extensions/`. The rest above is a paper's own. Other kinds today:
+ *
+ *   .potentialpaper/metadata.json   the system's: the layout's version, the kind and the key
+ *   venue.json, topic.json, org.json or profile.json   the kind file (`lib/kinds.ts`)
+ *   organizers/, members/ or about/ the owners' sections, where the kind has owners; community/ on all but a user's
+ *   <part>/links.jsonl              that part's labeled links
  *
  * PDFs and pictures are Git LFS pointers (`parseLfsPointer`): the repo holds their hash and size, the bytes
  * are in R2 (`server/lfs.ts`), and `git lfs` moves them through the batch API (`server/git/lfs.ts`).
@@ -141,9 +152,12 @@ export function isDemoPath(path: string): boolean {
   return path.startsWith(`${DEMOS_DIR}/`);
 }
 
-/** The two parts of a page written as prose, each a directory of section files. */
-export type PagePart = 'author' | 'community';
-export const PAGE_PARTS: readonly PagePart[] = ['author', 'community'];
+/**
+ * A part of a page written as prose, a directory of section files: the owners' (`author/` on a paper) and
+ * `community/`. Each kind has its own (`partsOf`); these are a paper's.
+ */
+export type PagePart = string;
+export const PAGE_PARTS: readonly PagePart[] = partsOf('paper');
 
 /**
  * A section's file name: two digits, a slug and the format, `20-why-it-matters.md`. Sections show in the
@@ -175,6 +189,19 @@ export function sectionName(path: string, part: PagePart): (OrderedName & { form
   const name = parseOrderedName(path.slice(part.length + 1));
   if (!name || name.extension === 'json') return null;
   return { ...name, format: name.extension === 'md' ? 'markdown' : 'html' };
+}
+
+/** Whether the path is a part's labeled links, `<part>/links.jsonl`, on a page of this kind. */
+export function isLabeledLinksPath(path: string, kind: PageKind = 'paper'): boolean {
+  const slash = path.indexOf('/');
+  return slash > 0 && path.slice(slash + 1) === LINKS_FILE && partsOf(kind).includes(path.slice(0, slash));
+}
+
+/** The part a path is in, if it is in one of the kind's: `community` for `community/10-summary.md`. */
+export function partOf(path: string, kind: PageKind = 'paper'): PagePart | null {
+  const slash = path.indexOf('/');
+  const part = slash > 0 ? path.slice(0, slash) : '';
+  return partsOf(kind).includes(part) ? part : null;
 }
 
 export function isLinkPath(path: string): boolean {
@@ -268,7 +295,7 @@ export function encodeLfsPointer({ sha256, bytes }: LfsPointer): string {
 /** What a page holds, said when a path isn't one of them. */
 const LAYOUT =
   'pages hold .gitattributes, prek.toml, .potentialpaper/ (metadata.json, paper.pdf, pdf.json), author/ and community/ ' +
-  '(sections named like 10-summary.md or 20-results.html), versions/<id>.json and <id>.pdf, links/ (named like ' +
+  '(sections named like 10-summary.md or 20-results.html, and links.jsonl), versions/<id>.json and <id>.pdf, links/ (named like ' +
   '10-code.json), thumbnail.png (or .jpg, .gif, .webp, .avif) and thumbnail.json, demos/<name>/, ' +
   'reviews/<source>/<submission>/ and extensions/';
 
@@ -276,21 +303,29 @@ const REVIEWS_LAYOUT =
   'reviews/<source>/<submission>/ holds submission.json, forms.json and notes/<id>.json, each name a lower-case ' +
   'slug (letters, digits, - and _)';
 
-/** Why nothing can be written at this path, or `null`. Deleting a file needs no such check. */
-export function layoutProblem(path: string): string | null {
-  if (SYSTEM_PATHS.has(path) || path === GITATTRIBUTES_PATH || path === PREK_PATH || path === THUMBNAIL_PATH) {
-    return null;
-  }
-  if (thumbnailImageType(path)) return null;
+/** What a page of a kind other than a paper holds, said when a path isn't one of them. */
+function kindLayout(kind: PageKind): string {
+  const parts = partsOf(kind).map((part) => `${part}/`);
+  return (
+    `${kind} pages hold .gitattributes, prek.toml, ${METADATA_PATH}, ${KINDS[kind].kindFile}, ` +
+    `${parts.join(' and ')} (sections named like 10-summary.md, and links.jsonl) and extensions/`
+  );
+}
+
+/** Why nothing can be written at this path on a page of this kind, or `null`. Deleting a file needs no such check. */
+export function layoutProblem(path: string, kind: PageKind = 'paper'): string | null {
+  if (path === METADATA_PATH || path === GITATTRIBUTES_PATH || path === PREK_PATH) return null;
   if (path.startsWith('extensions/')) return null;
-  if (path.startsWith(`${REVIEWS_DIR}/`)) return parseReviewPath(path) ? null : REVIEWS_LAYOUT;
-  for (const part of PAGE_PARTS) {
-    if (path.startsWith(`${part}/`)) {
-      return sectionName(path, part)
-        ? null
-        : `${part}/ holds one file per section, named like 10-summary.md or 20-results.html (two digits, a lower-case slug)`;
-    }
+  const part = partOf(path, kind);
+  if (part) {
+    return sectionName(path, part) || isLabeledLinksPath(path, kind)
+      ? null
+      : `${part}/ holds one file per section, named like 10-summary.md or 20-results.html (two digits, a lower-case slug), and ${LINKS_FILE}`;
   }
+  if (kind !== 'paper') return path === KINDS[kind].kindFile ? null : kindLayout(kind);
+  if (SYSTEM_PATHS.has(path) || path === THUMBNAIL_PATH) return null;
+  if (thumbnailImageType(path)) return null;
+  if (path.startsWith(`${REVIEWS_DIR}/`)) return parseReviewPath(path) ? null : REVIEWS_LAYOUT;
   if (path.startsWith(`${LINKS_DIR}/`)) {
     return isLinkPath(path) ? null : 'links/ holds one file per link, named like 10-code.json';
   }
@@ -375,11 +410,14 @@ export interface Roles {
   admin: boolean;
   /** Has a confirmed institutional address, or is a bot an operator minted. */
   verified: boolean;
-  /** A confirmed author of this paper (`author_claims`). */
-  confirmedAuthor: boolean;
-  /** The paper has a confirmed author, who then owns its picture and links. */
+  /**
+   * One of the page's owners: a confirmed author of a paper (`author_claims`), a confirmed organiser of a venue, a
+   * verified member of an org, the account a user page is (`server/pages/kinds.ts`'s `rolesOf`).
+   */
+  owner: boolean;
+  /** The page has a confirmed owner: a paper's confirmed author then owns its picture and links. */
   claimed: boolean;
-  /** A bot's write grants (`bot_grants`): path patterns such as `reviews/openreview/**`. */
+  /** A bot's write grants (`bot_grants`) on pages of this kind: path patterns such as `reviews/openreview/**`. */
   grants?: readonly string[];
 }
 
@@ -392,10 +430,15 @@ export function grantCovers(pattern: string, path: string): boolean {
 }
 
 /**
- * Why a bot can't be granted this pattern, or `null`. For now only a source's folder of imported reviews,
- * `reviews/<source>/**`; extensions' folders come with them (DESIGN.md §10).
+ * Why a bot can't be granted this pattern on pages of this kind, or `null`. On papers, a source's folder of imported
+ * reviews, `reviews/<source>/**`; on venues and orgs, the kind file (the `venues` and `orgs` bots of
+ * `handoffs/pages.md`); no bot writes topic or user pages. Extensions' folders come with them (DESIGN.md §10).
  */
-export function grantProblem(pattern: string): string | null {
+export function grantProblem(pattern: string, kind: PageKind = 'paper'): string | null {
+  if (kind === 'venue' || kind === 'org') {
+    return pattern === KINDS[kind].kindFile ? null : `on ${kind} pages a bot can be granted ${KINDS[kind].kindFile}`;
+  }
+  if (kind !== 'paper') return `no bot writes ${kind} pages`;
   const match = /^reviews\/([^/]+)\/\*\*$/.exec(pattern);
   if (!match || !/^[a-z0-9]+(?:-[a-z0-9]+)*$/.test(match[1]) || match[1].length > 40) {
     return "a grant is a source's folder of reviews, like reviews/openreview/** (the source a lower-case slug)";
@@ -403,11 +446,49 @@ export function grantProblem(pattern: string): string | null {
   return null;
 }
 
-/** Why these roles cannot write this path, or `null`. Checked for each path of a commit. */
-export function pathDenied(path: string, roles: Roles): string | null {
+const CONFIRM = 'confirm an institutional email address first';
+
+/**
+ * Who may write a page of a kind other than a paper (`handoffs/pages.md`): the owners' part is its owners' (a
+ * venue's confirmed organisers, an org's verified members, the account a user page is); `community/` anyone
+ * verified; the kind file its owners and the bot granted it on a venue or an org, anyone verified on a topic.
+ * Admins may write anything but the system's files' fixed content.
+ */
+function kindPathDenied(path: string, roles: Roles, kind: Exclude<PageKind, 'paper'>): string | null {
+  const { owners, kindFile } = KINDS[kind];
+  const owner = roles.owner || roles.admin;
+  const granted = roles.grants?.some((pattern) => grantCovers(pattern, path)) ?? false;
+  if (path === kindFile) {
+    // A person's profile.json is written by the site from their `user.show.*` settings (`server/user-pages.ts`),
+    // which are what count, so the file and the settings never disagree.
+    if (kind === 'user') {
+      return roles.system ? null : `${kindFile} follows your user.show.* settings: change them at /settings`;
+    }
+    if (roles.system) return 'the system only writes the metadata';
+    if (kind === 'topic') return roles.verified || roles.admin ? null : CONFIRM;
+    return owner || granted
+      ? null
+      : `only this ${kind}'s ${owners?.title.toLowerCase()} and admins can change ${kindFile}`;
+  }
+  const part = partOf(path, kind);
+  if (part && part === owners?.dir) {
+    if (kind === 'user') return owner ? null : 'only this account can change its page';
+    return owner ? null : `only this ${kind}'s ${owners.title.toLowerCase()} can edit ${part}/`;
+  }
+  if (part === 'community') {
+    if (roles.system) return 'the system only writes the metadata';
+    return roles.verified || roles.admin ? null : CONFIRM;
+  }
+  if (path.startsWith('extensions/')) return 'this path is reserved for extensions';
+  return kindLayout(kind);
+}
+
+/** Why these roles cannot write this path on a page of this kind, or `null`. Checked for each path of a commit. */
+export function pathDenied(path: string, roles: Roles, kind: PageKind = 'paper'): string | null {
   if (path.startsWith(`${SYSTEM_DIR}/`) || path === GITATTRIBUTES_PATH || path === PREK_PATH) {
     return roles.system || roles.admin ? null : `only the system and admins can change ${SYSTEM_DIR}/`;
   }
+  if (kind !== 'paper') return kindPathDenied(path, roles, kind);
   if (path.startsWith(`${VERSIONS_DIR}/`)) {
     return roles.system || roles.admin || roles.verified ? null : 'confirm an institutional email address first';
   }
@@ -415,13 +496,12 @@ export function pathDenied(path: string, roles: Roles): string | null {
     if (roles.system) return 'the system only writes the metadata';
     if (roles.admin) return null;
     if (roles.claimed)
-      return roles.confirmedAuthor ? null : "only this paper's confirmed authors can change its picture and links";
+      return roles.owner ? null : "only this paper's confirmed authors can change its picture and links";
     return roles.verified ? null : 'confirm an institutional email address first';
   }
   if (path.startsWith('author/')) {
-    return roles.confirmedAuthor || roles.admin
-      ? null
-      : "only this paper's confirmed authors can edit its author section";
+    // The authors' labeled links are theirs as their sections are, and say so (`origin`, DESIGN.md §8).
+    return roles.owner || roles.admin ? null : "only this paper's confirmed authors can edit its author section";
   }
   if (path.startsWith('community/')) {
     if (roles.system) return 'the system only writes the metadata';
@@ -605,7 +685,7 @@ export const LFS_NEEDED =
  * §4.3). Checked after merging as well, because two valid edits can merge into invalid JSON. Rules that
  * span files (how many links, their labels) are `commit.ts`'s, which sees the whole tree.
  */
-export function contentProblem(path: string, content: string): string | null {
+export function contentProblem(path: string, content: string, kind: PageKind = 'paper'): string | null {
   // A PDF or picture that arrived as itself rather than as a pointer is told how to fix that.
   const lfs = lfsKindOf(path);
   if (lfs) {
@@ -622,6 +702,27 @@ export function contentProblem(path: string, content: string): string | null {
   }
   if (Buffer.byteLength(content) > MAX_FILE_BYTES) return `is larger than ${MAX_FILE_BYTES} bytes`;
   if (path === GITATTRIBUTES_PATH) return content === GITATTRIBUTES ? null : 'is the same on every page, and fixed';
+  if (isLabeledLinksPath(path, kind)) {
+    const parsed = parseLabeledLinks(content, kind);
+    return 'problem' in parsed ? parsed.problem : null;
+  }
+  const part = partOf(path, kind);
+  if (part && path.endsWith('.html')) return htmlProblem(content);
+  if (kind !== 'paper') {
+    const { kindFile, kindFileSchema } = KINDS[kind];
+    if (path === kindFile && kindFileSchema) {
+      const problem = jsonProblem(content, true);
+      if (problem) return problem;
+      const parsed = kindFileSchema.safeParse(JSON.parse(content));
+      if (!parsed.success) {
+        const issue = parsed.error.issues[0];
+        return `is not a ${kindFile}: ${issue.path.join('.') || 'it'}: ${issue.message}`;
+      }
+      return null;
+    }
+    if (path === METADATA_PATH) return kindMetadataProblem(content, kind);
+    return path.endsWith('.json') ? jsonProblem(content, false) : null;
+  }
   if (path === PDF_PATH) {
     return parsePdfSource(content) ? null : 'is not { "source": "https://…", "license": "…", "fetchedAt": "…" }';
   }
@@ -639,9 +740,6 @@ export function contentProblem(path: string, content: string): string | null {
     const parsed = parseVersionFile(versionId, content);
     return 'problem' in parsed ? parsed.problem : null;
   }
-  if (path.endsWith('.html') && (path.startsWith('author/') || path.startsWith('community/'))) {
-    return htmlProblem(content);
-  }
   if (path === METADATA_PATH) {
     const problem = jsonProblem(content, true);
     if (problem) return problem;
@@ -651,6 +749,19 @@ export function contentProblem(path: string, content: string): string | null {
     return null;
   }
   if (path.endsWith('.json')) return jsonProblem(content, false);
+  return null;
+}
+
+/**
+ * The `.potentialpaper/metadata.json` of a page of a kind other than a paper: what its first commit wrote
+ * (`server/pages/kinds.ts`), `{ "layout", "kind", "key" }`, whose kind has to be the page's.
+ */
+function kindMetadataProblem(content: string, kind: PageKind): string | null {
+  const problem = jsonProblem(content, true);
+  if (problem) return problem;
+  const value = JSON.parse(content) as { kind?: unknown; layout?: unknown };
+  if (value.kind !== kind) return `has to say "kind": "${kind}"`;
+  if (value.layout !== undefined && layoutVersionOf(content) === null) return 'has a "layout" that is not a version';
   return null;
 }
 

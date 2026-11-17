@@ -11,13 +11,16 @@ import {
   jsonb,
   pgTable,
   primaryKey,
+  smallint,
   text,
   timestamp,
   uniqueIndex,
   uuid,
 } from 'drizzle-orm/pg-core';
 import { AGENT_POST_KINDS } from '../lib/agent-posts';
+import { PAGE_KINDS } from '../lib/kinds';
 import { NOTE_KINDS, SUBMISSION_STATUSES, type FieldValue, type VenueForms } from '../lib/submissions';
+import type { Bins, ScoreGroup, StatOutcome } from '../lib/scope-stats';
 import type { TitleLink } from '../lib/paper-links';
 import type { PaperVersion } from '../lib/versions';
 import type { PdfPointer, ThumbnailPointer } from '@/server/pages/rules';
@@ -87,13 +90,15 @@ export const botGrants = pgTable(
     accountId: uuid('account_id')
       .notNull()
       .references(() => accounts.id, { onDelete: 'cascade' }),
+    /** The kind of page the pattern applies to (`lib/kinds.ts`): `reviews/openreview/**` on papers, `venue.json` on venues. */
+    kind: text('kind', { enum: PAGE_KINDS }).notNull().default('paper'),
     pattern: text('pattern').notNull(),
     shown: boolean('shown').notNull().default(true),
     /** Who granted it: an admin's handle, or `system`. */
     grantedBy: text('granted_by').notNull(),
     createdAt: createdAt(),
   },
-  (t) => [primaryKey({ columns: [t.accountId, t.pattern] })],
+  (t) => [primaryKey({ columns: [t.accountId, t.kind, t.pattern] })],
 );
 
 /** The institutional addresses an account is verified through; written only by `server/affiliations.ts`. */
@@ -235,6 +240,57 @@ export const commitIdentities = pgTable(
 );
 
 /**
+ * Every page of every kind (`lib/kinds.ts`): a paper, a venue, a topic, an organisation or a person. A page is a
+ * repo (DESIGN.md §4), and every table of the page store is keyed by its id first (`page_objects`, `page_refs`,
+ * …, §4.11). **A paper's page id is its paper id**, and its row is made with the paper by a trigger
+ * (`papers_page_insert`, migration `0032`), so that it holds whatever wrote the paper; deleting the paper deletes
+ * it, and with it the repo. Other kinds' pages are made by `server/pages/kinds.ts`'s `createPage`. `key` is what
+ * the kind's address names (`iclr/2027`, a topic's slug, a handle); a paper's is its id, as its addresses are
+ * `paper_identifiers`.
+ */
+export const pages = pgTable(
+  'pages',
+  {
+    id: uuid('id').primaryKey().defaultRandom(),
+    kind: text('kind', { enum: PAGE_KINDS }).notNull(),
+    key: text('key').notNull(),
+    /**
+     * A topic merged into another (`handoffs/pages.md` Phase 5, `server/topic-pages.ts`): its page and history stay, its
+     * address and identifier lead to the page it was merged into, and nobody commits to it again.
+     */
+    mergedInto: uuid('merged_into').references((): AnyPgColumn => pages.id, { onDelete: 'set null' }),
+    createdAt: createdAt(),
+  },
+  (t) => [
+    uniqueIndex('pages_kind_key').on(t.kind, t.key),
+    index('pages_merged_into_idx').on(t.mergedInto),
+    check('pages_kind_check', sql.raw(`kind in (${PAGE_KINDS.map((kind) => `'${kind}'`).join(', ')})`)),
+  ],
+);
+
+export type Page = typeof pages.$inferSelect;
+
+/**
+ * Where a page's old address leads (`handoffs/pages.md` Phases 3 and 5): a user page is keyed by its account's handle,
+ * so a changed handle moves the page's key and leaves its old key here; a renamed topic leaves its old slug. `/u/<old>`
+ * and `user:<old>` (`/t/<old>`, `topic:<old>`) then still find the page. A user's is written only by the triggers on
+ * `accounts` (migration `0037`), so every writer of a handle leaves one, and deleted when another account takes the old
+ * handle; a topic's by `renameTopic` (`server/topic-pages.ts`), deleted when a new topic takes the old slug.
+ */
+export const pageRedirects = pgTable(
+  'page_redirects',
+  {
+    kind: text('kind', { enum: PAGE_KINDS }).notNull(),
+    key: text('key').notNull(),
+    pageId: uuid('page_id')
+      .notNull()
+      .references(() => pages.id, { onDelete: 'cascade' }),
+    createdAt: createdAt(),
+  },
+  (t) => [primaryKey({ columns: [t.kind, t.key] }), index('page_redirects_page_idx').on(t.pageId)],
+);
+
+/**
  * A page's git repository: real blobs, trees and commits as rows (DESIGN.md §4.1). `oid` is the SHA-1 git
  * would compute, and `body` the object without git's `<type> <size>\0` header. Read and written only
  * through `GitRepo` (`server/git/repo.ts`).
@@ -242,24 +298,24 @@ export const commitIdentities = pgTable(
 export const pageObjects = pgTable(
   'page_objects',
   {
-    paperId: uuid('paper_id')
+    pageId: uuid('page_id')
       .notNull()
-      .references(() => papers.id, { onDelete: 'cascade' }),
+      .references(() => pages.id, { onDelete: 'cascade' }),
     oid: bytea('oid').notNull(),
     type: text('type', { enum: ['blob', 'tree', 'commit'] }).notNull(),
     body: bytea('body').notNull(),
   },
   (t) => [
-    primaryKey({ columns: [t.paperId, t.oid] }),
+    primaryKey({ columns: [t.pageId, t.oid] }),
     check('page_objects_type_check', sql`${t.type} in ('blob', 'tree', 'commit')`),
   ],
 );
 
 /** The only mutable part of a repo: `refs/heads/main`. A paper nobody has edited has no row (§4.2). */
 export const pageRefs = pgTable('page_refs', {
-  paperId: uuid('paper_id')
+  pageId: uuid('page_id')
     .primaryKey()
-    .references(() => papers.id, { onDelete: 'cascade' }),
+    .references(() => pages.id, { onDelete: 'cascade' }),
   head: bytea('head').notNull(),
 });
 
@@ -271,9 +327,9 @@ export const pageRefs = pgTable('page_refs', {
 export const pageRevisions = pgTable(
   'page_revisions',
   {
-    paperId: uuid('paper_id')
+    pageId: uuid('page_id')
       .notNull()
-      .references(() => papers.id, { onDelete: 'cascade' }),
+      .references(() => pages.id, { onDelete: 'cascade' }),
     seq: integer('seq').notNull(),
     oid: bytea('oid').notNull(),
     authorId: text('author_id').notNull(),
@@ -290,8 +346,8 @@ export const pageRevisions = pgTable(
     at: timestamp('at', { withTimezone: true, mode: 'date' }).notNull(),
   },
   (t) => [
-    primaryKey({ columns: [t.paperId, t.seq] }),
-    uniqueIndex('page_revisions_oid_key').on(t.paperId, t.oid),
+    primaryKey({ columns: [t.pageId, t.seq] }),
+    uniqueIndex('page_revisions_oid_key').on(t.pageId, t.oid),
     index('page_revisions_account_idx').on(t.accountId),
     check('page_revisions_kind_check', sql`${t.kind} in ('edit', 'revert')`),
   ],
@@ -302,11 +358,14 @@ export const pageRevisions = pgTable(
  * Markdown is stored as written: rendering it to sanitized HTML at commit comes with the editor (Milestone 3).
  */
 export const pageCurrent = pgTable('page_current', {
-  paperId: uuid('paper_id')
+  pageId: uuid('page_id')
     .primaryKey()
-    .references(() => papers.id, { onDelete: 'cascade' }),
+    .references(() => pages.id, { onDelete: 'cascade' }),
   head: bytea('head').notNull(),
-  /** Each part's section files joined, as an agent reads them (`pages/sections.ts`). */
+  /**
+   * Each part's section files joined, as an agent reads them (`pages/sections.ts`). `author_*` holds the owners'
+   * part of any kind (a paper's `author/`, a venue's `organizers/`, a user's `about/`; `lib/kinds.ts`).
+   */
   authorMarkdown: text('author_markdown'),
   communityMarkdown: text('community_markdown'),
   /** The two parts' sections, rendered at commit (`pages/sections.ts`), which is all a reader is sent. */
@@ -320,6 +379,12 @@ export const pageCurrent = pgTable('page_current', {
   links: jsonb('links').$type<TitleLink[]>(),
   /** The page's `versions/`, oldest first (`lib/versions.ts`). */
   versions: jsonb('versions').$type<PaperVersion[]>(),
+  /**
+   * A page of another kind: its kind file as it parses (`venue.json`, …, `lib/kinds.ts`), or `null` if it has none
+   * or it doesn't parse, and the name it shows (`pageName`). A paper's are `null`: its title is `papers.title`.
+   */
+  kindFile: jsonb('kind_file').$type<Record<string, unknown>>(),
+  name: text('name'),
   updatedAt: timestamp('updated_at', { withTimezone: true, mode: 'date' }).notNull(),
 });
 
@@ -337,9 +402,9 @@ export const pageEvents = pgTable(
   'page_events',
   {
     id: bigint('id', { mode: 'number' }).primaryKey().generatedAlwaysAsIdentity(),
-    paperId: uuid('paper_id')
+    pageId: uuid('page_id')
       .notNull()
-      .references(() => papers.id, { onDelete: 'cascade' }),
+      .references(() => pages.id, { onDelete: 'cascade' }),
     seq: integer('seq').notNull(),
     type: text('type').notNull(),
     payload: jsonb('payload').$type<Record<string, unknown>>().notNull(),
@@ -348,10 +413,144 @@ export const pageEvents = pgTable(
       .default(sql`pg_current_xact_id()`),
     createdAt: createdAt(),
   },
+  (t) => [uniqueIndex('page_events_page_seq_key').on(t.pageId, t.seq), index('page_events_xid_id_idx').on(t.xid, t.id)],
+);
+
+/**
+ * The labeled links of every page (DESIGN.md §8), one row per line of a part's `links.jsonl`, written only by the
+ * `links` consumer (`server/page-links.ts`) and rebuildable from the repos. It answers "what links here" on a page
+ * of any kind: `target` is the identifier as the line names it, in normal form, and `target_page_id` the page it
+ * named when the line was indexed, if there was one then. `origin` is the part the line is in: the owners'
+ * (`author/` on a paper) or `community`.
+ */
+export const pageLinks = pgTable(
+  'page_links',
+  {
+    pageId: uuid('page_id')
+      .notNull()
+      .references(() => pages.id, { onDelete: 'cascade' }),
+    path: text('path').notNull(),
+    linkId: text('link_id').notNull(),
+    line: integer('line').notNull(),
+    target: text('target').notNull(),
+    /** The target's kind, or `web` for an address elsewhere (a person's homepage, `lib/labeled-links.ts`). */
+    targetKind: text('target_kind', { enum: [...PAGE_KINDS, 'web'] }).notNull(),
+    targetPageId: uuid('target_page_id').references(() => pages.id, { onDelete: 'set null' }),
+    label: text('label').notNull(),
+    origin: text('origin', { enum: ['owners', 'community'] }).notNull(),
+    note: text('note'),
+    fromAnchor: text('from_anchor'),
+    toAnchor: text('to_anchor'),
+    evidence: text('evidence'),
+  },
   (t) => [
-    uniqueIndex('page_events_paper_seq_key').on(t.paperId, t.seq),
-    index('page_events_xid_id_idx').on(t.xid, t.id),
+    primaryKey({ columns: [t.pageId, t.path, t.linkId] }),
+    index('page_links_target_idx').on(t.target),
+    index('page_links_target_page_idx').on(t.targetPageId),
   ],
+);
+
+/**
+ * What each paper says it belongs to, by public name: a submission's venue (`via` `submission`, `source`
+ * `openreview:ICLR.cc/2027/Conference`), a topic it links to (`via` the label, `source` `topic:<slug>`), or an
+ * institution's email domain (`via` `affiliation`, `source` `domain:ethz.ch`, and every domain above the address's:
+ * a confirmed author who shows their institution, weight 1, or an address printed on page 1, weight 0.5). Written by
+ * the `members` consumer (`server/page-members.ts`) from the paper's files and, for affiliations, from
+ * `author_claims`, `affiliations` and `pdf_documents` (`server/org-members.ts`), whether or not a page of that name
+ * exists yet, so `page_members` can be joined again whenever one appears.
+ */
+export const pageMemberSources = pgTable(
+  'page_member_sources',
+  {
+    paperId: uuid('paper_id')
+      .notNull()
+      .references(() => pages.id, { onDelete: 'cascade' }),
+    via: text('via').notNull(),
+    source: text('source').notNull(),
+    /** How sure it is: 1, or less for a source that counts for less than certain (an address printed on page 1). */
+    weight: doublePrecision('weight').notNull().default(1),
+  },
+  (t) => [primaryKey({ columns: [t.paperId, t.via, t.source] }), index('page_member_sources_source_idx').on(t.source)],
+);
+
+/**
+ * Papers whose affiliation sources (`page_member_sources` with `via` `affiliation`) are due again, because something
+ * they come from changed outside the paper's repo: a claim confirmed or withdrawn, an address confirmed or removed, an
+ * account's `show_institution`, the addresses read off a PDF. Filled by triggers on those tables (migration `0038`),
+ * emptied by the worker's `org-members` task (`server/org-members.ts`).
+ */
+export const orgMembersDue = pgTable('org_members_due', {
+  /** A paper's page id; no foreign key, since the triggers fire while a paper is being deleted too. */
+  paperId: uuid('paper_id').primaryKey(),
+  markedAt: timestamp('marked_at', { withTimezone: true, mode: 'date' }).notNull().defaultNow(),
+});
+
+/**
+ * The names a scope (a venue, topic or org page) answers to: its own identifier (`venue:iclr/2027`) and its kind
+ * file's `sources`. Written by the `members` consumer.
+ */
+export const pageScopeNames = pgTable(
+  'page_scope_names',
+  {
+    pageId: uuid('page_id')
+      .notNull()
+      .references(() => pages.id, { onDelete: 'cascade' }),
+    name: text('name').notNull(),
+  },
+  (t) => [primaryKey({ columns: [t.pageId, t.name] }), index('page_scope_names_name_idx').on(t.name)],
+);
+
+/** A scope's parents, by identifier (`lib/kinds.ts`'s `parentsOf`): an edition's series, a topic's broader topics. */
+export const pageParents = pgTable(
+  'page_parents',
+  {
+    pageId: uuid('page_id')
+      .notNull()
+      .references(() => pages.id, { onDelete: 'cascade' }),
+    parent: text('parent').notNull(),
+  },
+  (t) => [primaryKey({ columns: [t.pageId, t.parent] })],
+);
+
+/**
+ * The papers of every scope (`handoffs/pages.md`): a venue's through their submissions, a topic's through links,
+ * an org's through its members' confirmed claims and the domains printed on page 1 (`via` `affiliation` for both, so
+ * nothing public tells the two apart). Every list, count, statistic and plugin query above the paper reads
+ * this table, rolled up through `page_ancestors`. Written only by the `members` consumer; `weight` is for later
+ * sources that count for less than certain (a domain printed on page 1).
+ */
+export const pageMembers = pgTable(
+  'page_members',
+  {
+    scopePageId: uuid('scope_page_id')
+      .notNull()
+      .references(() => pages.id, { onDelete: 'cascade' }),
+    paperId: uuid('paper_id')
+      .notNull()
+      .references(() => pages.id, { onDelete: 'cascade' }),
+    via: text('via').notNull(),
+    weight: doublePrecision('weight').notNull().default(1),
+  },
+  (t) => [primaryKey({ columns: [t.scopePageId, t.paperId, t.via] }), index('page_members_paper_idx').on(t.paperId)],
+);
+
+/**
+ * The closure of `page_parents` over the pages they name: every ancestor of a scope, at its shortest depth, so a
+ * roll-up (a series' papers are its editions', a topic's include its narrower topics') is one join. Written by
+ * the `members` consumer.
+ */
+export const pageAncestors = pgTable(
+  'page_ancestors',
+  {
+    pageId: uuid('page_id')
+      .notNull()
+      .references(() => pages.id, { onDelete: 'cascade' }),
+    ancestorId: uuid('ancestor_id')
+      .notNull()
+      .references(() => pages.id, { onDelete: 'cascade' }),
+    depth: integer('depth').notNull(),
+  },
+  (t) => [primaryKey({ columns: [t.pageId, t.ancestorId] }), index('page_ancestors_ancestor_idx').on(t.ancestorId)],
 );
 
 /**
@@ -380,9 +579,9 @@ export const consumerCursors = pgTable('consumer_cursors', {
 export const searchDocs = pgTable(
   'search_docs',
   {
-    paperId: uuid('paper_id')
+    pageId: uuid('page_id')
       .notNull()
-      .references(() => papers.id, { onDelete: 'cascade' }),
+      .references(() => pages.id, { onDelete: 'cascade' }),
     path: text('path').notNull(),
     n: integer('n').notNull().default(0),
     blobOid: bytea('blob_oid').notNull(),
@@ -395,7 +594,7 @@ export const searchDocs = pgTable(
       .generatedAlwaysAs(sql`to_tsvector('english', text)`),
   },
   (t) => [
-    primaryKey({ columns: [t.paperId, t.path, t.n] }),
+    primaryKey({ columns: [t.pageId, t.path, t.n] }),
     index('search_docs_tsv_idx').using('gin', t.tsv),
     check('search_docs_scope_check', sql`${t.scope} in ('page', 'reviews')`),
   ],
@@ -435,9 +634,9 @@ export const demoSnapshots = pgTable('demo_snapshots', {
 export const demoPins = pgTable(
   'demo_pins',
   {
-    paperId: uuid('paper_id')
+    pageId: uuid('page_id')
       .notNull()
-      .references(() => papers.id, { onDelete: 'cascade' }),
+      .references(() => pages.id, { onDelete: 'cascade' }),
     /** As written in the block. */
     url: text('url').notNull(),
     snapshotId: text('snapshot_id')
@@ -447,7 +646,7 @@ export const demoPins = pgTable(
     commit: bytea('commit').notNull(),
     createdAt: createdAt(),
   },
-  (t) => [primaryKey({ columns: [t.paperId, t.url] })],
+  (t) => [primaryKey({ columns: [t.pageId, t.url] })],
 );
 
 /** Where one ingest stage stands for one PDF (`server/pdfs/ingest.ts`). */
@@ -538,6 +737,11 @@ export const submissions = pgTable(
     status: text('status', { enum: SUBMISSION_STATUSES }),
     /** As the venue words it: "Accept (Poster)". */
     decision: text('decision'),
+    /** The keywords its authors gave the source (OpenReview's), from `submission.json`; topic suggestions match them. */
+    keywords: text('keywords')
+      .array()
+      .notNull()
+      .default(sql`'{}'::text[]`),
     url: text('url'),
     /** When its folder in the repo last changed: an import that finds nothing new commits nothing. */
     fetchedAt: timestamp('fetched_at', { withTimezone: true, mode: 'date' }).notNull(),
@@ -642,6 +846,43 @@ export const authorClaims = pgTable(
 );
 
 export type AuthorClaim = typeof authorClaims.$inferSelect;
+
+/** What a page claim's status can be: waiting, confirmed or turned down. Stepping down removes the row. */
+export const PAGE_CLAIM_STATUSES = ['pending', 'confirmed', 'rejected'] as const;
+export type PageClaimStatus = (typeof PAGE_CLAIM_STATUSES)[number];
+
+/**
+ * An account's claim to be one of the owners of a page above the paper (`handoffs/pages.md`): for now a venue's
+ * organisers, who write its `organizers/` and its `venue.json`. Built on the author claim flow (`server/claims.ts`),
+ * with the page as what is claimed, and confirmed by an admin (`npm run claims:decide`). An organiser of a series
+ * also organises its editions (`server/page-claims.ts`). Organising is a public role, so an organiser's commits carry
+ * their own `u_` identity, not a per-claim one.
+ */
+export const pageClaims = pgTable(
+  'page_claims',
+  {
+    id: uuid('id').primaryKey().defaultRandom(),
+    pageId: uuid('page_id')
+      .notNull()
+      .references(() => pages.id, { onDelete: 'cascade' }),
+    accountId: uuid('account_id')
+      .notNull()
+      .references(() => accounts.id, { onDelete: 'cascade' }),
+    /** Their own words: who they are at the venue, and where that can be checked. */
+    evidence: text('evidence').notNull().default(''),
+    status: text('status', { enum: PAGE_CLAIM_STATUSES }).notNull().default('pending'),
+    decidedBy: uuid('decided_by').references(() => accounts.id, { onDelete: 'set null' }),
+    decidedAt: timestamp('decided_at', { withTimezone: true, mode: 'date' }),
+    createdAt: createdAt(),
+  },
+  (t) => [
+    uniqueIndex('page_claims_account_key').on(t.pageId, t.accountId),
+    index('page_claims_status_idx').on(t.status),
+    check('page_claims_status_check', sql.raw(`status in (${PAGE_CLAIM_STATUSES.map((s) => `'${s}'`).join(', ')})`)),
+  ],
+);
+
+export type PageClaim = typeof pageClaims.$inferSelect;
 
 /**
  * What an API token may do: `read` the viewer's own data, `write` as them (posts and edits, `git push`
@@ -939,4 +1180,251 @@ export const paperFollows = pgTable(
     createdAt: createdAt(),
   },
   (t) => [primaryKey({ columns: [t.accountId, t.paperId] }), index('paper_follows_paper_idx').on(t.paperId)],
+);
+
+/**
+ * Each account's `settings.json` (`lib/settings/`, DESIGN.md §10): the user layer over the defaults and the site
+ * layer. The **text** is kept as written, JSONC with its comments and key order, and parsed when read; a value that
+ * doesn't fit its setting reads as the layer below. Holds only what differs from the layers below. Preferences
+ * only: anything the site merely remembers stays out of it. **Private.**
+ */
+export const userSettings = pgTable('user_settings', {
+  accountId: uuid('account_id')
+    .primaryKey()
+    .references(() => accounts.id, { onDelete: 'cascade' }),
+  doc: text('doc').notNull(),
+  updatedAt: timestamp('updated_at', { withTimezone: true, mode: 'date' }).notNull().defaultNow(),
+});
+
+/**
+ * The site layer of settings (`lib/settings/`): one row, `id = 1`, whose JSONC text sits between the defaults and
+ * every user's document. Admins edit it by script (`npm run settings:site`), so it changes without a deploy.
+ */
+export const siteSettings = pgTable(
+  'site_settings',
+  {
+    id: smallint('id').primaryKey().default(1),
+    doc: text('doc').notNull(),
+    updatedAt: timestamp('updated_at', { withTimezone: true, mode: 'date' }).notNull().defaultNow(),
+  },
+  (t) => [check('site_settings_one_row', sql`${t.id} = 1`)],
+);
+
+/**
+ * A plugin's files at one commit (`handoffs/plugins.md` Phase 2, DESIGN.md §10), copied once from GitHub when it is
+ * first installed, as demos are (`server/plugins/snapshot.ts`): the bytes are stored by SHA-256 with demos', and the
+ * manifest was checked when the copy was taken. Served at `<host>.<content domain>/<commit>/…`, where `host` is a
+ * hash of the plugin id (`server/plugins/serve.ts`).
+ */
+export const pluginSnapshots = pgTable(
+  'plugin_snapshots',
+  {
+    /** The source's key, without its ref: `github:<owner>/<repo>[/<folder>]` (`lib/plugins/sources.ts`). */
+    source: text('source').notNull(),
+    commit: text('commit').notNull(),
+    pluginId: text('plugin_id').notNull(),
+    /** The label of the plugin's host, from its id. */
+    host: text('host').notNull(),
+    /** The manifest as it was checked (`lib/plugins/manifest.ts`'s `PluginManifest`). */
+    manifest: jsonb('manifest').$type<Record<string, unknown>>().notNull(),
+    /** The manifest's warnings, kept to show its author. */
+    warnings: jsonb('warnings').$type<string[]>().notNull(),
+    /** Path under the plugin's folder → file. */
+    files: jsonb('files').$type<Record<string, DemoFile>>().notNull(),
+    totalBytes: bigint('total_bytes', { mode: 'number' }).notNull(),
+    createdAt: createdAt(),
+  },
+  (t) => [
+    primaryKey({ columns: [t.source, t.commit] }),
+    uniqueIndex('plugin_snapshots_host_commit').on(t.host, t.commit),
+  ],
+);
+
+/**
+ * The commit a plugin source's ref (a tag, branch, or `''` for the default branch) named when it was first installed.
+ * Kept until someone asks for an update, so a moving branch doesn't change what runs: updates are explicit.
+ */
+export const pluginRefs = pgTable(
+  'plugin_refs',
+  {
+    source: text('source').notNull(),
+    ref: text('ref').notNull(),
+    commit: text('commit').notNull(),
+    resolvedAt: timestamp('resolved_at', { withTimezone: true, mode: 'date' }).notNull().defaultNow(),
+  },
+  (t) => [primaryKey({ columns: [t.source, t.ref] })],
+);
+
+/**
+ * Consent, kept out of settings.json (DESIGN.md §10): which plugin, at which commit, an account let run with which
+ * permissions and network origins. A plugin whose manifest asks for anything its grant lacks shows an approval
+ * prompt instead of running.
+ */
+export const userPluginGrants = pgTable(
+  'user_plugin_grants',
+  {
+    accountId: uuid('account_id')
+      .notNull()
+      .references(() => accounts.id, { onDelete: 'cascade' }),
+    pluginId: text('plugin_id').notNull(),
+    /** The commit approved. */
+    sha: text('sha').notNull(),
+    permissions: text('permissions').array().notNull(),
+    network: text('network').array().notNull(),
+    grantedAt: timestamp('granted_at', { withTimezone: true, mode: 'date' }).notNull().defaultNow(),
+  },
+  (t) => [primaryKey({ columns: [t.accountId, t.pluginId] })],
+);
+
+/** A plugin's small state for one account (`storage.get`/`storage.set`): one JSON object, at most 64 KB. */
+export const userPluginStorage = pgTable(
+  'user_plugin_storage',
+  {
+    accountId: uuid('account_id')
+      .notNull()
+      .references(() => accounts.id, { onDelete: 'cascade' }),
+    pluginId: text('plugin_id').notNull(),
+    data: jsonb('data').$type<Record<string, unknown>>().notNull(),
+    updatedAt: timestamp('updated_at', { withTimezone: true, mode: 'date' }).notNull().defaultNow(),
+  },
+  (t) => [primaryKey({ columns: [t.accountId, t.pluginId] })],
+);
+
+/**
+ * The keys that sign plugins' identity tokens (`server/plugins/identity.ts`, `handoffs/plugins.md` Phase 5): ES256
+ * key pairs as JWKs. The newest unretired key signs; every unretired key is published at `/.well-known/jwks.json`, so
+ * a backend verifies tokens across a rotation. The first is made on first use; `npm run identity:keys` rotates and
+ * retires them.
+ */
+export const identityKeys = pgTable('identity_keys', {
+  kid: text('kid').primaryKey(),
+  alg: text('alg').notNull(),
+  privateJwk: jsonb('private_jwk').$type<Record<string, string>>().notNull(),
+  publicJwk: jsonb('public_jwk').$type<Record<string, string>>().notNull(),
+  createdAt: createdAt(),
+  /** When it stopped being published; tokens it signed no longer verify. */
+  retiredAt: timestamp('retired_at', { withTimezone: true, mode: 'date' }),
+});
+
+/**
+ * Score statistics of every scope (`handoffs/plugins.md` Phase 4, data for plugins A), per `(scope, venue, field)`:
+ * every submission's mean over its reviews for a score field of the venue's review forms, sorted, with bins and the
+ * split by outcome (`lib/scope-stats.ts`). Rolled up like membership. Written only by `server/scope-stats.ts`, from
+ * `submissions`, `submission_notes` and `page_members`; `consumers:rebuild -- scope-stats` starts it over.
+ */
+export const scopeStats = pgTable(
+  'scope_stats',
+  {
+    scopePageId: uuid('scope_page_id')
+      .notNull()
+      .references(() => pages.id, { onDelete: 'cascade' }),
+    /** `<source>:<venue id>`, as `venues.id`. */
+    venueId: text('venue_id').notNull(),
+    /** The field's key in the venue's forms: `rating`. */
+    field: text('field').notNull(),
+    label: text('label').notNull(),
+    /** The field's place among the venue's: the form's summary first, then its order. */
+    position: integer('position').notNull(),
+    min: doublePrecision('min'),
+    max: doublePrecision('max'),
+    count: integer('count').notNull(),
+    values: doublePrecision('values').array().notNull(),
+    bins: jsonb('bins').$type<Bins>().notNull(),
+    byStatus: jsonb('by_status').$type<Record<StatOutcome, ScoreGroup>>().notNull(),
+    /** Whether the venue has decided on any submission yet, for `plugins.venueStats.hideUntil`. */
+    decisionsOut: boolean('decisions_out').notNull(),
+    computedAt: timestamp('computed_at', { withTimezone: true, mode: 'date' }).notNull(),
+  },
+  (t) => [primaryKey({ columns: [t.scopePageId, t.venueId, t.field] })],
+);
+
+/**
+ * Each scope's last change and its pending recomputation of `scope_stats`. A change to a member paper's reviews or to
+ * membership marks the scope and the scopes above it: `changed_at` moves (the bulk route's ETag), and `due_at` is set a
+ * few seconds ahead, pushed back by later changes but never past `dirty_since` plus a minute, so an import recomputes a
+ * scope now and then rather than on every paper.
+ */
+export const scopeState = pgTable(
+  'scope_state',
+  {
+    scopePageId: uuid('scope_page_id')
+      .primaryKey()
+      .references(() => pages.id, { onDelete: 'cascade' }),
+    changedAt: timestamp('changed_at', { withTimezone: true, mode: 'date' }).notNull(),
+    dirtySince: timestamp('dirty_since', { withTimezone: true, mode: 'date' }),
+    dueAt: timestamp('due_at', { withTimezone: true, mode: 'date' }),
+    computedAt: timestamp('computed_at', { withTimezone: true, mode: 'date' }),
+  },
+  (t) => [index('scope_state_due_idx').on(t.dueAt)],
+);
+
+/**
+ * Papers that might belong in a topic (`handoffs/pages.md` Phase 5): machines only suggest, a person confirms. Kept by
+ * the `topic-suggestions` consumer (`server/topic-suggestions.ts`) from OpenReview keywords and from the topic's name
+ * and aliases in titles and abstracts. Confirming one links the paper (`in-topic`); **a dismissal is remembered**: a
+ * row that isn't `open` is never rewritten, so the suggestion doesn't come back.
+ */
+export const TOPIC_SUGGESTION_STATUSES = ['open', 'dismissed', 'confirmed'] as const;
+export const TOPIC_SUGGESTION_REASONS = ['keyword', 'title', 'abstract'] as const;
+
+export const topicSuggestions = pgTable(
+  'topic_suggestions',
+  {
+    topicPageId: uuid('topic_page_id')
+      .notNull()
+      .references(() => pages.id, { onDelete: 'cascade' }),
+    paperId: uuid('paper_id')
+      .notNull()
+      .references(() => pages.id, { onDelete: 'cascade' }),
+    status: text('status', { enum: TOPIC_SUGGESTION_STATUSES }).notNull().default('open'),
+    /** The strongest reason: one of its keywords is the topic's name, the name is in its title, or in its abstract. */
+    reason: text('reason', { enum: TOPIC_SUGGESTION_REASONS }).notNull(),
+    /** The name or alias that matched. */
+    matched: text('matched').notNull(),
+    score: doublePrecision('score').notNull(),
+    decidedBy: uuid('decided_by').references(() => accounts.id, { onDelete: 'set null' }),
+    decidedAt: timestamp('decided_at', { withTimezone: true, mode: 'date' }),
+    createdAt: createdAt(),
+  },
+  (t) => [
+    primaryKey({ columns: [t.topicPageId, t.paperId] }),
+    index('topic_suggestions_open_idx').on(t.topicPageId, t.status, t.score),
+    index('topic_suggestions_paper_idx').on(t.paperId),
+    check(
+      'topic_suggestions_status_check',
+      sql.raw(`status in (${TOPIC_SUGGESTION_STATUSES.map((s) => `'${s}'`).join(', ')})`),
+    ),
+    check(
+      'topic_suggestions_reason_check',
+      sql.raw(`reason in (${TOPIC_SUGGESTION_REASONS.map((s) => `'${s}'`).join(', ')})`),
+    ),
+  ],
+);
+
+/**
+ * Page protection (DESIGN.md §7): who may still edit a page that is being fought over. `established`: accounts
+ * verified for a while (`server/page-protection.ts`); `admins`: admins only. Owners (a paper's confirmed authors, a
+ * venue's organisers, an org's members, a person), bots through their grants and the system are not held by it.
+ * Admins set it (`npm run pages:protect`, `PUT /api/v1/pages/{identifier}/protection`).
+ */
+export const PROTECTION_LEVELS = ['established', 'admins'] as const;
+
+export const pageProtection = pgTable(
+  'page_protection',
+  {
+    pageId: uuid('page_id')
+      .primaryKey()
+      .references(() => pages.id, { onDelete: 'cascade' }),
+    level: text('level', { enum: PROTECTION_LEVELS }).notNull(),
+    reason: text('reason'),
+    setBy: uuid('set_by').references(() => accounts.id, { onDelete: 'set null' }),
+    setAt: timestamp('set_at', { withTimezone: true, mode: 'date' })
+      .notNull()
+      .default(sql`clock_timestamp()`),
+    /** When it lapses by itself; `null`: until an admin lifts it. */
+    expiresAt: timestamp('expires_at', { withTimezone: true, mode: 'date' }),
+  },
+  () => [
+    check('page_protection_level_check', sql.raw(`level in (${PROTECTION_LEVELS.map((s) => `'${s}'`).join(', ')})`)),
+  ],
 );
