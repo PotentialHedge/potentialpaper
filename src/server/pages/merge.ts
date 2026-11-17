@@ -58,6 +58,11 @@ function sideOf(base: string[], side: Hunk[], start: number, end: number): strin
   return lines;
 }
 
+/** Line by line: joined, an empty line and no line at all would look the same. */
+function sameLines(a: string[], b: string[]): boolean {
+  return a.length === b.length && a.every((line, i) => line === b[i]);
+}
+
 /**
  * A three-way merge of lines, or `null` for a conflict. Changes that touch conflict, as they do in git. With
  * `markers`, a conflict is written into the result between git's conflict markers instead.
@@ -88,7 +93,7 @@ function mergeLines(
     const theirsText = sideOf(base, theirs.slice(firstB, b), start, end);
     // Only one side changed this region, or both made the same change.
     if (a === firstA) merged.push(...theirsText);
-    else if (b === firstB || oursText.join('\n') === theirsText.join('\n')) merged.push(...oursText);
+    else if (b === firstB || sameLines(oursText, theirsText)) merged.push(...oursText);
     else if (markers) {
       merged.push(`<<<<<<< ${markers.ours}`, ...oursText, '=======', ...theirsText, `>>>>>>> ${markers.theirs}`);
     } else return null;

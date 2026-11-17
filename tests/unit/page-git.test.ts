@@ -269,6 +269,12 @@ describe('merging', () => {
     );
   });
 
+  it('tells an emptied line from a deleted one', () => {
+    // Once found by the property above: joined, both sides' text was "", so ours won whichever side it was.
+    expect(mergeFile('c\na', '\na', 'a')).toEqual({ ok: false });
+    expect(mergeFile('c\na', 'a', '\na')).toEqual({ ok: false });
+  });
+
   it('refuses deleted against changed, and two different new files', () => {
     expect(mergeFile('a', null, 'b')).toEqual({ ok: false });
     expect(mergeFile('a', 'b', null)).toEqual({ ok: false });

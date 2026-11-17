@@ -95,9 +95,9 @@ describe('following papers', () => {
     const paperId = await paper();
     const ada = await person('ada');
     const bob = await person('bob');
-    const cy = await person('cy');
-    for (const p of [ada, bob, cy]) await api('POST', '/follows', { cookie: p.cookie, body: { paper: PAPER } });
-    await api('PATCH', '/me', { cookie: cy.cookie, body: { followMail: false } });
+    const cyd = await person('cyd');
+    for (const p of [ada, bob, cyd]) await api('POST', '/follows', { cookie: p.cookie, body: { paper: PAPER } });
+    await api('PATCH', '/me', { cookie: cyd.cookie, body: { followMail: false } });
 
     const before = devOutbox().length;
     const comment = await postComment({ paperId, account: bob.account, body: 'Nice result.' });

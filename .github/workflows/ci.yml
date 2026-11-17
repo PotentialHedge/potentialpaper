@@ -15,7 +15,7 @@ jobs:
           POSTGRES_DB: potentialpaper_test
         ports: ['5432:5432']
         options: >-
-          --health-cmd "pg_isready -U potentialpaper"
+          --health-cmd "pg_isready -U potentialpaper -d potentialpaper_test"
           --health-interval 5s
           --health-timeout 5s
           --health-retries 20
