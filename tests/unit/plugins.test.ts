@@ -9,7 +9,7 @@ import {
   missingConsent,
   runningPermissions,
 } from '@/lib/plugins/installed';
-import { manifestJsonSchema, panelSlot, PLUGIN_PANEL_ID_RE, validateManifest } from '@/lib/plugins/manifest';
+import { kindSlot, manifestJsonSchema, panelSlot, PLUGIN_PANEL_ID_RE, validateManifest } from '@/lib/plugins/manifest';
 import { BOOT_MESSAGE, type FrameContext, HELLO_MESSAGE } from '@/lib/plugins/protocol';
 import { parsePluginSource, sourceKey } from '@/lib/plugins/sources';
 import { evalWhen, pageWhenContext, parseWhen, whenHolds, whenProblem } from '@/lib/plugins/when';
@@ -143,6 +143,17 @@ describe('plugin manifests', () => {
         "contributes.panels[1].when: topic pages don't offer page.hasScores, which read as false there",
       ]),
     );
+  });
+
+  it('puts a panel under each submission on a paper only', () => {
+    const panel = (slot: unknown) => ({ id: 'standing', title: 'A', kinds: ['paper', 'venue'], slot });
+    const ok = validateManifest({ ...HELLO, contributes: { panels: [panel({ paper: 'submission', '*': 'main' })] } });
+    expect(ok.errors).toEqual([]);
+    expect(panelSlot(ok.manifest!.contributes.panels[0], 'paper')).toBe('submission');
+    expect(kindSlot('paper', 'submission')).toBe('paper.submission');
+    expect(validateManifest({ ...HELLO, contributes: { panels: [panel('submission')] } }).errors).toEqual([
+      'contributes.panels[0].slot: venue pages have no "submission" slot',
+    ]);
   });
 
   it('refuses a manifest for a newer API, saying so', () => {

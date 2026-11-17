@@ -167,7 +167,15 @@ export interface PageSummary {
 export interface FrameContext {
   plugin: { id: string; name: string; version: string; sha: string | null; dev: boolean };
   /** The panel the frame draws, or the plugin page it is. */
-  surface: { type: 'panel'; panel: string; slot: string } | { type: 'page'; page: string; path: string[] };
+  surface:
+    | {
+        type: 'panel';
+        panel: string;
+        slot: string;
+        /** In the `paper.submission` slot: the submission it is drawn under, by its venue (`openreview:ICLR.cc/2027/Conference`). */
+        submission?: { venue: { id: string; name: string } };
+      }
+    | { type: 'page'; page: string; path: string[] };
   /** The page the panel is on; `null` on a plugin's own page. */
   page: PageSummary | null;
   /**

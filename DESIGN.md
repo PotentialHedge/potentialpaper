@@ -940,7 +940,9 @@ Built 2026-11-16 (`handoffs/plugins.md` Phase 2). A plugin is a public repo (or 
   (`<GitHub owner>/<name>`, and the owner must be the repo's), `name`, `version` (semver), `apiVersion` (1), `main`
   (an HTML file), `permissions` (`page.read`, `scope.read`, `reviews.read`, `identity`), `network` (https origins
   its own backend lives at), an optional `bot` (the bot whose files on pages it shows) and what it `contributes`: `panels` (`{ id, title, kinds, slot, when? }`; `slot` is `main`, `aside` or
-  `tab`, one for every kind or one per kind, `{ "paper": "aside", "*": "main" }`), `pages` (whole pages at
+  `tab`, or on a paper `submission` (under each of its submissions with scores, in the Submissions section, the frame
+  told which as `pp.context.surface.submission`), one for every kind or one per kind,
+  `{ "paper": "submission", "*": "main" }`), `pages` (whole pages at
   `/x/<owner>/<name>/<page>`), `settings` (`SettingSpec`s, keyed `<plugin id>.<name>` in settings.json) and
   `commands` (in each of its panels' menus). The validator reports every problem in one pass, each on a line naming
   its field; unknown fields are warnings, so a newer manifest still loads on an older host.

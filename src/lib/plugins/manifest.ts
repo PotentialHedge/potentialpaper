@@ -35,8 +35,12 @@ export const PERMISSIONS = {
 export type PluginPermission = keyof typeof PERMISSIONS;
 export const PERMISSION_NAMES = Object.keys(PERMISSIONS) as PluginPermission[];
 
-/** Where on a page of a kind a panel goes: its kind's `<kind>.main`, `<kind>.aside` or `<kind>.tabs`. */
-export const PANEL_SLOTS = ['main', 'aside', 'tab'] as const;
+/**
+ * Where on a page of a kind a panel goes: its kind's `<kind>.main`, `<kind>.aside` or `<kind>.tabs`; on a paper also
+ * `submission`, `paper.submission`: once under each of its submissions that has scores, in the Submissions section,
+ * the frame told which (`pp.context.surface.submission`).
+ */
+export const PANEL_SLOTS = ['main', 'aside', 'tab', 'submission'] as const;
 export type PanelSlot = (typeof PANEL_SLOTS)[number];
 
 /** The kind's slot a panel's `slot` names: `tab` is the kind's `tabs`. */
@@ -98,7 +102,7 @@ const slotSchema = z
   .union([z.enum(PANEL_SLOTS), z.partialRecord(z.enum([...PAGE_KINDS, '*']), z.enum(PANEL_SLOTS))])
   .meta({
     description:
-      'Where it goes on each kind of page: "main", "aside" or "tab". One for every kind, or by kind with "*" for the rest: { "paper": "aside", "*": "main" }.',
+      'Where it goes on each kind of page: "main", "aside" or "tab", and on a paper "submission" (under each of its submissions with scores). One for every kind, or by kind with "*" for the rest: { "paper": "submission", "*": "main" }.',
   });
 
 const panelSchema = z.looseObject({

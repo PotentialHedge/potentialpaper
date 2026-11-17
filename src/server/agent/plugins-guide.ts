@@ -181,7 +181,7 @@ main.js
         "id": "graph",
         "title": "Citation graph",
         "kinds": ["paper", "venue"],
-        "slot": { "paper": "aside", "*": "main" },
+        "slot": { "paper": "submission", "*": "main" },
         "when": "page.hasSubmissions"
       }
     ],
@@ -232,7 +232,9 @@ Every field of the manifest:
 - \`bot\`: the handle of the bot account whose files on pages the plugin shows (\`"bot": "openreview"\`). The approval
   prompt says the plugin shows that bot's data, and what this site lets the bot write; naming a bot grants nothing.
 - \`contributes.panels\` (up to 8): \`id\`, \`title\`, \`kinds\` (${PAGE_KINDS.map((k) => `\`${k}\``).join(', ')}), \`slot\`
-  (\`main\`, \`aside\` or \`tab\`; or one per kind, \`{ "paper": "aside", "*": "main" }\`), and \`when\`.
+  (\`main\`, \`aside\` or \`tab\`, and on a paper \`submission\`: once under each of its submissions with scores, in the
+  Submissions section, with \`pp.context.surface.submission.venue\` saying which; or one per kind,
+  \`{ "paper": "submission", "*": "main" }\`), and \`when\`.
 - \`contributes.pages\` (up to 8): whole pages of its own at \`${origin}/x/<owner>/<name>/<page id>/…\`.
 - \`contributes.settings\`: each \`{ "type": "boolean" | "number" | "string" | "enum", "default", "description" }\`, with
   \`minimum\`/\`maximum\` for numbers, \`maxLength\` for strings, \`values\` (and \`labels\`) for enums. They appear in the

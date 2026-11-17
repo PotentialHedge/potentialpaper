@@ -1,4 +1,5 @@
 import type { ReactNode } from 'react';
+import { SubmissionPanels } from '@/components/plugins/SubmissionPanels';
 import { ui } from '@/components/ui';
 import { sourceName } from '@/lib/paper-ids';
 import {
@@ -268,6 +269,11 @@ function SubmissionView({ submission, tableNumber }: { submission: Submission; t
       </p>
       <p className={ui.fine}>Updated {DATE.format(submission.fetchedAt)}.</p>
       <ScoreTable submission={submission} number={tableNumber} />
+      {/* Plugins' panels for this submission (\`paper.submission\`): score standing's figure at this venue. */}
+      <SubmissionPanels
+        venue={{ id: submission.venue.id, name: submission.venue.name }}
+        hasScores={scoreTable(submission) !== null}
+      />
       <Forum submission={submission} />
     </section>
   );
