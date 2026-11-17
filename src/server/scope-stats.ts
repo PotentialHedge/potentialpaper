@@ -2,12 +2,13 @@ import { and, asc, eq, inArray, sql, type SQL } from 'drizzle-orm';
 import { getDb, type Database } from '@/db';
 import { scopeState, scopeStats, submissionNotes, submissions, venues } from '@/db/schema';
 import { KINDS, PAGE_KINDS } from '@/lib/kinds';
-import { fieldStats, type FieldStats, type HideUntil, outcomeOf } from '@/lib/scope-stats';
+import { fieldStats, type FieldStats, type HideUntil, outcomeOf, type StatOutcome } from '@/lib/scope-stats';
 import { type NoteForm, scoreOf, type SubmissionStatus, type VenueForms } from '@/lib/submissions';
 import type { Consumer } from './consumers/types';
 import { mustPage } from './pages/kinds';
 import type { Reader } from './pages/repo';
 import type { Writer } from './pages/projections';
+import type { PageSummary } from '@/lib/plugins/protocol';
 import { pageSummaries } from './plugins/pages';
 
 /**
@@ -283,7 +284,11 @@ export const scopeStatsConsumer: Consumer = {
 // Reads.
 
 export interface ScoreSummary {
-  venue: { id: string; name: string };
+  /**
+   * The venue, and its own page when it has one (the edition whose `venue.json` lists it as a source): that page's
+   * statistics of the venue are the whole venue's, where a topic's or an org's are only its own papers'.
+   */
+  venue: { id: string; name: string; page: PageSummary | null };
   field: string;
   label: string;
   count: number;
@@ -333,9 +338,10 @@ export async function scopeScoreList(
   // Venues with the most submissions first, keeping each venue's fields together and in order.
   const firstCount = new Map<string, number>();
   for (const row of rows) if (!firstCount.has(row.venueId)) firstCount.set(row.venueId, firstCount.size);
+  const venuePages = await venuePagesOf([...firstCount.keys()], database);
   return rows
     .map((row) => ({
-      venue: { id: row.venueId, name: row.venueName ?? row.venueId },
+      venue: { id: row.venueId, name: row.venueName ?? row.venueId, page: venuePages.get(row.venueId) ?? null },
       field: row.field,
       label: row.label,
       count: row.count,
@@ -367,13 +373,14 @@ export async function scopeScoreField(
   if (!row) return null;
   const s = row.stats;
   const hidden = hiddenBy(hideUntil, s.decisionsOut);
+  const venuePages = await venuePagesOf([s.venueId], database);
   const empty = (g: { bins: FieldStats['bins'] }) => ({
     count: 0,
     values: [],
     bins: { ...g.bins, counts: g.bins.counts.map(() => 0) },
   });
   return {
-    venue: { id: s.venueId, name: row.venueName ?? s.venueId },
+    venue: { id: s.venueId, name: row.venueName ?? s.venueId, page: venuePages.get(s.venueId) ?? null },
     field: s.field,
     label: s.label,
     count: s.count,
@@ -391,6 +398,105 @@ export async function scopeScoreField(
         ) as unknown as FieldStats['byStatus'])
       : s.byStatus,
   };
+}
+
+/**
+ * Each venue's own page: the venue page that answers to the venue's id (its `venue.json` lists it among `sources`).
+ * Should two, the deepest (an edition before its series), then by key. Venues with no page (a track, TMLR) are left out.
+ */
+export async function venuePagesOf(
+  venueIds: readonly string[],
+  database: Database = getDb(),
+): Promise<Map<string, PageSummary>> {
+  if (venueIds.length === 0) return new Map();
+  const { rows } = await database.execute<{ name: string; page_id: string }>(sql`
+    select distinct on (n.name) n.name, p.id as page_id
+      from page_scope_names n
+      join pages p on p.id = n.page_id and p.kind = 'venue' and p.merged_into is null
+     where n.name in (${sql.join(
+       venueIds.map((id) => sql`${id}`),
+       sql`, `,
+     )})
+     order by n.name, length(p.key) desc, p.key
+  `);
+  const summaries = await pageSummaries(
+    rows.map((row) => row.page_id),
+    database,
+  );
+  return new Map(
+    rows.flatMap((row) => {
+      const page = summaries.get(row.page_id);
+      return page ? [[row.name, page] as const] : [];
+    }),
+  );
+}
+
+/** The most named marks a field gives (`?marks=true`); a scope with more submissions in the field gets none. */
+export const MAX_MARKS = 1000;
+
+/** One submission of a scope placed on a venue's field: whose it is, and its mean. */
+export interface ScoreMark {
+  /** The paper's identifier and path on the site; `null` for a paper with no identifier yet. */
+  identifier: string | null;
+  address: string | null;
+  title: string;
+  /** Its mean over its reviews, as the statistics take it. */
+  mean: number;
+  outcome: StatOutcome;
+}
+
+/**
+ * The scope's own submissions at a venue with their means for a field and whose they are, ascending by mean: an org's
+ * papers to mark on the venue's curve (acceptodds' `marks`). The same submissions and means as the scope's
+ * statistics, read live with the same rules; `null` when there are more than `MAX_MARKS`.
+ */
+export async function scopeScoreMarks(
+  scopeId: string,
+  venueId: string,
+  field: string,
+  count: number,
+  database: Database = getDb(),
+): Promise<ScoreMark[] | null> {
+  if (count > MAX_MARKS) return null;
+  const { rows } = await database.execute<{
+    paper_id: string;
+    title: string;
+    status: SubmissionStatus | null;
+    mean: number;
+  }>(sql`
+    with subs as (${scopeSubmissionsSql(scopeId)}),
+    scores as (
+      select s.id,
+             case when jsonb_typeof(n.content -> ${field}) = 'number' then (n.content ->> ${field})::float8
+                  else (regexp_match(n.content ->> ${field}, ${SCORE_RE}))[1]::float8 end as score
+        from subs s
+        join submission_notes n on n.submission_id = s.id and n.kind = 'review'
+       where s.venue_id = ${venueId}
+    )
+    select sub.paper_id, p.title, sub.status, avg(sc.score)::float8 as mean
+      from scores sc
+      join submissions sub on sub.id = sc.id
+      join papers p on p.id = sub.paper_id
+     where sc.score is not null
+     group by sub.id, sub.paper_id, p.title, sub.status
+     order by mean, p.title
+     limit ${MAX_MARKS + 1}
+  `);
+  if (rows.length > MAX_MARKS) return null;
+  const summaries = await pageSummaries(
+    rows.map((row) => row.paper_id),
+    database,
+  );
+  return rows.map((row) => {
+    const page = summaries.get(row.paper_id);
+    return {
+      identifier: page?.identifier ?? null,
+      address: page?.address ?? null,
+      title: row.title,
+      mean: Number(row.mean),
+      outcome: outcomeOf(row.status),
+    };
+  });
 }
 
 /** When a scope last changed, for the bulk route's ETag; `null` if nothing has marked it yet. */

@@ -46,8 +46,8 @@ export const METHOD_DOCS: Record<keyof typeof HOST_METHODS, { call: string; does
     does: "A paper's submissions, with their reviews, decisions and the venue's forms.",
   },
   'scope.scores': {
-    call: 'pp.scope.scores([identifier], [venue], [field])',
-    does: "A scope's score statistics: its venues and fields with counts, or one field's sorted means, bins and split by outcome.",
+    call: 'pp.scope.scores([identifier], [venue], [field], { marks })',
+    does: "A scope's score statistics: its venues and fields with counts (each venue with its own page), or one field's sorted means, bins and split by outcome; `marks` adds the scope's own submissions by name.",
   },
   'scope.papers': {
     call: 'pp.scope.papers([identifier], { fields, onChunk })',
@@ -301,7 +301,11 @@ segment (\`venue%3Aiclr%2F2027\`). Each answer is cached a minute.
   counts (\`scope.scores\`)
 - \`GET ${origin}/api/v1/pages/<identifier>/scores/<venue>/<field>\`: one field at one venue (the venue's id,
   \`openreview:ICLR.cc/2027/Conference\`, URL-encoded): every submission's mean over its reviews, sorted, fixed-width
-  bins, and the same split by outcome (\`accepted\`, \`rejected\`, \`withdrawn\`, \`pending\`)
+  bins, and the same split by outcome (\`accepted\`, \`rejected\`, \`withdrawn\`, \`pending\`). \`?marks=true\` adds
+  \`marks\`: the scope's own submissions there, each with its paper (\`identifier\`, \`address\`, \`title\`), mean and
+  outcome, ascending (\`null\` above 1,000). Every venue in these answers carries \`venue.page\`, the venue's own page
+  (or \`null\`): on a topic or an org the numbers are only its papers', so draw the whole venue from
+  \`venue.page\`'s statistics and mark the scope's papers on it, as score standing's org view does
 - \`GET ${origin}/api/v1/pages/<identifier>/papers?fields=submissions,scores,status&limit=&after=\`: a scope's papers
   as NDJSON, one a line, with every submission, its status and each review's score vector (\`scope.papers\`). Without
   \`limit\`, all of them in one stream; with it, one chunk and the next cursor in \`X-Next-Cursor\`. Gzipped when asked.

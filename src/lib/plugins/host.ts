@@ -82,8 +82,14 @@ const PARAMS: Partial<Record<HostMethod, z.ZodType>> = {
   'page.resolve': z.object({ identifier }),
   'reviews.forPaper': z.object({ identifier }),
   'scope.scores': z
-    .object({ identifier, venue: z.string().min(1).max(300).optional(), field: z.string().min(1).max(200).optional() })
-    .refine((p) => !p.field || p.venue, { message: 'a field needs its venue', path: ['field'] }),
+    .object({
+      identifier,
+      venue: z.string().min(1).max(300).optional(),
+      field: z.string().min(1).max(200).optional(),
+      marks: z.boolean().optional(),
+    })
+    .refine((p) => !p.field || p.venue, { message: 'a field needs its venue', path: ['field'] })
+    .refine((p) => !p.marks || p.field, { message: 'marks are of one field', path: ['marks'] }),
   'scope.papers': z.object({
     identifier,
     fields: z.array(z.enum(PAPER_FIELDS)).max(PAPER_FIELDS.length).optional(),
@@ -125,9 +131,9 @@ const HANDLERS: Record<HostMethod, Handler> = {
   },
   'page.resolve': (s, { identifier }) => s.api(`/pages/${enc(identifier as string)}`),
   'reviews.forPaper': (s, { identifier }) => s.api(`/pages/${enc(identifier as string)}/submissions`),
-  'scope.scores': async (s, { identifier, venue, field }) => {
+  'scope.scores': async (s, { identifier, venue, field, marks }) => {
     const base = `/pages/${enc(identifier as string)}/scores`;
-    if (field) return s.api(`${base}/${enc(venue as string)}/${enc(field as string)}`);
+    if (field) return s.api(`${base}/${enc(venue as string)}/${enc(field as string)}${marks ? '?marks=true' : ''}`);
     const list = (await s.api(base)) as { scores: { venue: { id: string } }[] };
     return venue ? { ...list, scores: list.scores.filter((score) => score.venue.id === venue) } : list;
   },

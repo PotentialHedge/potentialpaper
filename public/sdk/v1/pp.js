@@ -231,11 +231,12 @@
       },
     },
     scope: {
-      scores: function (identifier, venue, field) {
+      scores: function (identifier, venue, field, options) {
         return ready.then(function () {
           var params = { identifier: page(identifier) };
           if (venue) params.venue = venue;
           if (field) params.field = field;
+          if (options && options.marks) params.marks = true;
           return call('scope.scores', params);
         });
       },

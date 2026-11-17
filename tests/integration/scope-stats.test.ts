@@ -2,21 +2,29 @@ import { gunzipSync } from 'node:zlib';
 import { eq } from 'drizzle-orm';
 import { afterAll, beforeEach, describe, expect, it } from 'vitest';
 import { getDb } from '@/db';
-import { scopeState, scopeStats, venues } from '@/db/schema';
+import { pageCurrent, pdfDocuments, scopeState, scopeStats, venues } from '@/db/schema';
 import { encodeReviewFile, formsFilePath, noteFilePath, submissionFilePath } from '@/lib/review-files';
 import type { SubmissionStatus } from '@/lib/submissions';
 import * as papersRoute from '@/app/api/v1/pages/[identifier]/papers/route';
 import * as scoresRoute from '@/app/api/v1/pages/[identifier]/scores/route';
 import { ensureBot, grantBot, OPENREVIEW_BOT } from '@/server/bots';
 import { rebuildConsumer, runConsumer } from '@/server/consumers/run';
-import { membersConsumer } from '@/server/page-members';
-import { commitPage } from '@/server/pages/commit';
+import { membersConsumer, syncDueAffiliations } from '@/server/page-members';
+import { ORGS_BOT } from '@/server/org-pages';
+import { commitPage, createPage } from '@/server/pages/commit';
 import { findKeyedPage } from '@/server/pages/kinds';
 import { readHead } from '@/server/pages/repo';
 import { savePaper } from '@/server/papers';
 import { reviewsConsumer } from '@/server/review-projection';
 import { saveSiteSettings } from '@/server/settings';
-import { recomputeDueScopes, scopeHasScores, scopeStatsConsumer } from '@/server/scope-stats';
+import {
+  MAX_MARKS,
+  recomputeDueScopes,
+  scopeHasScores,
+  scopeScoreMarks,
+  scopeStatsConsumer,
+  venuePagesOf,
+} from '@/server/scope-stats';
 import { syncVenuePages, VENUES_BOT, venueScoreStats } from '@/server/venue-pages';
 import { api, closePool, ORIGIN, resetDatabase } from './helpers';
 
@@ -310,6 +318,91 @@ describe('scope statistics (A)', () => {
     expect(hidden.body.bins.counts.every((n: number) => n === 0)).toBe(true);
     const shown = await api('GET', `/pages/${enc('venue:iclr')}/scores/${enc(ICLR_2026)}/rating`);
     expect(shown.body.values).toEqual([5]);
+    // Nor are the scope's papers named on it.
+    const marked = await api('GET', `/pages/${enc('venue:iclr')}/scores/${enc(ICLR_2027)}/rating?marks=true`);
+    expect(marked.body).toMatchObject({ hidden: true, marks: [] });
+  });
+
+  it("names each venue's own page, and marks an org's papers by name on the venue's field", async () => {
+    await venuePages();
+    const ours = await submitted(ICLR_2027, 'accepted', [8, 6]); // 7
+    await submitted(ICLR_2027, 'rejected', [3]);
+    const alsoOurs = await submitted(ICLR_2027, null, ['5: marginally below', 6]); // 5.5
+    await submitted(ICLR_2026, 'withdrawn', [10]);
+
+    // An org whose domain is printed on page 1 of two of the papers.
+    const bot = await ensureBot(ORGS_BOT);
+    await grantBot(ORGS_BOT, 'org.json', { grantedBy: 'system', kind: 'org' });
+    const org = await createPage('org', 'eth');
+    await commitPage(
+      org.id,
+      org.head,
+      bot,
+      [{ path: 'org.json', content: JSON.stringify({ name: 'ETH Zurich', domains: ['ethz.ch'] }) }],
+      'ETH',
+    );
+    for (const paperId of [ours, alsoOurs]) {
+      const sha256 = paperId.replace(/-/g, '').padEnd(64, '0');
+      await getDb()
+        .update(pageCurrent)
+        .set({ pdf: { sha256, bytes: 1, url: `https://example.org/${sha256}.pdf` } as never })
+        .where(eq(pageCurrent.pageId, paperId));
+      await getDb()
+        .insert(pdfDocuments)
+        .values({ sha256, url: `https://example.org/${sha256}.pdf`, emails: ['someone@inf.ethz.ch'] });
+    }
+    await syncDueAffiliations();
+    await catchUp();
+
+    // The org's list names the venue's own page, whose numbers are the whole venue's.
+    const list = await api('GET', `/pages/${enc('org:eth')}/scores`);
+    expect(list.status).toBe(200);
+    const rating = list.body.scores.find((s: { field: string }) => s.field === 'rating');
+    expect(rating).toMatchObject({
+      count: 2,
+      venue: {
+        id: ICLR_2027,
+        name: 'ICLR 2027',
+        page: { kind: 'venue', identifier: 'venue:iclr/2027', name: 'ICLR 2027' },
+      },
+    });
+    const whole = await api('GET', `/pages/${enc(rating.venue.page.identifier)}/scores/${enc(ICLR_2027)}/rating`);
+    expect(whole.body.values).toEqual([3, 5.5, 7]);
+    expect(whole.body.venue.page.identifier).toBe('venue:iclr/2027');
+    expect(whole.body.marks).toBeUndefined();
+
+    // The org's own submissions there, by name and mean, ascending, as its statistics take them.
+    const marked = await api('GET', `/pages/${enc('org:eth')}/scores/${enc(ICLR_2027)}/rating?marks=true`);
+    expect(marked.status).toBe(200);
+    expect(marked.body.values).toEqual([5.5, 7]);
+    expect(marked.body.marks).toEqual([
+      {
+        identifier: expect.stringMatching(/^openreview:/),
+        address: expect.any(String),
+        title: expect.any(String),
+        mean: 5.5,
+        outcome: 'pending',
+      },
+      {
+        identifier: expect.stringMatching(/^openreview:/),
+        address: expect.any(String),
+        title: expect.any(String),
+        mean: 7,
+        outcome: 'accepted',
+      },
+    ]);
+    expect(marked.body.marks.map((m: { mean: number }) => m.mean)).toEqual(marked.body.values);
+    // On the edition, every submission is its own.
+    const all = await api('GET', `/pages/${enc('venue:iclr/2027')}/scores/${enc(ICLR_2027)}/rating?marks=true`);
+    expect(all.body.marks.map((m: { outcome: string }) => m.outcome)).toEqual(['rejected', 'pending', 'accepted']);
+    expect((await api('GET', `/pages/${enc('org:eth')}/scores/${enc(ICLR_2027)}/rating?marks=yes`)).status).toBe(400);
+
+    // Over the cap, no names.
+    expect(await scopeScoreMarks(org.id, ICLR_2027, 'rating', MAX_MARKS + 1)).toBeNull();
+    // A venue with no page of its own has `page: null`.
+    await getDb().insert(venues).values({ id: 'openreview:TMLR', name: 'TMLR' }).onConflictDoNothing();
+    expect((await venuePagesOf(['openreview:TMLR', ICLR_2026])).get(ICLR_2026)?.identifier).toBe('venue:iclr/2026');
+    expect((await venuePagesOf(['openreview:TMLR'])).size).toBe(0);
   });
 });
 

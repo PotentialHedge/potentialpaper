@@ -124,8 +124,12 @@ declare namespace PP {
 
   /** A score field at one venue of a scope, with counts. */
   interface ScoreSummary {
-    /** `<source>:<venue id>`: `openreview:ICLR.cc/2027/Conference`. A 6 at one venue is no 6 at another. */
-    venue: { id: string; name: string };
+    /**
+     * `<source>:<venue id>`: `openreview:ICLR.cc/2027/Conference`. A 6 at one venue is no 6 at another. `page` is the
+     * venue's own page, whose statistics of it are the whole venue's (a topic's or an org's are only its papers');
+     * `null` for a venue with no page.
+     */
+    venue: { id: string; name: string; page: PageSummary | null };
     /** The field's key in the venue's review forms (`rating`), and its label. */
     field: string;
     label: string;
@@ -155,6 +159,21 @@ declare namespace PP {
     bins: Bins;
     /** The same by outcome. */
     split: Record<Outcome, { count: number; values: number[]; bins: Bins }>;
+    /**
+     * With `{ marks: true }`: the scope's own submissions in this field, whose they are and their means, ascending, to
+     * mark on the venue's distribution. `null` when the scope has more than 1,000 here; empty when withheld.
+     */
+    marks?: ScoreMark[] | null;
+  }
+
+  /** One of a scope's submissions on a field: the paper and its mean. */
+  interface ScoreMark {
+    /** The paper's identifier and path; `null` for a paper with no identifier yet. */
+    identifier: string | null;
+    address: string | null;
+    title: string;
+    mean: number;
+    outcome: Outcome;
   }
 
   /** A paper of a scope, as `scope.papers` gives it. */
@@ -241,10 +260,17 @@ declare namespace PP {
       /**
        * Needs `scope.read`: a venue's, topic's or org's score statistics, the current page by default. Without `venue`
        * and `field`, the list of venues and fields; with both, that field's sorted means, bins and split by outcome.
+       * `{ marks: true }` adds the scope's own submissions by name (`marks`). For a whole venue's numbers on a topic's or
+       * an org's page, ask the venue's own page: `scores(summary.venue.page.identifier, venue, field)`.
        */
       scores(identifier?: string): Promise<ScoreList>;
       scores(identifier: string | undefined, venue: string): Promise<ScoreList>;
-      scores(identifier: string | undefined, venue: string, field: string): Promise<ScoreField>;
+      scores(
+        identifier: string | undefined,
+        venue: string,
+        field: string,
+        options?: { marks?: boolean },
+      ): Promise<ScoreField>;
       /**
        * Needs `scope.read`: every paper of a scope, rolled up, fetched in chunks. Resolves with them all, or with `[]`
        * when `onChunk` takes each chunk as it comes. `fields` defaults to all three.

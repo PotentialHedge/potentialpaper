@@ -135,7 +135,7 @@ const ROUTES: [RegExp, any][] = [
   [/^\/pages\/(?<identifier>[^/?]+)\/children$/, orgChildrenRoute],
   [/^\/pages\/(?<identifier>[^/?]+)\/venue-papers(\?.*)?$/, venuePapersRoute],
   [/^\/pages\/(?<identifier>[^/?]+)\/scores(\?.*)?$/, pageScoresRoute],
-  [/^\/pages\/(?<identifier>[^/?]+)\/scores\/(?<venue>[^/?]+)\/(?<field>[^/?]+)$/, pageScoreFieldRoute],
+  [/^\/pages\/(?<identifier>[^/?]+)\/scores\/(?<venue>[^/?]+)\/(?<field>[^/?]+)(\?.*)?$/, pageScoreFieldRoute],
   [/^\/pages\/(?<identifier>[^/?]+)\/papers(\?.*)?$/, pagePapersRoute],
   [/^\/pages\/(?<identifier>[^/?]+)\/topic$/, topicRoute],
   [/^\/pages\/(?<identifier>[^/?]+)\/topics$/, paperTopicsRoute],

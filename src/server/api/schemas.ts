@@ -937,8 +937,12 @@ const ScoreBins = z.object({
 const ScoreGroup = z.object({ count: z.number().int(), values: z.array(z.number()), bins: ScoreBins });
 
 const ScoreSummary = z.object({
-  /** `<source>:<venue id>`, as submissions name it: `openreview:ICLR.cc/2027/Conference`. */
-  venue: z.object({ id: z.string(), name: z.string() }),
+  /**
+   * `<source>:<venue id>`, as submissions name it: `openreview:ICLR.cc/2027/Conference`. `page` is the venue's own
+   * page (the edition that lists it among its `sources`), whose statistics of it are the whole venue's; `null` for a
+   * venue with no page (a track, TMLR).
+   */
+  venue: z.object({ id: z.string(), name: z.string(), page: PageSummary.nullable() }),
   /** The field's key in the venue's review forms: `rating`. */
   field: z.string(),
   label: z.string(),
@@ -972,7 +976,26 @@ export const PageScoreField = ScoreSummary.extend({
   bins: ScoreBins,
   /** The same by outcome: `accepted`, `rejected`, `withdrawn`, `pending`. */
   split: z.record(z.string(), ScoreGroup),
+  /**
+   * With `?marks=true`: the scope's own submissions in this field, each with its paper and mean, ascending, to mark
+   * on the venue's distribution. `null` when the scope has more than 1,000 here; empty when the numbers are withheld.
+   */
+  marks: z
+    .array(
+      z.object({
+        identifier: z.string().nullable(),
+        address: z.string().nullable(),
+        title: z.string(),
+        mean: z.number(),
+        outcome: z.enum(['accepted', 'rejected', 'withdrawn', 'pending']),
+      }),
+    )
+    .nullable()
+    .optional(),
 });
+
+/** `GET /pages/{identifier}/scores/{venue}/{field}`: whether to name the scope's own submissions. */
+export const PageScoreFieldQuery = z.object({ marks: z.enum(['true', 'false']).default('false') });
 
 /** `GET /pages/{identifier}/papers`: which fields, and a chunk of them. */
 export const PagePapersQuery = z.object({

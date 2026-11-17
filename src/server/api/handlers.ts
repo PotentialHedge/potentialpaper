@@ -73,7 +73,7 @@ import { findPage } from '../pages/kinds';
 import { isClaimable, ownPageClaim, requestPageClaim, withdrawPageClaim } from '../page-claims';
 import { presentVenuePapers } from '../venue-pages';
 import { createOrgChild, orgOverview, presentOrgOverview } from '../org-pages';
-import { scopeChangedAt, scopePaperChunk, scopeScoreField, scopeScoreList } from '../scope-stats';
+import { scopeChangedAt, scopePaperChunk, scopeScoreField, scopeScoreList, scopeScoreMarks } from '../scope-stats';
 import { rolesOf } from '../pages/check';
 import { presentChanges, recentChanges } from '../changes';
 import { protectionOf, setProtection } from '../page-protection';
@@ -1111,12 +1111,24 @@ export const getPageScoreField = route(async (req, params) => {
   const page = await mustFindScope(identifierParam(params));
   const venue = encodedParam(params, 'venue');
   const field = encodedParam(params, 'field');
+  const query = parseQuery(req, S.PageScoreFieldQuery);
   const [summary, detail] = await Promise.all([
     scopeSummary(page.id),
     scopeScoreField(page.id, venue, field, await venueStatsHideUntil()),
   ]);
   if (!detail) throw new ApiError(404, 'not_found', `no statistics of "${field}" at ${venue} here`);
-  return respondCached(req, S.PageScoreField, { ...detail, page: summary }, PUBLIC_MINUTE);
+  const marks =
+    query.marks !== 'true'
+      ? undefined
+      : detail.hidden
+        ? []
+        : await scopeScoreMarks(page.id, venue, field, detail.count);
+  return respondCached(
+    req,
+    S.PageScoreField,
+    { ...detail, page: summary, ...(marks === undefined ? {} : { marks }) },
+    PUBLIC_MINUTE,
+  );
 });
 
 /** Chunks a stream reads at a time. */

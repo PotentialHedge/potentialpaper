@@ -437,6 +437,15 @@ describe('data for plugins over the RPC (scope.scores, scope.papers)', () => {
     expect(await dispatch(s, call('scope.scores', { identifier: 'venue:iclr/2027', field: 'rating' }))).toMatchObject({
       error: { code: 'InvalidParams', message: expect.stringContaining('venue') },
     });
+    // An org's own submissions by name, on one field only.
+    expect(
+      await dispatch(s, call('scope.scores', { identifier: 'org:eth', venue, field: 'rating', marks: true })),
+    ).toMatchObject({
+      result: { path: '/pages/org%3Aeth/scores/openreview%3AICLR.cc%2F2027%2FConference/rating?marks=true' },
+    });
+    expect(await dispatch(s, call('scope.scores', { identifier: 'org:eth', venue, marks: true }))).toMatchObject({
+      error: { code: 'InvalidParams', message: expect.stringContaining('marks') },
+    });
   });
 
   it('reads papers in chunks: the SDK follows the cursor to the end', async () => {

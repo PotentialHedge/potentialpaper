@@ -232,7 +232,7 @@ export function openApiDocument(origin: string) {
       ),
       '/pages/{identifier}/scores': get(
         "A scope's score statistics",
-        `The venues its papers were submitted to and each score field of their review forms, with counts, venues with the most submissions first. A site may withhold a venue's numbers until its decisions are out (\`hidden\`). ${ETAGGED}`,
+        `The venues its papers were submitted to and each score field of their review forms, with counts, venues with the most submissions first. Each venue names its own page (\`venue.page\`), whose statistics are the whole venue's. A site may withhold a venue's numbers until its decisions are out (\`hidden\`). ${ETAGGED}`,
         S.PageScores,
       ),
       '/pages/{identifier}/scores/{venue}/{field}': get(
@@ -255,6 +255,11 @@ export function openApiDocument(origin: string) {
             description: "The field's key in the venue's forms: `rating`.",
             schema: { type: 'string' },
           },
+          query(
+            'marks',
+            "`true` adds `marks`: the scope's own submissions in this field, each with its paper and mean, ascending (`null` above 1,000). For a topic or an org, draw the whole venue from `venue.page`'s statistics and mark these on it.",
+            { type: 'string', enum: ['true', 'false'], default: 'false' },
+          ),
         ],
       ),
       '/pages/{identifier}/papers': {
