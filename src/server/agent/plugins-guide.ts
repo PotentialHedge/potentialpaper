@@ -236,9 +236,22 @@ Every field of the manifest:
   Submissions section, with \`pp.context.surface.submission.venue\` saying which; or one per kind,
   \`{ "paper": "submission", "*": "main" }\`), and \`when\`.
 - \`contributes.pages\` (up to 8): whole pages of its own at \`${origin}/x/<owner>/<name>/<page id>/…\`.
-- \`contributes.settings\`: each \`{ "type": "boolean" | "number" | "string" | "enum", "default", "description" }\`, with
-  \`minimum\`/\`maximum\` for numbers, \`maxLength\` for strings, \`values\` (and \`labels\`) for enums. They appear in the
-  reader's settings.json as \`"<plugin id>.<name>"\`, and as a form on /settings/plugins.
+- \`contributes.settings\`: each by its name (letters, digits, \`-\`, \`_\`; no dots), \`{ "type", "default" }\` plus
+  any of \`title\` (its label; the name spaced out when absent: \`showLegend\` is "Show legend"), \`description\`,
+  \`group\` (a heading on your settings page) and \`order\` (lower first, then as listed). Each type is drawn with its
+  own control, as VS Code draws its settings:
+
+  | \`type\` | Value | Control | Also |
+  | --- | --- | --- | --- |
+  | \`boolean\` | \`true\`/\`false\` | a switch | |
+  | \`number\` | a number, or \`null\` when the default is | a number field | \`minimum\`, \`maximum\` |
+  | \`string\` | text | a text field | \`maxLength\` (up to 1000), \`multiline\`, \`placeholder\` |
+  | \`enum\` | one of \`values\` | a dropdown, or radio buttons with \`"display": "radio"\` | \`values\`, \`labels\` |
+  | \`list\` | an ordered list of different strings | a list to add to, remove from and reorder | \`values\` (and \`labels\`) to pick from instead of typing, \`maxItems\` (up to 100), \`maxLength\` (each, up to 200), \`placeholder\` |
+  | \`set\` | any of \`values\` | a box to tick per value | \`values\`, \`labels\` |
+
+  They appear in the reader's settings.json as \`"<plugin id>.<name>"\`, and on your plugin's own page of the
+  settings, ${origin}/settings/plugins/<owner>/<name>, which also lists them in the settings' search.
 - \`contributes.commands\` (up to 16): \`id\` and \`title\`, listed in each of its panels' menus; handle them with
   \`pp.commands.register(id, handler)\`.
 

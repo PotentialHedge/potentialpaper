@@ -90,8 +90,10 @@ import {
   topicOverview,
   topicSuggestionList,
 } from '../topic-pages';
+import { countView } from '../view-counter';
 import { ApiError } from './errors';
 import {
+  clientIp,
   etagOf,
   notModified,
   parseBody,
@@ -539,6 +541,19 @@ export const deleteFollow = route(async (req) => {
   const { paper } = await knownPaper(scheme, value);
   await unfollowPaper(paper.id, principal.account.id);
   return respond(S.FollowState, await followState(paper.id, principal.account.id), { principal });
+});
+
+/**
+ * Counts the caller as a viewer of the paper today (`server/view-counter.ts`): its page's beacon. Sent with the
+ * session cookie, so a signed-in reader counts as their account, anyone else as their network.
+ */
+export const postView = route(async (req) => {
+  const principal = await authenticate(req);
+  const { paper: id } = await parseBody(req, S.ViewBody);
+  const { paper } = await knownPaper(id.scheme, id.value);
+  const views = await countView(paper.id, { accountId: principal?.account.id, ip: clientIp(req) });
+  if (views === null) throw new ApiError(404, 'not_found', 'no paper with that identifier');
+  return respond(S.ViewState, { views }, { principal });
 });
 
 /** Mails the person a code for their agent. Anonymous, and the same answer whether or not they have an account. */

@@ -1,5 +1,6 @@
 import type { Metadata } from 'next';
 import { headers } from 'next/headers';
+import Link from 'next/link';
 import { redirect } from 'next/navigation';
 import { SignOut } from '@/components/SignOut';
 import { ui } from '@/components/ui';
@@ -41,7 +42,7 @@ export default async function Profile() {
         Your page is <a href={keyedPagePath('user', account.handle)}>{keyedPagePath('user', account.handle)}</a>. It
         shows your handle, what you write in its <code className={ui.mono}>about/</code>, and your links; your
         institution only as you choose below; your real name, papers, activity and comments only as you choose under{' '}
-        <a href="/settings">Settings, “Your public page”</a>.
+        <Link href="/settings/public-page">Settings, “Your public page”</Link>.
       </p>
       <ProfileForm
         initial={{

@@ -1,4 +1,6 @@
+import { cookies, headers } from 'next/headers';
 import Link from 'next/link';
+import { Collapsible } from '@/components/Collapsible';
 import { HomeNextStep } from '@/components/HomeNextStep';
 import { redirect } from 'next/navigation';
 import { FilterIcon, MoreIcon } from '@/components/icons';
@@ -12,7 +14,8 @@ import { ui } from '@/components/ui';
 import { paperIdFromText, paperPath, sourceLinks } from '@/lib/paper-ids';
 import { parseSearch } from '@/lib/query';
 import { normalizeSearch, SEARCH_MAX_LENGTH, SEARCH_SORTS, type SearchSort } from '@/lib/search';
-import { SEARCH_PAGE_SIZE, searchPapers, topVenues, type SearchHit } from '@/server/search';
+import { viewerFromHeaders } from '@/server/auth';
+import { SEARCH_PAGE_SIZE, searchPapers, topVenues, type SearchFilter, type SearchHit } from '@/server/search';
 
 export const dynamic = 'force-dynamic';
 
@@ -21,8 +24,32 @@ const ON = ui.on;
 /** Sorts kept out of the row, in the ⋯ menu (on a phone every sort is in the filter menu). */
 const MENU_SORTS: readonly SearchSort[] = ['oldest', 'title'];
 
+/** The viewer's own papers per page in the "My papers" section; `?mpage=` pages it. */
+const MINE_PAGE = 10;
+/** The cookie remembering whether that section was left collapsed. */
+const MINE_COOKIE = 'home_mine_open';
+/** Same for the "Following" section; `?fpage=` pages it. */
+const FOLLOWING_PAGE = 10;
+const FOLLOWING_COOKIE = 'home_following_open';
+
 function one(v: string | string[] | undefined): string | undefined {
   return Array.isArray(v) ? v[0] : v;
+}
+
+/**
+ * Page `requested` (1-based) of a list, `size` rows a page. Past the end it serves the last page, so a stale link
+ * after the list shrank still shows something.
+ */
+async function pageOf(
+  requested: string | string[] | undefined,
+  size: number,
+  filter: Omit<SearchFilter, 'page' | 'limit'>,
+): Promise<{ hits: SearchHit[]; total: number; page: number; pages: number }> {
+  const page = Math.max(1, Number.parseInt(one(requested) ?? '1', 10) || 1);
+  const found = await searchPapers({ ...filter, page, limit: size });
+  const pages = Math.max(1, Math.ceil(found.total / size));
+  if (page <= pages) return { ...found, page, pages };
+  return { ...(await searchPapers({ ...filter, page: pages, limit: size })), page: pages, pages };
 }
 
 export default async function Home({
@@ -50,14 +77,33 @@ export default async function Home({
   const sorts = SEARCH_SORTS.filter((s) => q || s !== 'relevance');
   const sort = sorts.find((s) => s === one(sp.sort)) ?? defaultSort;
 
-  const filter = { q, venue: venueFilter, sort };
-  const requested = Math.max(1, Number.parseInt(one(sp.page) ?? '1', 10) || 1);
-  let [{ hits, total }, venues] = await Promise.all([searchPapers({ ...filter, page: requested }), topVenues()]);
-  const pages = Math.max(1, Math.ceil(total / SEARCH_PAGE_SIZE));
-  // Past the end serves the last page, so a stale link after the list shrank still shows something.
-  const page = Math.min(requested, pages);
-  if (page < requested) ({ hits, total } = await searchPapers({ ...filter, page }));
-  if (venue && !venues.includes(venue)) venues = [...venues, venue];
+  const viewer = await viewerFromHeaders(await headers());
+  const me = viewer?.account.id ?? null;
+  // ?following=1: only papers the signed-in viewer follows.
+  const onlyFollowed = me !== null && one(sp.following) === '1';
+  // The viewer's own papers, then the papers they follow, are pinned above the list, as acceptodds pins
+  // followed papers and positions: same venue and sort, each paged on its own, and none repeated. A paper both
+  // theirs and followed is under My papers. Not while searching, nor when the list is already only followed papers.
+  const pins = me !== null && !q && !onlyFollowed;
+  const browse = { venue, sort };
+  const [all, mine, followed, topVenueList] = await Promise.all([
+    pageOf(sp.page, SEARCH_PAGE_SIZE, {
+      q,
+      venue: venueFilter,
+      sort,
+      followedBy: onlyFollowed ? me : null,
+      exceptAuthoredBy: pins ? me : null,
+      exceptFollowedBy: pins ? me : null,
+    }),
+    pins ? pageOf(sp.mpage, MINE_PAGE, { ...browse, authoredBy: me }) : null,
+    pins ? pageOf(sp.fpage, FOLLOWING_PAGE, { ...browse, followedBy: me, exceptAuthoredBy: me }) : null,
+    topVenues(),
+  ]);
+  const venues = venue && !topVenueList.includes(venue) ? [...topVenueList, venue] : topVenueList;
+  const cookieJar = await cookies();
+  const mineOpen = cookieJar.get(MINE_COOKIE)?.value !== '0';
+  const followingOpen = cookieJar.get(FOLLOWING_COOKIE)?.value !== '0';
+  const pinnedCount = (mine?.total ?? 0) + (followed?.total ?? 0);
 
   // Filter links keep the search; `q: ''` drops it (and its relevance sort). They go back to page 1:
   // pages are kept only by the pager's own links.
@@ -66,20 +112,26 @@ export default async function Home({
       ...(q ? { q } : {}),
       ...(venue ? { venue } : {}),
       sort,
+      ...(onlyFollowed ? { following: '1' } : {}),
       ...(detailed ? { view: 'detailed' } : {}),
       ...patch,
     });
     for (const key of ['q', 'venue', 'view']) if (!params.get(key)) params.delete(key);
+    if (params.get('following') === '0') params.delete('following');
     // The default sort stays out of the address, and relevance is gone with the search.
     const chosen = params.get('sort');
     if (chosen === 'relevance' || (chosen === 'activity' && !params.has('q'))) params.delete('sort');
-    if (params.get('page') === '1') params.delete('page');
+    for (const key of ['page', 'mpage', 'fpage']) if (params.get(key) === '1') params.delete(key);
     const query = params.toString();
     return query ? `/?${query}` : '/';
   };
+  // A pager's link to page `p` of its section, keeping the other sections' pages.
+  const pages = { page: String(all.page), mpage: String(mine?.page ?? 1), fpage: String(followed?.page ?? 1) };
+  const pageHref = (key: keyof typeof pages, anchor: string) => (p: number) =>
+    `${href({ ...pages, [key]: String(p) })}${anchor}`;
 
   // Shown on the ⋯ trigger when not the defaults, since the row doesn't show them.
-  const moreLabel = [MENU_SORTS.includes(sort) && sort, venue].filter(Boolean).join(', ');
+  const moreLabel = [MENU_SORTS.includes(sort) && sort, venue, onlyFollowed && '★'].filter(Boolean).join(', ');
   const viewLink = (v: 'compact' | 'detailed') => (
     <Link
       href={href({ view: v === 'detailed' ? 'detailed' : '' })}
@@ -117,6 +169,7 @@ export default async function Home({
       {/* A plain GET form, so search works without JavaScript. */}
       <form action="/" method="get" role="search" className="mt-5 flex gap-2">
         {venue && <input type="hidden" name="venue" value={venue} />}
+        {onlyFollowed && <input type="hidden" name="following" value="1" />}
         {detailed && <input type="hidden" name="view" value="detailed" />}
         <SearchInput
           name="q"
@@ -151,7 +204,7 @@ export default async function Home({
             className="relative hidden cursor-pointer px-2.5 text-muted hover:text-accent narrow:flex narrow:items-center"
           >
             <FilterIcon className="size-5" />
-            {venue && <span className="absolute top-1.5 right-1.5 size-1.5 rounded-full bg-accent" />}
+            {(venue || onlyFollowed) && <span className="absolute top-1.5 right-1.5 size-1.5 rounded-full bg-accent" />}
           </PopoverTrigger>
           <PopoverContent align="end" className="flex max-h-[70vh] flex-col gap-3 overflow-y-auto text-[13px]">
             <div>
@@ -183,6 +236,13 @@ export default async function Home({
                 ))}
               </div>
             </div>
+            {viewer && (
+              <PopoverClose asChild>
+                <Link href={href({ following: onlyFollowed ? '0' : '1' })} className={onlyFollowed ? ON : ''}>
+                  ★ following only
+                </Link>
+              </PopoverClose>
+            )}
             <div>
               <h3 className={ui.boxHeading}>View</h3>
               <div className="flex flex-wrap gap-x-4 gap-y-2">
@@ -206,7 +266,7 @@ export default async function Home({
 
       {q && (
         <div className="mt-2 font-sans text-[13px] text-muted">
-          {total.toLocaleString('en')} {total === 1 ? 'result' : 'results'} for “{q}”
+          {all.total.toLocaleString('en')} {all.total === 1 ? 'result' : 'results'} for “{q}”
           {venueFilter && <> in {venueFilter}</>}. <Link href={href({ q: '' })}>clear</Link>
         </div>
       )}
@@ -233,7 +293,7 @@ export default async function Home({
           {/* Not a flex box: an icon alone gives a flex item no text baseline, and the row aligns on
               baselines. Inline, `align-middle` centres the dots on the text's x-height. */}
           <PopoverTrigger
-            title="More sorts and filters: venue"
+            title="More sorts and filters: venue, following"
             className="-my-1 cursor-pointer px-1 py-1 text-ink hover:text-accent"
           >
             {moreLabel}
@@ -259,23 +319,84 @@ export default async function Home({
                 </Link>
               </PopoverClose>
             ))}
+            {viewer && (
+              <PopoverClose asChild>
+                <Link
+                  href={href({ following: onlyFollowed ? '0' : '1' })}
+                  className={`mt-1 border-t border-rule pt-1.5 ${onlyFollowed ? ON : ''}`}
+                >
+                  ★ following
+                </Link>
+              </PopoverClose>
+            )}
           </PopoverContent>
         </Popover>
       </div>
 
-      {total === 0 && (
-        <div className={ui.empty}>
-          {q ? `No papers match “${q}”. An arXiv id or DOI also finds papers new to us.` : 'No papers here yet.'}
-        </div>
-      )}
+      {all.total + pinnedCount === 0 &&
+        (q ? (
+          <div className={ui.empty}>
+            {onlyFollowed
+              ? `No papers you follow match “${q}”.`
+              : `No papers match “${q}”. An arXiv id or DOI also finds papers new to us.`}
+          </div>
+        ) : onlyFollowed ? (
+          <div className={ui.empty}>No papers you follow here. Follow one with ☆ on its page.</div>
+        ) : (
+          <div className={ui.empty}>No papers here yet.</div>
+        ))}
 
-      {total > 0 && (
-        <section>
-          <div className="h-3.5" />
-          {hits.map((hit) => (
+      {mine && mine.total > 0 && (
+        <Collapsible
+          id="mine"
+          cookie={MINE_COOKIE}
+          open={mineOpen}
+          className="group"
+          summary={
+            <>
+              My papers <span className="font-normal">({mine.total})</span>
+            </>
+          }
+        >
+          {mine.hits.map((hit) => (
             <Row key={`${hit.scheme}:${hit.value}`} hit={hit} detailed={detailed} />
           ))}
-          <Pager page={page} pages={pages} href={(p) => href({ page: String(p) })} />
+          <Pager page={mine.page} pages={mine.pages} href={pageHref('mpage', '#mine')} />
+        </Collapsible>
+      )}
+
+      {followed && followed.total > 0 && (
+        <Collapsible
+          id="following"
+          cookie={FOLLOWING_COOKIE}
+          open={followingOpen}
+          className="group"
+          summary={
+            <>
+              Following <span className="font-normal">({followed.total})</span>
+            </>
+          }
+        >
+          {followed.hits.map((hit) => (
+            <Row key={`${hit.scheme}:${hit.value}`} hit={hit} detailed={detailed} />
+          ))}
+          <Pager page={followed.page} pages={followed.pages} href={pageHref('fpage', '#following')} />
+        </Collapsible>
+      )}
+
+      {all.total > 0 && (
+        <section id="all">
+          {pinnedCount > 0 ? (
+            <h2 className={`mt-7 mb-2 ${ui.section}`}>
+              All papers <span className="font-normal">({all.total.toLocaleString('en')})</span>
+            </h2>
+          ) : (
+            <div className="h-3.5" />
+          )}
+          {all.hits.map((hit) => (
+            <Row key={`${hit.scheme}:${hit.value}`} hit={hit} detailed={detailed} />
+          ))}
+          <Pager page={all.page} pages={all.pages} href={pageHref('page', pinnedCount > 0 ? '#all' : '')} />
         </section>
       )}
     </main>

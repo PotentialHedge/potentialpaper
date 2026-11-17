@@ -60,9 +60,27 @@ export interface SearchFilter {
   /** One venue, exactly. */
   venue?: string | null;
   sort?: SearchSort;
+  /** Only the papers this account follows. */
+  followedBy?: string | null;
+  /** Only the papers this account is an author of, or has claimed to be (as on My papers). */
+  authoredBy?: string | null;
+  /** Leave out the papers this account follows: they are pinned above the list. */
+  exceptFollowedBy?: string | null;
+  /** Leave out the papers this account is an author of, or has claimed to be. */
+  exceptAuthoredBy?: string | null;
   /** From 1. */
   page?: number;
   limit?: number;
+}
+
+/** The papers an account follows, as a predicate on `papers p`. */
+function followed(accountId: string): SQL {
+  return sql`p.id in (select f.paper_id from paper_follows f where f.account_id = ${accountId}::uuid)`;
+}
+
+/** The papers an account is an author of, or has asked to be (`server/my-papers.ts`'s `authoredPapers`). */
+function authored(accountId: string): SQL {
+  return sql`p.id in (select a.paper_id from author_claims a where a.account_id = ${accountId}::uuid and a.status in ('confirmed', 'pending'))`;
 }
 
 /** The query is a bound parameter; the prefix alternative is made of letters and digits only (`lib/search.ts`). */
@@ -242,7 +260,16 @@ export async function searchPapers(
 type Found = Omit<SearchHit, 'matches' | 'matchCount'> & { id: string };
 
 async function readPage(
-  { venue, sort = 'relevance', page = 1, limit = SEARCH_PAGE_SIZE }: SearchFilter,
+  {
+    venue,
+    sort = 'relevance',
+    page = 1,
+    limit = SEARCH_PAGE_SIZE,
+    followedBy,
+    authoredBy,
+    exceptFollowedBy,
+    exceptAuthoredBy,
+  }: SearchFilter,
   node: SearchNode | null,
   fuzzy: boolean,
   scopes: Scopes,
@@ -252,6 +279,10 @@ async function readPage(
     [
       sql`p.merged_into is null`,
       ...(venue ? [sql`p.venue = ${venue}`] : []),
+      ...(followedBy ? [followed(followedBy)] : []),
+      ...(authoredBy ? [authored(authoredBy)] : []),
+      ...(exceptFollowedBy ? [sql`not ${followed(exceptFollowedBy)}`] : []),
+      ...(exceptAuthoredBy ? [sql`not ${authored(exceptAuthoredBy)}`] : []),
       ...(node === null ? [] : [predicate(node, fuzzy, scopes)]),
     ],
     sql` and `,

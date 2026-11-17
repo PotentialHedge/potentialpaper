@@ -1,6 +1,7 @@
 'use client';
 
 import { useState, type ReactNode } from 'react';
+import { Switch } from '@/components/controls';
 import { ui } from '@/components/ui';
 
 /** One email preference on the account, saved as soon as it changes (`PATCH /api/v1/me`). */
@@ -20,13 +21,12 @@ function MailToggle({
   const [note, setNote] = useState<{ ok: boolean; text: string } | null>(null);
   return (
     <div className="mb-3 max-w-[420px] font-sans text-sm">
-      <label className="flex items-center gap-2">
-        <input
-          type="checkbox"
+      <label className="flex cursor-pointer items-start gap-2.5">
+        <Switch
+          className="mt-0.5"
           checked={on}
           disabled={busy}
-          onChange={async (e) => {
-            const next = e.target.checked;
+          onCheckedChange={async (next) => {
             setBusy(true);
             setNote(null);
             const res = await fetch('/api/v1/me', {

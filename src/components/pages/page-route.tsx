@@ -120,7 +120,7 @@ export async function KeyedPageRoute({ kind, segments }: { kind: KeyedKind; segm
   };
   const clone = cloneAddresses({ kind, key });
   return (
-    <main className={ui.paperPage}>
+    <main className={ui.page}>
       <PluginPageProvider data={{ kind, page: summary, scopes, facts }}>
         <article>
           <p className={`${ui.fine} mt-6 text-center font-sans`}>{KINDS[kind].title}</p>

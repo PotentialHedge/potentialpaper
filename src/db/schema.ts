@@ -5,6 +5,7 @@ import {
   boolean,
   check,
   customType,
+  date,
   doublePrecision,
   index,
   integer,
@@ -177,6 +178,8 @@ export const papers = pgTable(
     abstractLicense: text('abstract_license'),
     /** The duplicate's survivor. Its identifiers still resolve, and redirect there. */
     mergedInto: uuid('merged_into').references((): AnyPgColumn => papers.id, { onDelete: 'set null' }),
+    /** Unique viewers, one a day each (`server/view-counter.ts`). */
+    viewCount: integer('view_count').notNull().default(0),
     search: tsvector('search')
       .notNull()
       .generatedAlwaysAs(
@@ -1161,6 +1164,23 @@ export const commentMentions = pgTable(
       .references(() => accounts.id, { onDelete: 'cascade' }),
   },
   (t) => [primaryKey({ columns: [t.commentId, t.accountId] }), index('comment_mentions_account_idx').on(t.accountId)],
+);
+
+/**
+ * Who looked at a paper today, so that a visitor counts once a day (`server/view-counter.ts`). `visitor` is an HMAC
+ * of the UTC day and the account or client network under a server secret: it cannot be reversed to an address, and,
+ * the day being inside it, cannot link one day's visitor to the next. Only today's and yesterday's rows are kept;
+ * `papers.view_count` is what lasts. A cache of reads, not a source of truth, so it has no foreign keys and can never
+ * take a lock on a row anything else holds.
+ */
+export const paperViews = pgTable(
+  'paper_views',
+  {
+    paperId: uuid('paper_id').notNull(),
+    day: date('day', { mode: 'string' }).notNull(),
+    visitor: text('visitor').notNull(),
+  },
+  (t) => [primaryKey({ columns: [t.paperId, t.day, t.visitor] }), index('paper_views_day_idx').on(t.day)],
 );
 
 /**

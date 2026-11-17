@@ -2,6 +2,7 @@
 
 import { useCallback, useEffect, useState } from 'react';
 import type { z } from 'zod';
+import { Checkbox } from '@/components/controls';
 import { ui } from '@/components/ui';
 import { aliasName } from '@/lib/aliases';
 import { COMMENT_PAGE, MAX_COMMENT_LENGTH, REPLY_PAGE } from '@/lib/comments';
@@ -352,8 +353,8 @@ function CommentForm({
         </span>
         <span className="flex shrink-0 items-center gap-2 whitespace-nowrap">
           {!viewer.authorName && (
-            <label className="mt-2 flex items-center gap-1 text-xs text-muted">
-              <input type="checkbox" checked={anonymous} onChange={(e) => setAnonymous(e.target.checked)} />
+            <label className="mt-2 flex cursor-pointer items-center gap-1.5 text-xs text-muted">
+              <Checkbox checked={anonymous} onCheckedChange={setAnonymous} />
               anonymous
             </label>
           )}

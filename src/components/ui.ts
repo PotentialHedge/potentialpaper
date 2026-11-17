@@ -26,9 +26,11 @@ export const ui = {
   boxHeading: `mb-2 ${subsectionLook}`,
   /** A run-in heading, set in a line of other text. */
   runIn: subsectionLook,
-  page: 'mx-auto max-w-[880px] px-6 pt-3 pb-15 narrow:px-4',
-  /** A paper's page, wider than the rest to give the main column room beside its panels. */
-  paperPage: 'mx-auto max-w-[1080px] px-6 pt-3 pb-15 narrow:px-4',
+  /**
+   * Every page's column: as wide as a paper's page needs for its main column beside its panels, and the same on every
+   * other page. Forms and long prose inside set their own narrower measure.
+   */
+  page: 'mx-auto max-w-[1080px] px-6 pt-3 pb-15 narrow:px-4',
   groupHeading: `mt-10 mb-2 ${section}`,
   /** An unnumbered section, for back matter such as References. */
   backHeading: `mt-10 mb-2 ${sectionLook}`,

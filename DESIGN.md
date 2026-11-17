@@ -50,17 +50,17 @@ Same as acceptodds unless a reason is stated here. The reference is
 [PotentialHedge/acceptodds](https://github.com/PotentialHedge/acceptodds), checked out locally at
 `../papermarket/platform`.
 
-| Concern | Choice                                                                          |
-| ------- | ------------------------------------------------------------------------------- |
-| App     | TypeScript, Next.js 16 App Router, Node 26, `output: 'standalone'`              |
-| Data    | Postgres 19 with Drizzle; migrations are a separate deploy step (§4.11)         |
-| Auth    | Better Auth: email-first sign-up, link plus 6-digit code, API keys              |
-| UI      | Tailwind v4 with acceptodds' `globals.css` tokens and `components/ui.ts`        |
-| Content | `react-markdown` stack with GFM and KaTeX, `d3-force` for the graph             |
-| Mail    | Resend                                                                          |
-| Tests   | Vitest and fast-check; integration tests against real Postgres                  |
-| Hosting | One app and one Postgres container behind Traefik and Cloudflare                |
-| Added   | Cloudflare R2 for uploaded media; `node-diff3` and `diff` for merging and diffs |
+| Concern | Choice                                                                                                                                                                        |
+| ------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| App     | TypeScript, Next.js 16 App Router, Node 26, `output: 'standalone'`                                                                                                            |
+| Data    | Postgres 19 with Drizzle; migrations are a separate deploy step (§4.11)                                                                                                       |
+| Auth    | Better Auth: email-first sign-up, link plus 6-digit code, API keys                                                                                                            |
+| UI      | Tailwind v4 with acceptodds' `globals.css` tokens and `components/ui.ts`; form controls in `components/controls` (Radix primitives and dnd-kit lists, styled with the tokens) |
+| Content | `react-markdown` stack with GFM and KaTeX, `d3-force` for the graph                                                                                                           |
+| Mail    | Resend                                                                                                                                                                        |
+| Tests   | Vitest and fast-check; integration tests against real Postgres                                                                                                                |
+| Hosting | One app and one Postgres container behind Traefik and Cloudflare                                                                                                              |
+| Added   | Cloudflare R2 for uploaded media; `node-diff3` and `diff` for merging and diffs                                                                                               |
 
 **Copy from acceptodds, don't share a package.** The two products will diverge, and a shared
 package would slow both. Good candidates to copy are `better-auth.ts`, `onboarding.ts`,
@@ -923,7 +923,14 @@ Built 2026-11-16 (`handoffs/plugins.md` Phase 1). One document per account, laye
   naming its key; unknown keys are kept, with a warning, so a file can name a plugin's settings before the plugin
   is installed. Agents and scripts use the same route.
 - `/schemas/settings.json` is its JSON Schema: the core keys and the requesting account's installed plugins' keys.
-  `/settings` has a form made from the schema, the raw file with the same checks, and Export and Import.
+  `/settings` is laid out as VS Code's settings editor (rebuilt 2026-11-17, `lib/settings/form.ts`): a page per
+  category (each kind's pages, "Your public page") and one per installed plugin (`/settings/plugins/<owner>/<name>`)
+  down the side, a search over every setting, and each setting drawn by a standard control (a switch, a dropdown or
+  radio buttons, a text or number field, a list to add to, remove from and reorder, a box per choice, a fixed set to
+  put in order; lists reorder by dragging, `components/controls`), saved as it changes. A kind's panels are one
+  control, each part of the page a list to drag with a switch per panel, over the two keys `<kind>.panels.order` and
+  `<kind>.panels.hidden`, which stay separate flat lists in the file. Each setting has a mark and a reset on what the reader's file sets. There is no editor for
+  the raw file: it is downloaded, edited in the reader's own editor, and uploaded, with the same checks.
 - **Settings are preferences.** Remembered state (dismissed prompts, a plugin's cache) stays out of the document,
   and so does consent (below).
 - The first core keys are `<kind>.panels.hidden` and `<kind>.panels.order`: a reader turns panels off or reorders
@@ -970,9 +977,11 @@ Built 2026-11-16 (`handoffs/plugins.md` Phase 2). A plugin is a public repo (or 
   site-wide pin of a ref never moves. The new commit is copied first, so a broken release changes nothing. If it asks
   for a permission or network origin their grant lacks, the update only describes it (`consent`) until they approve
   it in a browser, which switches and grants at once.
-- **`/settings/plugins`**: the installed plugins (on and off, version and commit, update, what each may do with
-  approve and withdraw, its settings as a form drawn from its `SettingSpec`s, remove), Discover, add by source, and
-  load from localhost. `/settings` links there, and its hidden/order lists offer installed plugins' panels too.
+- **`/settings/plugins`**: the installed plugins, Discover, add by source, and load from localhost. Each installed
+  plugin has its own page, `/settings/plugins/<owner>/<name>`: on and off, version and commit, update, its settings
+  drawn from its `SettingSpec`s (`boolean`, `number`, `string`, `enum`, `list`, `set`, each with an optional
+  `title`, `group` and `order`), what it may do with approve and withdraw, and remove. The core panel lists offer
+  installed plugins' panels too.
 - **`/plugins.md`**, linked from `llms.txt`, is the guide for agents: the manifest, the SDK (its method, permission
   and `when` tables are made from the code), the data routes, the dev loop and publishing. A README says "Read
   https://…/plugins.md and build me a PotentialPaper plugin."

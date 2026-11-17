@@ -1,7 +1,9 @@
 'use client';
 
 import { useState } from 'react';
+import { CopyField } from '@/components/CopyField';
 import { OnboardAgent } from '@/components/OnboardAgent';
+import { CheckboxField } from '@/components/controls';
 import { ui } from '@/components/ui';
 import { AGENT_TOKEN_NAME } from '@/lib/agent-prompt';
 
@@ -26,37 +28,6 @@ async function errorText(res: Response): Promise<string> {
 }
 
 const day = (iso: string | null) => (iso ? iso.slice(0, 10) : 'never');
-
-/** The new key, selected so it can be copied by hand where there is no clipboard, and a button that copies it. */
-function NewKey({ value, label }: { value: string; label: string }) {
-  const [copied, setCopied] = useState(false);
-  return (
-    <div className="flex gap-2">
-      <input
-        readOnly
-        value={value}
-        aria-label={label}
-        onFocus={(e) => e.currentTarget.select()}
-        className="min-w-0 flex-1 border border-rule bg-white p-1.5 font-mono text-[13px] leading-[normal] narrow:text-base"
-      />
-      <button
-        type="button"
-        className={ui.btn({ ghost: true, inline: true, flush: true })}
-        onClick={async () => {
-          try {
-            await navigator.clipboard.writeText(value);
-            setCopied(true);
-            setTimeout(() => setCopied(false), 1500);
-          } catch {
-            // No clipboard (an insecure context): the field is there to copy by hand.
-          }
-        }}
-      >
-        {copied ? 'copied' : 'copy'}
-      </button>
-    </div>
-  );
-}
 
 /**
  * The viewer's API keys as Table `n`, a form to make one, and the prompt to onboard an agent, as acceptodds'
@@ -170,7 +141,7 @@ export function ApiKeys({ initial, n, canWrite }: { initial: ApiKeyRow[]; n: num
             you. Send it as <code className={ui.mono}>Authorization: Bearer &lt;key&gt;</code>, or give it as the
             password when <code className={ui.mono}>git push</code> asks for one.
           </div>
-          <NewKey value={secret.token} label={`API key ${secret.name}`} />
+          <CopyField value={secret.token} label={`API key ${secret.name}`} />
         </div>
       )}
 
@@ -196,20 +167,30 @@ export function ApiKeys({ initial, n, canWrite }: { initial: ApiKeyRow[]; n: num
             make key
           </button>
         </div>
-        <label className="mt-1.5 flex items-baseline gap-1.5">
-          <input type="checkbox" checked={write} onChange={(e) => setWrite(e.target.checked)} />
-          <span>
-            Allow posting on papers&rsquo; agent pages and editing papers&rsquo; pages
-            {!canWrite && <span className="text-muted"> (it will work once you confirm an institutional address)</span>}
-          </span>
-        </label>
-        <label className="mt-1.5 flex items-baseline gap-1.5">
-          <input type="checkbox" checked={push} onChange={(e) => setPush(e.target.checked)} />
-          <span>
-            Allow <code className={ui.mono}>git push</code> to papers&rsquo; pages (untick the one above for a key that
-            can push but not post, to keep in git&rsquo;s credential helper)
-          </span>
-        </label>
+        <div className="mt-1.5">
+          <CheckboxField
+            checked={write}
+            onCheckedChange={setWrite}
+            label={
+              <>
+                Allow posting on papers&rsquo; agent pages and editing papers&rsquo; pages
+                {!canWrite && (
+                  <span className="text-muted"> (it will work once you confirm an institutional address)</span>
+                )}
+              </>
+            }
+          />
+          <CheckboxField
+            checked={push}
+            onCheckedChange={setPush}
+            label={
+              <>
+                Allow <code className={ui.mono}>git push</code> to papers&rsquo; pages (untick the one above for a key
+                that can push but not post, to keep in git&rsquo;s credential helper)
+              </>
+            }
+          />
+        </div>
       </form>
       {note && <div className={ui.note(note.ok)}>{note.text}</div>}
       <div className="mt-4">

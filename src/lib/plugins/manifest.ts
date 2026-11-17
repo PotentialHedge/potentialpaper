@@ -62,32 +62,67 @@ const contributionId = (what: string) =>
     .regex(CONTRIBUTION_ID, `a ${what}'s id is lower-case letters, digits and dashes, starting with a letter`)
     .meta({ description: `The ${what}'s id, unique in the plugin. Stable: settings name it.` });
 
+const settingValues = z
+  .array(z.string().min(1).max(100))
+  .min(1)
+  .max(50)
+  .meta({ description: 'The values it may take, in the order the form shows them.' });
+const settingLabels = z
+  .array(z.string().max(100))
+  .optional()
+  .meta({ description: 'What the form calls each value, one per value.' });
+const settingCommon = {
+  title: text(60, 'Its label in the form. Without one, the name spaced out: "showLegend" is "Show legend".').optional(),
+  description: text(300, 'What it does, for the settings form.').optional(),
+  group: text(60, 'A heading the form puts it under, on your settings page.').optional(),
+  order: z.number().optional().meta({ description: 'Its place in the form: lower first, then as listed here.' }),
+};
+
 const settingSpecSchema = z
   .discriminatedUnion('type', [
-    z.looseObject({
-      type: z.literal('boolean'),
-      default: z.boolean(),
-      description: text(300, 'What it does, for the settings form.').optional(),
-    }),
+    z.looseObject({ type: z.literal('boolean'), default: z.boolean(), ...settingCommon }),
     z.looseObject({
       type: z.literal('number'),
       default: z.number().nullable(),
       minimum: z.number().optional(),
       maximum: z.number().optional(),
-      description: text(300, 'What it does, for the settings form.').optional(),
+      ...settingCommon,
     }),
     z.looseObject({
       type: z.literal('string'),
       default: z.string(),
       maxLength: z.number().int().min(1).max(1000).optional(),
-      description: text(300, 'What it does, for the settings form.').optional(),
+      multiline: z.boolean().optional().meta({ description: 'A box of several lines, not one line.' }),
+      placeholder: z.string().max(100).optional(),
+      ...settingCommon,
     }),
     z.looseObject({
       type: z.literal('enum'),
       default: z.string(),
-      values: z.array(z.string().min(1).max(100)).min(1).max(50),
-      labels: z.array(z.string().max(100)).optional(),
-      description: text(300, 'What it does, for the settings form.').optional(),
+      values: settingValues,
+      labels: settingLabels,
+      display: z
+        .enum(['dropdown', 'radio'])
+        .optional()
+        .meta({ description: 'A dropdown (the default), or a radio button per value.' }),
+      ...settingCommon,
+    }),
+    z.looseObject({
+      type: z.literal('list'),
+      default: z.array(z.string()),
+      values: settingValues.optional(),
+      labels: settingLabels,
+      maxItems: z.number().int().min(1).max(100).optional(),
+      maxLength: z.number().int().min(1).max(200).optional(),
+      placeholder: z.string().max(100).optional(),
+      ...settingCommon,
+    }),
+    z.looseObject({
+      type: z.literal('set'),
+      default: z.array(z.string()),
+      values: settingValues,
+      labels: settingLabels,
+      ...settingCommon,
     }),
   ])
   .meta({ description: 'A setting: its type, its default and what it does.' });
@@ -259,11 +294,14 @@ function unknownFields(raw: Record<string, unknown>, warn: (path: string, messag
   each(contributes.pages, Object.keys(pageSchema.shape), 'contributes.pages');
   each(contributes.commands, Object.keys(commandSchema.shape), 'contributes.commands');
   if (isObject(contributes.settings)) {
+    const common = ['type', 'default', ...Object.keys(settingCommon)];
     const fields: Record<string, string[]> = {
-      boolean: ['type', 'default', 'description'],
-      number: ['type', 'default', 'minimum', 'maximum', 'description'],
-      string: ['type', 'default', 'maxLength', 'description'],
-      enum: ['type', 'default', 'values', 'labels', 'description'],
+      boolean: common,
+      number: [...common, 'minimum', 'maximum'],
+      string: [...common, 'maxLength', 'multiline', 'placeholder'],
+      enum: [...common, 'values', 'labels', 'display'],
+      list: [...common, 'values', 'labels', 'maxItems', 'maxLength', 'placeholder'],
+      set: [...common, 'values', 'labels'],
     };
     for (const [name, spec] of Object.entries(contributes.settings)) {
       if (isObject(spec) && typeof spec.type === 'string' && fields[spec.type]) {
@@ -334,8 +372,13 @@ function crossChecks(
 
   for (const [name, spec] of Object.entries(settings)) {
     const at = `contributes.settings.${name}`;
-    if (spec.type === 'enum' && spec.labels && spec.labels.length !== spec.values.length) {
-      error(`${at}.labels`, `needs ${spec.values.length} labels, one per value`);
+    if ('values' in spec && spec.values) {
+      if (spec.labels && spec.labels.length !== spec.values.length) {
+        error(`${at}.labels`, `needs ${spec.values.length} labels, one per value`);
+      }
+      if (new Set(spec.values).size !== spec.values.length) error(`${at}.values`, 'names a value twice');
+    } else if ('labels' in spec && spec.labels) {
+      warn(`${at}.labels`, 'labels name "values", and there are none; ignored');
     }
     if (
       spec.type === 'number' &&

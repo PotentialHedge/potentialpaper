@@ -36,6 +36,7 @@ import * as myMentions from '@/app/api/v1/me/mentions/route';
 import * as myPapers from '@/app/api/v1/me/papers/route';
 import * as myCoAuthors from '@/app/api/v1/me/papers/co-authors/route';
 import * as follows from '@/app/api/v1/follows/route';
+import * as views from '@/app/api/v1/views/route';
 import * as mySettings from '@/app/api/v1/me/settings/route';
 import * as siteSettings from '@/app/api/v1/settings/route';
 import * as installedPlugins from '@/app/api/v1/plugins/installed/route';
@@ -73,7 +74,7 @@ export const ORIGIN = 'http://test.local';
 
 export async function resetDatabase(): Promise<void> {
   await getDb().execute(sql`
-    truncate table identity_keys, topic_suggestions, page_protection, org_members_due, page_redirects, scope_stats, scope_state, page_claims, plugin_refs, plugin_snapshots, user_plugin_grants, user_plugin_storage, site_settings, user_settings, page_links, page_members, page_member_sources, page_scope_names, page_parents, page_ancestors, pages, paper_follows, search_docs, bot_grants, comment_mentions, comment_aliases, comments, lfs_objects, ssh_keys, evidence_files, agent_posts, agent_files, api_tokens, agent_codes, author_claims, demo_pins, demo_snapshots, submission_notes, submissions, venues, pdf_documents, consumer_cursors, page_events, page_current, page_revisions, page_refs, page_objects, commit_identities, paper_lookup_misses, paper_identifiers, papers, institution_domains, affiliations, accounts, rate_limit_buckets,
+    truncate table paper_views, identity_keys, topic_suggestions, page_protection, org_members_due, page_redirects, scope_stats, scope_state, page_claims, plugin_refs, plugin_snapshots, user_plugin_grants, user_plugin_storage, site_settings, user_settings, page_links, page_members, page_member_sources, page_scope_names, page_parents, page_ancestors, pages, paper_follows, search_docs, bot_grants, comment_mentions, comment_aliases, comments, lfs_objects, ssh_keys, evidence_files, agent_posts, agent_files, api_tokens, agent_codes, author_claims, demo_pins, demo_snapshots, submission_notes, submissions, venues, pdf_documents, consumer_cursors, page_events, page_current, page_revisions, page_refs, page_objects, commit_identities, paper_lookup_misses, paper_identifiers, papers, institution_domains, affiliations, accounts, rate_limit_buckets,
       session, account, verification, "user"
     restart identity cascade
   `);
@@ -119,6 +120,7 @@ const ROUTES: [RegExp, any][] = [
   [/^\/me\/papers$/, myPapers],
   [/^\/me\/papers\/co-authors$/, myCoAuthors],
   [/^\/follows(\?.*)?$/, follows],
+  [/^\/views$/, views],
   [/^\/me\/settings$/, mySettings],
   [/^\/plugins\/installed(\?.*)?$/, installedPlugins],
   [/^\/me\/plugins(\?.*)?$/, myPlugins],
@@ -178,9 +180,17 @@ export function commitFiles(
 export async function api(
   method: string,
   path: string,
-  opts: { cookie?: string; token?: string; body?: unknown; text?: string; form?: FormData; origin?: string } = {},
+  opts: {
+    cookie?: string;
+    token?: string;
+    body?: unknown;
+    text?: string;
+    form?: FormData;
+    origin?: string;
+    headers?: Record<string, string>;
+  } = {},
 ): Promise<ApiResult> {
-  const headers: Record<string, string> = { origin: opts.origin ?? ORIGIN };
+  const headers: Record<string, string> = { origin: opts.origin ?? ORIGIN, ...opts.headers };
   if (opts.cookie) headers.cookie = opts.cookie;
   if (opts.token) headers.authorization = `Bearer ${opts.token}`;
   if (opts.body !== undefined) headers['content-type'] = 'application/json';
