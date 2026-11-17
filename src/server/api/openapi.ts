@@ -168,6 +168,11 @@ export function openApiDocument(origin: string) {
           query('limit', 'How many.', { type: 'integer', minimum: 1, maximum: 200, default: 50 }),
         ],
       ),
+      '/pages/{identifier}/org': get(
+        "An organisation's overview",
+        `The organisation above it, its departments and labs with their papers, the members who show it as their institution (by handle), and the venues and topics its papers are at, by count. ${CACHED}`,
+        S.OrgOverview,
+      ),
       '/pages/{identifier}/scores': get(
         "A scope's score statistics",
         `The venues its papers were submitted to and each score field of their review forms, with counts, venues with the most submissions first. A site may withhold a venue's numbers until its decisions are out (\`hidden\`). ${ETAGGED}`,

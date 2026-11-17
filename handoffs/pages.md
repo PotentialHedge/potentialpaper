@@ -1,6 +1,6 @@
 # Handoff: pages above the paper (venues, topics, organisations, people)
 
-Status: plan, 2026-11-16. Phases 1 (the page model), 2 (venue pages) and 3 (user pages) are built; see the Log. Read with `handoffs/plugins.md`: plugins work on every kind of
+Status: plan, 2026-11-16. Phases 1 (the page model), 2 (venue pages), 3 (user pages) and 4 (organisation pages) are built; see the Log. Read with `handoffs/plugins.md`: plugins work on every kind of
 page this plan adds.
 
 ## Goal
@@ -153,9 +153,13 @@ show. A plugin written once can then add a panel to a paper, a venue, a topic, a
 ## Open questions
 
 - Which items a user page can show, and their defaults (Phase 3). **Built without Benedict, to confirm:** real name,
-  institution and authored papers off; activity and comments under the handle on (see Phase 3's Log). Also open:
-  whether `accounts.real_name`/`show_institution`, which still govern bylines on comments and My papers, should fold
-  into the same `user.show.*` settings.
+  institution and authored papers off; activity and comments under the handle on (see Phase 3's Log). Phase 4 folded
+  the institution into one switch, `accounts.show_institution` (see its Log); `real_name` still shows beside the handle
+  on comments whenever it is set, while `user.show.realName` governs the page only. Folding that too is still open.
+- A small org can still give away who wrote what (Phase 4): if the only person an org lists is @ada and a paper is on
+  its page with no address at its domains on page 1, @ada is probably an author. Nothing public says why a paper is
+  there, but the inference stays possible. Requiring `user.show.claimedPapers` as well for claim-based membership
+  would close it, at the cost of fewer papers on org pages.
 
 ## Log
 

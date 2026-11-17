@@ -45,7 +45,7 @@ function paper(id: PaperId, authors = ['Ada Lovelace', 'Charles Babbage']) {
 /** A verified account with its handle chosen. */
 async function person(handle: string, extra: Record<string, unknown> = {}) {
   const cookie = await signUp(`${handle}@ethz.ch`);
-  const done = await api('PATCH', '/me', { cookie, body: { handle, showInstitution: true, ...extra } });
+  const done = await api('PATCH', '/me', { cookie, body: { handle, showInstitution: false, ...extra } });
   expect(done.status).toBe(200);
   const [account] = await getDb().select().from(accounts).where(eq(accounts.handle, handle));
   return { cookie, account, actor: { kind: 'account', accountId: account.id, isAdmin: false } as const };
@@ -73,8 +73,9 @@ async function confirmClaim(cookie: string, paperId: string, authorIndex: number
   await decideClaim(row.id, 'confirmed', null);
 }
 
+// The institution is the profile's `showInstitution`, not a setting (`handoffs/pages.md` Phase 4).
 const showAll =
-  '{ "user.show.realName": true, "user.show.institution": true, "user.show.claimedPapers": true, "user.show.activity": true, "user.show.comments": true }';
+  '{ "user.show.realName": true, "user.show.claimedPapers": true, "user.show.activity": true, "user.show.comments": true }';
 
 describe('user pages', () => {
   it('makes a page with every account, with its repo and profile.json, moved with its handle', async () => {
@@ -145,6 +146,7 @@ describe('user pages', () => {
     const page = await userPage('ada');
 
     expect((await api('PUT', '/me/settings', { cookie: ada.cookie, text: showAll })).status).toBe(200);
+    expect((await api('PATCH', '/me', { cookie: ada.cookie, body: { showInstitution: true } })).status).toBe(200);
     const view = (await userPageView(page))!;
     expect(view.realName).toBe('Ada Lovelace');
     expect(view.institutions).toEqual(['ETH Zurich']);
@@ -153,6 +155,7 @@ describe('user pages', () => {
     ]);
     expect(JSON.parse((await files(page.id))['profile.json']).show).toMatchObject({
       realName: true,
+      institution: true,
       claimedPapers: true,
     });
     expect((await readPageForPlugins('user:ada')).kindFile).toMatchObject({
@@ -163,6 +166,7 @@ describe('user pages', () => {
 
     // Turned off again: gone from the page, and the file says so; the name was never in a commit.
     expect((await api('PUT', '/me/settings', { cookie: ada.cookie, text: '{}' })).status).toBe(200);
+    expect((await api('PATCH', '/me', { cookie: ada.cookie, body: { showInstitution: false } })).status).toBe(200);
     expect((await userPageView(page))!).toMatchObject({ realName: null, claimedPapers: null });
     const show = JSON.parse((await files(page.id))['profile.json']).show;
     expect(show).toEqual(DEFAULT_SHOWN);

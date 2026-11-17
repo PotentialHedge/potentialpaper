@@ -844,6 +844,26 @@ export const OwnPageClaim = z.object({
     .nullable(),
 });
 
+/** `POST /pages/{identifier}/children`: a department or lab under an org, made by one of its verified members. */
+export const OrgChildBody = z.object({
+  /** The last segment of its key: `inf` makes `org:eth/inf`. */
+  slug: z.string().min(1).max(60),
+  name: z.string().min(1).max(200),
+  /** Its own email domains, its organisation's or under them; none to take its papers only from labs under it. */
+  domains: z.array(z.string().min(1).max(200)).max(20).optional(),
+});
+
+/** `GET /pages/{identifier}/org`: what an org page lists besides its papers. */
+export const OrgOverview = z.object({
+  parent: z.object({ identifier: z.string(), name: z.string(), url: z.string() }).nullable(),
+  children: z.array(z.object({ identifier: z.string(), name: z.string(), url: z.string(), papers: z.number().int() })),
+  /** Members who show their institution, by handle (DESIGN.md §5.3: only theirs). */
+  people: z.array(z.object({ handle: z.string(), url: z.string() })),
+  peopleCount: z.number().int(),
+  venues: z.array(z.object({ identifier: z.string(), name: z.string(), url: z.string(), papers: z.number().int() })),
+  topics: z.array(z.object({ identifier: z.string(), name: z.string(), url: z.string(), papers: z.number().int() })),
+});
+
 export const VenuePapersQuery = z.object({
   status: z.enum(['accepted', 'under_review', 'rejected', 'desk_rejected', 'withdrawn', 'unknown']).optional(),
   decision: z.string().min(1).max(200).optional(),

@@ -49,8 +49,12 @@ export const PAGE_PANELS = {
   ],
   org: [
     { id: 'about', slot: 'org.main', title: 'About the organisation' },
+    { id: 'departments', slot: 'org.main', title: 'Departments and labs' },
     { id: 'members', slot: 'org.main', title: 'Members section' },
     { id: 'community', slot: 'org.main', title: 'Community section' },
+    { id: 'people', slot: 'org.aside', title: 'People' },
+    { id: 'venues', slot: 'org.aside', title: 'Venues' },
+    { id: 'topics', slot: 'org.aside', title: 'Topics' },
     { id: 'links', slot: 'org.aside', title: 'Labeled links' },
     { id: 'backlinks', slot: 'org.aside', title: 'What links here' },
     { id: 'papers', slot: 'org.tabs', title: 'Papers' },

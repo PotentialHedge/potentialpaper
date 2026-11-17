@@ -118,6 +118,38 @@ export async function userPageView(
   };
 }
 
+/**
+ * The people an org page lists (`handoffs/pages.md` Phase 4): accounts with a confirmed address at one of its domains
+ * or its departments' (or under one), that are verified, not bots, and **show their institution**
+ * (`show_institution`, the same choice that shows it on their page and beside their handle). Only their handles: a
+ * real name stays as `user.show.realName` says, on their own page. Never anyone who chose not to show it.
+ */
+export async function orgPeople(
+  scopeId: string,
+  { limit = 100 }: { limit?: number } = {},
+  database: Database = getDb(),
+): Promise<{ handles: string[]; count: number }> {
+  const { rows } = await database.execute<{ handle: string; total: number }>(sql`
+    with domains as (
+      select substr(n.name, length('domain:') + 1) as domain
+        from page_scope_names n
+       where n.name like 'domain:%'
+         and (n.page_id = ${scopeId}
+              or n.page_id in (select page_id from page_ancestors where ancestor_id = ${scopeId}))
+    ), people as (
+      select distinct a.handle
+        from affiliations f
+        join accounts a on a.id = f.account_id
+        cross join lateral domain_suffixes(split_part(f.email, '@', 2)) s(domain)
+       where f.verified_at is not null
+         and a.show_institution and a.verified_at is not null and not a.is_bot
+         and s.domain in (select domain from domains)
+    )
+    select handle, (count(*) over ())::int as total from people order by handle limit ${limit}
+  `);
+  return { handles: rows.map((row) => row.handle), count: rows[0]?.total ?? 0 };
+}
+
 /** The papers the account is a confirmed author of, newest first. */
 async function claimedPapersOf(accountId: string, database: Database): Promise<ClaimedPaper[]> {
   const claims = await database

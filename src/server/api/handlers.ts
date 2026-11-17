@@ -24,6 +24,7 @@ import { addSshKey, listSshKeys, removeSshKey } from '../ssh-keys';
 import { previewDemoSources } from '../demos/attach';
 import { snapshotDemo } from '../demos/snapshot';
 import { demoUrl } from '@/lib/demos';
+import { formatIdentifier } from '@/lib/kinds';
 import { addCoAuthor, ownClaim, requestClaim, withdrawClaim } from '../claims';
 import { authoredPapers } from '../my-papers';
 import {
@@ -70,6 +71,7 @@ import { pluginUpdates, updatePlugin } from '../plugins/updates';
 import { findPage } from '../pages/kinds';
 import { isClaimable, ownPageClaim, requestPageClaim, withdrawPageClaim } from '../page-claims';
 import { presentVenuePapers } from '../venue-pages';
+import { createOrgChild, orgOverview, presentOrgOverview } from '../org-pages';
 import { scopeChangedAt, scopePaperChunk, scopeScoreField, scopeScoreList } from '../scope-stats';
 import { rolesOf } from '../pages/check';
 import { ApiError } from './errors';
@@ -1018,6 +1020,30 @@ export const deletePageClaim = route(async (req, params) => {
   const page = await claimablePage(params);
   await withdrawPageClaim(page, principal.account.id);
   return respond(S.OwnPageClaim, { claim: null }, { principal });
+});
+
+async function orgPage(params: Record<string, string | string[]>) {
+  const page = await mustFindPage(identifierParam(params));
+  if (page.kind !== 'org') throw new ApiError(422, 'validation_error', 'only an organisation page has this');
+  return page;
+}
+
+/** An org's parent, departments and labs, the members who show their institution, and its venues and topics by count. Public. */
+export const getOrgOverview = route(async (_req, params) => {
+  const page = await orgPage(params);
+  return respond(S.OrgOverview, presentOrgOverview(await orgOverview(page), siteUrl()), { headers: PUBLIC_MINUTE });
+});
+
+/** Makes a department or lab under an org. Its verified members and admins may. */
+export const postOrgChild = route(async (req, params) => {
+  const principal = await requireVerified(req);
+  const parent = await orgPage(params);
+  const body = await parseBody(req, S.OrgChildBody);
+  const page = await createOrgChild(parent, body, actorOf(principal));
+  return respond(S.PageResponse, await resolvePage(formatIdentifier({ kind: 'org', key: page.key })), {
+    status: 201,
+    principal,
+  });
 });
 
 /** A venue's submissions by status, decision and title, rolled up from its editions. Public. */

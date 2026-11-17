@@ -241,6 +241,23 @@ the account turned on (§5.3): its real name, institutions, the papers it is a c
 from those settings. A person's own links may also go elsewhere (`homepage`, `orcid`, `scholar`, to https addresses)
 and to their work (`wrote`, to a paper), §8.
 
+**Organisation pages** (built in `handoffs/pages.md` Phase 4). An institution (`/o/eth-zurich`) and its departments
+and labs (`/o/eth-zurich/inf`, up to three levels) each have a page whose `org.json` holds its name, its email
+`domains`, other `parents` and its ROR id. The `orgs` bot, granted `org.json` on org pages (migration `0038`), makes a
+page per institution on the sign-up allowlist (§5.1; an institution is a name there, with every domain the list gives
+it, and its ROR id from `config/institution-ror.json`): the institutions in use by `npm run orgs:sync` (a confirmed
+address, an address printed on a paper's page 1, a domain an admin added; `--all` for every one), and a new member's
+when their address is confirmed. It only ever adds missing domains and a missing ROR id to an `org.json` someone
+wrote. Departments and labs are made by the institution's verified members (`/new/org/<key>`,
+`POST /api/v1/pages/{identifier}/children`). **Members** are the accounts with a confirmed address at one of the
+org's domains or under one (`inf.ethz.ch` under `ethz.ch`), on the page or an org above it by address; they own
+`members/` and `org.json`. A top-level org's domains are changed only by admins and the bot, and a department's must
+be its organisation's or under them, so nobody widens an org to take in another institution's people or papers.
+**Its papers** (`page_members`, `via` `affiliation`, §4.9) are those with a confirmed author claim by a verified
+member who shows their institution (weight 1), and those whose page 1 prints an address at one of its domains or
+under one (weight 0.5), rolled up from its departments. The page lists its departments and labs, the members who show
+it as their institution (by handle; §5.3), the venues and topics its papers are at by count, and its papers.
+
 **Sections** are named `NN-slug.md` or `NN-slug.html`: two digits, then a lower-case ASCII slug.
 They show in the order of their names, which is the order `ls` lists them in. A section's title is the
 `#` heading (or `<h1>`) its file starts with, and otherwise its slug. HTML is checked against an
@@ -516,6 +533,13 @@ rows (`scope_state`: `changed_at`, and a `due_at` a few seconds ahead, debounced
 the first change), and the worker recomputes due scopes after each pass. Its own `scope-stats` consumer only marks,
 so `consumers:rebuild -- scope-stats` still starts it over.
 
+Data that comes from tables rather than repos is the other case. An org's papers come from author claims, confirmed
+addresses, `show_institution` and the addresses read off PDFs, none of which is a commit to the paper's page. Triggers
+on those tables put the affected papers in a queue (`org_members_due`, migration `0038`), and the worker's
+`org-members` task brings their membership up to date after each pass (before the statistics, which it marks). The
+`members` consumer's reset writes every paper's affiliation sources from the tables, so a rebuild covers papers that
+have no repo too.
+
 ### 4.10 Search
 
 Decided 2026-11-16. Everything in a repo is searchable, whoever wrote it:
@@ -640,19 +664,26 @@ name. Stances on links touching your own paper don't count towards totals.
 **What a person's page shows** (`/u/<handle>`, §4.3; built in `handoffs/pages.md` Phase 3) is the account's choice,
 item by item, in its own settings.json (`user.show.*`, which the site layer can't set for everyone):
 
-| Item                                  | Default | Why                                                                            |
-| ------------------------------------- | ------- | ------------------------------------------------------------------------------ |
-| Real name (`user.show.realName`)      | off     | Real names are optional; the handle need not say who someone is                |
-| Institution (`user.show.institution`) | off     | At a small institution it can identify someone on its own                      |
-| Papers authored (`claimedPapers`)     | off     | It ties the handle to the names on those papers, which nothing else does       |
-| Activity (`user.show.activity`)       | on      | Edits and links under the handle are public under it on each page already      |
-| Comments (`user.show.comments`)       | on      | The same; anonymous ones and those on the person's own papers are never listed |
+| Item                              | Default | Why                                                                            |
+| --------------------------------- | ------- | ------------------------------------------------------------------------------ |
+| Real name (`user.show.realName`)  | off     | Real names are optional; the handle need not say who someone is                |
+| Institution (`show_institution`)  | off     | At a small institution it can identify someone on its own                      |
+| Papers authored (`claimedPapers`) | off     | It ties the handle to the names on those papers, which nothing else does       |
+| Activity (`user.show.activity`)   | on      | Edits and links under the handle are public under it on each page already      |
+| Comments (`user.show.comments`)   | on      | The same; anonymous ones and those on the person's own papers are never listed |
 
 Edits under a per-claim author identity are never listed, whatever the settings say, and neither are comments on a
 paper the account is a confirmed author of. The rule lives in one place, `server/user-pages.ts`'s `userPageView`,
 which the page, plugins' `page.read` and the public routes all read. The page's bylines elsewhere (comments, My
-papers) still follow `real_name` and `show_institution` as above; whether to fold those into the same settings is
-open (`handoffs/pages.md`).
+papers) follow `real_name` as above.
+
+**The institution is one choice everywhere** (`handoffs/pages.md` Phase 4): `show_institution`, asked at onboarding
+and changed on the profile, shows it beside the handle on comments and edits, on the person's page, and on their
+organisation's page, which then lists the handle among its people and counts the papers they are a confirmed author
+of. There is no separate `user.show.institution`, so the institution is never public in one place and hidden in
+another. An org page lists only handles; a real name stays on the person's own page as `user.show.realName` says.
+Which papers came to an org through a member's claim and which through a printed address is not said anywhere
+public (both are `via` `affiliation`).
 
 **Known limits.** Writing style and timing can still identify people, and this protects against casual
 linking rather than a determined investigator. Someone who hasn't claimed their paper can still praise
@@ -996,7 +1027,9 @@ Decided 2026-11-16: bots are how data gets onto pages, and they work like GitHub
 
 Our own OpenReview import is the first bot, `openreview`, and goes through exactly this route, which keeps
 the route honest. The second is `venues` (`npm run venues:sync`), granted `venue.json` on venue pages: it makes a
-series' and an edition's pages from the venues the imports know. The activity feed hides bot commits by default.
+series' and an edition's pages from the venues the imports know. The third is `orgs` (`npm run orgs:sync`), granted
+`org.json` on org pages: it makes an institution's page from the sign-up allowlist, with its domains and ROR id
+(§4.3). The activity feed hides bot commits by default.
 
 ### What to do now, so this stays cheap
 

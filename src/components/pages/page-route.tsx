@@ -11,6 +11,7 @@ import { linksFrom, linksTo } from '@/server/page-links';
 import { scopeMemberCount, scopePapers } from '@/server/page-members';
 import { cloneAddresses } from '@/server/pages/clone';
 import { findKeyedPage, type PageRow, redirectedPage } from '@/server/pages/kinds';
+import { orgOverview } from '@/server/org-pages';
 import { userPageView } from '@/server/user-pages';
 import { PluginPageProvider } from '@/components/plugins/PluginPage';
 import { pageFacts, pageSummaries, scopesOfPage } from '@/server/plugins/pages';
@@ -73,7 +74,7 @@ export async function KeyedPageRoute({ kind, segments }: { kind: KeyedKind; segm
   if ('redirect' in found) redirect(found.redirect);
   const { page, key, current } = found;
   const scope = KINDS[kind].scope;
-  const [from, to, count, list, summaries, scopes, facts, user] = await Promise.all([
+  const [from, to, count, list, summaries, scopes, facts, user, org] = await Promise.all([
     linksFrom(page.id),
     linksTo(page.id),
     scope ? scopeMemberCount(page.id) : Promise.resolve(0),
@@ -84,6 +85,8 @@ export async function KeyedPageRoute({ kind, segments }: { kind: KeyedKind; segm
     pageFacts(page),
     // A person's page shows only what its account chose (DESIGN.md §5.3), all of it from `userPageView`.
     kind === 'user' ? userPageView(page) : Promise.resolve(null),
+    // Its people are only those who show it as their institution (`orgPeople`).
+    kind === 'org' ? orgOverview(page) : Promise.resolve(null),
   ]);
   const summary = summaries.get(page.id)!;
   const props = {
@@ -98,6 +101,7 @@ export async function KeyedPageRoute({ kind, segments }: { kind: KeyedKind; segm
     linksTo: to,
     papers: scope ? { count, list } : null,
     user,
+    org,
   };
   const clone = cloneAddresses({ kind, key });
   return (

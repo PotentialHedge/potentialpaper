@@ -1,8 +1,17 @@
 import { and, eq, like, sql } from 'drizzle-orm';
 import { getDb, type Database } from '@/db';
-import { pageCurrent, pages } from '@/db/schema';
+import { accounts, botGrants, pageCurrent, pages } from '@/db/schema';
 import { emailDomain } from '@/lib/email-address';
-import { formatIdentifier, isUnderDomain, keyProblem, KINDS, type OrgFile, orgFileSchema, SLUG } from '@/lib/kinds';
+import {
+  formatIdentifier,
+  isUnderDomain,
+  keyedPagePath,
+  keyProblem,
+  KINDS,
+  type OrgFile,
+  orgFileSchema,
+  SLUG,
+} from '@/lib/kinds';
 import { ApiError } from './api/errors';
 import { ensureBot } from './bots';
 import { IMPORT_RATE_LIMIT } from './import-reviews';
@@ -10,6 +19,8 @@ import { addedInstitutionDomains, allInstitutionDomains, domainCandidates, rorId
 import { type Actor, commitPage, createPage } from './pages/commit';
 import { findKeyedPage, type PageRow } from './pages/kinds';
 import { domainsAbove, isOrgMember } from './org-roles';
+import { type OverlapPage, scopeOverlap } from './page-members';
+import { orgPeople } from './user-pages';
 
 /**
  * Organisation pages (`handoffs/pages.md` Phase 4): the `orgs` bot, which makes a page per institution from the
@@ -177,6 +188,23 @@ async function topOrgs(database: Database) {
   return { byKey, byDomain };
 }
 
+/** Whether the `orgs` bot may write `org.json` (migration `0038` grants it). */
+async function orgsBotGranted(database: Database): Promise<boolean> {
+  const [row] = await database
+    .select({ id: botGrants.accountId })
+    .from(botGrants)
+    .innerJoin(accounts, eq(accounts.id, botGrants.accountId))
+    .where(
+      and(
+        eq(accounts.handle, ORGS_BOT),
+        eq(accounts.isBot, true),
+        eq(botGrants.kind, 'org'),
+        eq(botGrants.pattern, KINDS.org.kindFile),
+      ),
+    );
+  return row !== undefined;
+}
+
 /** The domains in use: confirmed addresses, addresses printed on papers' page 1, and those an admin added. */
 async function domainsInUse(database: Database): Promise<string[]> {
   const { rows } = await database.execute<{ domain: string }>(sql`
@@ -263,6 +291,13 @@ export async function syncOrgPages(
   if (chosen.length === 0) return report;
   chosen.sort((a, b) => (a.name < b.name ? -1 : a.name > b.name ? 1 : 0));
   const bot = await ensureBot(ORGS_BOT, database);
+  if (!(await orgsBotGranted(database))) {
+    throw new ApiError(
+      403,
+      'forbidden',
+      `the ${ORGS_BOT} bot isn't granted ${KINDS.org.kindFile} on org pages: npm run bots:grant -- ${ORGS_BOT} ${KINDS.org.kindFile} --kind org --by <admin>`,
+    );
+  }
   const orgs = await topOrgs(database);
   for (const institution of chosen) await writeOrg(database, bot, institution, orgs, report);
   return report;
@@ -276,6 +311,8 @@ export async function ensureOrgPageFor(email: string, database: Database = getDb
   const domain = emailDomain(email);
   if (!domain) return;
   try {
+    // A site that hasn't granted the bot (a test's, a fresh database without migration 0038's grant) has no org pages.
+    if (!(await orgsBotGranted(database))) return;
     await syncOrgPages({ domains: [domain], database });
   } catch (err) {
     console.error(`making the org page for ${domain} failed`, err);
@@ -406,4 +443,40 @@ export async function createOrgChild(
     throw err;
   }
   return page;
+}
+
+export interface OrgOverview {
+  parent: { key: string; name: string } | null;
+  children: OrgChild[];
+  people: { handles: string[]; count: number };
+  venues: OverlapPage[];
+  topics: OverlapPage[];
+}
+
+/** What an org page lists besides its sections and papers: where it sits, its people, and its venues and topics by count. */
+export async function orgOverview(page: PageRow, database: Database = getDb()): Promise<OrgOverview> {
+  const [parent, children, people, venues, topics] = await Promise.all([
+    orgParent(page, database),
+    orgChildren(page, database),
+    orgPeople(page.id, {}, database),
+    scopeOverlap(page.id, 'venue', { database }),
+    scopeOverlap(page.id, 'topic', { database }),
+  ]);
+  return { parent, children, people, venues, topics };
+}
+
+/** The overview as the API gives it (`GET /pages/{identifier}/org`), with identifiers and addresses. */
+export function presentOrgOverview(overview: OrgOverview, origin: string) {
+  const page = (kind: 'org' | 'venue' | 'topic', key: string) => ({
+    identifier: formatIdentifier({ kind, key }),
+    url: `${origin}${keyedPagePath(kind, key)}`,
+  });
+  return {
+    parent: overview.parent ? { ...page('org', overview.parent.key), name: overview.parent.name } : null,
+    children: overview.children.map((c) => ({ ...page('org', c.key), name: c.name, papers: c.papers })),
+    people: overview.people.handles.map((handle) => ({ handle, url: `${origin}${keyedPagePath('user', handle)}` })),
+    peopleCount: overview.people.count,
+    venues: overview.venues.map((v) => ({ ...page('venue', v.key), name: v.name, papers: v.papers })),
+    topics: overview.topics.map((t) => ({ ...page('topic', t.key), name: t.name, papers: t.papers })),
+  };
 }

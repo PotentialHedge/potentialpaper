@@ -2,6 +2,7 @@
   "domains": {
     "example.org": "Example University",
     "ethz.ch": "ETH Zurich",
+    "mit.edu": "Massachusetts Institute of Technology",
     "uk": "A bare TLD, which must admit nobody"
   }
 }

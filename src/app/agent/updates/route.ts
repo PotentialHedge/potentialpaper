@@ -9,6 +9,10 @@ export const dynamic = 'force-dynamic';
  */
 const UPDATES: { date: string; text: string }[] = [
   {
+    date: '2026-11-17',
+    text: "Organisations have pages: `/o/<key>` (identifier `org:<key>`, departments and labs under it, such as `org:eth-zurich/inf`), made from the institutions people sign up from. An organisation's papers are its members' claimed papers (when they show their institution) and those whose first page prints one of its email domains; `GET /api/v1/pages/<identifier>/org` gives its departments, the people who show it as their institution, and its venues and topics by count. A member may add a department or lab with `POST /api/v1/pages/<identifier>/children`, when the person asks. Whether a person's institution is public is one choice, their profile's `showInstitution`: there is no `user.show.institution` setting any more.",
+  },
+  {
     date: '2026-11-16',
     text: "Score statistics and bulk reads for any venue, topic or organisation: `GET /api/v1/pages/<identifier>/scores` lists the venues and review score fields with counts, and `…/scores/<venue>/<field>` gives every submission's mean over its reviews (sorted), bins, and the split by outcome. `GET /api/v1/pages/<identifier>/papers` streams the papers as NDJSON with their submissions, statuses and each review's scores (`?limit=` for chunks, the next cursor in `X-Next-Cursor`). All public, with ETags; reviews are CC BY 4.0, so keep their licence and link with what you show. OpenAPI: `/openapi.json`. Plugins read the same through `pp.scope.scores` and `pp.scope.papers` (permission `scope.read`).",
   },

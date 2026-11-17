@@ -2,12 +2,14 @@ import type { ComponentType, ReactNode } from 'react';
 import { ArrangedPanels } from '@/components/ArrangedPanels';
 import { ArrangedTabs } from '@/components/ArrangedTabs';
 import { ui } from '@/components/ui';
-import { type KeyedKind, KINDS, type OrgFile, pagePath } from '@/lib/kinds';
+import { type KeyedKind, KINDS, pagePath } from '@/lib/kinds';
 import { slotPanels } from '@/lib/panels';
 import type { PageLink } from '@/server/page-links';
+import type { OrgOverview } from '@/server/org-pages';
 import type { ScopePaper } from '@/server/page-members';
 import type { UserPageView } from '@/server/user-pages';
 import { LinksBox } from './LinkLists';
+import { OrgAbout, OrgDepartments, OrgPeople, OrgTopics, OrgVenues } from './org-panels';
 import { UserActivity, UserComments, UserIdentity, UserPapers } from './user-panels';
 import { VenueAbout, VenueEditions, VenueOrganizers, VenuePapers, VenueScores } from './venue-panels';
 
@@ -15,7 +17,7 @@ import { VenueAbout, VenueEditions, VenueOrganizers, VenuePapers, VenueScores } 
  * The panels of the kinds of page other than a paper (`lib/kinds.ts`), by id in `lib/panels.ts`, rendered into a
  * kind's slots: `<kind>.main` beside `<kind>.aside`, then `<kind>.tabs`. A paper's are `components/paper/slots.tsx`.
  * What each kind shows beyond these generic panels comes with its phase of `handoffs/pages.md`: a venue's are in
- * `venue-panels.tsx`. As on a paper, panels are the same HTML for every reader.
+ * `venue-panels.tsx`, an org's in `org-panels.tsx`. As on a paper, panels are the same HTML for every reader.
  */
 
 export interface KindPanelProps {
@@ -35,6 +37,8 @@ export interface KindPanelProps {
   papers: { count: number; list: ScopePaper[] } | null;
   /** A person's page: what its account shows (`server/user-pages.ts`); `null` on other kinds. */
   user: UserPageView | null;
+  /** An org's page: where it sits, its people, venues and topics (`server/org-pages.ts`); `null` on other kinds. */
+  org: OrgOverview | null;
 }
 
 function Html({ html, empty }: { html: string | null; empty: ReactNode }) {
@@ -65,18 +69,13 @@ function CommunitySection({ kind, communityHtml }: KindPanelProps) {
   );
 }
 
-/** What the kind file says, in a line or two: an org's ROR id, a topic's other names. A venue's is `VenueAbout`. */
+/** What the kind file says, in a line or two: a topic's other names. A venue's is `VenueAbout`, an org's `OrgAbout`. */
 function About({ kind, kindFile }: KindPanelProps) {
   if (!kindFile) return null;
   const facts: ReactNode[] = [];
   if (kind === 'topic') {
     const aliases = (kindFile.aliases as string[] | undefined) ?? [];
     if (aliases.length > 0) facts.push(`Also called ${aliases.join(', ')}`);
-  }
-  if (kind === 'org') {
-    const org = kindFile as OrgFile;
-    if (org.ror) facts.push(<a href={org.ror}>ROR</a>);
-    if (org.domains?.length) facts.push(org.domains.join(', '));
   }
   if (facts.length === 0) return null;
   return (
@@ -169,9 +168,23 @@ const VENUE_PANELS: Record<string, ComponentType<KindPanelProps>> = {
   papers: VenuePapers,
 };
 
+/**
+ * An org's own panels (`org-panels.tsx`): where it sits, its departments and labs, the people who show it as their
+ * institution, and its venues and topics by count. Its papers are the generic list, rolled up from its departments.
+ */
+const ORG_PANELS: Record<string, ComponentType<KindPanelProps>> = {
+  ...PANELS,
+  about: OrgAbout,
+  departments: OrgDepartments,
+  people: OrgPeople,
+  venues: OrgVenues,
+  topics: OrgTopics,
+};
+
 const KIND_PANELS: Partial<Record<KeyedKind, Record<string, ComponentType<KindPanelProps>>>> = {
   user: USER_PANELS,
   venue: VENUE_PANELS,
+  org: ORG_PANELS,
 };
 
 /** A slot's panels, which the reader's settings may hide or reorder (`ArrangedPanels`, `ArrangedTabs`). */

@@ -385,3 +385,41 @@ export async function scopePapers(
     return { ...row, address: id ? { kind: 'paper', id: { scheme: id.scheme, value: id.value } } : null };
   });
 }
+
+/** A page of another scope that a scope's papers are in, with how many of them are. */
+export interface OverlapPage {
+  pageId: string;
+  key: string;
+  name: string;
+  papers: number;
+}
+
+/**
+ * The pages of `kind` that a scope's papers (rolled up) are in directly, by how many of its papers each has, most
+ * first: an org's venues (editions) and topics, a topic's venues and orgs.
+ */
+export async function scopeOverlap(
+  scopeId: string,
+  kind: 'venue' | 'topic' | 'org',
+  options: { limit?: number; database?: Database } = {},
+): Promise<OverlapPage[]> {
+  const { limit = 10, database = getDb() } = options;
+  const { rows } = await database.execute<{ page_id: string; key: string; name: string | null; papers: number }>(sql`
+    with mine as (
+      select distinct m.paper_id
+        from page_members m
+       where m.scope_page_id = ${scopeId}
+          or m.scope_page_id in (select page_id from page_ancestors where ancestor_id = ${scopeId})
+    )
+    select p.id as page_id, p.key, c.name, count(distinct o.paper_id)::int as papers
+      from mine
+      join page_members o on o.paper_id = mine.paper_id
+      join pages p on p.id = o.scope_page_id and p.kind = ${kind}
+      left join page_current c on c.page_id = p.id
+     where p.id <> ${scopeId}
+     group by p.id, p.key, c.name
+     order by papers desc, p.key
+     limit ${limit}
+  `);
+  return rows.map((row) => ({ pageId: row.page_id, key: row.key, name: row.name ?? row.key, papers: row.papers }));
+}
