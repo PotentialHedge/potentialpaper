@@ -3,6 +3,13 @@ import { getDb, type Database } from '@/db';
 import { runConsumer, type RunReport } from './run';
 import { type Consumer, EVENTS_CHANNEL } from './types';
 
+/** An error for the log, with its cause: Drizzle's "Failed query" carries the Postgres error only there. */
+function describe(err: unknown): string {
+  if (!(err instanceof Error)) return String(err);
+  const text = err.stack ?? err.message;
+  return err.cause === undefined ? text : `${text}\ncaused by: ${describe(err.cause)}`;
+}
+
 /**
  * The `worker` service (`npm run consumers:work`): runs every consumer until it has caught up, then sleeps until
  * a commit says something changed (`NOTIFY page_events`, sent by `recordCommit` and delivered when its
@@ -129,7 +136,7 @@ export async function runWorker(options: WorkerOptions): Promise<void> {
           }
         } catch (err) {
           // The database restarting, say: try again on the next pass.
-          log(`${consumer.name}: pass failed: ${err instanceof Error ? (err.stack ?? err.message) : String(err)}`);
+          log(`${consumer.name}: pass failed: ${describe(err)}`);
         }
       }
       let wait = pollMs;
@@ -139,7 +146,7 @@ export async function runWorker(options: WorkerOptions): Promise<void> {
           if (done > 0) log(`${task.name}: ${done} done`);
           if (nextInMs !== null) wait = Math.min(wait, Math.max(250, nextInMs));
         } catch (err) {
-          log(`${task.name}: failed: ${err instanceof Error ? (err.stack ?? err.message) : String(err)}`);
+          log(`${task.name}: failed: ${describe(err)}`);
         }
       }
       options.onPass?.(reports);

@@ -161,15 +161,24 @@ export async function computeScopeStats(scopeId: string, database: Reader = getD
     with subs as (${subs}),
     fields as (select * from jsonb_to_recordset(${JSON.stringify(fields.map((f) => ({ venue: f.venue, key: f.key })))}::jsonb)
                 as f(venue text, key text)),
-    -- Each review's score first, so what is grouped and sorted is narrow (not the notes' content). A JSON number is
-    -- read as it is; text such as "6: marginally above" by its leading number.
+    -- Each review's score fields first, so what is grouped and sorted is narrow. A review's content is decompressed
+    -- once here and only the score keys kept; reading content -> key per field decompressed it once per field,
+    -- which at ICLR's size (126k reviews, 5 fields) was most of the query's time.
+    notes as materialized (
+      select n.submission_id, e.key, e.value
+        from submission_notes n
+        cross join lateral jsonb_each(n.content) e
+       where n.kind = 'review' and n.submission_id in (select id from subs)
+         and e.key in (select key from fields)
+    ),
+    -- A JSON number is read as it is; text such as "6: marginally above" by its leading number.
     scores as materialized (
       select s.id, f.key,
-             case when jsonb_typeof(n.content -> f.key) = 'number' then (n.content ->> f.key)::float8
-                  else (regexp_match(n.content ->> f.key, ${SCORE_RE}))[1]::float8 end as score
+             case when jsonb_typeof(x.value) = 'number' then (x.value #>> '{}')::float8
+                  else (regexp_match(x.value #>> '{}', ${SCORE_RE}))[1]::float8 end as score
         from subs s
         join fields f on f.venue = s.venue_id
-        join submission_notes n on n.submission_id = s.id and n.kind = 'review'
+        join notes x on x.submission_id = s.id and x.key = f.key
     ),
     means as (
       select id, key, avg(score) as mean from scores where score is not null group by id, key
@@ -205,6 +214,9 @@ export async function recomputeScope(scopeId: string, database: Database = getDb
     await tx.execute(sql`select pg_advisory_xact_lock(hashtextextended(${`scope-stats:${scopeId}`}, 0))`);
     // A venue the size of ICLR is a million review scores to group and sort: in memory, not on disk.
     await tx.execute(sql`set local work_mem = '128MB'`);
+    // A background job holding only its own advisory lock: the pool's 15 s statement timeout (meant for request
+    // paths holding row locks) is too short for a venue that size, which then never got statistics at all.
+    await tx.execute(sql`set local statement_timeout = '5min'`);
     const computed = await computeScopeStats(scopeId, tx);
     await tx.delete(scopeStats).where(eq(scopeStats.scopePageId, scopeId));
     const computedAt = new Date();
