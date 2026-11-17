@@ -34,7 +34,15 @@ export type Control =
    */
   | { kind: 'checklist'; choices: Choice[]; inverted: boolean }
   /** A fixed set of choices to put in order; the value lists those moved first. */
-  | { kind: 'rank'; choices: Choice[] }
+  | {
+      kind: 'rank';
+      choices: Choice[];
+      /**
+       * A second setting the control edits: a list of the choices switched off, drawn as a switch on each row. The
+       * setting's own key keeps the order; this one keeps what is hidden.
+       */
+      toggleKey?: string;
+    }
   /** No control: set it in the file. */
   | { kind: 'file' };
 
@@ -133,21 +141,30 @@ export function coreItems(pluginChoices: (kind: PanelKind) => Choice[] = () => [
     const category = coreCategory(key, setting);
     if (!category) continue;
     const kind = key.split('.')[0] as PanelKind;
-    const extra = setting.widget && PANEL_KINDS.includes(kind) ? pluginChoices(kind) : [];
-    // A list of panels to hide is drawn as a box per panel, ticked when shown, so the form names it that way.
-    const shownList = setting.widget === 'toggles';
+    const panels = PANEL_KINDS.includes(kind) && setting.widget !== undefined;
+    // A kind's panels are one control: its order, with a switch per panel for `<kind>.panels.hidden`. The two stay
+    // separate keys in the file, flat lists anyone can edit by hand.
+    if (panels && setting.widget === 'toggles') continue;
+    const extra = panels ? pluginChoices(kind) : [];
+    const control = coreControl(setting, extra);
+    const pageTitle = findCategory(category)?.title.toLowerCase() ?? 'these pages';
     out.push({
       key,
-      title: shownList ? 'Panels shown' : setting.title,
-      description: shownList
-        ? `Untick a panel to leave it off ${findCategory(category)?.title.toLowerCase() ?? 'these pages'}.`
+      title: panels ? 'Panels' : setting.title,
+      description: panels
+        ? `Drag to reorder the panels within each part of ${pageTitle}, and switch one off to leave it out.`
         : setting.description,
       category,
-      control: coreControl(setting, extra),
+      control: panels && control.kind === 'rank' ? { ...control, toggleKey: `${kind}.panels.hidden` } : control,
       fallback: setting.default,
     });
   }
   return out;
+}
+
+/** Every key an item edits: its own, and its control's second one. */
+export function itemKeys(item: SettingItem): string[] {
+  return item.control.kind === 'rank' && item.control.toggleKey ? [item.key, item.control.toggleKey] : [item.key];
 }
 
 function specChoices(spec: { values: string[]; labels?: string[] }): Choice[] {
@@ -214,6 +231,7 @@ export function matchesSearch(item: SettingItem, categoryTitle: string, query: s
   const words = query.toLowerCase().split(/\s+/).filter(Boolean);
   if (words.length === 0) return false;
   const choices = 'choices' in item.control ? (item.control.choices ?? []).map((c) => c.label).join(' ') : '';
-  const text = `${item.title} ${item.description} ${item.key} ${categoryTitle} ${choices}`.toLowerCase();
+  const text =
+    `${item.title} ${item.description} ${itemKeys(item).join(' ')} ${categoryTitle} ${choices}`.toLowerCase();
   return words.every((w) => text.includes(w));
 }

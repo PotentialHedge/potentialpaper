@@ -927,7 +927,9 @@ Built 2026-11-16 (`handoffs/plugins.md` Phase 1). One document per account, laye
   category (each kind's pages, "Your public page") and one per installed plugin (`/settings/plugins/<owner>/<name>`)
   down the side, a search over every setting, and each setting drawn by a standard control (a switch, a dropdown or
   radio buttons, a text or number field, a list to add to, remove from and reorder, a box per choice, a fixed set to
-  put in order; lists reorder by dragging, `components/controls`), saved as it changes, with a mark and a reset on what the reader's file sets. There is no editor for
+  put in order; lists reorder by dragging, `components/controls`), saved as it changes. A kind's panels are one
+  control, each part of the page a list to drag with a switch per panel, over the two keys `<kind>.panels.order` and
+  `<kind>.panels.hidden`, which stay separate flat lists in the file. Each setting has a mark and a reset on what the reader's file sets. There is no editor for
   the raw file: it is downloaded, edited in the reader's own editor, and uploaded, with the same checks.
 - **Settings are preferences.** Remembered state (dismissed prompts, a plugin's cache) stays out of the document,
   and so does consent (below).

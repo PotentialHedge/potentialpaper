@@ -25,7 +25,8 @@ import { iconButtonClass } from './fields';
 /**
  * A list to put in order: drag a row by its handle (dnd-kit), or with the keyboard (focus the handle, Space to pick
  * it up, the arrows to move it, Space to drop it), or with each row's up and down buttons. Generic over its items;
- * `actions` adds buttons of the caller's to each row (remove, edit).
+ * `actions` adds buttons of the caller's to each row (remove, edit), shown on hover; `trailing` adds a control of the
+ * caller's at the end of each row, always shown (a switch).
  */
 export function SortableList<T>({
   items,
@@ -34,6 +35,7 @@ export function SortableList<T>({
   onReorder,
   renderItem,
   actions,
+  trailing,
   label,
   numbered = false,
   disabled,
@@ -47,6 +49,7 @@ export function SortableList<T>({
   onReorder: (items: T[]) => void;
   renderItem?: (item: T, index: number) => ReactNode;
   actions?: (item: T, index: number) => ReactNode;
+  trailing?: (item: T, index: number) => ReactNode;
   /** Names the list for assistive tech. */
   label: string;
   /** Number the rows, for a ranking. */
@@ -110,6 +113,7 @@ export function SortableList<T>({
               disabled={disabled}
               onMove={(by) => onReorder(arrayMove(items, i, i + by))}
               actions={actions?.(item, i)}
+              trailing={trailing?.(item, i)}
             >
               {renderItem ? renderItem(item, i) : getLabel(item)}
             </SortableRow>
@@ -140,6 +144,7 @@ function SortableRow({
   disabled,
   onMove,
   actions,
+  trailing,
   children,
 }: {
   id: string;
@@ -150,6 +155,7 @@ function SortableRow({
   disabled?: boolean;
   onMove: (by: number) => void;
   actions?: ReactNode;
+  trailing?: ReactNode;
   children: ReactNode;
 }) {
   const { attributes, listeners, setNodeRef, setActivatorNodeRef, transform, transition, isDragging } = useSortable({
@@ -198,6 +204,7 @@ function SortableRow({
           ↓
         </button>
       </span>
+      {trailing && <span className="ml-1 flex shrink-0 items-center">{trailing}</span>}
     </li>
   );
 }

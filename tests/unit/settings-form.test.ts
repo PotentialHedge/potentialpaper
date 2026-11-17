@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { validateManifest } from '@/lib/plugins/manifest';
 import { sanitizeSettingValue, type SettingSpec, settingsJsonSchema, settingTitle } from '@/lib/settings';
-import { CATEGORIES, coreItems, matchesSearch, pluginItems } from '@/lib/settings/form';
+import { CATEGORIES, coreItems, itemKeys, matchesSearch, pluginItems } from '@/lib/settings/form';
 
 describe('list and set settings', () => {
   const list: SettingSpec = { type: 'list', default: [], maxItems: 2, maxLength: 5 };
@@ -48,11 +48,12 @@ describe('the settings form', () => {
     const items = coreItems();
     expect(items.every((i) => ids.has(i.category))).toBe(true);
     expect(items.some((i) => i.key.startsWith('plugins'))).toBe(false);
-    expect(items.find((i) => i.key === 'paper.panels.hidden')?.control).toMatchObject({
-      kind: 'checklist',
-      inverted: true,
-    });
-    expect(items.find((i) => i.key === 'paper.panels.order')?.control.kind).toBe('rank');
+    // A kind's panels are one control: the order, with a switch per panel for the hidden list.
+    expect(items.some((i) => i.key === 'paper.panels.hidden')).toBe(false);
+    const panels = items.find((i) => i.key === 'paper.panels.order')!;
+    expect(panels.control).toMatchObject({ kind: 'rank', toggleKey: 'paper.panels.hidden' });
+    expect(itemKeys(panels)).toEqual(['paper.panels.order', 'paper.panels.hidden']);
+    expect(matchesSearch(panels, 'Paper pages', 'hidden')).toBe(true);
   });
 
   it("draws a plugin's settings with the standard controls, in their order", () => {

@@ -19,18 +19,23 @@ function asList(value: unknown): string[] {
 
 /**
  * One setting's control (`lib/settings/form.ts` `Control`), drawn with the site's standard controls
- * (`components/controls`). Each reports a whole new value; saving it is the row's.
+ * (`components/controls`). `value` is the setting's own; a control that edits a second setting too (a `rank` with a
+ * `toggleKey`) reads it from `values` and reports it through `onChangeKey`. Saving is the row's.
  */
 export function SettingControl({
   control,
   value,
   onChange,
+  values,
+  onChangeKey,
   label,
   disabled,
 }: {
   control: Control;
   value: unknown;
   onChange: (value: unknown) => void;
+  values?: Record<string, unknown>;
+  onChangeKey?: (key: string, value: unknown) => void;
   label: string;
   disabled?: boolean;
 }) {
@@ -108,6 +113,10 @@ export function SettingControl({
           options={control.choices}
           value={asList(value)}
           onChange={onChange}
+          hidden={control.toggleKey ? asList(values?.[control.toggleKey]) : undefined}
+          onHiddenChange={
+            control.toggleKey && onChangeKey ? (hidden) => onChangeKey(control.toggleKey!, hidden) : undefined
+          }
           label={label}
           disabled={disabled}
         />
