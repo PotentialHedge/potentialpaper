@@ -11,7 +11,7 @@ import {
 } from '@/lib/plugins/installed';
 import { manifestJsonSchema, panelSlot, PLUGIN_PANEL_ID_RE, validateManifest } from '@/lib/plugins/manifest';
 import { BOOT_MESSAGE, type FrameContext, HELLO_MESSAGE } from '@/lib/plugins/protocol';
-import { formatPluginSource, parsePluginSource, sourceKey } from '@/lib/plugins/sources';
+import { parsePluginSource, sourceKey } from '@/lib/plugins/sources';
 import { evalWhen, pageWhenContext, parseWhen, whenHolds, whenProblem } from '@/lib/plugins/when';
 import { checkSettings, parseSettings, resolveSettings, setInSettings } from '@/lib/settings';
 import { pluginCsp } from '@/server/plugins/serve';
@@ -30,7 +30,6 @@ describe('plugin sources', () => {
     const folder = parsePluginSource('github:alice/kit/plugins/poll@feature/x')!;
     expect(folder).toMatchObject({ path: 'plugins/poll', ref: 'feature/x' });
     expect(sourceKey(folder)).toBe('github:alice/kit/plugins/poll');
-    expect(formatPluginSource(folder)).toBe('github:alice/kit/plugins/poll@feature/x');
     expect(sourceKey(parsePluginSource('alice/Poll@v1')!)).toBe('github:alice/poll');
     expect(parsePluginSource('https://github.com/alice/poll/tree/v2/dist')).toMatchObject({ ref: 'v2', path: 'dist' });
     expect(parsePluginSource('http://localhost:5173/potentialpaper-plugin.json')).toEqual({

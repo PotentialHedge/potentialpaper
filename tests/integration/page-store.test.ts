@@ -26,7 +26,7 @@ import {
 import { ApiError } from '@/server/api/errors';
 import { answerGitRequest, clonePath } from '@/server/pages/clone';
 import { type Actor, commitPage, type FileChange, moveHead, revertCommit, SYSTEM_ACTOR } from '@/server/pages/commit';
-import { buildTrees, encodeCommit, gitObject, looseObject, SYSTEM_AUTHOR_ID } from '@/server/pages/git-objects';
+import { looseObject } from '@/server/pages/git-objects';
 import { mergeFile } from '@/server/pages/merge';
 import { rebuildAllPages } from '@/server/pages/projections';
 import { diffCommits, pageHistory, readHead } from '@/server/pages/repo';
@@ -231,36 +231,6 @@ describe('every repo passes git fsck --strict', () => {
     expect(accepted).toBeGreaterThan(20);
     expect(refused).toBeGreaterThan(5);
   }, 240_000);
-
-  it('for names that sort differently as directories, where a wrong tree order would show', () => {
-    // The layout has no such names (`rules.ts`), but a pushed tree can, and trees are built one way for all.
-    const blob = gitObject('blob', Buffer.from(''));
-    const names = ['a', 'a-b', 'a.b', 'a0', 'a b', 'é', 'Z', 'z'];
-    const files = new Map(
-      names.flatMap((name) => [`x/${name}/file`, `x/${name}-file`, `x/${name}.file`].map((path) => [path, blob.oid])),
-    );
-    const { root, trees } = buildTrees(files);
-    const commit = gitObject(
-      'commit',
-      encodeCommit({
-        tree: root,
-        parent: null,
-        authorId: SYSTEM_AUTHOR_ID,
-        at: new Date(0),
-        summary: 'Names',
-        kind: 'edit',
-      }),
-    );
-    const repo = workDir();
-    git(['init', '-q', '--bare', '--initial-branch=main', repo]);
-    for (const { oid, type, body } of [blob, ...trees, commit]) {
-      const file = join(repo, 'objects', oid.slice(0, 2), oid.slice(2));
-      mkdirSync(dirname(file), { recursive: true });
-      writeFileSync(file, looseObject(type, body));
-    }
-    writeFileSync(join(repo, 'refs/heads/main'), `${commit.oid}\n`);
-    fsck(repo);
-  });
 
   it('for a first commit, a merge, a revert and the system commit, read by real git', async () => {
     const paperId = await newPaper();

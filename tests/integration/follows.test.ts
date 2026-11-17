@@ -6,7 +6,8 @@ import { decideClaim } from '@/server/claims';
 import { postComment } from '@/server/comments';
 import { mailCommentFollowers, mailEditFollowers } from '@/server/follows';
 import { devOutbox } from '@/server/mail';
-import { setLinks } from '@/server/pages/card';
+import { commitPage } from '@/server/pages/commit';
+import { readHead } from '@/server/pages/repo';
 import { savePaper } from '@/server/papers';
 import { api, closePool, lastMailTo, resetDatabase, signUp } from './helpers';
 
@@ -79,7 +80,13 @@ describe('following papers', () => {
     await api('POST', '/follows', { cookie: bob.cookie, body: { paper: PAPER } });
 
     const actor = { kind: 'account' as const, accountId: bob.account.id, isAdmin: false };
-    const edit = await setLinks(paperId, actor, [{ label: 'Code', url: 'https://example.org/code' }]);
+    const edit = await commitPage(
+      paperId,
+      await readHead(getDb(), paperId),
+      actor,
+      [{ path: 'community/10-summary.md', content: '# Summary\n\nA short summary.\n' }],
+      'Add a summary',
+    );
     expect(edit.status).toBe('committed');
     if (edit.status !== 'committed') return;
     expect(await mailEditFollowers(paperId, bob.account.id, [edit.seq])).toBe(1);
@@ -95,9 +102,9 @@ describe('following papers', () => {
     const paperId = await paper();
     const ada = await person('ada');
     const bob = await person('bob');
-    const cy = await person('cy');
-    for (const p of [ada, bob, cy]) await api('POST', '/follows', { cookie: p.cookie, body: { paper: PAPER } });
-    await api('PATCH', '/me', { cookie: cy.cookie, body: { followMail: false } });
+    const cyd = await person('cyd');
+    for (const p of [ada, bob, cyd]) await api('POST', '/follows', { cookie: p.cookie, body: { paper: PAPER } });
+    await api('PATCH', '/me', { cookie: cyd.cookie, body: { followMail: false } });
 
     const before = devOutbox().length;
     const comment = await postComment({ paperId, account: bob.account, body: 'Nice result.' });

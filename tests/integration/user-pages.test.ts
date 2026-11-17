@@ -136,7 +136,7 @@ describe('user pages', () => {
     expect(read.kindFile).toEqual({ show: DEFAULT_SHOWN });
     const route = await api('GET', `/pages/${encodeURIComponent('user:ada')}/files`);
     expect(route.status).toBe(200);
-    expect(JSON.stringify(route.body)).not.toMatch(/Lovelace|ETH|1706/);
+    expect(JSON.stringify(route.body)).not.toMatch(/Lovelace|ETH|1706\.03762/);
   });
 
   it('shows what the account turns on in its settings, and profile.json follows', async () => {

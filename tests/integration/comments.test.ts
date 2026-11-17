@@ -69,7 +69,7 @@ describe('comments', () => {
     expect(newest.html).not.toContain('<img src="https://example.org');
   });
 
-  it('refuses visitors and unverified writes, and needs a known paper', async () => {
+  it('refuses visitors, and needs a known paper', async () => {
     await paper();
     expect((await api('POST', '/comments', { body: { paper: PAPER, body: 'hi' } })).status).toBe(401);
     const ada = await person('ada');
@@ -88,7 +88,8 @@ describe('comments', () => {
     const a2 = await post(ada, 'Anonymous two.', { anonymous: true });
     expect(a1.body.author.kind).toBe('alias');
     expect(a2.body.author.alias).toBe(a1.body.author.alias);
-    expect(JSON.stringify(a1.body)).not.toContain('ada');
+    // The handle as a JSON value: the id (hex) and the alias (four characters) can contain "ada" by chance.
+    expect(JSON.stringify(a1.body)).not.toContain('"ada"');
     const alias = a1.body.author.alias as string;
 
     const reply = await post(bob, `@${alias} and @ada, but not @nobody or \`@ada\`.`, { parentId: a1.body.id });

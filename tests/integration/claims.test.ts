@@ -1,18 +1,13 @@
-import { mkdtempSync, rmSync } from 'node:fs';
-import { tmpdir } from 'node:os';
-import { join } from 'node:path';
 import { eq } from 'drizzle-orm';
-import { afterAll, beforeAll, beforeEach, describe, expect, it } from 'vitest';
+import { afterAll, beforeEach, describe, expect, it } from 'vitest';
 import { getDb } from '@/db';
 import { accounts, authorClaims, commitIdentities, pageCurrent, pageObjects } from '@/db/schema';
 import { decideClaim } from '@/server/claims';
-import { setLinks, setThumbnail } from '@/server/pages/card';
 import { historyWithHandles } from '@/server/pages/edit';
 import { savePaper } from '@/server/papers';
 import { api, closePool, commitFiles, resetDatabase, signUp } from './helpers';
 
 const PAPER = { scheme: 'arxiv', value: '1706.03762' } as const;
-const PNG = Buffer.from('89504e470d0a1a0a0000000d49484452000000010000000108060000001f15c489', 'hex');
 
 async function paper(): Promise<string> {
   return savePaper({
@@ -38,15 +33,7 @@ async function accountOf(email: string) {
 const authorEdit = (cookie: string, content: string, baseOid: string | null = null) =>
   commitFiles(cookie, PAPER, baseOid, { 'author/10-tldr.md': content });
 
-let images: string;
-beforeAll(() => {
-  images = mkdtempSync(join(tmpdir(), 'thumbnails-'));
-  process.env.THUMBNAILS_DIR = images;
-});
-afterAll(async () => {
-  rmSync(images, { recursive: true, force: true });
-  await closePool();
-});
+afterAll(closePool);
 beforeEach(resetDatabase);
 
 describe('claiming a paper', () => {
@@ -200,46 +187,6 @@ describe('My papers and co-authors', () => {
     expect(confirmed.status).toBe(201);
     const after = await api('GET', '/me/papers', { cookie: noam.cookie });
     expect(after.body.authored[0].mine).toMatchObject({ status: 'confirmed', method: 'vouch', canStepDown: true });
-  });
-});
-
-describe("a paper's picture and links", () => {
-  it('are anyone verified until the paper is claimed, then its authors only', async () => {
-    const paperId = await paper();
-    const ada = await accountOf('ada@ethz.ch');
-    const ashish = await accountOf('ashish@ethz.ch');
-
-    const actor = { kind: 'account' as const, accountId: ada.account.id, isAdmin: false };
-    const links = await setLinks(paperId, actor, [
-      { label: 'Code', url: 'https://github.com/tensorflow/tensor2tensor' },
-      { label: 'PDF', url: 'https://example.org/attention.pdf' },
-    ]);
-    expect(links.status).toBe('committed');
-    await expect(setLinks(paperId, actor, [{ label: 'X', url: 'javascript:alert(1)' }])).rejects.toMatchObject({
-      status: 422,
-    });
-
-    const picture = await setThumbnail(paperId, actor, { image: PNG, alt: 'One pixel' });
-    expect(picture.status).toBe('committed');
-    const [current] = await getDb().select().from(pageCurrent).where(eq(pageCurrent.pageId, paperId));
-    expect(current.links).toEqual([
-      { label: 'Code', url: 'https://github.com/tensorflow/tensor2tensor' },
-      { label: 'PDF', url: 'https://example.org/attention.pdf' },
-    ]);
-    expect(current.thumbnail).toMatchObject({ type: 'image/png', alt: 'One pixel', url: /^\/thumbnails\// });
-    // New words keep the image.
-    await setThumbnail(paperId, actor, { caption: 'A pixel.' });
-    const [worded] = await getDb().select().from(pageCurrent).where(eq(pageCurrent.pageId, paperId));
-    expect(worded.thumbnail).toMatchObject({ sha256: current.thumbnail!.sha256, caption: 'A pixel.' });
-
-    await api('POST', '/claims', { cookie: ashish.cookie, body: { paper: PAPER, authorIndex: 0 } });
-    const [claim] = await getDb().select().from(authorClaims);
-    await decideClaim(claim.id, 'confirmed', null);
-
-    await expect(setLinks(paperId, actor, [])).rejects.toMatchObject({ status: 403 });
-    await expect(setThumbnail(paperId, actor, { caption: 'Mine now' })).rejects.toMatchObject({ status: 403 });
-    const owner = { kind: 'account' as const, accountId: ashish.account.id, isAdmin: false };
-    expect((await setLinks(paperId, owner, [])).status).toBe('committed');
   });
 });
 

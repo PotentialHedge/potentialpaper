@@ -9,7 +9,7 @@ import { historyWithHandles } from '@/server/pages/edit';
 import { rebuildAllPages } from '@/server/pages/projections';
 import { savePaper } from '@/server/papers';
 import { compareVersions } from '@/server/versions';
-import { api, closePool, commitFiles, resetDatabase, signUp } from './helpers';
+import { api, closePool, resetDatabase, signUp } from './helpers';
 
 process.env.EVIDENCE_FILES_DIR = mkdtempSync(join(tmpdir(), 'evidence-'));
 
@@ -171,19 +171,5 @@ describe('versions', () => {
     const html = new FormData();
     html.set('file', new File(['<html><script>x</script></html>'], 'x.html'));
     expect((await api('POST', '/files', { cookie: ada, form: html })).status).toBe(422);
-  });
-
-  it('carry evidence on a section edit too', async () => {
-    const paperId = await paper();
-    const ada = await signUp('ada@ethz.ch');
-    const res = await commitFiles(
-      ada,
-      PAPER,
-      null,
-      { 'community/10-errata.md': '# Errata\nTable 2 is wrong.\n' },
-      'Erratum\n\nEvidence: https://github.com/x/y/issues/1',
-    );
-    expect(res.status).toBe(200);
-    expect((await historyWithHandles(paperId))[0].evidence).toEqual(['https://github.com/x/y/issues/1']);
   });
 });

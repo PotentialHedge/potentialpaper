@@ -46,7 +46,7 @@ describe('git objects', () => {
       git(['init', '-q', '--bare', repo]);
       const blob = git(['hash-object', '-w', '--stdin'], 'x', repo).trim();
       const subtree = git(['mktree'], `100644 blob ${blob}\tf\n`, repo).trim();
-      const names = ['a', 'a.b', 'a0', 'b', 'é', 'Z', 'z', '日本語'];
+      const names = ['a', 'a-b', 'a.b', 'a0', 'a b', 'b', 'é', 'Z', 'z', '日本語'];
       const entries = names.flatMap((name) => [
         { name, isTree: false, oid: blob },
         { name: `${name}-dir`, isTree: true, oid: subtree },
@@ -267,6 +267,12 @@ describe('merging', () => {
         expect(mergeFile(base, a, b)).toEqual(mergeFile(base, b, a));
       }),
     );
+  });
+
+  it('tells an emptied line from a deleted one', () => {
+    // Once found by the property above: joined, both sides' text was "", so ours won whichever side it was.
+    expect(mergeFile('c\na', '\na', 'a')).toEqual({ ok: false });
+    expect(mergeFile('c\na', 'a', '\na')).toEqual({ ok: false });
   });
 
   it('refuses deleted against changed, and two different new files', () => {
