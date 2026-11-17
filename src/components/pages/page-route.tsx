@@ -1,7 +1,7 @@
 import 'katex/dist/katex.min.css';
 import { eq } from 'drizzle-orm';
 import type { Metadata } from 'next';
-import { notFound } from 'next/navigation';
+import { notFound, redirect } from 'next/navigation';
 import { cache } from 'react';
 import { ui } from '@/components/ui';
 import { getDb } from '@/db';
@@ -10,7 +10,8 @@ import { type KeyedKind, keyedPagePath, keyProblem, KINDS, pageName } from '@/li
 import { linksFrom, linksTo } from '@/server/page-links';
 import { scopeMemberCount, scopePapers } from '@/server/page-members';
 import { cloneAddresses } from '@/server/pages/clone';
-import { findKeyedPage } from '@/server/pages/kinds';
+import { findKeyedPage, type PageRow, redirectedPage } from '@/server/pages/kinds';
+import { userPageView } from '@/server/user-pages';
 import { PluginPageProvider } from '@/components/plugins/PluginPage';
 import { pageFacts, pageSummaries, scopesOfPage } from '@/server/plugins/pages';
 import { KindSlot } from './slots';
@@ -21,12 +22,29 @@ import { KindSlot } from './slots';
  * read the request; a page that doesn't exist is a 404 until it is made (`createPage` refreshes its address).
  */
 
-const load = cache(async (kind: KeyedKind, segments: string[]) => {
+type Loaded =
+  | { redirect: string }
+  | {
+      page: PageRow;
+      key: string;
+      current: {
+        name: string | null;
+        kindFile: Record<string, unknown> | null;
+        ownersHtml: string | null;
+        communityHtml: string | null;
+      } | null;
+    };
+
+const load = cache(async (kind: KeyedKind, segments: string[]): Promise<Loaded | null> => {
   const raw = segments.map(decodeURIComponent).join('/');
   const key = kind === 'user' ? raw.toLowerCase() : raw;
   if (keyProblem(kind, key)) return null;
   const page = await findKeyedPage(getDb(), kind, key);
-  if (!page) return null;
+  if (!page) {
+    // An old handle leads to the page's new address (`page_redirects`).
+    const moved = await redirectedPage(getDb(), kind, key);
+    return moved ? { redirect: keyedPagePath(kind, moved.key) } : null;
+  }
   const [current] = await getDb()
     .select({
       name: pageCurrent.name,
@@ -41,7 +59,7 @@ const load = cache(async (kind: KeyedKind, segments: string[]) => {
 
 export async function keyedPageMetadata(kind: KeyedKind, segments: string[]): Promise<Metadata> {
   const found = await load(kind, segments);
-  if (!found) return {};
+  if (!found || 'redirect' in found) return {};
   const name = found.current?.name ?? pageName(kind, found.key, null);
   return {
     title: `${name} · ${KINDS[kind].title} · PotentialPaper`,
@@ -52,9 +70,10 @@ export async function keyedPageMetadata(kind: KeyedKind, segments: string[]): Pr
 export async function KeyedPageRoute({ kind, segments }: { kind: KeyedKind; segments: string[] }) {
   const found = await load(kind, segments);
   if (!found) notFound();
+  if ('redirect' in found) redirect(found.redirect);
   const { page, key, current } = found;
   const scope = KINDS[kind].scope;
-  const [from, to, count, list, summaries, scopes, facts] = await Promise.all([
+  const [from, to, count, list, summaries, scopes, facts, user] = await Promise.all([
     linksFrom(page.id),
     linksTo(page.id),
     scope ? scopeMemberCount(page.id) : Promise.resolve(0),
@@ -63,6 +82,8 @@ export async function KeyedPageRoute({ kind, segments }: { kind: KeyedKind; segm
     pageSummaries([page.id]),
     scopesOfPage(page),
     pageFacts(page),
+    // A person's page shows only what its account chose (DESIGN.md §5.3), all of it from `userPageView`.
+    kind === 'user' ? userPageView(page) : Promise.resolve(null),
   ]);
   const summary = summaries.get(page.id)!;
   const props = {
@@ -76,6 +97,7 @@ export async function KeyedPageRoute({ kind, segments }: { kind: KeyedKind; segm
     linksFrom: from,
     linksTo: to,
     papers: scope ? { count, list } : null,
+    user,
   };
   const clone = cloneAddresses({ kind, key });
   return (

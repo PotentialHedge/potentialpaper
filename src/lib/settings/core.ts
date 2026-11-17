@@ -5,6 +5,7 @@ import { PAGE_PANELS, PANEL_KINDS, panelIds, SLOT_TITLES, type PanelKind } from 
 import { PLUGIN_PANEL_ID_RE } from '../plugins/manifest';
 import { parsePluginSource, sourceKey } from '../plugins/sources';
 import { PLUGIN_ID_RE } from './spec';
+import { USER_SHOW, USER_SHOW_ITEMS, userShowKey } from '../user-pages';
 
 /**
  * The site's own settings: one entry per key, with its schema, default and description. The settings form, the
@@ -27,8 +28,11 @@ export interface CoreSetting<T = unknown> {
    * below". Without one, a value reads only if `schema` accepts it whole.
    */
   sanitize?: (raw: unknown) => T | undefined;
-  /** How the form draws a list of choices: `toggles` (a box each) or `order` (a list to arrange). */
-  widget?: 'toggles' | 'order';
+  /**
+   * How the form draws it: a list of choices as `toggles` (a box each) or `order` (a list to arrange); a boolean as a
+   * `switch` (one box).
+   */
+  widget?: 'toggles' | 'order' | 'switch';
   /** The choices of a list setting, with their labels, for the form. */
   choices?: { value: string; label: string; group?: string }[];
   /**
@@ -36,6 +40,14 @@ export interface CoreSetting<T = unknown> {
    * file may name it, with a warning, and it changes nothing.
    */
   siteOnly?: boolean;
+  /**
+   * Read from the user layer only: what only the account itself may decide, such as what its public page shows
+   * (`user.show.*`). A site file may name it, with a warning, and it changes nothing, so no admin can publish
+   * everyone's real names by changing a default.
+   */
+  accountOnly?: boolean;
+  /** Shown in the form only to a signed-in reader: it is about the account (`user.show.*`). */
+  signedInOnly?: boolean;
 }
 
 /**
@@ -185,8 +197,27 @@ const PLUGIN_SETTINGS: Record<string, CoreSetting> = {
   },
 };
 
+/** What the account's public page shows (`lib/user-pages.ts`): one switch per item, the account's own choice. */
+export const USER_PAGE_GROUP = 'Your public page';
+const USER_SETTINGS: Record<string, CoreSetting> = Object.fromEntries(
+  USER_SHOW_ITEMS.map((item): [string, CoreSetting] => [
+    userShowKey(item),
+    {
+      schema: z.boolean() as z.ZodType,
+      default: USER_SHOW[item].default,
+      title: USER_SHOW[item].title,
+      description: USER_SHOW[item].description,
+      group: USER_PAGE_GROUP,
+      widget: 'switch',
+      accountOnly: true,
+      signedInOnly: true,
+    },
+  ]),
+);
+
 export const CORE_SETTINGS: Record<string, CoreSetting> = {
   ...Object.fromEntries(PANEL_KINDS.flatMap((kind) => Object.entries(kindSettings(kind)))),
+  ...USER_SETTINGS,
   ...PLUGIN_SETTINGS,
 };
 

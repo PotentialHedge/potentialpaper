@@ -14,6 +14,7 @@ import { readSections, sectionTitle } from '../pages/sections';
 import type { PagePart } from '../pages/rules';
 import { siteUrl } from '../site';
 import { submissionsOf } from '../submissions';
+import { type UserPageView, userPageView } from '../user-pages';
 
 /**
  * Pages of every kind as plugins read them (`handoffs/plugins.md` Phase 2): the summaries `page.resolve` and
@@ -148,7 +149,7 @@ function presentLink(link: PageLink) {
   return {
     label: link.label,
     origin: link.origin,
-    to: link.page.address ? formatIdentifier(link.page.address) : null,
+    to: link.page.url ?? (link.page.address ? formatIdentifier(link.page.address) : null),
     name: link.page.name,
     note: link.note,
     fromAnchor: link.fromAnchor,
@@ -160,8 +161,7 @@ function presentLink(link: PageLink) {
 /**
  * `page.read`, `GET /pages/{identifier}/files`: the page's kind file, its sections (Markdown, in order, part by part)
  * and its labeled links, at its current commit. A paper's "kind file" is its metadata. A user page gives its
- * `about/` and links, and an empty `profile.json` until the account chooses what to show (`handoffs/pages.md`
- * Phase 3).
+ * `about/`, its links, and `userKindFile`: only what its account shows (`server/user-pages.ts`).
  */
 export async function readPageForPlugins(identifier: string, database: Database = getDb()) {
   const page = await mustFindPage(identifier, database);
@@ -194,8 +194,9 @@ export async function readPageForPlugins(identifier: string, database: Database 
       .where(eq(paperIdentifiers.paperId, page.id));
     kindFile = paper ? { ...paper, identifiers: ids.map((id) => `${id.scheme}:${id.value}`) } : null;
   } else if (page.kind === 'user') {
-    // Nothing in profile.json is shown yet, so nothing is given (DESIGN.md §5.3).
-    kindFile = {};
+    // Only what the account shows the public (DESIGN.md §5.3), from the same view the page draws.
+    const view = await userPageView(page, { limit: 0 }, database);
+    kindFile = view ? userKindFile(view) : {};
   } else {
     kindFile = current?.kindFile ?? null;
   }
@@ -212,6 +213,21 @@ export async function readPageForPlugins(identifier: string, database: Database 
     }
   }
   return { page: self, kindFile, sections, links: links.map(presentLink), commit };
+}
+
+/**
+ * A user page's "kind file" as plugins and the public routes read it: its `profile.json` choices, and the values of
+ * the items the account shows (its real name, institutions, the papers it authored), nothing else.
+ */
+export function userKindFile(view: UserPageView): Record<string, unknown> {
+  return {
+    show: view.shown,
+    ...(view.realName ? { realName: view.realName } : {}),
+    ...(view.institutions ? { institutions: view.institutions } : {}),
+    ...(view.claimedPapers
+      ? { papers: view.claimedPapers.map((p) => ({ identifier: p.page.identifier, authorName: p.authorName })) }
+      : {}),
+  };
 }
 
 /** `page.members`, `GET /pages/{identifier}/members`: a scope's papers, a page at a time, rolled up by default. */

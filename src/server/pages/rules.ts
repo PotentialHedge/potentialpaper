@@ -459,9 +459,13 @@ function kindPathDenied(path: string, roles: Roles, kind: Exclude<PageKind, 'pap
   const owner = roles.owner || roles.admin;
   const granted = roles.grants?.some((pattern) => grantCovers(pattern, path)) ?? false;
   if (path === kindFile) {
+    // A person's profile.json is written by the site from their `user.show.*` settings (`server/user-pages.ts`),
+    // which are what count, so the file and the settings never disagree.
+    if (kind === 'user') {
+      return roles.system ? null : `${kindFile} follows your user.show.* settings: change them at /settings`;
+    }
     if (roles.system) return 'the system only writes the metadata';
     if (kind === 'topic') return roles.verified || roles.admin ? null : CONFIRM;
-    if (kind === 'user') return owner ? null : 'only this account can change its page';
     return owner || granted
       ? null
       : `only this ${kind}'s ${owners?.title.toLowerCase()} and admins can change ${kindFile}`;

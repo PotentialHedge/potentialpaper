@@ -12,8 +12,10 @@ import {
   type SettingsProblem,
 } from '@/lib/settings';
 import type { HideUntil } from '@/lib/scope-stats';
+import { shownFromSettings, USER_SHOW_ITEMS } from '@/lib/user-pages';
 import { ApiError } from './api/errors';
 import { pluginSettingsOf } from './plugins/installed';
+import { syncProfileFile } from './user-pages';
 
 /**
  * settings.json on the server (DESIGN.md §10): each account's document (`user_settings`) over the site layer
@@ -104,10 +106,14 @@ function refuse(problems: SettingsProblem[]): never {
 export async function saveUserSettings(account: Account, text: string): Promise<SettingsView> {
   const problems = checkSettings(text, await installedPluginSettings(account));
   if (problems.some((p) => p.severity === 'error')) refuse(problems);
+  const before = shownFromSettings(resolveSettings({ user: parseSettings((await userSettingsRow(account.id)).text) }));
   await getDb()
     .insert(userSettings)
     .values({ accountId: account.id, doc: text })
     .onConflictDoUpdate({ target: userSettings.accountId, set: { doc: text, updatedAt: sql`now()` } });
+  // What the account's page shows changed: its profile.json follows, and the page is rendered again.
+  const after = shownFromSettings(resolveSettings({ user: parseSettings(text) }));
+  if (USER_SHOW_ITEMS.some((item) => before[item] !== after[item])) await syncProfileFile(account);
   return settingsFor(account);
 }
 

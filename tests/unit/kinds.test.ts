@@ -143,7 +143,10 @@ describe('path rules per kind', () => {
     expect(pathDenied('venue.json', roles({ grants: ['venue.json'] }), 'venue')).toBeNull();
     expect(pathDenied('org.json', roles({ owner: true }), 'org')).toBeNull();
     expect(pathDenied('about/10-me.md', roles(), 'user')).toMatch(/only this account/);
-    expect(pathDenied('profile.json', roles({ owner: true }), 'user')).toBeNull();
+    // A person's profile.json follows their user.show.* settings: only the site writes it.
+    expect(pathDenied('profile.json', roles({ owner: true }), 'user')).toMatch(/user\.show/);
+    expect(pathDenied('profile.json', roles({ admin: true }), 'user')).toMatch(/user\.show/);
+    expect(pathDenied('profile.json', { ...roles(), system: true }, 'user')).toBeNull();
     expect(pathDenied('.potentialpaper/metadata.json', roles({ owner: true }), 'user')).toMatch(/system/);
     expect(pathDenied('extensions/x/a.json', roles({ admin: true }), 'topic')).toMatch(/reserved/);
     expect(pathDenied('community/links.jsonl', roles(), 'paper')).toBeNull();
@@ -158,6 +161,9 @@ describe('path rules per kind', () => {
     expect(contentProblem('topic.json', '{ "name": "X", "broader": ["Not A Slug"] }', 'topic')).toMatch(/broader/);
     expect(contentProblem('profile.json', '{}', 'user')).toBeNull();
     expect(contentProblem('profile.json', '{ "realName": "x" }', 'user')).not.toBeNull();
+    expect(contentProblem('profile.json', '{ "show": { "realName": true, "activity": false } }', 'user')).toBeNull();
+    expect(contentProblem('profile.json', '{ "show": { "email": true } }', 'user')).not.toBeNull();
+    expect(contentProblem('profile.json', '{ "show": { "realName": "yes" } }', 'user')).not.toBeNull();
     expect(contentProblem('.potentialpaper/metadata.json', '{ "kind": "topic" }', 'venue')).toMatch(/"kind": "venue"/);
     expect(grantProblem('venue.json', 'venue')).toBeNull();
     expect(grantProblem('org.json', 'org')).toBeNull();

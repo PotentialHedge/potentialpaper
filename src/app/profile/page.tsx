@@ -3,6 +3,7 @@ import { headers } from 'next/headers';
 import { redirect } from 'next/navigation';
 import { SignOut } from '@/components/SignOut';
 import { ui } from '@/components/ui';
+import { keyedPagePath } from '@/lib/kinds';
 import { shownHandle } from '@/lib/profile';
 import { authHref, VERIFY_EMAIL } from '@/lib/return-to';
 import { listAffiliations } from '@/server/affiliations';
@@ -36,6 +37,12 @@ export default async function Profile() {
         Signed in as {viewer.email} · <SignOut className={ui.linkBtn} />
       </p>
       <h2 className={ui.groupHeading}>Public profile</h2>
+      <p className="mb-3 font-sans text-sm">
+        Your page is <a href={keyedPagePath('user', account.handle)}>{keyedPagePath('user', account.handle)}</a>. It
+        shows your handle, what you write in its <code className={ui.mono}>about/</code>, and your links; your real
+        name, institution, papers, activity and comments only as you choose under{' '}
+        <a href="/settings">Settings, “Your public page”</a>.
+      </p>
       <ProfileForm
         initial={{
           handle: account.handle,

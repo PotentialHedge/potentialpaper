@@ -6,7 +6,9 @@ import { type KeyedKind, KINDS, type OrgFile, pagePath } from '@/lib/kinds';
 import { slotPanels } from '@/lib/panels';
 import type { PageLink } from '@/server/page-links';
 import type { ScopePaper } from '@/server/page-members';
+import type { UserPageView } from '@/server/user-pages';
 import { LinksBox } from './LinkLists';
+import { UserActivity, UserComments, UserIdentity, UserPapers } from './user-panels';
 import { VenueAbout, VenueEditions, VenueOrganizers, VenuePapers, VenueScores } from './venue-panels';
 
 /**
@@ -31,6 +33,8 @@ export interface KindPanelProps {
   linksTo: PageLink[];
   /** A scope's papers, rolled up from the pages under it, and how many there are; `null` on a page that isn't one. */
   papers: { count: number; list: ScopePaper[] } | null;
+  /** A person's page: what its account shows (`server/user-pages.ts`); `null` on other kinds. */
+  user: UserPageView | null;
 }
 
 function Html({ html, empty }: { html: string | null; empty: ReactNode }) {
@@ -127,8 +131,30 @@ const PANELS: Record<string, ComponentType<KindPanelProps>> = {
   papers: Papers,
 };
 
-/** A user page's `about` is its owners' part: the person's own words. */
-const USER_PANELS: Record<string, ComponentType<KindPanelProps>> = { ...PANELS, about: OwnersSection };
+/**
+ * A person's page (`user-panels.tsx`): `about` is its owners' part, the person's own words; the rest is what the
+ * account chose to show.
+ */
+const USER_PANELS: Record<string, ComponentType<KindPanelProps>> = {
+  ...PANELS,
+  identity: UserIdentity,
+  about: OwnersSection,
+  papers: UserPapers,
+  activity: UserActivity,
+  comments: UserComments,
+};
+
+/**
+ * Panels that are there only when what they show is: a person's tabs for items the account doesn't show would be
+ * empty tabs, so they are left out of the slot altogether.
+ */
+const PRESENT: Partial<Record<KeyedKind, Record<string, (props: KindPanelProps) => boolean>>> = {
+  user: {
+    papers: ({ user }) => user?.claimedPapers != null,
+    activity: ({ user }) => user?.activity != null,
+    comments: ({ user }) => user?.comments != null,
+  },
+};
 
 /**
  * A venue's own panels (`venue-panels.tsx`): its editions, its organisers' claim, its review scores, its submissions by
@@ -150,10 +176,12 @@ const KIND_PANELS: Partial<Record<KeyedKind, Record<string, ComponentType<KindPa
 
 /** A slot's panels, which the reader's settings may hide or reorder (`ArrangedPanels`, `ArrangedTabs`). */
 export function KindSlot({ slot, ...props }: KindPanelProps & { slot: 'main' | 'aside' | 'tabs' }) {
-  const panels = slotPanels(props.kind, `${props.kind}.${slot}`).map(({ id, title }) => {
-    const Panel = (KIND_PANELS[props.kind] ?? PANELS)[id];
-    return { id, title, node: <Panel {...props} /> };
-  });
+  const panels = slotPanels(props.kind, `${props.kind}.${slot}`)
+    .filter(({ id }) => PRESENT[props.kind]?.[id]?.(props) ?? true)
+    .map(({ id, title }) => {
+      const Panel = (KIND_PANELS[props.kind] ?? PANELS)[id];
+      return { id, title, node: <Panel {...props} /> };
+    });
   const name = `${props.kind}.${slot}`;
   if (slot === 'tabs') return <ArrangedTabs kind={props.kind} slot={name} panels={panels} />;
   return <ArrangedPanels kind={props.kind} slot={name} panels={panels} />;

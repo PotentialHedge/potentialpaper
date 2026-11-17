@@ -265,6 +265,25 @@ export const pages = pgTable(
 export type Page = typeof pages.$inferSelect;
 
 /**
+ * Where a page's old address leads (`handoffs/pages.md` Phase 3): a user page is keyed by its account's handle, so a
+ * changed handle moves the page's key and leaves its old key here. `/u/<old>` and `user:<old>` then still find the
+ * page, until another account takes the old handle, which deletes the row. Written only by the triggers on
+ * `accounts` (migration `0037`), so every writer of a handle leaves one.
+ */
+export const pageRedirects = pgTable(
+  'page_redirects',
+  {
+    kind: text('kind', { enum: PAGE_KINDS }).notNull(),
+    key: text('key').notNull(),
+    pageId: uuid('page_id')
+      .notNull()
+      .references(() => pages.id, { onDelete: 'cascade' }),
+    createdAt: createdAt(),
+  },
+  (t) => [primaryKey({ columns: [t.kind, t.key] }), index('page_redirects_page_idx').on(t.pageId)],
+);
+
+/**
  * A page's git repository: real blobs, trees and commits as rows (DESIGN.md §4.1). `oid` is the SHA-1 git
  * would compute, and `body` the object without git's `<type> <size>\0` header. Read and written only
  * through `GitRepo` (`server/git/repo.ts`).
@@ -407,7 +426,8 @@ export const pageLinks = pgTable(
     linkId: text('link_id').notNull(),
     line: integer('line').notNull(),
     target: text('target').notNull(),
-    targetKind: text('target_kind', { enum: PAGE_KINDS }).notNull(),
+    /** The target's kind, or `web` for an address elsewhere (a person's homepage, `lib/labeled-links.ts`). */
+    targetKind: text('target_kind', { enum: [...PAGE_KINDS, 'web'] }).notNull(),
     targetPageId: uuid('target_page_id').references(() => pages.id, { onDelete: 'set null' }),
     label: text('label').notNull(),
     origin: text('origin', { enum: ['owners', 'community'] }).notNull(),

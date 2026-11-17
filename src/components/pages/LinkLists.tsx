@@ -38,7 +38,15 @@ export function LinksBox({ links, direction }: { links: PageLink[]; direction: '
 }
 
 function LinkedName({ link }: { link: PageLink }) {
-  const { address, name } = link.page;
+  const { address, name, url } = link.page;
+  // An address elsewhere, on a person's own page: `rel="me"` says it is theirs, as their page says.
+  if (url) {
+    return (
+      <a href={url} rel="me nofollow noopener" className="text-ink">
+        {url.replace(/^https:\/\/(www\.)?/, '').replace(/\/$/, '')}
+      </a>
+    );
+  }
   const shown = name ?? (address ? formatIdentifier(address) : 'a page');
   if (!address) return <span className="text-ink">{shown}</span>;
   return (

@@ -89,7 +89,7 @@ export function SettingsEditor() {
       </div>
       {note && <p className={`${ui.note(note.ok)} mb-3`}>{note.text}</p>}
       {view === 'form' ? (
-        <SettingsForm text={settings.text} siteText={settings.siteText} onNote={setNote} />
+        <SettingsForm text={settings.text} siteText={settings.siteText} signedIn={settings.signedIn} onNote={setNote} />
       ) : (
         <RawEditor
           saved={settings.text}
@@ -123,7 +123,17 @@ function plural(n: number, word: string) {
  * A form made from the core settings' schema (`lib/settings/core.ts`), one group at a time. Each change edits one
  * key of the file, keeping the rest as written, and a value equal to the layer below is taken out of it.
  */
-function SettingsForm({ text, siteText, onNote }: { text: string; siteText: string; onNote: (n: Note) => void }) {
+function SettingsForm({
+  text,
+  siteText,
+  signedIn,
+  onNote,
+}: {
+  text: string;
+  siteText: string;
+  signedIn: boolean;
+  onNote: (n: Note) => void;
+}) {
   const below = useMemo(() => resolveSettings({ site: parseSettings(siteText) }), [siteText]);
   const values = useMemo(
     () => resolveSettings({ site: parseSettings(siteText), user: parseSettings(text) }),
@@ -136,6 +146,8 @@ function SettingsForm({ text, siteText, onNote }: { text: string; siteText: stri
     for (const [key, setting] of Object.entries(CORE_SETTINGS)) {
       // Plugins are managed on /settings/plugins; the site-only keys aren't the reader's to set.
       if (setting.group === 'Plugins') continue;
+      // What your public page shows is about your account, which a signed-out reader hasn't got.
+      if (setting.signedInOnly && !signedIn) continue;
       // A kind's panel lists offer installed plugins' panels too, beside the built-in ones.
       const kind = key.split('.')[0] as PanelKind;
       const extra = setting.widget && PANEL_KINDS.includes(kind) ? pluginPanelChoices(plugins, kind) : [];
@@ -148,7 +160,7 @@ function SettingsForm({ text, siteText, onNote }: { text: string; siteText: stri
       out.set(setting.group, list);
     }
     return [...out];
-  }, [plugins]);
+  }, [plugins, signedIn]);
 
   if (!isEditable(text)) {
     return (
@@ -208,6 +220,15 @@ function SettingField({
     for (const c of choices) out.set(c.group ?? '', [...(out.get(c.group ?? '') ?? []), c]);
     return [...out];
   }, [choices]);
+
+  if (setting.widget === 'switch') {
+    return (
+      <label className="flex items-center gap-2">
+        <input type="checkbox" checked={value === true} onChange={(e) => onChange(e.target.checked)} />
+        {value === true ? 'Shown' : 'Not shown'}
+      </label>
+    );
+  }
 
   if (setting.widget === 'toggles') {
     // A box per choice, ticked when it is shown: the setting lists the ones left out.

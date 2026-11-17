@@ -128,6 +128,8 @@ export function checkSettings(
       if (!parsed.success) error(key, at, zodMessage(parsed.error.issues));
       else if (CORE_SETTINGS[key].siteOnly && layer === 'user') {
         warn(key, at, "set by the site's admins for everyone; it changes nothing in your file");
+      } else if (CORE_SETTINGS[key].accountOnly && layer === 'site') {
+        warn(key, at, "each account's own choice; the site's file changes nothing");
       }
       continue;
     }
@@ -195,6 +197,9 @@ export function resolveSettings(layers: SettingsLayers, plugins: PluginSettings[
     if (setting.siteOnly) {
       const site = layers.site && Object.hasOwn(layers.site, key) ? read(layers.site[key]) : undefined;
       out[key] = site ?? setting.default;
+    } else if (setting.accountOnly) {
+      const user = layers.user && Object.hasOwn(layers.user, key) ? read(layers.user[key]) : undefined;
+      out[key] = user ?? setting.default;
     } else {
       out[key] = pick(key, read, setting.default);
     }

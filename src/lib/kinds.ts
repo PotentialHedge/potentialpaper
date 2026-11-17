@@ -1,6 +1,7 @@
 import { z } from 'zod';
 import { canonicalPaperId, PAPER_SCHEMES, paperPath, parsePaperId, type PaperId, type PaperScheme } from './paper-ids';
 import { HANDLE_PATTERN } from './profile';
+import { USER_SHOW, USER_SHOW_ITEMS, type UserShowItem } from './user-pages';
 
 /**
  * The kinds of page (`handoffs/pages.md`): a paper, a venue, a topic, an organisation or a person. Every kind is a
@@ -101,12 +102,27 @@ export const orgFileSchema = z
   .meta({ title: 'Organisation', description: "An organisation page's org.json." });
 
 /**
- * A `profile.json`: what the person chose to show. Which items there are is decided with `handoffs/pages.md`
- * Phase 3, each defaulting to what DESIGN.md §5.3 allows; until then it holds nothing (`{}`), and nothing reads it.
+ * A `profile.json`: what the person chose to show (`lib/user-pages.ts`), one switch per item, as their
+ * `user.show.*` settings say. The site writes it from those settings (`server/user-pages.ts`); it holds the choices,
+ * never the values (a real name in a commit would stay in the history after it is turned off). A missing item reads as
+ * its §5.3-safe default.
  */
 export const profileFileSchema = z
-  .strictObject({})
-  .meta({ title: 'Profile', description: "A user page's profile.json: what the account chose to show." });
+  .strictObject({
+    show: z
+      .strictObject(
+        Object.fromEntries(
+          USER_SHOW_ITEMS.map((item) => [item, z.boolean().optional().meta({ description: USER_SHOW[item].title })]),
+        ) as Record<UserShowItem, z.ZodOptional<z.ZodBoolean>>,
+      )
+      .optional()
+      .meta({ description: 'What the page shows beyond the handle, about/ and links.' }),
+  })
+  .meta({
+    title: 'Profile',
+    description:
+      "A user page's profile.json: what the account chose to show, as its user.show.* settings say. Written by the site.",
+  });
 
 export type VenueFile = z.output<typeof venueFileSchema>;
 export type TopicFile = z.output<typeof topicFileSchema>;

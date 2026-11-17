@@ -1,8 +1,14 @@
 import { and, eq, inArray, or, sql } from 'drizzle-orm';
 import { getDb, type Database } from '@/db';
 import { pageCurrent, pageLinks, pages, paperIdentifiers, papers } from '@/db/schema';
-import { formatIdentifier, type PageAddress, type PageKind, parseIdentifier, partsOf } from '@/lib/kinds';
-import { type LabeledLink, LINKS_FILE, type LinkLabelName, parseLabeledLinks } from '@/lib/labeled-links';
+import { formatIdentifier, type PageAddress, parseIdentifier, partsOf } from '@/lib/kinds';
+import {
+  type LabeledLink,
+  LINKS_FILE,
+  type LinkLabelName,
+  type LinkTargetKind,
+  parseLabeledLinks,
+} from '@/lib/labeled-links';
 import { canonicalPaperId } from '@/lib/paper-ids';
 import type { Consumer } from './consumers/types';
 import { findPageByAddress, mustPage, type PageRow } from './pages/kinds';
@@ -90,7 +96,9 @@ export const linksConsumer: Consumer = {
 /** A page at the other end of a link, as a list shows it. */
 export interface LinkedPage {
   pageId: string | null;
-  kind: PageKind;
+  kind: LinkTargetKind;
+  /** For a link to an address elsewhere (`web`), the address. */
+  url?: string;
   /** Its identifier, which also makes its address (`pagePath`). */
   address: PageAddress | null;
   /** Its title or name; `null` for a page that doesn't exist (yet). */
@@ -171,7 +179,7 @@ export async function linksFrom(pageId: string, database: Database = getDb()): P
   // A target named before its page existed is found now.
   const resolved = new Map<string, string | null>();
   for (const row of rows) {
-    if (row.targetPageId || resolved.has(row.target)) continue;
+    if (row.targetPageId || resolved.has(row.target) || row.targetKind === 'web') continue;
     const address = parseIdentifier(row.target);
     resolved.set(row.target, address ? ((await findPageByAddress(database, address))?.id ?? null) : null);
   }
@@ -182,7 +190,10 @@ export async function linksFrom(pageId: string, database: Database = getDb()): P
     const known = id ? found.get(id) : undefined;
     return asLink(
       row,
-      known ?? { pageId: null, kind: row.targetKind, address: parseIdentifier(row.target), name: null },
+      known ??
+        (row.targetKind === 'web'
+          ? { pageId: null, kind: 'web', address: null, name: null, url: row.target }
+          : { pageId: null, kind: row.targetKind, address: parseIdentifier(row.target), name: null }),
     );
   });
 }

@@ -260,6 +260,13 @@
       "when": 1794864253067,
       "tag": "0036_scope_stats",
       "breakpoints": true
+    },
+    {
+      "idx": 37,
+      "version": "7",
+      "when": 1794875150850,
+      "tag": "0037_user_pages",
+      "breakpoints": true
     }
   ]
 }

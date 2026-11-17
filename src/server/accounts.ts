@@ -8,6 +8,8 @@ import { normalizeEmail, syncAccount } from './affiliations';
 import { ApiError } from './api/errors';
 import { claimByEmail } from './claims';
 import { institutionForEmail } from './institution-domains';
+import { refreshPages } from './pages/refresh';
+import { afterHandleChange, startUserPage } from './user-pages';
 
 function placeholderHandle(): string {
   return `user-${randomBytes(6)
@@ -68,6 +70,8 @@ export async function ensureAccountForUser(
       } catch (err) {
         console.error('claim by email', err);
       }
+      // Its page at /u/<handle> exists already (a trigger made it with the account); its repo starts here.
+      await startUserPage(created, database);
       return created;
     } catch (err) {
       if (!isUniqueViolation(err)) throw err;
@@ -91,7 +95,8 @@ export interface ProfileChange {
 /**
  * Change what the public sees. The first completion must choose a handle and answer about the
  * institution; nothing is assumed for the person. Page history refers to a stable id, not the
- * handle, so a handle can change freely.
+ * handle, so a handle can change freely; the account's page at `/u/<handle>` moves with it, leaving a redirect from
+ * the old address until someone else takes that handle (`server/user-pages.ts`).
  */
 export async function updateProfile(
   account: Account,
@@ -120,6 +125,10 @@ export async function updateProfile(
       })
       .where(eq(accounts.id, account.id))
       .returning();
+    // The trigger moved the page to the new handle and left a redirect from the old one.
+    if (updated.handle !== account.handle) await afterHandleChange(account.handle, updated.handle, database);
+    // What the page shows may have changed (a real name), whether or not it shows it.
+    else await refreshPages({ kind: 'user', key: updated.handle }).catch(() => {});
     return updated;
   } catch (err) {
     if (isUniqueViolation(err)) throw new ApiError(409, 'handle_taken', 'that handle is taken');

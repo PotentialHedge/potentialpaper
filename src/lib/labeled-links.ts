@@ -16,7 +16,13 @@ export const MAX_LINKS_PER_FILE = 500;
 const MAX_NOTE = 2000;
 const MAX_ANCHOR = 200;
 
-export type LinkGroup = 'lineage' | 'support' | 'contest' | 'discourse' | 'topic';
+export type LinkGroup = 'lineage' | 'support' | 'contest' | 'discourse' | 'topic' | 'person';
+
+/**
+ * What a link's `to` names: a page of a kind, or `web`, an https address elsewhere (a person's homepage, ORCID
+ * record or Scholar profile), which only the labels that say so take.
+ */
+export type LinkTargetKind = PageKind | 'web';
 
 export interface LinkLabel {
   /** As the source page reads it: "extends". */
@@ -28,9 +34,14 @@ export interface LinkLabel {
   cito?: string;
   /** Contested labels need a note, because that is where the content is. */
   noteRequired?: boolean;
-  /** The kinds it may go from and to; none means any. */
+  /** The kinds it may go from and to; none means any page. */
   from?: readonly PageKind[];
   to?: readonly PageKind[];
+  /**
+   * An address elsewhere rather than a page: `to` is an https URL, whose host, if given, has to be one of these
+   * (`orcid.org`). Such a link names no page, so it is in no page's "what links here".
+   */
+  web?: { hosts?: readonly string[] };
 }
 
 const PAPERS = { from: ['paper'], to: ['paper'] } as const;
@@ -95,6 +106,18 @@ export const LINK_LABELS = {
     from: ['paper'],
     to: ['topic'],
   },
+  /** A person's own work (`handoffs/pages.md` Phase 3): put on their page by themselves, so their choice to show it. */
+  wrote: { reads: 'wrote', inverse: 'written by', group: 'person', from: ['user'], to: ['paper'] },
+  /** A person elsewhere: only from their own page, to an https address. */
+  homepage: { reads: 'homepage', inverse: 'homepage of', group: 'person', from: ['user'], web: {} },
+  orcid: { reads: 'ORCID', inverse: 'ORCID of', group: 'person', from: ['user'], web: { hosts: ['orcid.org'] } },
+  scholar: {
+    reads: 'Google Scholar',
+    inverse: 'Google Scholar of',
+    group: 'person',
+    from: ['user'],
+    web: { hosts: ['scholar.google.com'] },
+  },
 } as const satisfies Record<string, LinkLabel>;
 
 export type LinkLabelName = keyof typeof LINK_LABELS;
@@ -114,7 +137,7 @@ export const labeledLinkSchema = z
       .meta({ description: 'The link\'s id, unique in its file: a ULID such as "01JC8Z4X6Q0N4C3T6G1W6R2B7M".' }),
     to: z.string().max(300).meta({
       description:
-        'The target, by public identifier: arxiv:1706.03762, doi:10.…, openreview:…, venue:iclr/2027, topic:linear-attention, org:eth, user:alice.',
+        'The target, by public identifier: arxiv:1706.03762, doi:10.…, openreview:…, venue:iclr/2027, topic:linear-attention, org:eth, user:alice. For homepage, orcid and scholar (on a user page), an https address.',
     }),
     label: z.enum(LINK_LABEL_NAMES).meta({ description: 'What the link says (DESIGN.md §8).' }),
     note: z.string().trim().min(1).max(MAX_NOTE).optional().meta({
@@ -137,26 +160,48 @@ export const labeledLinkSchema = z
 export type LabeledLinkLine = z.output<typeof labeledLinkSchema>;
 
 export interface LabeledLink extends LabeledLinkLine {
-  /** `to` in its normal form. */
+  /** `to` in its normal form: an identifier, or for a `web` label the address as written. */
   target: string;
-  targetKind: PageKind;
+  targetKind: LinkTargetKind;
   /** The line it is on, from 1. */
   line: number;
 }
 
 /** Why the line can't go from a page of `from`, or `null`. */
-function lineProblem(link: LabeledLinkLine, from: PageKind): { problem: string } | { target: string; kind: PageKind } {
-  const address = parseIdentifier(link.to);
-  if (!address) return { problem: `"to" is not an identifier of a page: ${JSON.stringify(link.to)}` };
+function lineProblem(
+  link: LabeledLinkLine,
+  from: PageKind,
+): { problem: string } | { target: string; kind: LinkTargetKind } {
   const label: LinkLabel = LINK_LABELS[link.label];
   if (label.from && !label.from.includes(from)) {
     return { problem: `"${link.label}" goes from ${label.from.join(' or ')} pages, not from a ${from} page` };
   }
+  if (label.web) {
+    const url = webAddress(link.to);
+    if (!url) return { problem: `"${link.label}" goes to an https address, not ${JSON.stringify(link.to)}` };
+    const hosts = label.web.hosts;
+    if (hosts && !hosts.includes(url.hostname.replace(/^www\./, ''))) {
+      return { problem: `"${link.label}" goes to an address on ${hosts.join(' or ')}, not ${url.hostname}` };
+    }
+    return { target: link.to, kind: 'web' };
+  }
+  const address = parseIdentifier(link.to);
+  if (!address) return { problem: `"to" is not an identifier of a page: ${JSON.stringify(link.to)}` };
   if (label.to && !label.to.includes(address.kind)) {
     return { problem: `"${link.label}" goes to ${label.to.join(' or ')} pages, not to ${link.to}` };
   }
   if (label.noteRequired && !link.note) return { problem: `"${link.label}" needs a note saying why` };
   return { target: formatIdentifier(address), kind: address.kind };
+}
+
+/** An https address, or `null`. */
+function webAddress(text: string): URL | null {
+  if (!/^https:\/\//.test(text)) return null;
+  try {
+    return new URL(text);
+  } catch {
+    return null;
+  }
 }
 
 /**

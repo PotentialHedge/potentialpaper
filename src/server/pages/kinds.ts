@@ -1,7 +1,7 @@
 import { and, eq } from 'drizzle-orm';
 import { getDb, type Database } from '@/db';
 import { pgErrorCode } from '@/db/errors';
-import { pages, paperIdentifiers, papers } from '@/db/schema';
+import { pageRedirects, pages, paperIdentifiers, papers } from '@/db/schema';
 import {
   type KeyedKind,
   keyedPagePath,
@@ -53,11 +53,26 @@ export async function findKeyedPage(db: Reader, kind: KeyedKind, key: string): P
 }
 
 /**
- * The page an address names, or `null`: a paper through its identifiers (following a merge to the paper that
+ * The page an old key leads to (`page_redirects`): a user page whose account changed its handle, until another account
+ * takes the old one. `null` if none.
+ */
+export async function redirectedPage(db: Reader, kind: KeyedKind, key: string): Promise<PageRow | null> {
+  const [row] = await db
+    .select({ id: pages.id, kind: pages.kind, key: pages.key })
+    .from(pageRedirects)
+    .innerJoin(pages, eq(pages.id, pageRedirects.pageId))
+    .where(and(eq(pageRedirects.kind, kind), eq(pageRedirects.key, key)));
+  return row ?? null;
+}
+
+/**
+ * The page an address names, or `null` (following an old key's redirect): a paper through its identifiers (following a merge to the paper that
  * survived it), any other kind by its key. Never asks a paper source, so it is safe on unbounded input.
  */
 export async function findPageByAddress(db: Reader, address: PageAddress): Promise<PageRow | null> {
-  if (address.kind !== 'paper') return findKeyedPage(db, address.kind, address.key);
+  if (address.kind !== 'paper') {
+    return (await findKeyedPage(db, address.kind, address.key)) ?? redirectedPage(db, address.kind, address.key);
+  }
   const [row] = await db
     .select({ id: papers.id, mergedInto: papers.mergedInto })
     .from(paperIdentifiers)

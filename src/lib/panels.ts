@@ -56,9 +56,13 @@ export const PAGE_PANELS = {
     { id: 'papers', slot: 'org.tabs', title: 'Papers' },
   ],
   user: [
+    { id: 'identity', slot: 'user.main', title: 'Name and institution' },
     { id: 'about', slot: 'user.main', title: 'About' },
+    { id: 'papers', slot: 'user.main', title: 'Papers they authored' },
     { id: 'links', slot: 'user.aside', title: 'Labeled links' },
     { id: 'backlinks', slot: 'user.aside', title: 'What links here' },
+    { id: 'activity', slot: 'user.tabs', title: 'Activity' },
+    { id: 'comments', slot: 'user.tabs', title: 'Comments' },
   ],
 } as const satisfies Record<string, readonly PanelInfo[]>;
 
