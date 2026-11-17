@@ -4,6 +4,7 @@ import { SDK_BASE } from '@/lib/plugins/origin';
 import { HOST_METHODS, MAX_FRAME_HEIGHT, MAX_STORAGE_BYTES, THEME_TOKENS } from '@/lib/plugins/protocol';
 import { MANIFEST_FILE } from '@/lib/plugins/sources';
 import { PLUGIN_TOPIC } from '../plugins/discover';
+import { IDENTITY_TOKEN_SECONDS, JWKS_PATH } from '../plugins/identity';
 import { MAX_PLUGIN_BYTES, MAX_PLUGIN_FILE_BYTES, MAX_PLUGIN_FILES } from '../plugins/snapshot';
 
 /**
@@ -226,7 +227,10 @@ Every field of the manifest:
   frame loads), and optionally \`description\`, \`author\`, \`homepage\`.
 - \`permissions\`: what it may read ([Permissions](#permissions)).
 - \`network\`: https origins its own backend lives at (\`https://api.example.org\`), which its frames may connect to.
-  They are shown to the reader before they approve it, and a new one needs their approval again.
+  They are shown to the reader before they approve it, and a new one needs their approval again
+  ([Your own backend](#your-own-backend)).
+- \`bot\`: the handle of the bot account whose files on pages the plugin shows (\`"bot": "openreview"\`). The approval
+  prompt says the plugin shows that bot's data, and what this site lets the bot write; naming a bot grants nothing.
 - \`contributes.panels\` (up to 8): \`id\`, \`title\`, \`kinds\` (${PAGE_KINDS.map((k) => `\`${k}\``).join(', ')}), \`slot\`
   (\`main\`, \`aside\` or \`tab\`; or one per kind, \`{ "paper": "aside", "*": "main" }\`), and \`when\`.
 - \`contributes.pages\` (up to 8): whole pages of its own at \`${origin}/x/<owner>/<name>/<page id>/…\`.
@@ -308,7 +312,63 @@ and percentiles are yours to do from \`values\`. A site may withhold a venue's s
 (\`hidden: true\`, with no values). Reviews are CC BY 4.0: show each one's licence and link with what you draw from
 it. The OpenAPI description of these routes is at ${origin}/openapi.json.
 
-A plugin with its own backend lists that backend's origin in \`network\`; it never gets the reader's session.
+## Your own backend
+
+A plugin can have a server of its own, for what the site doesn't keep: a reader's private notes, a model's
+predictions, data from another service. The site never runs it and it never sees the reader's session.
+
+1. **List its origin in \`network\`** (\`"network": ["https://api.example.org"]\`). Those origins, and the plugin's
+   own, are the only places its frames may connect to (CSP \`connect-src\`). The approval prompt names them, and adding
+   one in an update asks the reader again. The backend answers CORS for the plugin's origin (or \`*\`: it is called
+   with a bearer token, not cookies).
+2. **To know who the reader is, ask for \`identity\`** (\`"permissions": ["identity"]\`). \`pp.identity.token()\` gives a
+   JWT the site signs for the signed-in reader, good for ${IDENTITY_TOKEN_SECONDS / 60} minutes (the host keeps one while it
+   has more than a minute left, so ask for it on every request); \`pp.identity.fetch(url, init)\` sends it as
+   \`Authorization: Bearer …\`. Signed out, it fails with \`Unavailable\`. Only the reader can approve \`identity\`, in their
+   browser, even for a plugin the site installs for everyone: until they do, such a plugin runs without it
+   (\`PermissionDenied\`).
+3. **The backend verifies the token** against the site's keys, ${origin}${JWKS_PATH} (ES256, a JWKS; fetch it again
+   when a token names a \`kid\` you don't have, since keys rotate). Check:
+   - the signature, with the key whose \`kid\` the token's header names, and \`alg\` \`ES256\`;
+   - \`iss\` is \`${new URL(origin).origin}\`;
+   - \`aud\` is your plugin's id. A token for another plugin is refused this way, so a plugin can't pass its readers'
+     tokens to yours;
+   - \`exp\` (and \`nbf\`), with a minute's leeway.
+
+   Then key what you keep by \`sub\`: the reader's id for your plugin, stable when they change their handle, and
+   different for every plugin, so backends can't join their users by it. \`handle\` is their handle, for showing.
+   The claims: \`iss\`, \`aud\`, \`sub\`, \`handle\`, \`plugin\`, \`iat\`, \`nbf\`, \`exp\`, \`jti\`.
+4. **While developing**, a plugin loaded from localhost gets tokens for \`aud\` \`dev:<plugin id>\` (with \`dev: true\`),
+   since anyone can claim any id on their own machine. Accept them only in a backend you run locally; its frames are
+   served by your dev server, so \`network\` doesn't limit them there (\`pp.context.plugin.dev\` says which you are).
+
+In the frame:
+
+\`\`\`js
+const API = pp.context.plugin.dev ? 'http://localhost:8787' : 'https://api.example.org';
+const res = await pp.identity.fetch(\`\${API}/notes?page=\${encodeURIComponent(pp.context.page.identifier)}\`);
+\`\`\`
+
+In the backend (Node; any JWT library with ES256 and JWKS does the same, such as \`jose\` or PyJWT):
+
+\`\`\`js
+import { createRemoteJWKSet, jwtVerify } from 'jose';
+const keys = createRemoteJWKSet(new URL('${origin}${JWKS_PATH}'));
+const { payload } = await jwtVerify(token, keys, { issuer: '${new URL(origin).origin}', audience: '<owner>/<name>', algorithms: ['ES256'] });
+// payload.sub: the reader, for your plugin; payload.handle: their handle
+\`\`\`
+
+A complete example without dependencies is the "Private notes" plugin in the site's repo: the plugin,
+\`examples/plugins/notes\` (https://github.com/PotentialHedge/potentialpaper/tree/main/examples/plugins/notes), keeps
+each reader's notes on any page in its backend, \`examples/plugins/notes-backend\`, whose \`verify.mjs\` checks a token
+with Node's own crypto and refetches the keys after a rotation.
+
+**Writing to pages.** A backend never writes shared state through the RPC or a reader's token. Data for everyone
+(scores, links, results) is written to pages as files by a **bot**: an account the site grants folders by path, whose
+commits show as a bot's. Today a bot can be granted a source's review imports (\`reviews/<source>/**\`, as the site's
+\`openreview\` bot is), by the site's admins; \`extensions/<plugin id>/\` is reserved for plugins' own bots, which come
+with registering a bot yourself, bot tokens and webhooks (not yet). Name the bot in the manifest's \`bot\`, so the
+approval prompt says whose data the plugin shows, and read its files with \`pp.page.read\` or \`pp.reviews.forPaper\`.
 
 ## Develop
 

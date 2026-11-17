@@ -6,7 +6,7 @@ import * as S from './schemas';
  * topic and change lists, `/topics` and `/changes`), which
  * plugins (through the SDK) and outside backends (`handoffs/plugins.md`, data for plugins A, B and D) read alike. The
  * response bodies are made from the same zod schemas the routes check their answers against, so the two can't drift.
- * The rest of the API is described in `/llms.txt` and the agent instructions; it can join here route by route.
+ * Also `/.well-known/jwks.json`, for plugins' backends (data for plugins D). The rest of the API is described in `/llms.txt` and the agent instructions; it can join here route by route.
  */
 
 const json = (schema: z.ZodType) => z.toJSONSchema(schema, { io: 'output', unrepresentable: 'any' });
@@ -289,6 +289,17 @@ export function openApiDocument(origin: string) {
             '400': ERROR,
             '404': ERROR,
             '422': ERROR,
+          },
+        },
+      },
+      '/.well-known/jwks.json': {
+        servers: [{ url: origin }],
+        get: {
+          summary: "The keys that sign plugins' identity tokens",
+          description:
+            "For a plugin's own backend: the public ES256 keys (a JWKS) that sign the tokens `pp.identity.token()` gives a plugin with the `identity` permission. Verify a token with the key its header's `kid` names, `iss` the site's origin and `aud` your plugin's id, and key what you keep by `sub` (the reader, pairwise per plugin). Fetch again when a token names a `kid` you don't have: keys rotate, and every live key is listed. Public; `Cache-Control: public, max-age=300`.",
+          responses: {
+            '200': { description: 'OK', content: { 'application/json': { schema: json(S.Jwks) } } },
           },
         },
       },
