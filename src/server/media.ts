@@ -2,6 +2,7 @@ import { mkdir, writeFile } from 'node:fs/promises';
 import { join } from 'node:path';
 import { AwsClient } from 'aws4fetch';
 import type { ThumbnailType } from './pages/rules';
+import { r2Put } from './r2-put';
 
 /** Bytes kept outside the page repos, by hash: in R2, or in development under `public/`. */
 
@@ -53,12 +54,10 @@ export async function storeMedia(
     service: 's3',
     region: 'auto',
   });
-  const put = await client.fetch(`https://${R2_ACCOUNT_ID}.r2.cloudflarestorage.com/${BUCKET}/${folder}/${name}`, {
-    method: 'PUT',
-    body: new Uint8Array(bytes),
-    headers: { 'Content-Type': contentType, 'Cache-Control': 'public, max-age=31536000, immutable' },
+  await r2Put(client, `https://${R2_ACCOUNT_ID}.r2.cloudflarestorage.com/${BUCKET}/${folder}/${name}`, bytes, {
+    'Content-Type': contentType,
+    'Cache-Control': 'public, max-age=31536000, immutable',
   });
-  if (!put.ok) throw new Error(`R2 upload: HTTP ${put.status}: ${(await put.text()).slice(0, 200)}`);
   return `${MEDIA_BASE}/${folder}/${name}`;
 }
 

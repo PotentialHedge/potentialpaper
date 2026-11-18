@@ -6,6 +6,7 @@ import { join } from 'node:path';
 import { Readable } from 'node:stream';
 import { pipeline } from 'node:stream/promises';
 import { AwsClient } from 'aws4fetch';
+import { r2Put } from '../r2-put';
 import { sql, type SQL } from 'drizzle-orm';
 import { getDb, type Database } from '@/db';
 import type { PdfStageState } from '@/db/schema';
@@ -172,12 +173,10 @@ async function storeCover(sha256: string, jpeg: Buffer): Promise<string> {
     await writeFile(join(dir, `${sha256}.jpg`), jpeg);
     return `/covers/${sha256}.jpg`;
   }
-  const res = await remote.client.fetch(`${remote.base}/cover/${sha256}.jpg`, {
-    method: 'PUT',
-    body: new Uint8Array(jpeg),
-    headers: { 'Content-Type': 'image/jpeg', 'Cache-Control': 'public, max-age=31536000, immutable' },
+  await r2Put(remote.client, `${remote.base}/cover/${sha256}.jpg`, jpeg, {
+    'Content-Type': 'image/jpeg',
+    'Cache-Control': 'public, max-age=31536000, immutable',
   });
-  if (!res.ok) throw new Error(`R2 upload: HTTP ${res.status}: ${(await res.text()).slice(0, 200)}`);
   return `${PDF_BASE}/cover/${sha256}.jpg`;
 }
 

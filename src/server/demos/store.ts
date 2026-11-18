@@ -1,6 +1,7 @@
 import { mkdir, readFile, writeFile } from 'node:fs/promises';
 import { join } from 'node:path';
 import { AwsClient } from 'aws4fetch';
+import { r2Put } from '../r2-put';
 
 /**
  * Demo files' bytes, stored once each under their SHA-256: in R2 when its keys are set, as PDFs and
@@ -52,12 +53,7 @@ export async function putBlob(sha256: string, bytes: Buffer): Promise<void> {
     await writeFile(join(localDir(), sha256), bytes);
     return;
   }
-  const res = await remote.client.fetch(`${remote.base}/${key(sha256)}`, {
-    method: 'PUT',
-    body: new Uint8Array(bytes),
-    headers: { 'Content-Type': 'application/octet-stream' },
-  });
-  if (!res.ok) throw new Error(`R2 upload: HTTP ${res.status}: ${(await res.text()).slice(0, 200)}`);
+  await r2Put(remote.client, `${remote.base}/${key(sha256)}`, bytes, { 'Content-Type': 'application/octet-stream' });
 }
 
 /** The bytes, as a stream, or `null` if they aren't stored. */
