@@ -4666,6 +4666,825 @@
        "modifiedAt": "2026-02-12T15:38:55.104Z"
       }
      ]
+    },
+    {
+     "id": "053vZMxDB5",
+     "number": 1461,
+     "title": "TGPO: Temporal Grounded Policy Optimization for Signal Temporal Logic Tasks",
+     "abstract": "Learning control policies for complex, long-horizon tasks is a central challenge in robotics and autonomous systems. Signal Temporal Logic (STL) offers a powerful and expressive language for specifying such tasks, but its non-Markovian nature and inherent sparse reward make it difficult to be solved via standard Reinforcement Learning (RL) algorithms. Prior RL approaches focus only on limited STL fragments or use STL robustness scores as sparse terminal rewards. In this paper, we propose TGPO, Temporal Grounded Policy Optimization, to solve general STL tasks. TGPO decomposes STL into timed subgoals and invariant constraints and provides a hierarchical framework to tackle the problem. The high-level component of TGPO proposes concrete time allocations for these subgoals, and the low-level time-conditioned policy learns to achieve the sequenced subgoals using a dense, stage-wise reward signal. During inference, we sample various time allocations and select the most promising assignment for the policy network to rollout the solution trajectory. To foster efficient policy learning for complex STL with multiple subgoals, we leverage the learned critic to guide the high-level temporal search via Metropolis-Hastings sampling, focusing exploration on temporally feasible solutions. We conduct experiments on five environments, ranging from low-dimensional navigation to manipulation, drone, and quadrupedal locomotion. Under a wide range of STL tasks, TGPO significantly outperforms state-of-the-art baselines (especially for high-dimensional and long-horizon cases), with an average of 31.6% improvement in task success rate compared to the best baseline.",
+     "authors": [
+      "Yue Meng",
+      "Fei Chen",
+      "Chuchu Fan"
+     ],
+     "keywords": [
+      "Reinforcement Learning; Signal Temporal Logic"
+     ],
+     "status": "rejected",
+     "decision": "Reject",
+     "notes": [
+      {
+       "externalId": "Jnq4Ep2xfC",
+       "replyTo": null,
+       "kind": "review",
+       "invitation": "Official_Review",
+       "signature": "Reviewer TtqM",
+       "content": {
+        "summary": "This paper presents a reinforcement learning (RL) approach for learning from signal temporal logic (STL) to make learning more feasible for long-horizon tasks. The novel model-free approach divides and flattens complex STL formulas and searches for time-variable actualizations via Metropolis-Hastings (MH) sampling to enable efficient learning. The proposed method is compared with a range of existing approaches across several environments. I believe the idea is original and shows promise for improving over existing methods for STL learning. However, the paper still needs substantial work; specifically, a more thorough technical analysis and a systematic description of the proposed approach, as well as clearer explanations and presentation of the experimental results.",
+        "soundness": 2,
+        "presentation": 2,
+        "contribution": 3,
+        "strengths": "To the best of my knowledge, the proposed approach is a novel way to address the sparsity and non-Markovian nature of STL rewards, an important problem in STL learning that existing methods do not sufficiently handle, especially for long-horizon tasks with complex STL formulas. In addition, the proposed approach is compared against a sufficiently representative set of baselines.",
+        "weaknesses": "- **W1.** (Minor) Eq. (2) can be visually improved.\n- **W2.** The problem statement is quite vague and somewhat confusing. I think a more comprehensive and consistent notation can be used. Also, constructing an augmented MDP should be part of the solution rather than the objective. Lastly, the probability-maximization statement with respect to the initial state is also ambiguous.\n- **W3.** The STL decomposition is not systematically or algorithmically explained (Algorithm 1 is very high level) and is presented primarily through intuition and examples.\n- **W4.** The number of different time-variable assignments can grow exponentially with the number of subgoals, which can be further complicated for nested and/or disjunctive formulas.\n- **W5.** I think observed (continuous) time should be part of the augmented state space rather than the discrete step number, as STL is defined for continuous signals.\n- **W6.** Exact time-variable assignments do not seem realistic; as I understand it, they represent the exact time at which a certain state must be reached.\n- **W7.** It seems that a new MDP is constructed for every new assignment, which can technically impede RL.\n- **W8.** The formal connection between the dense rewards and STL satisfaction is not established or discussed.\n- **W9.** The authors do not provide sufficient technical analysis of the time-variable assignment procedure.\n- **W10.** The flow and clarity of the experiments section can be improved.",
+        "questions": "- **Q1.** See W2. What does $\\mathbb{P}_{x_0\\in\\mathcal{X}_0}$ formally mean in the problem statement? Do we assume a distribution over the initial states? Is the objective maximization over success rates or average robustness score?\n- **Q2.** See W3. Can you provide pseudocode for STL decomposition? What are the inputs and outputs? How are nested formulas formally divided? How are the time variables determined; for example, for $G_{[0,200]} F_{[0,10]} a$, where the number of time variables can vary, or for $F_{[0,100]} a \\vee F_{[0,100]} b$, where one time variable might be sufficient?\n- **Q3.** What are your thoughts regarding W4?\n- **Q4.** See W6. Why isn't an ordering of subgoals sufficient?\n- **Q5.** See W7. What are your thoughts on such a nonstationary environment? Why do you think your procedure transfers knowledge efficiently across MDPs?\n- **Q6.** See W8. Does maximizing the return maximize the STL success rate or the robustness score? Is it an admissible heuristic?\n- **Q7.** See W9. For example, assuming deep RL converges to an optimal policy that maximizes return, is the time-variable assignment procedure complete; i.e., if there is a feasible assignment, will the procedure eventually propose such an assignment? How fast could that be, given W4?\n- **Q8.** See W9. Could you provide pseudocode for time-variable assignment with MH sampling? Also, why do you think the critic provides a good heuristic for MH sampling given that the MDPs are changing?\n- **Q9.** I think some of the STL formulas used in the experiments should be discussed in the main paper. Could you provide a general description of the STL formulas? \n- **Q10.** In the figures in the experiments section, are training steps the same as environment steps?\n- **Q11.** Could you compare the dimensionality of your augmented state space with history-stacked state spaces?\n- **Q12.** Regarding Figure 6, did you use the same STL formulas with the same time intervals? Could you provide similar figures for different environments where the intervals are also scaled accordingly?",
+        "flag_for_ethics_review": [
+         "No ethics review needed."
+        ],
+        "rating": 2,
+        "confidence": 3,
+        "code_of_conduct": "Yes"
+       },
+       "license": "CC-BY-4.0",
+       "url": "https://openreview.net/forum?id=053vZMxDB5&noteId=Jnq4Ep2xfC",
+       "createdAt": "2025-10-30T22:49:21.417Z",
+       "modifiedAt": "2025-11-12T02:49:35.131Z"
+      },
+      {
+       "externalId": "lGJIfeabQm",
+       "replyTo": null,
+       "kind": "review",
+       "invitation": "Official_Review",
+       "signature": "Reviewer sqA6",
+       "content": {
+        "summary": "The paper proposes Temporal Grounded Policy Optimization (TGPO), a hierarchical reinforcement learning framework for solving control problems specified using Signal Temporal Logic (STL). STL enables rich task specifications with temporal and spatial constraints, but its non-Markovian structure and sparse reward signals make it difficult to handle with standard RL algorithms.  TGPO decomposes STL formulas into subgoals with invariant constraints, and introduces a two-level architecture: a high-level “temporal grounding” component assigns time variables to each subgoal, while a low-level time-conditioned policy learns to satisfy them using dense, stage-wise rewards. The framework includes a critic-guided Bayesian time allocation step using Metropolis–Hastings sampling, which focuses exploration on promising temporal schedules.\nExperiments across five environments (2D navigation, unicycle, Franka Panda, quadrotor, and Ant) show that TGPO and its Bayesian variant (TGPO*) outperform several baselines—τ-MDP, F-MDP, RNN, Grad, and CEM—particularly on complex, high-dimensional, and long-horizon STL tasks.",
+        "soundness": 3,
+        "presentation": 3,
+        "contribution": 3,
+        "strengths": "Strengths\n1. Solid statistical analysis and thorough results section.\nThe empirical evaluation is broad, well-structured, and uses multiple seeds, metrics, and ablation studies. The inclusion of both low- and high-dimensional systems helps demonstrate scalability.\n2. The use of the learned value function to guide time allocation search is interesting \n3. The writing is clear for the most part (see weakness 1)",
+        "weaknesses": "1. In sec. 4.1 the authors say “Our method of decomposing STL into subgoals with invariant constraints is inspired by Kapoor et al. (2024); Liu et al. (2025).”  From a clarity standpoint, it is unclear to what extent the proposed method for decomposition into subgoals differs from these prior works.  Can the authors elaborate on this?\n2. The shaped reward defined in eq. 6 seems specific to locomotion-type problems.  It’s unclear how this would generalize to other domains.",
+        "questions": "1. See weaknesses 1 and 2\n2. In what sense is the time-allocation method Bayesian?\nThe Metropolis–Hastings sampling uses the critic as a heuristic energy function, but it’s unclear whether this constitutes a Bayesian inference procedure or simply a guided stochastic search.",
+        "flag_for_ethics_review": [
+         "No ethics review needed."
+        ],
+        "rating": 8,
+        "confidence": 2,
+        "code_of_conduct": "Yes"
+       },
+       "license": "CC-BY-4.0",
+       "url": "https://openreview.net/forum?id=053vZMxDB5&noteId=lGJIfeabQm",
+       "createdAt": "2025-10-31T21:36:39.668Z",
+       "modifiedAt": "2025-11-12T02:49:34.997Z"
+      },
+      {
+       "externalId": "S02eqipeGp",
+       "replyTo": null,
+       "kind": "review",
+       "invitation": "Official_Review",
+       "signature": "Reviewer G7gi",
+       "content": {
+        "summary": "This paper presents a new reinforcement learning method to learn control policies for some types of STL specifications. The proposed method consists of first sampling time assignments for decomposed subgoals and then learn policies to achieve these subgoals conditioned on the time assignments.",
+        "soundness": 2,
+        "presentation": 3,
+        "contribution": 2,
+        "strengths": "This work presents a new reinforcement learning method for motion planning to achieve sequenced subgoals given time assignments. The formulation of several RL components including state space and reward function seems to be new.\n\nThis work proposes a new method for time domain planning in STL that is capable of sampling promising future timesteps for subgoal planning.\n\nExperiments in five simulated environments demonstrate improved performance over some baseline methods.",
+        "weaknesses": "Although the paper claims to solve *general* STLs, in fact the proposed method cannot be applied to some important STLs at the moment.\n- Line 197, it is assumed that the type of invariance task after translation only contains *interval* for time variable. This makes modelling and learning for STL that involves infinite time impractical. Although this is mentioned in the limitation section, It should be clearly described at the introduction of STLs.\n- This paper cannot handle STLs like G(F …) as mentioned in Line 212. In fact, many liveness properties of the STL cannot be handled by the current method. These kinds of temporal logic are quite important in some domain like maintenance tasks or repeated tasks that require the agent conduct task periodically.\nTherefore, the current paper overclaims what types of STL the proposed method can handle. The paper is supposed to have a clear explanation on what the specific STLs are they are targeting, give a formal definition on what these STLs are and what common properties they have in common, how they are related to other types of STLs that the method cannot handle.\n\nThe proposed reward function lacks a direct link with respect to the original STL task. It is unclear under this combination of rewards, how the optimal policy behaves in the original STL task. Ideally, the conversion from STL task to RL task should be formulated in a way that both optimization tasks share the same optimal solutions. Similar to LTL2Action, it would be better to provide analysis showing that the optimal policy under the proposed rewards also guarantees the satisfaction of the original STL.",
+        "questions": "How are the STLs designed?\n\nWhat are the guidelines used for this designing?\n\nAre there any practical scenarios where these STLs have been applied in real applications?",
+        "flag_for_ethics_review": [
+         "No ethics review needed."
+        ],
+        "rating": 4,
+        "confidence": 4,
+        "code_of_conduct": "Yes"
+       },
+       "license": "CC-BY-4.0",
+       "url": "https://openreview.net/forum?id=053vZMxDB5&noteId=S02eqipeGp",
+       "createdAt": "2025-11-01T11:13:39.983Z",
+       "modifiedAt": "2025-11-12T02:49:34.887Z"
+      },
+      {
+       "externalId": "z4O7818E9m",
+       "replyTo": "S02eqipeGp",
+       "kind": "comment",
+       "invitation": "Official_Comment",
+       "signature": "Authors",
+       "content": {
+        "comment": "Thank you for recognizing the novelty of our work. There is limited literature addressing the STL planning problem with an emphasis on temporal aspects, which are crucial yet often overlooked by the community. Below, we provide detailed discussions for the weaknesses (W) and questions (Q) raised.\n\n> W1: Generability\n\nOur method focuses on finite-horizon STL with bounded time intervals, and we have clarified this scope in the revised version (Section 1, last paragraph). While formulas like $G(F(\\cdots))$ might not be efficiently handled by TGPO, we respectfully clarify that TGPO has no problem in handling liveness properties. The Figure 1 in our paper illustrates how we solve multiple liveness properties, and Figure 2 shows how we solve nested liveness properties (other STLs with multiple liveness properties are shown in Appendix A.10.1-A.10.5). The ability to handle deep, nested STLs is one of the main advantages of TGPO. We have mentioned the STLs we can solve in the original manuscript (Section 4.1,  \"In this work, we do not consider ...\") To re-emphasize the class of the STL tasks we can solve, we have revised the paper to state the scope (Section 3.1, last paragraph).\n\n\n> W2: Theoretical analysis\n\nWe added a theoretical analysis in the revised paper (appendix A.5). We show that with a proper scaling for the reward terms, the optimal policy will satisfy the STL task, if the original problem is feasible.\n\n> Q1: How are the STLs designed? Guidelines? \n\nThe STL formulas used for each scenario are shown in the appendix A.10 of our paper and they are largely inspired by references [1,2]. We construct predicates from task-related spatial requirements and compose them into bounded temporal operators. To challenge our framework, we include nested, long-horizon, and structurally complex STL tasks that go beyond simple reach-avoid formulas.\n\n\n> Q2: Any practical scenarios for these STLs in real applications?\n\nFor the STLs formulas in our paper to test TGPO, their common structure (conjunctions of \"eventually\" and \"always\" operators; timed goal reaching, obstacle avoidance, and ordered mission execution) is representative of many real-world tasks such as autonomous driving [3] and smart cities [4].\n\n\n**We hope our response has addressed your concerns. We kindly ask if there are any remaining issues preventing a more positive evaluation, and we would like to continue the discussion in the remaining rebuttal period.**\n\n\n**References:**\n1. Sun, Dawei, et al. \"Multi-agent motion planning from signal temporal logic specifications.\" IEEE Robotics and Automation Letters 7.2 (2022): 3451-3458.\n2. Meng, Yue, and Chuchu Fan. \"TeLoGraF: Temporal Logic Planning via Graph-encoded Flow Matching.\" arXiv preprint arXiv:2505.00562 (2025).\n3. Zhong, Ziyuan, et al. \"Guided conditional diffusion for controllable traffic simulation.\" arXiv preprint arXiv:2210.17366 (2022).\n4. Ma, Meiyi, et al. \"STLnet: Signal temporal logic enforced multivariate recurrent neural networks.\" Advances in Neural Information Processing Systems 33 (2020): 14604-14614."
+       },
+       "license": "CC-BY-4.0",
+       "url": "https://openreview.net/forum?id=053vZMxDB5&noteId=z4O7818E9m",
+       "createdAt": "2025-11-21T06:46:18.913Z",
+       "modifiedAt": "2025-11-21T06:46:18.913Z"
+      },
+      {
+       "externalId": "Sh8vngRxxv",
+       "replyTo": "lGJIfeabQm",
+       "kind": "comment",
+       "invitation": "Official_Comment",
+       "signature": "Authors",
+       "content": {
+        "comment": "We thank the reviewer for the positive feedback, especially regarding our broad empirical evaluation across diverse systems, and the use of the learned value function for time-allocation search. We also appreciate the comments on the clarity of our writing. Below, we provide a detailed discussion of the weaknesses (W) and questions (Q) raised.\n\n> W1, Q1: How TGPO decomposes STL differently compared to prior work.\n\nDecomposing STLs into reachability and invariance tasks is introduced in [1] to accelerate classical solver solving process for long-horizon STL tasks. Then the work in [2] leverages it to conduct zero-shot trajectory planning based on generative models learned from demonstration data. \n\nThe novelty of our work is not the decomposition technique itself, but an inherit novel RL algorithm to solve broader class of STL problems without demonstrations: we introduce a dense, stage-wise reward design and an augmented MDP that are directly aligned with each subgoal’s semantics, and we further view the problem through a temporal variable assignment perspective, and use the critic to guide a more efficient search. This leads to improved scalability, interpretability, and the ability to handle more general, nested, and long-horizon STL tasks compared to prior works.\n\n> W2, Q1: Generability to other domains.\n\nWe would like to respectfully clarify that TGPO is not limited to locomotion tasks. The Franka Panda benchmark used in our paper is a manipulation task and not a locomotion task. While Eq. 6 uses a distance-based reward, the reward structure is domain-agnostic because it is derived from STL robustness semantics. The high-level reward structure depends on how \"far\" a trajectory is from satisfying a subgoal, flags for subgoal completion and invariance constraint violation. These components are not tied to locomotion and can be generalized to other domains by defining appropriate task-relatd predicates.\n\n> Q2: In what sense is the time-allocation method Bayesian?\n\nWe classify our time-allocation algorithm as Bayesian, because we seek to find the posterior distribution of \"good\" time variable assignments that can lead to the fulfillment of the STL task. Our prior belief over the time variables follows a uniform distribution over their corresponding intervals. We use the learned critic value as a learned, non-normalized approximation of the log-likelihood of success, and we use MH algorithm to sample time variables from the updated belief at each training epoch. We have clarified this in the revised manuscript (Section 4.3).\n\n**References**\n1. Kapoor, Parv, Eunsuk Kang, and Rômulo Meira-Góes. \"Safe planning through incremental decomposition of signal temporal logic specifications.\" NASA Formal Methods Symposium. Cham: Springer Nature Switzerland, 2024.\n2. Liu, Ruijia, et al. \"Zero-Shot Trajectory Planning for Signal Temporal Logic Tasks.\" arXiv preprint arXiv:2501.13457 (2025)."
+       },
+       "license": "CC-BY-4.0",
+       "url": "https://openreview.net/forum?id=053vZMxDB5&noteId=Sh8vngRxxv",
+       "createdAt": "2025-11-21T06:49:33.653Z",
+       "modifiedAt": "2025-11-21T06:49:33.653Z"
+      },
+      {
+       "externalId": "2aM1Lsk9gq",
+       "replyTo": "Jnq4Ep2xfC",
+       "kind": "comment",
+       "invitation": "Official_Comment",
+       "signature": "Authors",
+       "content": {
+        "comment": "We thank the reviewer for recognizing our novel approach to handling the sparsity and non-Markovian nature of STL rewards, especially for long-horizon tasks with complex formulas. We also appreciate the positive assessment of our comprehensive experiments compared against a sufficiently representative set of baselines. Below, we provide a detailed discussion of the weaknesses (W) and questions (Q) raised.\n\n> W1:  (Minor) Eq. (2) can be visually improved.\n\nThanks for the suggestion on the writing. We have updated the manuscript with Eq. (2) visually improved.\n\n> W2/Q1: Clarification on the problem statement.\n\nWe have modified the manuscript to have a clearer problem statement. (Section 3.3) We assume there is a distribution for the initial states on a set. The objective is to maximize over success rates for these initial states.\n\n> W3/Q2: STL decomposition is not systematically or algorithmically explained.\n\nWe have updated the paper to introduce the STL decomposition algorithm (Section 4.1, Algorithm 1). For $G_{[0,200]}F_{[0,10]} a$, we have 1 time variable for each index in the time window for G. And for $F_{[0,100]}a \\lor F_{[0,100]} b$, although we haven't tackled them in this paper, theoretically we can use a binary variable to indicate the branch of the conditions, and then introduce a time variable under each branch, and use the binary variable to \"activate\" the corresponding time variable.\n\n> W4/Q3: The number of different time-variable assignments can grow exponentially with the number of subgoals, which can be further complicated for nested and/or disjunctive formulas.\n\nWe thank the reviewer for raising the important issue of combinatorial complexity. While we briefly mention this in our \"limitation\" section in the original manuscript, we argue that the practical problem in the STL domain remains tractable for our TGPO for two reasons.\n\n1. **Density of feasible solutions.** In robotics tasks, feasible time assignments typically form continuous, dense volumes rather than isolated points (which is shown in our Figure 7). Due to the continuity of system dynamics, if a task is solvable at time $t$, it is usually solvable within a range $[t-\\Delta_1, t+\\Delta_2]$. This implies that the set of valid assignments constitutes a significant portion of the search space. Consequently, even uniform sampling has a high probability of identifying a feasible allocation, and our Bayesian sampling can further improve the efficiency by exploiting the gradients of the learned value landscape to rapidly focus the search on these feasible regions.\n\n2. **Advancement over existing RL baselines**. Critically, the complexity of these temporal tasks must be viewed relative to the capabilities of existing baselines. For baselines like F-MDP or $\\tau$-MDP struggle to solve STL with more than two temporal layers or long-horizon tasks (T>300). In contrast, TGPO can solve multi-level nested tasks on high-dimensional systems. This demonstrates that our hierarchical grounding approach significantly expands the frontier of STL specifications that are tractable for RL methods.\n\nWe acknowledge that, similar to other sampling-based motion planning algorithms (e.g., RRT), our efficiency scales inversely with the dimension of the sampling space. However, this is a trade-off that is hard to avoid when solving problems involving complex dynamics where MILP or gradient-based solvers are inapplicable. To address this in future work, we plan to investigate the integration of commonsense priors from LLMs to prune the search space by ruling out semantically infeasible assignments.\n\n\n\n> W5:  The observed (continuous) time should be in the augmented state rather than the discrete step number, as STL is defined for continuous signals.\n\nSince we consider discrete-time dynamical systems, including the discrete step number in the state provides the neural network with identical information as the continuous time; the distinction is merely a scalar constant (time duration). Furthermore, in implementation, we normalized the features to ensure that numerically the input is in the reasonable range. We have made it clear in the updated paper (Section 4.2, between Eq(4) and Eq(5))."
+       },
+       "license": "CC-BY-4.0",
+       "url": "https://openreview.net/forum?id=053vZMxDB5&noteId=2aM1Lsk9gq",
+       "createdAt": "2025-11-21T06:51:37.597Z",
+       "modifiedAt": "2025-11-21T06:51:37.597Z"
+      },
+      {
+       "externalId": "PjNuN172bw",
+       "replyTo": "Jnq4Ep2xfC",
+       "kind": "comment",
+       "invitation": "Official_Comment",
+       "signature": "Authors",
+       "content": {
+        "comment": "> W6/Q4: Exact time-variable assignments do not seem realistic, as they require reaching at the exact time./ Why isn't an ordering of subgoals sufficient?\n\nOur time-variable assignment, state transition and reward design does not require the agent to reach a subgoal \"only\" at an exact time $\\tau$, instead, it requires the agent to reach the subgoal \"at least\" at $\\tau$ (the agent can reach the subgoal before $\\tau$ but it needs to also be there at $\\tau$.) which makes the requirement not that hard to meet. Just specifying the order of the subgoals is not sufficient, as it does not keep track of the subgoal achieving status, and then defining transition and the reward can be a challenge. Meanwhile, since now there is no explicit condition in the augmented state space regarding the \"pace\", the environment becomes non-stationary and makes the training less stable (for STL $F_{[5,100]} A \\land F_{[80,90]} B$, for the order A->B, one possible $t_A$ should be in [5, 79] and $t_B$ in [80,90], then during training the policy might change from faster-ones ($t_A$=5) to slower-ones ($t_A$=75), but since we don't have this $t$ in context, the neural network cannot distinguish between these two, and this will cause non-stationary RL and make training less stable.) Thus we use the exact time-variable conditions to have more controllable behavior and more stable training.\n\n\n> W7/Q5: It seems that a new MDP is constructed for every new assignment, which can technically impede RL.\n\nOur TGPO falls into the category of a stationary contextual MDP[1], where we include time variable assignment $\\mathbf{t}$ as the context. In this augmented state space, the reward function and the transition dynamics are fixed functions of the state and $\\mathbf{t}$ (won't drift over time). The RL agent is not \"re-learning\" a new MDP each time. Instead, it is learning a mapping from contexts ($\\mathbf{t}$) to behaviors. This stationary setup and the fact that similar time variable assignments often lead to similar policies (unless changing subgoal orders) allow efficient knowledge transfer among assignments.\n\n\n\n> W8/Q6: Lack formal connection between the dense rewards and STL satisfaction (does maximizing the return maximize the STL success rate or the robustness score?) Is it an admissible heuristic?\n\nWe have updated the manuscript with an formal analysis (in appendix A.5) linking our designed dense reward to STL satisfaction. We show that, with certain scaling relationship among the reward terms, for a given initial state, if the problem is feasible, the optimal policy can satisfy the STL task. Thus, maximizing the expected return here is equivalent to maximizing the STL success rate over the distribution of initial states.\n\nRegarding the \"admissible heuristic\", we respectfully clarify that this terminology (derived from informed search algorithm like A\\*) does not directly apply to our RL framework, as the training process does not involve heuristic search over the state space. However, if the reviewer's concern is whether the dense rewards might bias the agent away from the STL satisfaction, as we show in the updated manuscript (Appendix A.5), the optimal policy always maximize the STL success rate.\n\n**References**\n1. Hallak, Assaf, Dotan Di Castro, and Shie Mannor. \"Contextual markov decision processes.\" arXiv preprint arXiv:1502.02259 (2015)."
+       },
+       "license": "CC-BY-4.0",
+       "url": "https://openreview.net/forum?id=053vZMxDB5&noteId=PjNuN172bw",
+       "createdAt": "2025-11-21T06:52:43.582Z",
+       "modifiedAt": "2025-11-21T06:53:58.155Z"
+      },
+      {
+       "externalId": "GCGSftbz3v",
+       "replyTo": "PjNuN172bw",
+       "kind": "comment",
+       "invitation": "Official_Comment",
+       "signature": "Authors",
+       "content": {
+        "comment": "> W9/Q7/Q8: technical analysis (completeness; why critic is a good heuristic) and pseudocode for the time-variable assignment sampling procedure.\n\n**Completeness analysis**: Our algorithm provides a guarantee for probabilistic completeness. Since the space of discrete time-variable assigments is finite, and our hybrid sampler includes a uniform sampling component (40%), every valid assigment has a non-zero probability of being sampled. In the limit of infinite samples, every feasible assignment is guaranteed to be visited infinitely often, providing the RL agent sufficient data and iterations to converge to the optimal policy for that specific assigment.\n\n**Critic as heuristic**: The critic estimates the expected return of the policy given a specific time-variable assignment. In our paper, the return includes dense stage-wise progression reward. A key insight in our framework is that an assignment allowing more progress (without breaking invariant properties) is often most likely to be feasible. A physically impossible assignment forces the agent to fail early, resulting in low accumulated reward. Conversely, a feasible (or near-feasible) assignment allows tha agent to complete more subgoals, getting higher returns even before the optimal policy is mastered. Consequently, the critic assigns higher values to these \"high-progress\" time-variable assignments, effectively serving as a powerful heuristic to guide the MCMC sampler towards the feasible regions where the task can be solved.\n\n\n**Pseudocode**: We respectfully point the reviewer to Algorithm 2 in Appendix A.5 of our original submission (Algorithm 3 in Appendix A.7 in the updated manuscript), which provides the detailed algorithm implementation for time variable MH sampling. We have added a reference to this algorithm in the main text (Sec 4.3, the last sentence) to ensure it is not missed.\n\n\n> Q10: In Figure 5, are the training steps the same as environment steps?\n\nWe clarify that the \"training steps\" in Figure 5 refer to training epochs, not environment steps. In each epoch, the policy collects the data by interacting with the simulation environment, and then the policy is updated on the collected data. One training step collects $NT$ environment steps of data, where $N$ is the number of parallel environments ($N=512$ in this paper), and $T$ is the task horizon ($T=100$ in most cases).\n\n\n> Q11: Dimensionality: TGPO vs. history-stacked state space.\n\n\nThe augmented state dimension for TGPO is $n+4+N_c$, where $n$ is the original system state dimension, $4$ additional variables to record time index, progress index, previous progress index and the certificate to proceed to the next subgoal, and $N_c$ variables to record satisfaction status for the invariant properties. The dimension for the history-stacked state space is $nT$, where $T$ is the task horizon. For our 12D quadrotor task with a horizon of $T=100$ and 4 invariance constraints, TGPO requires an input dimension of only 20, whereas the history-stacked method will require 1200 dimension input. The massive difference in dimensionality is the main reason why TGPO strikes much better than $\\tau$-MDP for long-horizon tasks.\n\n> Q12: Clarification for the varied-horizon experiments and additional results on different environments.\n\nIn our original varied-horizon experiment, the time interval for each subformula is scaled proportionally to the task horizon. Due to time constraint, we conducted the experiments on the unicycle experiment with 3 random seeds and show the result in the appendix A.6. The conclusion is similar to what we had on the linear case, which shows that our approach’s effectiveness in handling long-horizon tasks is consistent across different system dynamics.\n\n\n\n**We hope our response has addressed your concerns. We kindly ask if there are any remaining issues preventing a more positive evaluation, and we would like to continue the discussion in the remaining rebuttal period.**"
+       },
+       "license": "CC-BY-4.0",
+       "url": "https://openreview.net/forum?id=053vZMxDB5&noteId=GCGSftbz3v",
+       "createdAt": "2025-11-21T06:53:46.886Z",
+       "modifiedAt": "2025-11-21T06:53:46.886Z"
+      },
+      {
+       "externalId": "2lDFazqUYb",
+       "replyTo": null,
+       "kind": "comment",
+       "invitation": "Official_Comment",
+       "signature": "Authors",
+       "content": {
+        "comment": "We thank all reviewers for their constructive feedback. We are glad to see **the reviewers reached consensus that our TGPO is novel and our empirical evaluation is sufficient, broad, and solid.**\n\nWe have uploaded a revised manuscript with changes marked in $\\textcolor{OrangeRed}{\\text{this color}}$. Here is a list of key revisions:\n\n- **Clarifications on scope:** We refined Section 1 and Section 3 to clearly state the scope of STL formulas we address (finite-horizon, nested conjunctions).\n\n- **Algorithm details:** We included the pseudocode for the symbolic STL decomposition (Section 4.1, Algorithm 1).\n\n- **Theoretical analysis:** We added a formal analysis in Appendix A.5 to establish the link between our dense reward design and STL satisfaction. We prove that under specific reward conditions, maximizing the expected return is equivalent to maximizing the STL success rate.\n\n- **Additional experiment:** We conducted a varied-horizon test for the Unicycle dynamics (Appendix A.6) to demonstrate the consistency of our method across different dynamics.\n\nWe have addressed each reviewer's specific concerns in the separate threads below. **Happy to discuss further for any remaining questions during the rebuttal phase.**",
+        "title": "Official Summary by Authors"
+       },
+       "license": "CC-BY-4.0",
+       "url": "https://openreview.net/forum?id=053vZMxDB5&noteId=2lDFazqUYb",
+       "createdAt": "2025-11-21T07:17:56.710Z",
+       "modifiedAt": "2025-11-21T07:19:27.721Z"
+      },
+      {
+       "externalId": "dVFRnUelBD",
+       "replyTo": "2lDFazqUYb",
+       "kind": "comment",
+       "invitation": "Official_Comment",
+       "signature": "Authors",
+       "content": {
+        "comment": "We want to gently follow up to ensure the reviewers have had a chance to review our rebuttal (regarding scope, additional experiments, and theoretical analysis). If there are any outstanding concerns that might hinder a more positive assessment, please let us know; we would greatly value the opportunity to resolve them. Thanks!"
+       },
+       "license": "CC-BY-4.0",
+       "url": "https://openreview.net/forum?id=053vZMxDB5&noteId=dVFRnUelBD",
+       "createdAt": "2025-11-26T08:50:22.334Z",
+       "modifiedAt": "2026-02-12T17:42:00.509Z"
+      },
+      {
+       "externalId": "ei5WyBoGcC",
+       "replyTo": "GCGSftbz3v",
+       "kind": "comment",
+       "invitation": "Official_Comment",
+       "signature": "Reviewer TtqM",
+       "content": {
+        "comment": "I thank the authors for going over my comments and for their response. I have included my additional comments below:\n\n**W2/Q1.**  \nI believe that explicitly mentioning this initial state distribution in Sections 3.2 or 3.3 could improve the quality and clarity of the paper.\n\n**W3/Q2.**  \nThis means that $G_{[0,200]}F_{[0,10]}$ requires 200 time variables, which is much higher than the 5 variables used in the experiments; it is also still not clear to me how disjunctions are handled. I realized that the experiments did not include disjunctions and GF subformulas, and in the updated manuscript under (2) it is mentioned that such formulas are not considered. This means the proposed approach does not cover the entire STL but only a fragment of it (which also needs to be formally defined), diminishing the contribution of the paper.\n\n**W4/Q3.**  \nI do agree that, without disjunctions and GF subformulas, the proposed approach can improve upon existing approaches for a reasonably small number of time variables. However, I still think that exponentially growing time-variable assignments are one of the main limitations of your approach and deserve more than a very brief mention.\n\n**W8/Q6.**  \nHow do you choose $\\lambda_1, \\lambda_2, \\lambda_3,$ and $\\lambda_4$ in Appendix 5?\n\n**Q9.**  \nI think it is important to discuss what kinds of STL formulas are included in the experiments. For example, why are STL-06 formulas considered multi-layer?"
+       },
+       "license": "CC-BY-4.0",
+       "url": "https://openreview.net/forum?id=053vZMxDB5&noteId=ei5WyBoGcC",
+       "createdAt": "2025-11-26T10:35:21.383Z",
+       "modifiedAt": "2025-11-26T10:35:21.383Z"
+      },
+      {
+       "externalId": "STGglZvxlR",
+       "replyTo": "ei5WyBoGcC",
+       "kind": "comment",
+       "invitation": "Official_Comment",
+       "signature": "Authors",
+       "content": {
+        "comment": "We thank the reviewer for the follow-up questions. We have modified the paper accordingly and included our comments below.\n\n**W2/Q1:** Thanks for this feedback. As suggested, we have added this initial state distribution to Section 3.2 to improve the paper's quality.\n\n**W4/Q3 \\& W3/Q2:** We thank the reviewer for these comments. We agree that “not handling disjunction, GF, and scalability towards more time variables” are the limitations of TGPO. We have explicitly mentioned this limitation in Sections 5 & 6. In addition, we have removed the word “general” from our contribution, and have **added a new section in Appendix A.11 to discuss potential solutions about how to address these limitations.** \n\nHowever, we argue that our contribution lies in “proposing a novel STL RL algorithm” (which all the reviewers agree upon) and \"solving the unsolved\": **TGPO can solve deeply nested STLs in long-horizon tasks under complex system dynamics that previous methods cannot solve or struggle to solve.** In the experiments, we have shown leading performance over 10 STLs on 5 different benchmarks, and in long-horizon cases as well (200-1000 steps). We believe these results constitute a significant step forward for the STL community. \n\n**W8/Q6:** For hyperparameter selection, we ran a hyperparameter search in the “Linear” dynamics environment using a subset of STL tasks and selected the configuration that yielded the highest performance. (To ensure fair comparisons, we applied a similar hyper-parameter tuning process for all the baselines.) From the theoretical analysis shown in Appendix A. 5, a more systematic way to choose the hyperparameter assignment would be: first estimate the lower and upper bounds for the discounted distance-based return $Z$ to compute the $\\Delta Z$, and then set $\\lambda_1=1$, and find the $\\lambda_2, \\lambda_3, \\lambda_4$ can satisfy the inequality constraints shown in Theorem 1. Since the inequality is homogeneous, these coefficients can be scaled globally to match the magnitude of empirical rewards while strictly preserving the theoretical guarantees.\n\n**Q9:** We have clarified the fragment we can work on (as long as it does not contain GF or disjunction operators) in Section 3.1 (last sentence) and detailed it in Section 5.1 (Benchmark subsection). The types of STLs are mainly for locomotion and manipulation tasks with temporal constraints and with varied system dynamics. We include single-layer STLs like STL-06 in the appendix A 10.1 to complete the scope of STLs TGPO can handle, whereas the F-MDP can only solve two-layer STLs.\n\n\n**We kindly ask if there are any remaining issues preventing a more positive evaluation, and we would like to continue the discussion in the remaining rebuttal period. But anyway, we appreciate the time you have taken to continue reviewing our work during this busy period.**"
+       },
+       "license": "CC-BY-4.0",
+       "url": "https://openreview.net/forum?id=053vZMxDB5&noteId=STGglZvxlR",
+       "createdAt": "2025-11-27T02:19:42.805Z",
+       "modifiedAt": "2025-11-27T02:19:42.805Z"
+      },
+      {
+       "externalId": "WO8XSYOReh",
+       "replyTo": null,
+       "kind": "meta_review",
+       "invitation": "Meta_Review",
+       "signature": "Area Chair yj7n",
+       "content": {
+        "summary": "This meta-review recommends a Reject for the submission. The primary concerns informing this decision center on the restricted scope of the Signal Temporal Logic (STL) fragment addressed and the scalability of the proposed temporal grounding mechanism. While the reviewers generally appreciated the novelty of using Metropolis-Hastings sampling to handle temporal assignments and the empirical performance across diverse environments, the consensus shifted toward a more critical view of the paper's theoretical and general applicability. Specifically, the method’s inability to handle fundamental STL operators like disjunctions and liveness properties (e.g., always eventually) suggests that the paper over-claims its ability to solve general STL tasks. Furthermore, the exponential growth of the temporal assignment search space relative to the number of subgoals remains a significant technical hurdle that limits the framework’s utility for truly complex, long-horizon specifications.",
+        "reviewer_concerns": "During the rebuttal, the authors were proactive in addressing several technical gaps. They provided a theoretical analysis in Appendix A.5 to link the dense reward function to STL satisfaction—a point of disagreement for Reviewers G7gi and TtqM. They also clarified the problem statement regarding initial state distributions and improved the algorithmic description of the STL decomposition. However, several critical issues remain outstanding. Reviewer TtqM correctly identified that while the authors removed the word \"general\" from their claims, the current fragment of STL supported is quite narrow. The authors' defense of scalability—relying on the \"density of feasible solutions\" and empirical results—is more intuitive than rigorous. The reliance on a critic-guided heuristic for Bayesian sampling, while innovative, does not fully alleviate the fundamental combinatorial complexity inherent in the temporal decomposition for tasks with high subgoal density.",
+        "reviewer_scores": "The divergence between the high score from Reviewer sqA6 and the low score from Reviewer TtqM is telling of the confidence levels. Reviewer sqA6, despite their positive rating, admitted to low confidence and likely overlooked the technical limitations of the STL fragment. Had they participated in the full technical discussion with TtqM, their score would likely have drifted toward a 5 or 6 as the limitations became clear. Reviewer G7gi remained skeptical of the paper's generality; while they might have moved to a 5 following the inclusion of the reward-satisfaction proof, the limited scope would have prevented an \"Accept\" recommendation. Reviewer TtqM maintained their 2, and given their detailed follow-up, it is unlikely they would have changed their stance without a more fundamental expansion of the algorithm's capabilities. Consequently, the lack of support from high-confidence reviewers leads to a rejection."
+       },
+       "license": "CC-BY-4.0",
+       "url": "https://openreview.net/forum?id=053vZMxDB5&noteId=WO8XSYOReh",
+       "createdAt": "2026-01-05T23:40:41.129Z",
+       "modifiedAt": "2026-02-09T06:33:43.694Z"
+      },
+      {
+       "externalId": "CfoPC0BwKL",
+       "replyTo": null,
+       "kind": "decision",
+       "invitation": "Decision",
+       "signature": "Program Chairs",
+       "content": {
+        "title": "Paper Decision",
+        "decision": "Reject",
+        "comment": ""
+       },
+       "license": "CC-BY-4.0",
+       "url": "https://openreview.net/forum?id=053vZMxDB5&noteId=CfoPC0BwKL",
+       "createdAt": "2026-01-26T08:34:25.561Z",
+       "modifiedAt": "2026-02-06T04:51:28.429Z"
+      }
+     ]
+    },
+    {
+     "id": "0YjO70etNj",
+     "number": 15043,
+     "title": "Mirror Descent-Ascent for mean-field min-max problems",
+     "abstract": "We study two variants of the mirror descent-ascent algorithm for solving min-max problems on the space of measures: simultaneous and sequential. We work under assumptions of convexity-concavity and relative smoothness of the payoff function with respect to a suitable Bregman divergence, defined on the space of measures via flat derivatives. We show that the convergence rates to mixed Nash equilibria, measured in the Nikaidò-Isoda error, are of order $\\mathcal{O}\\left(N^{-1/2}\\right)$ and $\\mathcal{O}\\left(N^{-2/3}\\right)$ for the simultaneous and sequential schemes, respectively, which is in line with the state-of-the-art results for related finite-dimensional algorithms.",
+     "authors": [
+      "Razvan-Andrei Lascu",
+      "Mateusz B. Majka",
+      "Lukasz Szpruch"
+     ],
+     "keywords": [
+      "Mean-field optimization",
+      "min-max games",
+      "Bregman divergence",
+      "Adversarial learning"
+     ],
+     "status": "rejected",
+     "decision": "Reject",
+     "notes": [
+      {
+       "externalId": "vy1p3QoZXT",
+       "replyTo": null,
+       "kind": "review",
+       "invitation": "Official_Review",
+       "signature": "Reviewer dZnt",
+       "content": {
+        "summary": "This paper studies the convergence properties of simultaneous and sequential mirror descent for solving min-max games. The paper shows that under some technical assumptions, the convergence rates (in terms of NI error) are $O(N^{-1/2})$ in the simultaneous case and $O(N^{-2/3})$ in the sequential case. An example of training GANs is implemented with both variants of MD, and the behavior corroborates the faster convergence rate of sequential MD.",
+        "soundness": 3,
+        "presentation": 2,
+        "contribution": 3,
+        "strengths": "- The main technical results are clearly presented and while the notation is quite heavy, the authors do a good job of making the paper readable.\n- The convergence result for sequential MD is the first such result for mean-field min-max games, and the proof technique is quite interesting (if reliant on several technical assumptions).\n- The motivating example of GANs is clearly presented and the experimental results nicely corroborate the theoretical statements.",
+        "weaknesses": "- A concern is how extensible the convergence results are -- it is not made clear what other problem settings would satisfy the required technical assumptions to obtain a fast convergence rate. In particular, Assumption 3.4 seems like a very restrictive condition on the second variation, and I believe it would improve the paper to show more examples of divergences and min-max problems that satisfy all technical assumptions.\n- Beyond GANs and mean field neural nets, not much is said about the other concrete applications of the framework. Considering that prior work has shown connections and examples ranging from Sinkhorn and EM algorithms to reinforcement learning, a natural question which is not investigated is how sequential MD performs in these settings. I would be more positive on the paper if it can be shown that sequential MD is a superior method for other applications. As it stands, the theoretical results are novel but the significance and applicability of the results are not convincing.\n- The notation in the paper is quite dense (and somewhat unavoidable given the topic), but giving some additional clarifications on the assumptions and also providing more detailed proof sketches (in particular emphasizing the way the proofs diverge from standard techniques) would help readers who might be unfamiliar with the material.",
+        "questions": "- The MD variants studied are Euler discretizations of the Fisher-Rao gradient flow in continuous time. I am curious if other discrete-time algorithms which can be obtained by taking different discretizations? Does the continuous-time convergence rate given insights into the behavior of its discretizations?",
+        "flag_for_ethics_review": [
+         "No ethics review needed."
+        ],
+        "details_of_ethics_concerns": "NA",
+        "rating": 6,
+        "confidence": 2,
+        "code_of_conduct": "Yes"
+       },
+       "license": "CC-BY-4.0",
+       "url": "https://openreview.net/forum?id=0YjO70etNj&noteId=vy1p3QoZXT",
+       "createdAt": "2025-10-26T17:48:26.713Z",
+       "modifiedAt": "2025-11-12T05:29:26.592Z"
+      },
+      {
+       "externalId": "mTtXa8WyZS",
+       "replyTo": null,
+       "kind": "review",
+       "invitation": "Official_Review",
+       "signature": "Reviewer pJx5",
+       "content": {
+        "summary": "This paper studies mirror descent (MD) algorithms on spaces of measures. It provides analysis for both the simultaneous and sequential (a.k.a. alternating) versions of MD for general convex-concave objectives and general objectives, generalizing existing results.",
+        "soundness": 2,
+        "presentation": 3,
+        "contribution": 3,
+        "strengths": "The generalization of existing results to this setting requires, at least in my understanding, a significant amount of technical work, and the paper seems to do this well. The paper is also generally well-written and clear.",
+        "weaknesses": "### Issue with the spaces under consideration\nI have trouble understanding on which spaces assumptions and statements are valid.\n\nIn particular, it is not clear how Assumption 3.4 can be satisfied for the entropy regularizer with the current wording.\nIndeed, Assumption 3.4 requires the existence of a constant $L_{h^* }$ such that the inequality l368 holds uniformly over all bounded functions.\nBut the constant $L_{h^* }$ given by Prop. G.15 depends on the functions themselves (through their sup norm).\nMoreover, in this proof, the authors refer to (Lascu et al., 2025, Lemma A.2) for the Lipschitzness of $\\phi$ but I could not find this result in the lemma mentioned (which is several pages long). I also do not see how to obtain such a pointwise Lipschitz bound.\n(This issue is the main reason behind my current rating.)\n\nMoreover, in example 1.3, the authors appear to have to restrict the space of probability measures to those with density wthin bounded distance from a reference distribution. This seems to be restrictive compared to (Hsieh et al., 2019) for instance.\n\n### Lack of examples of divergence\nIn its comparison to previous work, this paper insists on the generality of the divergences considered compared to previous works which were only on KL divergence.\nHowever, most of the assumptions are verified only for the entropy regularizer, see Asm 2.1 and 3.4.\nMoreover, for the examples 1.2 and E, the choice of divergence is not discussed, and the reader is refered to Remark 2.2. If I understand correctly, this means that these examples are only valid when $h$ satisfies the inequality l286. If this is the case, this should be made more explicit in the paper and this assumption should be better discussed.\n\n\n### Minor\n- l260-267 make it sound as if the form of the update is novel while, unless I am mistaken, it is standard in mirror methods.\n- The appendix is quite long, it could benefit from a table of contents and an introductory section explaining its organization.",
+        "questions": "Could the authors address \"Issue with the spaces under consideration\" and \"Lack of examples of divergence\" in the section above?",
+        "flag_for_ethics_review": [
+         "No ethics review needed."
+        ],
+        "rating": 2,
+        "confidence": 4,
+        "code_of_conduct": "Yes"
+       },
+       "license": "CC-BY-4.0",
+       "url": "https://openreview.net/forum?id=0YjO70etNj&noteId=mTtXa8WyZS",
+       "createdAt": "2025-10-28T14:34:54.747Z",
+       "modifiedAt": "2025-11-12T05:29:26.093Z"
+      },
+      {
+       "externalId": "ET4kM4BWLm",
+       "replyTo": null,
+       "kind": "review",
+       "invitation": "Official_Review",
+       "signature": "Reviewer kmEj",
+       "content": {
+        "summary": "This paper studies the simultaneous and sequential mirror descent-ascent (MDA) algorithms in solving convex-concave min-max problems with infinite-dimensional action spaces.\nFor simultaneous MDA, they show that the averaged iterate converges at a rate of $O(1/\\sqrt{N})$, where $N$ is the number of iterations.\nFor sequential MDA, they show that the averaged iterate converges at a rate of $O(1/N^{2/3})$.\nBoth convergence rates match the known rates for the finite-dimensional bilinear case.\nThey also implement many numerical experiments to prove the efficiency of the algorithms in its applications, e.g., training GANs.",
+        "soundness": 2,
+        "presentation": 3,
+        "contribution": 3,
+        "strengths": "*   The paper seems to be the first paper to study the sequential MDA for games with infinite action spaces;\n*   This paper establishes theoretical foundations for the faster convergence of the sequential MDA than its simultanuous counterpart;\n*   The paper is fairly well-written and polished.",
+        "weaknesses": "*   It looks like the new result on the sequential MDA is obtained by the parallel analysis in the discrete-case. It would be better if the authors can point out the main differences between the discrete-time and continuous-time proofs;\n*   It seems that in the statement of their main theorems, they missed some key assumptions:\n    *   It appears that they need the reference function $h$ to be Legendre, i.e., the norm of the derivative of $h$ goes to infinity as the iterate approaches the boundary. For example, they may need that assumption to get the first-order optimality conditions in Eq. (20). If correct, this is a big limitation that should be called out in many places. Currently, the paper repeatedly emphasizes being for \"general Bregman divergences.\"\n    *   The stepsizes need to be set depending on the total number of iterations $N$ for both algorithms, while it seems that they did not include that setup in the statements of Theorem 2.4 and Theorem 3.6.\n*.  The GANs motivation does not feel very compelling. Having a probability distribution over network parameters feels highly unrealistic. How would you train this?",
+        "questions": "*   Is my understanding of part 3 correct?\n*  How do you imagine realistically training a probability distribution over parameters in a neural network?\n\nMinor points:\n*   In Assumption 1.5, it would be clearer if the authors clearify the notations $D_{F(\\cdot, \\mu)}(\\nu', \\nu)$ and $D_{F(\\nu, \\cdot)}(\\mu', \\mu)$. As $D_h$ is used to denote Bregman divergence in the paper, maybe they can consider use alternative notations for the second-order derivatives if possible;\n*   The motivation of MDA formulation in Section 1.6 can be simplified in my opinion, as it aligns with the general gradient-based optimization methods;\n*   Remark 2.5 is not entirely right in my opinion, since the usual $1/\\sqrt{N}$ rate does not require relative Lipschitzness.\n*   In much of the related literature, \"sequential\" algorithms are called \"alternating\" rather than \"sequential\".\n*   Typos:\n    *   p18 l929: due [to] Assumption 3.5 or [by] Assumption 3.5.\n    *   Why are $\\mu^\\*,\\nu^\\*$ included in Theorem 2.4? As far as I can tell they play no role?",
+        "flag_for_ethics_review": [
+         "No ethics review needed."
+        ],
+        "rating": 6,
+        "confidence": 4,
+        "code_of_conduct": "Yes"
+       },
+       "license": "CC-BY-4.0",
+       "url": "https://openreview.net/forum?id=0YjO70etNj&noteId=ET4kM4BWLm",
+       "createdAt": "2025-10-30T14:52:12.907Z",
+       "modifiedAt": "2025-11-12T05:29:25.706Z"
+      },
+      {
+       "externalId": "yXlmdnWaGo",
+       "replyTo": null,
+       "kind": "review",
+       "invitation": "Official_Review",
+       "signature": "Reviewer xMxA",
+       "content": {
+        "summary": "This manuscript studies mirror descent/ascent algorithms for nonlinear convex–concave problems defined on the space of probability measures. The authors consider two variants of a saddle-point optimization algorithm: simultaneous and sequential. They leverage relative smoothness and Lipschitzness properties of the convex–concave objective to prove a $1/\\sqrt{N}$ bound for the simultaneous algorithm. Additionally, they use Hessian Lipschitzness and an $L_{\\infty}$ assumption on derivatives to improve the convergence rate to $1/N^{2/3}$ for the sequential algorithm. The results extend earlier results for bilinear objectives and can be extended to training mean-field neural networks.",
+        "soundness": 3,
+        "presentation": 3,
+        "contribution": 3,
+        "strengths": "- The paper is well-written.\n- It tackles the technical arguments needed to extend optimization guarantees for bilinear objectives on probability spaces to nonlinear convex–concave objectives.\n- It empirically verifies its theoretical results.",
+        "weaknesses": "- The analysis assumes both Lipschitzness and smoothness, yet the convergence of the simultaneous algorithm is $1/\\sqrt{N}$, which may be restrictive for nonlinear objectives. The cited analogous result (Bubeck 2015 Theorem 5.1) assumes only Lipschitzness. That said, the authors clearly explain the proof bottleneck, which I appreciate.  \n- The implementation requires an internal sampler to trace the algorithm’s trajectory, but the approximation error introduced by this sampler is not characterized.",
+        "questions": "Do you think it is possible to derive a $1/N$ rate in the relative-smoothness case using an algorithm similar to (Bubeck 2015, Section 5.2.3)? What are the main technical challenges? If not, is there an impossibility result—e.g., a matching lower bound—establishing that faster rates are unattainable under these assumptions?",
+        "flag_for_ethics_review": [
+         "No ethics review needed."
+        ],
+        "rating": 4,
+        "confidence": 3,
+        "code_of_conduct": "Yes"
+       },
+       "license": "CC-BY-4.0",
+       "url": "https://openreview.net/forum?id=0YjO70etNj&noteId=yXlmdnWaGo",
+       "createdAt": "2025-11-04T01:01:16.794Z",
+       "modifiedAt": "2025-11-12T05:29:25.247Z"
+      },
+      {
+       "externalId": "GalEK7Obwz",
+       "replyTo": "yXlmdnWaGo",
+       "kind": "comment",
+       "invitation": "Official_Comment",
+       "signature": "Authors",
+       "content": {
+        "title": "Response to the reviewer",
+        "comment": "We would like to thank the reviewer for appreciating the contribution of our paper, for their feedback and questions. We would like to address the weaknesses and questions formulated by the reviewer:\n\n### Weaknesses:\n- We agree with the reviewer that, in the simultaneous scheme (the analogue of the algorithm in Bubeck 2015, Theorem 5.1), our original analysis used both the Lipschitzness and the relative smoothness of $F$ with respect to the Bregman divergence. This discrepancy between our result and Bubeck's theorem occurred because Bubeck’s theorem assumes the mirror map $h$ is strongly convex, whereas we had only assumed strict convexity. In the revised version of the paper, we decided to impose the assumption that $h$ is strongly convex with respect to $\\operatorname{TV}^2$ (Assumption 1.1) since this is naturally satisfied anyway for all typical examples of $h$ (cf. the discussion in Section 1.5). Under this stronger convexity assumption, we can establish convergence of the simultaneous scheme assuming only that the flat derivatives of $F$ are uniformly bounded and that $F$ is convex–concave (i.e., we no longer need the relative smoothness).\n\n- We agree that this is an important question, however, we believe that it will require a substantial amount of additional work and hence it falls beyond the scope of the present paper. We are planning to carry out a full theoretical analysis of the algorithm from Section 4 in a future work - this will require combining the results from the present paper with a careful analysis of the approximation error. The latter would be essentially a propagation-of-chaos-type result, showing that the empirical measures for the interacting particle systems from Section 4 converge to the corresponding (simultaneous or alternating) infinite-dimensional MDA dynamics. To the best of our knowledge, such results are currently unavailable in the literature for the dynamics studied in our paper.\n\n### Questions:\nExtending our analysis to the Mirror Prox scheme is not straightforward due to the following technical issue. To replicate the assumptions on the objective used in Bubeck (2015, Section 5.2.3), one would need to impose the following $\\operatorname{TV}$-Lipschitz condition on $F$. Specifically, there exist $C_{11}, C_{12}, C_{21}, C_{22} > 0$ such that \n\\begin{equation*}\n    \\left|\\frac{\\delta F}{\\delta \\nu}(\\nu',\\mu,x') - \\frac{\\delta F}{\\delta \\nu}(\\nu,\\mu,x)\\right| \\leq C_{11}(\\operatorname{TV}(\\nu',\\nu) + |x'-x|),\n\\end{equation*}\n\\begin{equation*}\n    \\left|\\frac{\\delta F}{\\delta \\nu}(\\nu,\\mu',x') - \\frac{\\delta F}{\\delta \\nu}(\\nu,\\mu,x)\\right| \\leq C_{12}(\\operatorname{TV}(\\mu',\\mu) + |x'-x|),\n\\end{equation*}\n\\begin{equation*}\n    \\left|\\frac{\\delta F}{\\delta \\mu}(\\nu',\\mu,y') - \\frac{\\delta F}{\\delta \\mu}(\\nu,\\mu,y)\\right| \\leq C_{21}(\\operatorname{TV}(\\nu',\\nu) + |y'-y|).\n\\end{equation*}\n\\begin{equation*}\n    \\left|\\frac{\\delta F}{\\delta \\mu}(\\nu,\\mu',y') - \\frac{\\delta F}{\\delta \\mu}(\\nu,\\mu,y)\\right| \\leq C_{22}(\\operatorname{TV}(\\mu',\\mu) + |y'-y|).\n\\end{equation*}\nThis $\\operatorname{TV}$-Lipschitz assumption is substantially stronger than the relative smoothness condition (Assumption 3.6 in the revised version, which is now needed only for the alternating scheme but not for the simultaneous one). For instance, the bilinear game $$F(\\nu, \\mu) = \\int \\int f(x,y)\\nu(dx)\\mu(dy)$$ satisfies Assumption 3.6 for $L_\\nu = L_\\mu = 0,$ yet it is $\\operatorname{TV}$-Lipschitz only when $f$ is both bounded and Lipschitz. Thus, showing that Mirror Prox achieves an $1/N$ convergence rate under the weaker relative smoothness assumption remains a challenging open question.\n\nAs a side remark, we added a few comments on the comparison between mirror descent and Mirror Prox (cf. Appendix K). Mirror Prox is computationally more expensive than mirror descent since it requires two mirror descent steps per player per iteration, effectively doubling the number of gradient evaluations. Although it achieves a $1/N$ convergence rate with deterministic gradients, in the stochastic case it attains only the same $1/\\sqrt{N}$ rate as simultaneous MDA. Since the stochastic setting is precisely the one arising in the particle-based algorithmic implementation, even if the theoretical infinite-dimensional Mirror Prox analysis yielded a $1/N$ rate, the corresponding particle system would still converge at best at $1/\\sqrt{N}$. Finally, we note that the convergence analysis of an alternating Mirror Prox scheme remains, to our knowledge, open. Designing how to alternate the four mirror descent steps in a way that improves convergence rates appears to be technically delicate. We view this as another potential direction for future work."
+       },
+       "license": "CC-BY-4.0",
+       "url": "https://openreview.net/forum?id=0YjO70etNj&noteId=GalEK7Obwz",
+       "createdAt": "2025-11-28T19:41:38.912Z",
+       "modifiedAt": "2025-11-28T19:41:38.912Z"
+      },
+      {
+       "externalId": "x2y4wbQBw0",
+       "replyTo": "ET4kM4BWLm",
+       "kind": "comment",
+       "invitation": "Official_Comment",
+       "signature": "Authors",
+       "content": {
+        "title": "Response to the reviewer 1",
+        "comment": "We would like to thank the reviewer for appreciating the contribution of our paper, for their feedback and questions. We would like to address the weaknesses and questions formulated by the reviewer:\n\n### Weaknesses:\n- In principle the analysis in continuous time can give us a general idea about which gradient flows converge to the minimizer/maximizer (and under what assumptions, what rate, etc.) and hence which gradient flows can be used as the basis for constructing discrete-time algorithms, but ultimately the analysis in discrete-time has to be carried out independently because it crucially depends on the choice of the discretisation (for example we can use mirror/Jordan-Kinderlehler-Otto (JKO)-type schemes or we can use interacting particle systems). In particular, our paper demonstrates that the choice of simultaneous vs. alternating mirror scheme is important. \n\nRestricting to our min-max games setup, the continuous time analysis typically reveals an \"ideal\" rate of convergence of gradient flow. By \"ideal\" we mean that this rate may not be attained by the discrete-time algorithms. This is now explained in Remark 1.7. In Appendix J, we provide a formal calculation showing that in continuous time we arrive at a $1/t$ convergence rate, which could only be attained by an implicit MDA scheme but which, as we mention there, is not implementable in practice because it requires both players to know the next move of their opponent. \n\nFrom a technical perspective, the continuous time analysis does not require the technical tools we need in discrete-time such as the three-point lemma and the analysis on the dual space. Thus making the analysis in discrete-time more technically challenging. \n\n- We thank the reviewer for raising the connection with Legendre-type (essentially smooth) mirror maps. In our setting, however, we explicitly assume that the Bregman potential $h$ is flat differentiable on the entire domains $\\mathcal{C}$ and $\\mathcal{D}$ (Assumption 1.1). This guarantees that $h$ is differentiable everywhere in all feasible directions.\n\nIn contrast, the Legendre property ensures that minimizers remain in the interior of the domain, where $h$ is differentiable, thus avoiding boundary issues. For instance, Definition 1 (Legendre functions) in [Bauschke et al., 2017, A descent Lemma beyond Lipschitz gradient\ncontinuity: first-order methods revisited and applications] only requires $h$ to be differentiable on the interior of $dom(h)$. Consequently, they must additionally impose the condition mentioned by the reviewer to handle potential boundary complications. This is also reflected in their definition of the Bregman divergence (their Eq. (5)):\n\\begin{equation*}\n    D_h(x,y) = h(x) - h(y) - \\langle \\nabla h(y), x-y\\rangle, \\forall x \\in dom(h), \\forall y \\in int(dom(h)).\n\\end{equation*}\n\nOur framework differs in that we assume $h$ is flat differentiable on the full domains $\\mathcal{C}$ and $\\mathcal{D}$, not only on their interiors. Hence, $D_h$ is well defined on the entire domain without restricting $y$ to lie in the interior. The key requirement for taking derivatives and writing optimality conditions is therefore to specify domains $\\mathcal{C}$ and $\\mathcal{D}$ on which $h$ is everywhere differentiable. \n\nTo make this precise, we provide concrete examples for the relative entropy and the chi-squared divergence by identifying admissible classes $\\mathcal{E}$ and $\\mathcal{F}$ where $h$ is flat differentiable and $D_h$ is well defined. Moreover, Lemmas B.8 and B.9 show that the iterates of both the simultaneous and alternating schemes remain in these admissible classes at every step. Thus, for each $n \\geq 0$, the flat derivative of $D_h(\\nu, \\nu^n)$ at $\\nu=\\nu^{n+1}$ can be computed as\n\\begin{equation*}\n    \\frac{\\delta D_h(\\cdot,\\nu^n)}{\\delta \\nu}(\\nu^{n+1},\\cdot) = \\frac{\\delta h}{\\delta \\nu}(\\nu^{n+1},\\cdot) - \\frac{\\delta h}{\\delta \\nu}(\\nu^{n},\\cdot), \\nu^{n+1}-a.e.\n\\end{equation*}\nsince $\\frac{\\delta h}{\\delta \\nu}(\\nu^{n+1},\\cdot)$ is well-defined within its admissible class."
+       },
+       "license": "CC-BY-4.0",
+       "url": "https://openreview.net/forum?id=0YjO70etNj&noteId=x2y4wbQBw0",
+       "createdAt": "2025-11-28T19:42:19.295Z",
+       "modifiedAt": "2025-11-28T19:42:19.295Z"
+      },
+      {
+       "externalId": "ZTKqFgjKHX",
+       "replyTo": "ET4kM4BWLm",
+       "kind": "comment",
+       "invitation": "Official_Comment",
+       "signature": "Authors",
+       "content": {
+        "title": "Response to the reviewer 2",
+        "comment": "- The conditions on the stepsizes are now explicitly included in the statements of the theorems. Regarding training in the mean-field regime, our methodology aligns with the mean-field perspective on neural networks, in which models are described by probability distributions over their parameters [Chizat and Bach, 2018; On the Global Convergence of Gradient Descent for Overparameterized Models using Optimal Transport], [Mei, Montanari, Nguyen, 2018; A mean field view of the landscape of two-layer neural networks] and [Rotskoff and Vanden-Eijnden, 2018; Neural networks as interacting particle systems:\nAsymptotic convexity of the loss landscape and universal scaling of the approximation error]. These works show that training a one-hidden-layer neural network with a sufficiently large number of parameters can be interpreted as minimizing a functional defined on the space of probability distributions over the parameters. \nFrom the practical point of view, such infinite-dimensional optimization problems can be solved by a variety of methods, including interacting particle systems approximating mean-field Langevin dynamics as in Section 4 of our paper (see also [Hu et al.; Mean-Field Langevin Dynamics and Energy Landscape of Neural Networks], [Nitanda, Wu, Suzuki; Convex Analysis of the Mean Field Langevin Dynamics], [Chizat; Mean-Field Langevin Dynamics: Exponential Convergence and Annealing]).\n\n### Questions: \nPlease see our responses in the Weaknesses section.\n\n### Minor points:\n- By definition of the Bregman divergence, the notations $D_{F(\\cdot,\\mu)}$ and $D_{F(\\nu,\\cdot)}$ precisely mean the Bregman divergences of the maps $F(\\cdot,\\mu)$ and $F(\\nu,\\cdot),$ respectively. In the revised version we wrote the explicit expressions to remove any confusion. \n - We decided to remove the paragraph on the motivation of MDA due to space constraints after revision.\n - We refined the assumptions and in the current version we obtain $1/\\sqrt{N}$ rate for the simultaneous scheme under analogous assumptions to (Bubeck 2015, Theorem 5.1).\n - We have decided to follow the suggestion and changed the name from \"sequential\" to \"alternating\".\n - Both typos are fixed now."
+       },
+       "license": "CC-BY-4.0",
+       "url": "https://openreview.net/forum?id=0YjO70etNj&noteId=ZTKqFgjKHX",
+       "createdAt": "2025-11-28T19:46:05.123Z",
+       "modifiedAt": "2025-11-28T19:46:05.123Z"
+      },
+      {
+       "externalId": "H0O5W2ECuD",
+       "replyTo": "mTtXa8WyZS",
+       "kind": "comment",
+       "invitation": "Official_Comment",
+       "signature": "Authors",
+       "content": {
+        "title": "Response to the reviewer",
+        "comment": "We would like to thank the reviewer for appreciating the contribution of our paper, for their feedback and questions. We would like to address the weaknesses and questions formulated by the reviewer:\n\n### Issue with the spaces under consideration\nWe understand the reviewer's concern and we thank the reviewer for carefully checking the proof. Indeed, our assumption on the second variation of the dual map was a local Lipschitz assumption, rather than a global one. We also agree that the Lipschitzness of $\\varphi$ is not pointwise but with respect to the $L^\\infty$ norm. We fixed the assumption (the newly added Assumption 3.5) by adopting the analogous condition used in [Theorem 3.2, Wibisono et al., Alternating Mirror Descent for Constrained Min–Max Games]. Specifically, we now assume that the third-order Fréchet derivative of the dual map is uniformly bounded. In Propositions H.14 and H.15, we verify that this assumption holds for the cases of interest, namely, when $h$ is the entropy or the chi-squared divergence.\n\nWe emphasize that the restriction in Example 1.3 is necessary to rigorously guarantee the existence of the flat derivative of the relative entropy (which was not fully addressed in (Hsieh et al., 2019)). In Theorem 4, part 2 of (Hsieh et al., 2019), the authors provide a heuristic argument suggesting that the entropy admits a flat derivative. Their argument relies on the approximation $\\log(1+t) = t + o(t)$ as $t \\to 0$, and it implicitly invokes the dominated convergence theorem without verifying its applicability, i.e., for one of the terms in their proof it reads\n\\begin{equation*}\n\\lim_{\\epsilon \\to 0} \\int \\rho \\log\\left(1+\\epsilon\\frac{\\rho''}{\\rho}\\right)\n= \\int \\rho  \\lim_{\\epsilon \\to 0} \\log\\left(1+\\epsilon\\frac{\\rho''}{\\rho}\\right).\n\\end{equation*}\nTo apply the dominated convergence theorem, one must ensure that the integrand is dominated by an integrable function independent of $\\epsilon$. Since both (Hsieh et al., 2019) and our work operate under the TV norm, where test functions are bounded and continuous, it suffices to assume that at every step of the algorithm the logarithmic term inside the integral is uniformly bounded in $\\epsilon.$ This requirement is reflected by the condition stated in our Example 1.3. \n\nThe issue of flat differentiability of the entropy is addressed in (Kerimkulov et al., 2025, Proposition 2.17), which shows that the entropy admits a flat derivative only for measures in the admissible class $\\mathcal{E}.$ A related observation appears in [Remark 5, Aubin-Frankowski, Korba, Lejer. Mirror Descent with Relative Smoothness in Measure Spaces, with application to Sinkhorn and EM]: A sufficient condition for the relative entropy (or the entropy) to admit a flat derivative in $L^{\\infty}$ at $\\mu$ is that there exists $\\kappa_0, \\kappa_1 > 0$ such that $\\kappa_0 \\leq \\frac{\\mathrm{d}\\mu}{\\mathrm{d}\\pi} \\leq \\kappa_1$ a.e. on $\\mathcal{X},$ which is precisely an equivalent condition to the one defining the class $\\mathcal{E}.$\n\nOf course, choosing $\\pi$ as the reference measure is not necessary. We included it merely to demonstrate that Example 1.3 holds in a more general setting. One could just as well omit $\\pi$ and define the entropy directly with respect to the Lebesgue measure.\n\n### Lack of examples of divergence\nWe agree with the reviewer that when we verify the assumptions for the GAN example and the NN example, we implicitly rely on the comment in Remark 2.2, namely that $h$ satisfies a Pinsker-type inequality but for Bregman divergences. We have made this more transparent in the revised version and state directly in the current Assumption 1.1 that $h$ is strongly convex with respect to $\\operatorname{TV}^2,$ which essentially implies that $h$ satisfies the Bregman Pinsker-type inequality in the previous Remark 2.2. We verify that this inequality holds for relative entropy and for chi-squared divergence in Examples 1.3 and 1.4, respectively, and we also refer to other examples in [Lemma 3.2, Chizat. Convergence Rates of Gradient Methods for Convex Optimization in the Space of Measures]. \n\nTwo additional benefits arise from this modification. First, we no longer need to assume that $F$ is Lipschitz with respect to the Bregman divergence (Assumption 2.1 in the previous version). Second, we can now establish convergence of the simultaneous scheme without requiring relative smoothness of $F$. It suffices to assume boundedness of the flat derivatives of $F$. Moreover, the previous Assumption 3.4 (now Assumption 3.5) is verified for both the entropy and the chi-squared divergence.\n\n### Minor\n1. A table of contents and a description of the appendix have been added.\n2. We agree that L260-267 are unnecessary and we decided to remove them."
+       },
+       "license": "CC-BY-4.0",
+       "url": "https://openreview.net/forum?id=0YjO70etNj&noteId=H0O5W2ECuD",
+       "createdAt": "2025-11-28T19:53:37.208Z",
+       "modifiedAt": "2025-11-28T19:53:48.374Z"
+      },
+      {
+       "externalId": "TKIkNaZWg7",
+       "replyTo": "vy1p3QoZXT",
+       "kind": "comment",
+       "invitation": "Official_Comment",
+       "signature": "Authors",
+       "content": {
+        "title": "Response to the reviewer",
+        "comment": "We would like to thank the reviewer for appreciating the contribution of our paper, for their feedback and questions. We would like to address the weaknesses and questions formulated by the reviewer:\n### Weaknesses\n- Due to the technical issues raised by reviewer pJx5, we replaced Assumption 3.4 with the new Assumption 3.5, which serves as the infinite-dimensional analogue of the smoothness condition used in [Theorem 3.2, Wibisono et al. (2022), Alternating Mirror Descent for Constrained Min–Max Games]. Although Assumption 3.5 may appear restrictive, it is satisfied by many standard choices of $h$. In the revised manuscript, we added Propositions H.14 and H.15, where we explicitly verify that the duals of the entropy and chi-squared divergence admit well-defined third-order Fréchet derivatives and indeed satisfy Assumption 3.5. We have also expanded the paper with Appendix E, presenting one additional application of our framework: two-player zero-sum Markov games, a class of problems in multi-agent reinforcement learning. We verify that the corresponding objective function satisfies our assumptions.\n\n- We would like to clarify that the Sinkhorn and EM algorithms fall under the category of pure minimization problems, rather than min–max problems. Both can be formulated as min–min optimization over their respective objective functions; see [Section 4 (Applications to Sinkhorn and EM with convergence rates) in Aubin-Frankowski et al., Mirror Descent with Relative Smoothness in Measure Spaces.] As noted above, we have also added one further application in Appendix E: two-player zero-sum Markov games to demonstrate the applicability of our general framework.\n\n- In the revised version, we have added sketches of our proofs (cf. Sections 2.1 and 3.1) and provided additional comments about our assumptions, in order to improve the clarity of the paper.\n\n### Questions:\n- Continuous-time analysis provides useful intuition about which gradient flows converge to minimizers/maximizers, under what assumptions, and at what rates. It can therefore guide the design of discrete-time algorithms. However, discrete-time analysis must ultimately be carried out independently, as convergence properties depend on the choice of discretization (such as mirror/JKO-type schemes or interacting particle systems). In particular, our paper highlights the importance of choosing between simultaneous and alternating mirror schemes.\n\nIn our min–max games setting, continuous-time analysis typically reveals an \"ideal\" convergence rate of the gradient flow, by which we mean a rate that may not be achievable by discrete-time algorithms. This is now explained in Remark 1.7. In Appendix J, we provide a formal calculation showing that the continuous time gradient flow yields a $1/t$ convergence rate, which is faster than both the simultaneous and alternating discrete-time schemes. Other discretizations, such as the implicit MDA scheme (Appendix J), can match this rate in theory (i.e., $1/N$), but are not practically implementable since they require knowledge of the opponent’s next move.\n\nCrucially, continuous-time analysis does not require the technical tools needed in discrete-time, such as the three-point lemma or analysis in the dual space. This makes the discrete-time analysis significantly more delicate and technically involved."
+       },
+       "license": "CC-BY-4.0",
+       "url": "https://openreview.net/forum?id=0YjO70etNj&noteId=TKIkNaZWg7",
+       "createdAt": "2025-11-28T19:56:41.645Z",
+       "modifiedAt": "2025-11-28T19:56:41.645Z"
+      },
+      {
+       "externalId": "szZtslJeQY",
+       "replyTo": null,
+       "kind": "comment",
+       "invitation": "Official_Comment",
+       "signature": "Authors",
+       "content": {
+        "title": "Meta-response to the reviewers",
+        "comment": "We apologize for the delay in providing our rebuttal. We required additional time to carefully address and resolve the technical issues raised by reviewer pJx5. \n\nWe would like to summarize the main revisions made to the paper:\n- **Strengthened convexity assumption.** We now assume that $h$ is strongly convex relative to $\\operatorname{TV}^2$ (and verify this for common choices of $h$), rather than strictly convex as in the previous version. Consequently, our main result for simultaneous schemes (Theorem 2.1) now does not require to assume: (i) smoothness of the objective $F$ relative to $D_h$ and (ii) Lipschitzness of $F$ relative to $D_h$.\n- **Additional verification of assumptions on $h$.** Our assumptions on $h$ (Assumption 1.1 and 3.5) are now verified not only for the entropy but also for another commonly used choice, the chi-squared divergence. In addition, Assumption 1.1 is showed to hold for a broader class of divergences.\n- **Additional context on convergence rates.** In Remark 1.7 and Appendix J, we expand our discussion of the convergence rates for the simultaneous and alternating schemes by comparing them with an implicit discretization and we describe the connection among all three discretizations (simultaneous, alternating, implicit) and the continuous-time Bregman gradient flow.\n- **Correction of Assumption 3.4.** Following reviewer pJx5’s observation that the previous Assumption 3.4 does not hold for entropy, we replaced it with the new Assumption 3.5. We rewrote Section 3 using Fréchet derivatives of the dual map (instead of first/second order variations) and proved that Assumption 3.5 holds both when $h$ is the entropy and when $h$ is the chi-squared divergence.\n- **Expanded proof sketches.** We added more detailed proof sketches for the main results in Sections 2.1 and 3.1.\n- **New application.** In Appendix E, we introduce an additional application to two-player zero-sum Markov games and verify that it satisfies our assumptions.\n- **Numerical experiments relocated.** Due to space constraints after the revision, the entire numerical experiments section has been moved to Appendix F."
+       },
+       "license": "CC-BY-4.0",
+       "url": "https://openreview.net/forum?id=0YjO70etNj&noteId=szZtslJeQY",
+       "createdAt": "2025-11-28T20:06:00.183Z",
+       "modifiedAt": "2025-12-01T07:33:27.406Z"
+      },
+      {
+       "externalId": "BpINZu0HCT",
+       "replyTo": null,
+       "kind": "meta_review",
+       "invitation": "Meta_Review",
+       "signature": "Area Chair KCSU",
+       "content": {
+        "summary": "This paper analyzes mirror descent-ascent (MDA) for solving min-max problems on the space of measures. The goal is to be able to handle nonlinear convex-concave coupling function $F$ as well as the case when the function $h$ generating the Bregman divergence is not necessarily the negative entropy. The authors show $O(1/\\sqrT{T})$ for the simultaneous MDA and $O(1/T^{2/3})$ for the alternating MDA. The authors initially required strict convexity from $h$ and smoothness and Lipschitzness from $F$. The authors later changed their setting after the technical issues pointed out by Reviewer pJx5. I think that the changes proposed in the rebuttal are major and hence require a new round of review. As a result, the positioning compared to Hsieh et al., 2019 requires a new explanation with the new setup. Moreover, the fact that current submission cannot handle Mirror-Prox, unlike Hsieh et al., 2019 needs to also be explained in a better way compared to Appendix K (Indeed, the fact that stochastic MP and MDA get similar rates does not mean that getting a fast rate is MP is not desirable).",
+        "reviewer_concerns": "Main concerns by Reviewer pJx5 were that the authors didn't have examples apart from the negative entropy case for their Assumptions 2.1 and 3.4. This reviewer also pointed out that Assumption 3.4 may not be satisfied for the case when $h$ is negative entropy and that the given reference (Lascu et al., Lemma A.2) did not contain the claimed proof. The authors then changed their assumptions (added Assumption 3.5) and showed that chi-squared divergence satisfies this new assumption. Even though these changes may address the concerns, they are rather major and require a new round of review.\n\nMoreover, as pointed out by Reviewer xMxA, the submission cannot handle Mirror-Prox to obtain a faster rate. This is in contrast to Hsieh et al., 2019. The explanation in Appendix K is not convincing regarding the lack of such a result in the current submission. The text in the rebuttal is better, yet does not completely address the concern for the lack of such a result.",
+        "reviewer_scores": "I think that Reviewer 9vd3 would not have increased their score because their concerns are addressed by changing the assumption and the main setup of the problem, which are major changes not suitable for the discussion period.\n\nI think that Reviewer xMxA would not have increased their score as well, since to address their concern about the assumptions on $F$, the authors introduced a new set of assumptions. Moreover, an improved rate with MP seems to be out of reach.\n\nI think Reviewer kmEj and dZnt would keep their weak accept recommendations."
+       },
+       "license": "CC-BY-4.0",
+       "url": "https://openreview.net/forum?id=0YjO70etNj&noteId=BpINZu0HCT",
+       "createdAt": "2026-01-17T04:34:49.689Z",
+       "modifiedAt": "2026-02-09T06:44:27.939Z"
+      },
+      {
+       "externalId": "KoO2dLg9Ku",
+       "replyTo": null,
+       "kind": "decision",
+       "invitation": "Decision",
+       "signature": "Program Chairs",
+       "content": {
+        "title": "Paper Decision",
+        "decision": "Reject",
+        "comment": ""
+       },
+       "license": "CC-BY-4.0",
+       "url": "https://openreview.net/forum?id=0YjO70etNj&noteId=KoO2dLg9Ku",
+       "createdAt": "2026-01-26T08:45:40.203Z",
+       "modifiedAt": "2026-02-06T05:00:39.406Z"
+      }
+     ]
+    },
+    {
+     "id": "1Q2DotMyQ4",
+     "number": 604,
+     "title": "Training-Free Spatially Grounded Geometric Shape Encoding",
+     "abstract": "Positional encoding has become the de facto standard for grounding deep neural network to discrete positions, and has achieved remarkable success in tasks where the input can be represented as one-dimensional sequence. However, extending this concept to spatial geometric shapes demands carefully designed encoding strategies that account not only for the shape's geometry and spatial position, but also for its compatibility with neural network learning. In this work, we address these challenges by introducing a training-free, general-purpose encoding strategy, dubbed XShapeEnc, that encodes an arbitrary spatially grounded geometric shape into compact representation that is fully invertible and frequency-rich. Specifically, XShapeEnc decomposes a shape into its shape geometry and shape pose, and independently encodes each of them under Zernike moments transform. Benefiting from the orthogonality of Zernike basis across the both radial and angular frequencies, both the shape geometry and shape pose are projected into compact representation that completely describes the shape from coarse-to-fine granularity. By further involving carefully designed shape intrinsic position encoding and orthonormal radial basis for shape geometry and shape pose respectively, the resulting encoded representation naturally contains high frequency component while maintaining the invertibility.",
+     "authors": [
+      "Yuhang He"
+     ],
+     "keywords": [
+      "shape encoding",
+      "training-free",
+      "invertibility",
+      "neural network friendly",
+      "frequency richness"
+     ],
+     "status": "desk_rejected",
+     "decision": null,
+     "notes": [
+      {
+       "externalId": "W4NzRQxeNN",
+       "replyTo": null,
+       "kind": "withdrawal",
+       "invitation": "Desk_Rejection",
+       "signature": "Program Chairs",
+       "content": {
+        "desk_reject_comments": "Paper rejected because pdf title does not match submission title.",
+        "title": "Submission Desk Rejected by Program Chairs"
+       },
+       "license": "CC-BY-4.0",
+       "url": "https://openreview.net/forum?id=1Q2DotMyQ4&noteId=W4NzRQxeNN",
+       "createdAt": "2025-10-07T15:54:24.501Z",
+       "modifiedAt": "2026-02-12T15:38:54.281Z"
+      }
+     ]
+    },
+    {
+     "id": "1tJVBCpVD0",
+     "number": 164,
+     "title": "Building Transformation Layers for Riemannian Neural Networks",
+     "abstract": "Recently, deep neural networks on manifold-valued representations have garnered significant attention in various machine learning applications. One recent focus is to generalize Euclidean Fully Connected (FC) and convolutional layers to non-Euclidean geometries. However, previous approaches typically focus on a few selected manifolds and rely on the specific properties of the target manifold. In contrast, this work proposes a framework for constructing FC and convolutional layers over computationally tractable Riemannian spaces, using only Riemannian geometry. This framework incorporates several previous FC layers across different geometries as special cases, and is instantiated over ten representative manifolds, including three hyperbolic models, five geometries of the Symmetric Positive Definite (SPD) manifold, and two Grassmannian perspectives. Experiments on different manifolds demonstrate the effectiveness and applicability of our approach.",
+     "authors": [
+      "Ziheng Chen",
+      "Xiaojun Wu",
+      "Bernhard Schölkopf",
+      "Nicu Sebe"
+     ],
+     "keywords": [
+      "Hyperbolic",
+      "SPD",
+      "Symmetric Positive Definite",
+      "Grassmannian",
+      "Riemannian Manifolds",
+      "Riemannian Networks"
+     ],
+     "status": "withdrawn",
+     "decision": null,
+     "notes": [
+      {
+       "externalId": "ieusffWlPs",
+       "replyTo": null,
+       "kind": "review",
+       "invitation": "Official_Review",
+       "signature": "Reviewer zURU",
+       "content": {
+        "summary": "This paper proposes a general framework for constructing Fully Connected (FC) and convolutional layers on Riemannian manifolds. The framework relies solely on fundamental Riemannian operators. The authors show that several existing manifold-specific FC layers (e.g., Poincaré FC, gyro-SPD FC layers, flat-SPD FC, Lorentz linear layers). The framework is instantiated across ten geometries, including: three hyperbolic models, five well-known SPD geometries, and both ONB and projector perspectives of the Grassmannian. The proposed framework is evaluated with several datasets: Disease, Airport, Pubmed, and Cora for hyperbolic spaces, and Radar, HD05, FPHA for SPD manifolds.",
+        "soundness": 3,
+        "presentation": 3,
+        "contribution": 3,
+        "strengths": "The core novelty is the unification of FC and convolutional transformations across many Riemannian spaces.\nThe authors broadly instantiate the proposed framework across hyperbolic, SPD, and Grassmannian manifolds. The framework behaves conysistently across these settings, suggesting general usefulness.\nThe authors evaluate the framework with 7 datasets in both hyperbolic spaces and SPD manifolds, that strengthens argments.",
+        "weaknesses": "There are still some points not clear and need to be clarified:\n1. why point-to-hyperplane distance leads to FC transformations not directly explained\n2. Computational cost is not discussed. Riemannian operations can be expensive depending on the manifold and metric. A runtime or FlOPs comparison across manifolds would make the generality claim more convincing.",
+        "questions": "1. why point-to-hyperplane distance leads to FC transformations\n2. Can the authors provide more details on comparing computational cost, that would strenghten the generability of the propose framework.\n3. Can the authors provide more details on trivialization. what paremeters are in tangent spaces, what are in the manifold.",
+        "flag_for_ethics_review": [
+         "No ethics review needed."
+        ],
+        "rating": 8,
+        "confidence": 2,
+        "code_of_conduct": "Yes"
+       },
+       "license": "CC-BY-4.0",
+       "url": "https://openreview.net/forum?id=1tJVBCpVD0&noteId=ieusffWlPs",
+       "createdAt": "2025-10-27T11:58:20.620Z",
+       "modifiedAt": "2025-11-12T02:44:20.938Z"
+      },
+      {
+       "externalId": "wQfC5h8mKA",
+       "replyTo": null,
+       "kind": "review",
+       "invitation": "Official_Review",
+       "signature": "Reviewer 6ri4",
+       "content": {
+        "summary": "This paper proposes a framework for constructing FC and convolutional layers for neural networks on hyperbolic, Symmetric Positive\nDefinite (SPD), and Grassmannian spaces. The authors show that several existing Riemannian FC and convolutional layers are special cases of their proposed layers. The authors conducted experiments on link prediction, radar classification, and action recognition to validate the proposed framework.",
+        "soundness": 3,
+        "presentation": 3,
+        "contribution": 2,
+        "strengths": "- Three popular Riemannian manifolds are investigated.\n- The authors provide theoretical results to justify their construction of FC and convolutional layers.",
+        "weaknesses": "- The paper lacks of novelty (the weakest point). \n- Some experimental settings are missing (minor).\n- Experiements are insuffient to demonstrate the efficacy of the proposed method (moderately important).",
+        "questions": "1) This paper relies heavily on the works in [Shimizu et al., 2021; Nguyen and Yang, 2023; Nguyen et al., 2024; Chen et al., 2024c]. Here, the key idea is to build Riemannian FC and convolutional layers from Riemannian analogs of linear transformations just as Euclidean FC and convolutional layers are built from linear transformations. This idea was first introduced for hyperbolic manifold [Shimizu et al., 2021]. The main difficulty is how one can adap this idea to matrix manifolds, which was already done in [Nguyen et al., 2024]. In the present work, the authors simply apply a similar approach to obtain formulae for different metrics associated with different Riemannian manifolds (which have been throughly studied in previous works). While the authors have attempted to show that the proposed framework is applicable to a variety of Riemannian manifolds, it still stays within the context of hyperbolic and matrix manifolds (e.g., SPD and Grassmann manifolds) considered in [Ganea et al., 2018; Shimizu et al., 2021; Nguyen et al., 2024]. The paper would be much appreciated if the authors can develop a new approach for constructing Riemannian FC and convolutional layers rather than using an existing approach for different Riemannian metrics which are well-understood.\n\nTo give a bit more details of what I said above: The key ingredient to the construction of FC and convolutional layers in the approaches of [Shimizu et al., 2021; Nguyen et al., 2024] as well as in the present paper is the Riemannian point-to-hyperplane distance. In the present work, it is given in line 146. This distance coincides with those in [Nguyen and Yang, 2023] in the cases of AIM, LEM, LCM. Eq. (2) is the one proposed in [Nguyen et al., 2024] for hypergyroplane that contains the origin and is orthogonal to an axis of the output space. The construction of FC and convolutional layers for Grassmann space, while not being presented in [Nguyen et al., 2024], is quite direct from that work in my opinion (since the point-to-hyperplane distance can be derived as in that work). Therefore, the paper focuses on the same context as [Shimizu et al., 2021; Nguyen et al., 2024] while using the same idea as these works for the construction of the proposed layers. \n\nIn addition to my concern above on the novelty of the paper, I also have concern on the practical benefit of the proposed models:\n\n- Hyperbolic space: compared to [Shimizu et al., 2021; Bdeir et al., 2024], the authors add the Klein model to their study. However, Table 4 shows that either the Poincare model or the Hyperboloid model outperforms the Klein model in all cases.\n\n- SPD space: compared to [Nguyen et al., 2024], the authors add the PEM and BWM metrics to their study. However, Table 6 show that for 3 out of 4 datasets (e.g., HDM05, FPHA, NTU60), none of these metrics is the best performer. The only case where PEM performs the best is on Radar dataset, but the performance gap between PEM and LEM is minor (98.43 $\\pm$ 0.44 vs. 98.27 $\\pm$ 0.48).  \n\nThat being said, by considering some Riemannian metrics and hyperbolic models that were not considered in previous works, the present paper provides new FC and convolutional layers, but these do not seem to be as effective as existing layers. \n\n2) In Section 3.1, the authors state that \"The previous work typically requires a case-by-case derivation for a specific geometry\". I think this is because those derivations require closed form formulas of the exponential/logarithm maps, and this limitation applies to any methods built upon those maps, including the proposed method. So I failed to see the advantage of the propsed method compared to previous ones in this matter.\n\n3) Experimental settings are not always clearly provided. For instance, for NTU60 dataset, the authors said \"we focus on the mutual action in NTU60\". However, as far as I know, there are different experimental settings for this dataset and it is not clear which one they authors used. \n\n4) Some improvements observed from the experiemnts, in my opinion, mainly come from specific implementations and experiemental settings. This is because the proposed layers seem to follow a similar construction as existing ones, and I failed to see how notable improvements can be obtained if similar constructions are used. \n\n\nQuestions:\n\n1. Could the authors explain the new contributions in terms of layers' construction w.r.t. [Shimizu et al., 2021; Nguyen and Yang, 2023; Nguyen et al., 2024; Chen et al., 2024c] ?\n\n2. What are the challenges to address, given that the key ingredients have already been given in [Shimizu et al., 2021; Nguyen and Yang, 2023; Nguyen et al., 2024; Chen et al., 2024c] ?\n\n3. What are the differences in the architectures of SPDNN-LEM and GyroLE in Table 6 ? How the input are computed ? How many epochs are used for each experiment ? How many runs for each model ? Some of those are briefly given in the Appendix but I would like to ask for further details and discussions.",
+        "flag_for_ethics_review": [
+         "No ethics review needed."
+        ],
+        "rating": 2,
+        "confidence": 4,
+        "code_of_conduct": "Yes"
+       },
+       "license": "CC-BY-4.0",
+       "url": "https://openreview.net/forum?id=1tJVBCpVD0&noteId=wQfC5h8mKA",
+       "createdAt": "2025-10-31T21:51:55.274Z",
+       "modifiedAt": "2025-11-12T02:44:20.755Z"
+      },
+      {
+       "externalId": "LQQqKznzsH",
+       "replyTo": null,
+       "kind": "review",
+       "invitation": "Official_Review",
+       "signature": "Reviewer E7jf",
+       "content": {
+        "summary": "The paper studies transformation layers for Riemannian neural networks. Their construction in S3.1 starts with fully-connected (FC) layers in Euclidean space and generalizes them to the manifold case in Def 3.1/Thm 3.3, and then extends them to convolutional layers. They instantiate these layers on the hyperbolic, SPD, and Grassmannian manifolds and experimentally evaluate on link prediction, radar classification, and human action recognition tasks.",
+        "soundness": 2,
+        "presentation": 2,
+        "contribution": 2,
+        "strengths": "The generality of the paper is appealing: it is nice to have a general framework for parameterized transformations (e.g., FC or convolutional layers) on manifolds. The paper proposes one way of doing this and shows that is already captures existing methods specialized to other manifolds (like GyroSPD++). The experimental results also show these layers have practical value too (although in the next section I do have some concerns on the experimental results not being complete).",
+        "weaknesses": "I have a few concerns on weaknesses that hold me back from recommending an accept at this point. I'm very open to discussing them throughout the review process.\n\nThe most significant is on the experimental results: setting out to be (near) state-of-the-art on the experimental settings across all of the geometries considered in the paper is as ambitious goal that I see as necessary for publishing the paper. The current experiments are lacking. For example, the link prediction results in Table 4/5 significantly underperform the reported results from Table 1 of the [Riemannian Residual Neural Networks paper](https://proceedings.neurips.cc/paper_files/paper/2023/file/c868aa7437dc9b29e674cd2e25689021-Paper-Conference.pdf) --- for example, they get 98.4 on disease and 95.2 on airport. And, Table 6 comparing to GyroSPD++ significantly underperforms the results reported in Table 1 of the [original GyroSPD++ paper](https://arxiv.org/abs/2405.19206) --- the paper under review states this is due to not being able to reproduce GyroSPD++ and not having code available, but the difference seems too significant and warrants further justification.\n\nMy other concern is on the positioning and slight over-claiming of the paper, making statements such as \"this paper extends fundamental FC and convolutional layers to operate on Riemannian manifold\": it does not give enough credit to other attempts at creating general Riemannian layers, such as in the Riemannian Residual Neural Networks paper, which also just uses an exponential map and projection onto the tangent space. My recommendation here would be to tone down these claims, and give more credit to previous attempts at creating general Riemannian layers.",
+        "questions": "I am very open to discussing the weaknesses I have pointed out, especially on the experiments seeming incomplete.\n\nBeyond that, I do have a larger question for discussion on the use and motivation for Riemannian layers that I am curious about. If we are modeling a mapping from manifold data for classification or regression tasks (on the simplex or Euclidean space), then at what point should the model stop using Riemannian layers and start just using the standard (Euclidean) layers used in other regression/classification tasks? It seems like there could be some representational argument for first embedding the Riemannian input data into a latent Euclidean space with Riemannian layers, and then processing that with Eucldiean layers. I could also see an argument that if the input data is already a real-valued vector space (via the representation of the points on the manifold or ambient Euclidean space), then the entire task could be processed with just Euclidean layers. Is it just experimental what transformation works the best, or is there some strong argument that the transformations need to be done on the manifold?\n\nAnd one last question to discuss is on the comparison between the Riemannian layer proposed and other the general Riemannian layers, like in the Riemannian ResNet paper combining a Euclidean module with a projection onto the tangent space and exponential map. Conceptually or theoretically, is there any argument for why the proposed layer should be more capacitive or learnable? Or are there only experimental justifications? I would find this helpful to discuss (and eventually include in the paper)",
+        "flag_for_ethics_review": [
+         "No ethics review needed."
+        ],
+        "rating": 2,
+        "confidence": 4,
+        "code_of_conduct": "Yes"
+       },
+       "license": "CC-BY-4.0",
+       "url": "https://openreview.net/forum?id=1tJVBCpVD0&noteId=LQQqKznzsH",
+       "createdAt": "2025-11-01T00:12:59.288Z",
+       "modifiedAt": "2025-11-12T02:44:20.299Z"
+      },
+      {
+       "externalId": "CrpErXca7w",
+       "replyTo": null,
+       "kind": "review",
+       "invitation": "Official_Review",
+       "signature": "Reviewer eqsD",
+       "content": {
+        "summary": "The paper proposes a framework for developing fully connected (FC) layers for Riemannian neural networks. Performance is evaluated across multiple manifolds, and the accuracy seems to outperform state-of-the-art methods including GyroSPD++ and RResNet.",
+        "soundness": 3,
+        "presentation": 2,
+        "contribution": 3,
+        "strengths": "Fully connected layers for Riemannian neural networks have been a design problem for some time, and this paper seems to have a novel solution to it that works well in practice. The accuracy numbers in Table 5 and Table 6 are in particular quite good.",
+        "weaknesses": "Much of the rhetoric in the introduction seems to be overclaiming. There are a lot of previous FC layers that the paper cites but doesn't discuss in any detail. No real explanation is given for how the proposed FC setup differs from these previous approaches. And in particular the setup of RResNet (which is mentioned in the experiments section as a basis for the experiments, but not in the intro) seems to satisfy all the desiderata: it uses only geometric Riemannian operators and works generally across manifolds. Some more reason why the proposed FC method works better would improve the paper.",
+        "questions": "Can this Riemannian FC layer truly be said to be based on Riemannian operators if it involves taking a particular basis at \"the origin\"? Many manifolds do not have an obvious origin. Is this method somehow independent of which point is chosen as an origin.",
+        "flag_for_ethics_review": [
+         "No ethics review needed."
+        ],
+        "rating": 4,
+        "confidence": 4,
+        "code_of_conduct": "Yes"
+       },
+       "license": "CC-BY-4.0",
+       "url": "https://openreview.net/forum?id=1tJVBCpVD0&noteId=CrpErXca7w",
+       "createdAt": "2025-11-01T07:03:34.163Z",
+       "modifiedAt": "2025-11-12T02:44:20.133Z"
+      },
+      {
+       "externalId": "MehQRkGbRi",
+       "replyTo": null,
+       "kind": "withdrawal",
+       "invitation": "Withdrawal",
+       "signature": "Authors",
+       "content": {
+        "withdrawal_confirmation": "I have read and agree with the venue's withdrawal policy on behalf of myself and my co-authors."
+       },
+       "license": "CC-BY-4.0",
+       "url": "https://openreview.net/forum?id=1tJVBCpVD0&noteId=MehQRkGbRi",
+       "createdAt": "2025-11-14T10:44:17.576Z",
+       "modifiedAt": "2025-11-14T10:44:17.576Z"
+      }
+     ]
+    },
+    {
+     "id": "2yWis3aAvj",
+     "number": 15858,
+     "title": "Neural Operator-based Curriculum Learning for Physics-Informed Neural Networks",
+     "abstract": "In this paper, we tackle the critical failure modes of Physics-Informed Neural Networks (PINNs), such as spectral bias and ill-conditioning, which lead to poor convergence on complex PDEs. We identify two key shortcomings in existing curriculum learning methods for PINNs: unreliable knowledge transfer between stages and a reliance on manual, ad-hoc curriculum design. To overcome these limitations, we present Neural Operator-based Curriculum Learning (NOCL), a unified framework that leverages Neural Tangent Kernel (NTK) theory to automate curriculum generation and employs neural operators to enable robust, dynamic knowledge transfer across curriculum stages. By dynamically training the operator and filtering data for PINN initialization, our approach ensures scalable and effective learning across progressively difficult tasks. Experiments verify that our proposed NOCL achieves state-of-the-art performance, markedly improving convergence and generalization over existing methods.",
+     "authors": [
+      "Lingshi MENG",
+      "Haosen Shi",
+      "Sinno Jialin Pan"
+     ],
+     "keywords": [
+      "Curriculum Learning",
+      "PINNs",
+      "Nerual Operator",
+      "PDEs"
+     ],
+     "status": "withdrawn",
+     "decision": null,
+     "notes": [
+      {
+       "externalId": "66uQJKXbSA",
+       "replyTo": null,
+       "kind": "review",
+       "invitation": "Official_Review",
+       "signature": "Reviewer DWSU",
+       "content": {
+        "summary": "This paper proposes Neural Operator-based Curriculum Learning (NOCL) to address critical failure modes in Physics-Informed Neural Networks (PINNs) when solving complex PDEs. The authors identify that traditional curriculum learning for PINNs suffers from two key issues: direct parameter transfer between curriculum stages can cause catastrophic failures, and manual curriculum design for multi-parameter systems lacks principled guidance. NOCL addresses these by using neural operators (FNO) to provide robust knowledge transfer across curriculum stages, combined with NTK eigenvalue variance as an automated difficulty metric for curriculum construction. A mask-based filtering algorithm ensures only high-quality predictions initialize PINN training. Experiments on heat, convection, and reaction-diffusion equations demonstrate that NOCL achieves state-of-the-art performance, successfully training PINNs on challenging parameters where both baseline and traditional curriculum learning fail, while showing robustness even with suboptimal curriculum designs.",
+        "soundness": 3,
+        "presentation": 3,
+        "contribution": 3,
+        "strengths": "- The paper provides clear empirical evidence that traditional parameter-transfer-based curriculum learning can catastrophically fail, sometimes performing worse than baseline, which motivates the need for alternative approaches.\n- Employing neural operators for knowledge transfer between curriculum stages, rather than directly inheriting network parameters, is an innovative solution that effectively addresses the parameter sensitivity problem while maintaining scalability through dynamic operator updates.\n- Using NTK eigenvalue variance as a difficulty metric provides a principled and automated approach to curriculum construction based on established NTK theory, eliminating ad-hoc manual design and demonstrating strong empirical correlation with actual training difficulty across multiple PDE systems.",
+        "weaknesses": "- The assumption needs to be better justified.\n- The experiments need to be elaborated.\n- Systematic analysis should be added to the mask filtering.\n- The term \"knowledge transfer\" is misleading.",
+        "questions": "- The paper's effectiveness relies on a critical unstated assumption: that initializing PINNs with approximate solution data (x, u(x)) enables convergence on otherwise intractable parameters. This assumption is neither explicitly acknowledged nor independently validated—the paper provides no theoretical analysis, prior literature support, or dedicated experiments isolating this effect. Without establishing when and why such initialization works, the method's applicability and failure modes remain unclear.\n- Limited experimental scope with only low-dimensional (1D-2D) problems and relatively simple PDEs. The scalability to high-dimensional systems, industrial-scale problems, or more complex PDE types remains unclear, and computational cost analysis is largely absent.\n- The mask filtering algorithm lacks systematic analysis and presents a critical trade-off that is not adequately explored: retaining too few points may provide insufficient initialization data for PINN training, while retaining too many points risks contaminating the initialization with low-quality predictions. The choice of retention ratio (α=0.5) appears arbitrary with no sensitivity analysis across different values, and the conditions determining when masking is necessary versus harmful are not clearly characterized, making it difficult to apply the method to new problems.\n- The paper misleadingly frames the approach as \"knowledge transfer\" (abstract, Section 3.1). The method does not transfer learned representations or model parameters; instead, neural operators provide numerical solution predictions (x, u(x)) pairs to initialize fresh PINNs that are then trained from scratch. This is fundamentally warm-start optimization rather than transfer learning, as each PINN learns independently without inheriting structural knowledge from previous stages. The approach would be more accurately described as \"solution-based initialization.\"",
+        "flag_for_ethics_review": [
+         "No ethics review needed."
+        ],
+        "rating": 4,
+        "confidence": 3,
+        "code_of_conduct": "Yes"
+       },
+       "license": "CC-BY-4.0",
+       "url": "https://openreview.net/forum?id=2yWis3aAvj&noteId=66uQJKXbSA",
+       "createdAt": "2025-10-31T21:22:50.132Z",
+       "modifiedAt": "2025-11-12T05:41:18.256Z"
+      },
+      {
+       "externalId": "XQaiFjSYam",
+       "replyTo": null,
+       "kind": "review",
+       "invitation": "Official_Review",
+       "signature": "Reviewer wxCg",
+       "content": {
+        "summary": "Existing curriculum learning approaches in PINN still face two significant unre\u0002solved issues: traditional methods based on direct parameter transfer may fail on certain curricula, and designing curricula for multi-parameter PDEs requires prior knowledge to define an appropri\u0002ate progression. This paper proposes a neural operator-based curriculum learning framework, which could ensure effective knowledge propagation across successive stages.",
+        "soundness": 2,
+        "presentation": 2,
+        "contribution": 2,
+        "strengths": "1. This paper integrates neural operators with curriculum learning to overcome the knowledge transfer problem between curriculum stages.\n2. The motivation of the paper is valid.\n3. The overall scheme of the manuscript is reasonable.",
+        "weaknesses": "1. The paper compares primarily against baseline PINNs and traditional curriculum learning, but fails to compare with recent advanced PINN variants. \n2. The paper claims to solve two critical issues with existing curriculum learning methods (unreliable knowledge transfer and manual design), but the experimental evidence for these specific contributions is weak. For instance, the ablation study on mask filtering (Table 1 vs. Table 2) suggests that the mask algorithm might be more critical than the neural operator itself, contradicting the paper's emphasis on neural operators for knowledge transfer.\n3. The experimental comparisons were insufficient, lacking more quantitative indicators for comparison.\n4. The results in Table 2 and Figure 3 show that simply adding the mask algorithm (w/o NO) already provides significant improvements over traditional curriculum learning, suggesting that the neural operator component may not be as essential as claimed.\n5. The author lacks a comparison with existing curriculum  learning on the PINN method, such as CoPINN: Cognitive Physics-Informed Neural Networks.",
+        "questions": "See Weaknesses.",
+        "flag_for_ethics_review": [
+         "No ethics review needed."
+        ],
+        "rating": 4,
+        "confidence": 5,
+        "code_of_conduct": "Yes"
+       },
+       "license": "CC-BY-4.0",
+       "url": "https://openreview.net/forum?id=2yWis3aAvj&noteId=XQaiFjSYam",
+       "createdAt": "2025-11-01T08:54:42.890Z",
+       "modifiedAt": "2025-11-12T05:41:17.910Z"
+      },
+      {
+       "externalId": "05qnlU8TnW",
+       "replyTo": null,
+       "kind": "review",
+       "invitation": "Official_Review",
+       "signature": "Reviewer wW82",
+       "content": {
+        "summary": "This paper proposes a neural operator-based curriculum learning framework (NOCL) to improve the generalization ability of Physics-Informed Neural Networks (PINNs) under multi-parameter Partial Differential Equations (PDEs). The key idea is to first train a neural operator to learn a parameter-to-solution mapping, and then use its predictions—filtered by residual-based masking—to initialize subsequent PINN training stages. The paper further introduces a task difficulty metric based on the variance of the Neural Tangent Kernel (NTK) eigenvalue spectrum to determine curriculum ordering. Experiments show improved performance on selected benchmark tasks.",
+        "soundness": 2,
+        "presentation": 2,
+        "contribution": 2,
+        "strengths": "1.The paper explores the integration of neural operators and curriculum learning to address PINN generalization in multi-parameter PDE problems. The proposed workflow is interesting and shows some empirical improvement.\n\n2.The motivation is clearly presented. It targets well-known failure modes in PINNs such as spectral bias, parameter sensitivity, and optimization ill-conditioning, and proposes corresponding mitigation techniques.\n\n3.The introduction of a quantifiable curriculum metric using NTK eigenvalue variance instead of heuristic ordering is insightful.",
+        "weaknesses": "1.The reliability of residual masking hinges on the assumption of solution structural consistency across stages. If this assumption fails, the method may degrade or even collapse. Even if the solution shape remains similar, the new model’s optimization dynamics may differ, and previous “good” points might no longer be effective. This assumption demands stronger theoretical or structural support, which the paper currently does not provide. Furthermore, masking is applied to the output of a black-box neural operator (FNO) that does not inherently enforce physical consistency. A low residual may occur by chance rather than indicating physical correctness. Thus, the core curriculum strategy lacks robustness and generality.\n\n2.While PINN training is physically constrained, the transfer mechanism itself lacks physical constraints. Therefore, the success of the transfer depends heavily on the neural operator's ability to capture solution structure. The use of “low-residual points” from a previous stage’s neural operator prediction as initialization for the next stage is not guaranteed to be reliable—especially under significant parameter shifts. Theoretically, this residual-masking transfer mechanism is unstable and lacks justification. Without theoretical or statistical analysis on cross-stage consistency, such point-wise knowledge transfer remains empirical and fragile. Moreover, the demonstrated success occurs only under controlled conditions. This does not generalize to broader settings with abrupt structural changes in the solution space. The lack of theoretical support for cross-structure transferability is a major limitation.\n\n3.The paper lacks sufficient ablation studies to validate the method. What happens if NTK-based ordering is removed? Does residual masking alone help? Would uniform initialization perform similarly? These questions remain unanswered.\n\n4.Although the authors claim to perform function-level transfer, in essence, they still rely on a trained model (the neural operator), which is itself a parametric neural network. Therefore, this is not truly model-free transfer.\n\n5.The paper introduces a large number of complex-sounding terms (e.g., “function-level transfer,” “spectral bias avoidance,” “residual masking initialization,” “neural-operator curriculum learning”), which may obscure the true contribution. A more concise presentation focused on core ideas is recommended.\n\n6.Typographical error in Figure 1: “curricumun” should be corrected to “curriculum.” The figure layout is cluttered and deserves a cleaner redesign.",
+        "questions": "1.Can the residual masking mechanism be theoretically justified? Is there any statistical or functional consistency analysis available across different PDE parameters?\n\n2.Figure 6 is meant to support curriculum ordering, but it seems to suggest that NTK spectral structures vary significantly across parameters. Doesn’t this contradict the assumption of mask consistency?\n\n3.NTK computation is extremely expensive in large-scale models or datasets. How does the proposed method scale in such cases? Are there more efficient ways to perform difficulty-aware curriculum planning?",
+        "flag_for_ethics_review": [
+         "No ethics review needed."
+        ],
+        "rating": 2,
+        "confidence": 3,
+        "code_of_conduct": "Yes"
+       },
+       "license": "CC-BY-4.0",
+       "url": "https://openreview.net/forum?id=2yWis3aAvj&noteId=05qnlU8TnW",
+       "createdAt": "2025-11-05T06:01:32.059Z",
+       "modifiedAt": "2025-11-12T05:41:17.476Z"
+      },
+      {
+       "externalId": "RMTZHptDxi",
+       "replyTo": null,
+       "kind": "review",
+       "invitation": "Official_Review",
+       "signature": "Reviewer yC3g",
+       "content": {
+        "summary": "This paper addresses two core failure modes of Physics-Informed Neural Networks (PINNs) on complex PDEs — spectral bias and ill-conditioning — which often cause poor convergence. It identifies two major limitations of existing curriculum learning (CL) approaches for PINNs: (1) unreliable knowledge transfer between curriculum stages and (2) manual, ad-hoc curriculum design.\nTo overcome these issues, the authors propose Neural Operator-based Curriculum Learning (NOCL), a unified framework that leverages neural operators (mainly FNO) to perform functional-space knowledge transfer between stages, and uses the variance of the Neural Tangent Kernel (NTK) spectrum as a universal difficulty measure for automated curriculum construction. Additionally, PDE residual–based masking is used to filter high-quality points for PINN initialization. Experiments on heat, convection, and reaction–diffusion equations show that NOCL significantly improves convergence and generalization compared to baselines.",
+        "soundness": 3,
+        "presentation": 3,
+        "contribution": 3,
+        "strengths": "1. **Clear motivation and problem definition.**  \n   The paper systematically analyzes the two weaknesses of curriculum learning (CL) in PINNs — parameter inheritance instability and manual curriculum tuning — and provides empirical evidence supporting these claims.\n\n2. **Sound method design.**  \n   - Neural operators enable function-space transfer, avoiding parameter compatibility issues.  \n   - The PDE-residual-based mask filters unreliable operator outputs during initialization.  \n   - The NTK variance serves as a task-agnostic and theoretically interpretable difficulty metric, improving curriculum robustness.\n\n3. **Coherent algorithmic structure.**  \n   Algorithm 1 and Figure 1 clearly describe the closed-loop workflow (*train operator → operator-guided initialization → physics training → feedback*).  \n   This makes the framework reproducible and extensible.\n\n4. **Comprehensive experiments.**  \n   - **Heat equation:** NTK variance correlates with training error; NOCL yields consistent L2 improvements.  \n   - **Convection equation:** Better performance under large β and multi-stage α curricula, with masking ablation.  \n   - **Reaction–diffusion:** Strong results under both ν and ρ curricula, outperforming “causal” CL.\n\n5. **Rich implementation details.**  \n   The appendix includes hyperparameters, curriculum segmentation, and sampling strategy, which facilitate reproduction and adaptation to other PDE problems.",
+        "weaknesses": "1. **Limited novelty boundary and comparison depth.**  \n   While the combination of operator + curriculum + mask + NTK variance is well-motivated, the paper lacks direct comparisons to *operator-enhanced PINNs* (e.g., PINO, DeepONet with physics constraints) or *NTK/spectral-based curriculum methods*.  \n   Claims of SOTA are only relative to weaker baselines, leaving uncertainty about the position of NOCL among stronger contemporaries.\n\n2. **Weak theoretical justification of NTK variance.**  \n   The metric’s robustness under varying network width, sampling density, or scaling is not systematically analyzed.  \n   Evidence remains empirical, without formal generalization guarantees or complexity estimates for large-scale PDE systems.\n\n3. **Potential bias in operator training.**  \n   The initial operator is trained on PINN predictions rather than high-fidelity ground truth, introducing a “bootstrapping” bias.  \n   Although masking mitigates this, quantifying or comparing against hybrid (small true data + bootstrap) strategies would strengthen the paper’s reliability.\n\n4. **Lack of efficiency evaluation.**  \n   The experiments only report relative L2 errors.  \n   There are no metrics on wall-clock time, GPU hours, convergence speed, or curriculum length–performance trade-offs, which are crucial for evaluating the practicality of NOCL.\n\n5. **Incomplete ablations.**  \n   - *CL w/o NO* only removes the operator component; more variants (e.g., using different difficulty metrics like curvature or loss spectral energy) should be tested.  \n   - The mask ratio α (0.3/0.5) is fixed; a sensitivity analysis or robustness curve is missing, which limits understanding of hyperparameter stability.",
+        "questions": "1. **On the NTK variance metric:**  \n   Does its correlation with task difficulty hold under different network widths, activations, or sampling densities?  \n   Have you validated its consistency across multiple architectures or tasks?\n\n2. **Generalization to complex PDEs:**  \n   How does NOCL behave on highly nonlinear, multi-scale, or multi-physics PDEs (e.g., Navier–Stokes, Allen–Cahn, Burgers 2D/3D)?  \n   Are there observed failure cases or stability issues?\n\n3. **Efficiency and resource usage:**  \n   What is the total training time and GPU memory compared to the baselines?  \n   Does the operator training overhead offset the convergence benefits provided by the curriculum?\n\n4. **Operator bootstrapping bias:**  \n   Could early PINN errors accumulate within the operator during self-training?  \n   Beyond masking, have you tried uncertainty-weighted losses or consistency regularization between PDE residuals and operator outputs?\n\n5. **Stronger baselines and ablations:**  \n   Please include comparisons with PINO/DeepONet + physics constraints, and report how the mask ratio and FNO resolution jointly affect performance and stability.",
+        "flag_for_ethics_review": [
+         "No ethics review needed."
+        ],
+        "rating": 6,
+        "confidence": 3,
+        "code_of_conduct": "Yes"
+       },
+       "license": "CC-BY-4.0",
+       "url": "https://openreview.net/forum?id=2yWis3aAvj&noteId=RMTZHptDxi",
+       "createdAt": "2025-11-11T08:45:37.602Z",
+       "modifiedAt": "2025-11-12T05:41:17.189Z"
+      },
+      {
+       "externalId": "wVysVQCGUz",
+       "replyTo": null,
+       "kind": "withdrawal",
+       "invitation": "Withdrawal",
+       "signature": "Authors",
+       "content": {
+        "withdrawal_confirmation": "I have read and agree with the venue's withdrawal policy on behalf of myself and my co-authors."
+       },
+       "license": "CC-BY-4.0",
+       "url": "https://openreview.net/forum?id=2yWis3aAvj&noteId=wVysVQCGUz",
+       "createdAt": "2025-11-18T15:53:52.248Z",
+       "modifiedAt": "2025-11-18T15:53:52.248Z"
+      }
+     ]
     }
    ]
   },
@@ -4906,6 +5725,293 @@
      ],
      "status": "under_review",
      "decision": null,
+     "notes": []
+    }
+   ]
+  },
+  {
+   "group": "NeurIPS.cc/2026/Conference",
+   "name": "NeurIPS 2026",
+   "year": 2026,
+   "anonymous": false,
+   "papers": [
+    {
+     "id": "uhy1JdsQsE",
+     "number": 148848,
+     "title": "TGPO: Temporal Grounded Policy Optimization for Signal Temporal Logic Tasks",
+     "abstract": "Learning control policies for complex, long-horizon tasks is a central challenge in autonomous systems. Signal Temporal Logic (STL) offers an expressive language for specifying such tasks, but its non-Markovian nature and inherent sparse reward make it hard for standard Reinforcement Learning (RL) to solve. Prior RL approaches focus only on limited STL fragments or use robustness scores as sparse rewards. Our new method TGPO (Temporal Grounded Policy Optimization) decomposes STL into timed subgoals and invariant constraints and tackles the problem in a hierarchical fashion. Its high-level module proposes time allocations for subgoals, and the low-level time-conditioned policy learns to achieve the sequenced subgoals using a dense, stage-wise reward. In inference, we use the critic to efficiently sample time allocations and select the most promising assignment for the policy to rollout. We evaluate in five environments, from low-dimensional navigation to manipulation, drone, and quadrupedal locomotion, and TGPO significantly outperforms baselines (especially for high-dimensional and long-horizon cases), with 31.6% higher success rate compared to the best method.",
+     "authors": [
+      "Yue Meng",
+      "Fei Chen",
+      "Chuchu Fan"
+     ],
+     "keywords": [
+      "Reinforcement Learning; Signal Temporal Logic"
+     ],
+     "status": "accepted",
+     "decision": "Accept (poster)",
+     "notes": []
+    },
+    {
+     "id": "yXh6kzlErC",
+     "number": 148349,
+     "title": "Mirror Descent-Ascent for mean-field min-max problems",
+     "abstract": "We study two variants of the mirror descent-ascent (MDA) algorithm for solving min-max problems on the space of measures: simultaneous and alternating. We work under assumptions of convexity-concavity and relative smoothness of the payoff function with respect to a suitable Bregman divergence, defined on the space of measures via flat derivatives. We establish non-asymptotic convergence rates to mixed Nash equilibria, measured in the Nikaido-Isoda error, proving an $\\mathcal{O}(N^{-1/2})$ rate for simultaneous MDA and an improved $\\mathcal{O}(N^{-2/3})$ rate for alternating MDA. The main technical contribution is an infinite-dimensional dual space analysis that relates Bregman divergences on measures to dual Bregman divergences on spaces of bounded continuous functions, allowing us to control asymmetric commutator terms created by alternating updates. The results substantially generalize prior analyses restricted to bilinear objectives and also apply to nonlinear convex-concave problems on measure spaces, thereby providing a unified theoretical foundation for MDA in mean-field min-max optimization.",
+     "authors": [
+      "Razvan-Andrei Lascu",
+      "Mateusz Majka",
+      "Lukasz Szpruch"
+     ],
+     "keywords": [
+      "Mean-field optimization",
+      "min-max games",
+      "Bregman divergence",
+      "Adversarial learning"
+     ],
+     "status": "accepted",
+     "decision": "Accept (poster)",
+     "notes": []
+    },
+    {
+     "id": "j770IgUZZG",
+     "number": 150307,
+     "title": "Training-free Spatially Grounded Geometric Shape Encoding",
+     "abstract": "In this work, we introduce a novel training-free encoding framework, dubbed XShapeEnc , that encodes an arbitrary spatially grounded 2D geometric shape into a compact representation exhibiting five favorable properties, including invertibility, adaptivity, generality and controllability. Specifically, a 2D spatially grounded geometric shape is decomposed into its normalized geometry within the unit disk and its pose vector, where the pose is further transformed into a harmonic pose field that also lies within the unit disk. A set of orthogonal Zernike basis is constructed to encode shape geometry and pose either independently or jointly, with controllable relative emphasis on shape geometry or shape pose. We demonstrate the theoretical validity, efficiency, discriminability, and wide applicability of XShapeEnc via extensive analysis and experiments across a wide range of shape-aware tasks and our self-curated XShapeCorpus dataset. We envision XShapeEnc as a foundational tool for research beyond one-dimensional sequential data and data-driven, learning-based encoding paradigms, paving the way for a unified spatial encoding framework for frontier 2D spatial intelligence.",
+     "authors": [
+      "Yuhang He"
+     ],
+     "keywords": [
+      "shape encoding",
+      "training-free",
+      "invertibility",
+      "neural network friendly",
+      "frequency richness"
+     ],
+     "status": "accepted",
+     "decision": "Accept (poster)",
+     "notes": []
+    },
+    {
+     "id": "arer1bhGjQ",
+     "number": 151412,
+     "title": "Building Transformation Layers for Riemannian Neural Networks",
+     "abstract": "Recently, deep neural networks on manifold-valued representations have garnered significant attention across various machine learning applications. One recent focus is the generalization of Euclidean fully connected (FC) and convolutional layers to non-Euclidean geometries. However, previous approaches typically focus on a few selected manifolds and rely on specific properties of the target manifold. In contrast, this work proposes a framework for constructing FC and convolutional layers over computationally tractable Riemannian spaces. This framework incorporates several previous FC layers across different geometries as special cases and is instantiated on ten representative manifolds, including three hyperbolic models, five geometries of the symmetric positive definite (SPD) manifold, and two Grassmannian perspectives. Experiments on different manifolds demonstrate the effectiveness and applicability of our approach.",
+     "authors": [
+      "Ziheng Chen"
+     ],
+     "keywords": [
+      "Hyperbolic",
+      "SPD",
+      "Symmetric Positive Definite",
+      "Grassmannian",
+      "Riemannian Manifolds",
+      "Riemannian Networks"
+     ],
+     "status": "accepted",
+     "decision": "Accept (poster)",
+     "notes": []
+    },
+    {
+     "id": "ciNWXOXC8v",
+     "number": 151141,
+     "title": "Neural Operator-based Curriculum Learning for Physics-Informed Neural Networks",
+     "abstract": "In this paper, we tackle the critical failure modes of Physics-Informed Neural Networks (PINNs), such as spectral bias, which lead to poor convergence on complex PDEs. We identify two key shortcomings in existing curriculum learning methods for PINNs: unreliable knowledge transfer between stages and a reliance on manual, ad-hoc curriculum design. To overcome these limitations, we present Neural Operator-based Curriculum Learning (NOCL), a unified framework that leverages Neural Tangent Kernel (NTK) theory to automate curriculum generation and employs neural operators to enable robust, dynamic knowledge transfer across curriculum stages. By dynamically training neural operators and filtering data for PINN initialization, our approach ensures scalable and effective learning across progressively difficult tasks. Experiments verify that NOCL leads to marked gains in convergence and generalization relative to prior methods, resulting in substantially better performance on test suite.",
+     "authors": [
+      "Lingshi MENG",
+      "Haosen Shi",
+      "Sinno Pan"
+     ],
+     "keywords": [
+      "Curriculum Learning",
+      "PINNs",
+      "Nerual Operator",
+      "PDEs"
+     ],
+     "status": "accepted",
+     "decision": "Accept (poster)",
+     "notes": []
+    },
+    {
+     "id": "zsQOS0D6s7",
+     "number": 138871,
+     "title": "SurvCancel: A Longitudinal Dataset and Benchmark for Dynamic Order Cancellation Prediction in On-Demand Ride-Sharing Systems",
+     "abstract": "Passenger-order cancellation is a critical source of uncertainty in on-demand ride-sharing systems, where requests, assignments, and vehicle routes evolve continuously in real time. Due to shared capacity and coupled routes, a single cancellation may propagate through downstream matching and routing decisions, degrading system efficiency and service reliability. However, cancellation prediction in on-demand ride-sharing remains difficult to study systematically due to the lack of large-scale longitudinal datasets, standardized evaluation protocols, and fine-grained real-time benchmarks. In this work, we introduce SurvCancel, a real-world longitudinal dataset and benchmark for dynamic passenger-order cancellation prediction in on-demand ride-sharing systems. Constructed from operational logs collected across four service regions in the real world, SurvCancel contains 173K released orders and 7.9M time-dependent snapshots. Each order is represented as a longitudinal sequence of system states, capturing both order-level attributes and the evolving supply-demand environment throughout its lifecycle. We formulate cancellation prediction as a stage-conditioned dynamic survival task: at each landmark time, models estimate short-term cancellation risk from the historical state sequence observed so far. We evaluate representative survival and dynamic-risk models under both in-distribution and distribution-shift protocols. Our results show stage-dependent model behavior in the in-distribution setting and reveal distinct robustness patterns under regional and temporal distribution shifts.",
+     "authors": [
+      "Huayang Liu",
+      "Mingyu Zheng",
+      "Wei Zhang",
+      "Yijun Bian",
+      "Kai Wang"
+     ],
+     "keywords": [],
+     "status": "accepted",
+     "decision": "Accept (poster)",
+     "notes": []
+    },
+    {
+     "id": "zrKbSaWEfZ",
+     "number": 138872,
+     "title": "Benchmarking Graph Self-Supervised Learning for Node-Level Tasks: Insights and Strong Baseline",
+     "abstract": "Self-supervised learning (SSL) has received notable attention in the graph machine learning community, enabling the efficient use of unlabeled data. However, evaluation setups vary significantly across studies, and baseline tuning often receives limited attention, making it difficult to draw reliable conclusions about model performance. In this paper, we reevaluate four representative graph SSL methods within a unified setup across a diverse set of datasets. We focus on rigorously tuning both SSL and supervised methods by employing enhanced GNN architectures and comprehensive hyperparameter optimization. We observe that, contrary to prior literature, two popular generative methods, MaskGAE and GraphMAE, regularly fail to outperform well-tuned supervised baselines. In contrast, the contrastive methods BGRL and GRACE consistently perform better than both the generative methods and supervised baselines. We hypothesize that this discrepancy arises because BGRL and GRACE capture information from both graph structure and node features, whereas MaskGAE and GraphMAE focus on a single source of information. We support this hypothesis through an analysis on carefully designed synthetic data. Motivated by our observations, we advocate for designing SSL objectives that capture both feature and structural information. To verify the effectiveness of this approach, we propose a simple generative method, GrASP, which reconstructs both graph structure and node features. Despite its simplicity, GrASP outperforms all other evaluated approaches and can be considered as a strong baseline in future studies.",
+     "authors": [
+      "Dmitry Eremeev",
+      "Gleb Bazhenov",
+      "Oleg Platonov",
+      "Artem Babenko",
+      "Liudmila Prokhorenkova"
+     ],
+     "keywords": [],
+     "status": "accepted",
+     "decision": "Accept (poster)",
+     "notes": []
+    },
+    {
+     "id": "zo1sae7b5n",
+     "number": 138873,
+     "title": "SciHazard: A Benchmark for Measuring Scientific Safety Risks with Decomposed Harm Scoring",
+     "abstract": "Large language models (LLMs) increasingly support science, but they can also convert hazardous scientific knowledge into actionable misuse guidance. Existing benchmarks often rely on templated queries disconnected from real-world hazards, and employ LLM-as-a-Judge paradigms without domain grounding. To address this, we introduce SciHazard, a real-world-grounded benchmark for scientific risks and a dataset agnostic evaluation framework for measuring harmfulness. SciHazard contains 2400 hazardous questions and 600 oversafety questions across 12 disciplines, with both queries grounded in regulated entities and documented failure scenarios. To compute DeHarm-Score , we develop a decomposed evaluating procedure that combines query hazard severity, refusal behavior, and response-level risk. For non-refused responses, it further decomposes response-level harm into Executability, quantified via dynamic checklists with importance weighting, and Net-new risk, assessed through retrieval-augmented claim extraction and synthesis-barrier verification. An expert-validation study shows that DeHarm-Score improves agreement with expert annotations by 90.17% over the strongest baseline. We benchmark 31 frontier LLMs and deep research agents in an extensive scientific safety evaluation. Notably, Deep research agents yield 32.3% higher mean Deharm-Score than standard LLMs, exposing autonomous agents as a critical blind spot in current safety defenses. Code and dataset are available at https://anonymous.4open.science/r/DeharmScore-7B55.",
+     "authors": [
+      "Chunxiao Li",
+      "Yuan Xiong",
+      "Lijun Li",
+      "Tianyi Du",
+      "Wenlong Zhang",
+      "LEI BAI",
+      "Jing Shao"
+     ],
+     "keywords": [],
+     "status": "accepted",
+     "decision": "Accept (poster)",
+     "notes": []
+    },
+    {
+     "id": "zbG2HOGCGH",
+     "number": 138874,
+     "title": "ColdDDI: Evaluating Knowledge Utilization in Cold-Start Drug-Drug Interaction Prediction",
+     "abstract": "Cold-start drug-drug interaction (DDI) prediction tests whether models can identify clinically significant interactions for drugs without training-time interaction history. Existing benchmarks mostly report aggregate edge-prediction scores, leaving a key evaluation question unanswered: when models receive molecular, textual, or knowledge-graph (KG) evidence, do they actually use the evidence that pharmacologically supports the interaction? We introduce ColdDDI, a reconstructible evaluation benchmark built from the latest DrugBank 5.1.13, with 1,900 approved small-molecule drugs and 565,731 positive DDI pairs. ColdDDI evaluates three levels of drug novelty, namely test pairs whose two drugs were both seen during training, pairs with one unseen drug, and pairs with two unseen drugs. It also annotates each interaction by whether it changes drug exposure or drug effect, and by whether the biomedical knowledge graph contains shared enzymes, transporters, or targets that can plausibly mediate the interaction. These annotations allow ColdDDI to separate two factors that aggregate metrics conflate, namely whether mechanistic evidence is available, and whether a model prediction depends on that evidence. We evaluate eight conventional DDI methods and 13 LLMs; for open-weight LLMs, we test five prompt patterns and use masking, drug replacement, and channel-sensitivity metrics to probe knowledge utilization. ColdDDI exposes that, in the hardest split where both drugs are unseen, the main performance divide is mediator availability. A fine-tuned 1B LLM recovers 89-93% of interactions with a shared enzyme, transporter, or target, but only 40-62% without such a mediator. More importantly, KG-provided evidence is not always used; several KG-augmented baselines change little when the shared mediator is masked or disrupted, whereas fine-tuned LLMs respond strongly to this intervention. Thus, ColdDDI evaluates knowledge utilization rather than knowledge access alone, showing where cold-start DDI models rely on mechanistic evidence and where they fail despite receiving it. We release derivative annotations, splits, prompts, diagnostics, evaluation code, and a DrugBank reconstruction pipeline.",
+     "authors": [
+      "Jiheng Liang",
+      "Chen Zhao",
+      "Di Wu",
+      "Chenyang Bu",
+      "Yunpeng Hong",
+      "Xingquan Zhu",
+      "Yi He"
+     ],
+     "keywords": [],
+     "status": "accepted",
+     "decision": "Accept (poster)",
+     "notes": []
+    },
+    {
+     "id": "zYzgw5b6rP",
+     "number": 138875,
+     "title": "Auditing Conformal Prediction for Language Models Under Inference-Time Model Shift",
+     "abstract": "Conformal prediction (CP) for language models is typically evaluated under a \\emph{matched} protocol, in which calibration and deployment use the same post-training inference configuration, such as quantization mode and inference temperature. In deployment, these choices often differ from those used at calibration to meet memory or throughput constraints or serving policies. We argue that this exposes a limitation in current CP evaluation protocols for language models. We formalize the underlying phenomenon as \\emph{inference-time model shift}: a change in the conformal score distribution induced by inference configuration rather than by the input--label distribution, and theoretically characterize how it breaks split-conformal exchangeability even when the task distribution and trained model are unchanged. We then evaluate its consequences across $8$ language models, $4$ finite-label benchmarks, and $12$ inference configurations. We find that matched evaluation can substantially overstate deployment-time coverage, and that the effect is heterogeneous across models and datasets. We argue that inference configuration should be reported as a first-class experimental axis in CP evaluations for language-model systems.",
+     "authors": [
+      "Achref Doula",
+      "Max Mühlhäuser"
+     ],
+     "keywords": [],
+     "status": "accepted",
+     "decision": "Accept (poster)",
+     "notes": []
+    },
+    {
+     "id": "zRZaS5IdaH",
+     "number": 138876,
+     "title": "ScrapeGraphAI-100k: Dataset for Schema-Constrained LLM Generation",
+     "abstract": "Producing output that conforms to a specified JSON schema underlies tool use, structured extraction, and knowledge base construction in modern large language models. Despite this centrality, public datasets for the task remain small, synthetic, or text-only, and rarely pair real page content with the prompts and schemas used in practice. We introduce ScrapeGraphAI-100k, 93{,}695 schema-constrained extraction events collected via opt-in ScrapeGraphAI telemetry in Q2--Q3 2025, deduplicated and balanced by schema from 9M raw events. The corpus spans 18{,}000+ unique schemas across 15 named languages plus a long-tail Other category, with English and Traditional Chinese covering 88\\% of detected content, each instance pairs Markdown-converted page content with a prompt, schema, LLM response, and per-example jsonschema-rs structural conformance labels (semantic correctness is out of scope, and raw HTML is deferred beyond v1.0). We characterize structural diversity across the corpus and identify sharp failure thresholds as schema complexity grows. As a case study, a 1.7B student fine-tuned on this data closely tracks the output distribution of its GPT-5-nano teacher, though it still trails a 30B-A3B reference (3.3B active parameters) on schema compliance. We offer this distillation result as preliminary evidence that grounding schema-constrained generation in real practitioner workloads at scale enables training and benchmarking that prior synthetic or text-only corpora could not support.",
+     "authors": [
+      "William Brach",
+      "Francesco Zuppichini",
+      "Lorenzo Padoan",
+      "Marco Vinciguerra"
+     ],
+     "keywords": [],
+     "status": "accepted",
+     "decision": "Accept (poster)",
+     "notes": []
+    },
+    {
+     "id": "zLkvbhLO4d",
+     "number": 138877,
+     "title": "RAVEN-Bench: A Paired EO-IR Video QA Benchmark for Aerial Multimodal Understanding",
+     "abstract": "Multimodal large language models (MLLMs) have advanced rapidly on image and video understanding, but their ability to reason over paired aerial electro-optical and infrared (EO-IR) videos remains underexplored. Such videos contain small targets, sparse temporal evidence, changing viewpoints, and modality-dependent cues that are poorly captured by RGB-centric benchmarks. We introduce RAVEN-Bench (Reasoning over Aerial Videos with EO-IR aligNment), a paired EO-IR video QA benchmark for low-altitude aerial multimodal understanding. RAVEN-Bench contains 48 temporally aligned EO-IR video pairs and 576 human-verified four-way multiple-choice questions. It supports EO-only, IR-only, and paired EO+IR evaluation, and uses hierarchical capability levels and structured question groups to diagnose cross-modal gain, modality reliance, consistency, and reasoning coherence. We evaluate representative frontier and open-weight MLLMs, showing that aggregate performance can overestimate reliable EO-IR reasoning. RAVEN-Bench provides a focused testbed for assessing whether progress on RGB video benchmarks transfers to aerial cross-spectral understanding.",
+     "authors": [
+      "Yu Hu",
+      "Jianyang Gu",
+      "Yue Cao",
+      "Hao Liu",
+      "Kangnan Wang",
+      "Jozsef Hamari",
+      "Zheng Liu",
+      "Mohsen Zardadi"
+     ],
+     "keywords": [],
+     "status": "accepted",
+     "decision": "Accept (poster)",
+     "notes": []
+    },
+    {
+     "id": "zGCbUayJh6",
+     "number": 138878,
+     "title": "Re:Cognize - A Framework for Open-Set Sequential Character Re-Identification",
+     "abstract": "Character re-identification (Re-ID) is the foundation of every downstream task on long-form visual narratives such as manga and comics: without consistent character identity across pages, archives spanning hundreds of millions of pages stay opaque to search and reasoning. Existing benchmarks, however, evaluate Re-ID under a closed-set assumption, retrieval against a fixed gallery of known identities. That assumption collapses on a fresh volume, where new characters appear over time, the gallery is built online, and predictions must stay consistent across long temporal gaps. We introduce $\\textbf{Re:Cognize}$, a framework that exposes this regime through four evaluation protocols spanning closed-set retrieval, few-shot retrieval with a fixed gallery, unsupervised online clustering, and pre-seeded online gallery growth, instantiated on large comic datasets (PopCharacters, Manga109, Re:Verse) across five Re-ID backbones from person, manga-native, and multimodal pre-training. The decomposition surfaces a striking property of the regime: across every backbone, a single seed image per identity recovers nearly the entire closed-set retrieval ceiling, while online accumulation overshoots that ceiling within a handful of seeds. Identity $\\textit{maintenance}$, not gallery construction, is the practical deployment bottleneck, and identity $\\textit{emergence}$ is the harder, separable sub-problem that closed-set evaluation has never made visible. To complete the suite, we further introduce $\\textbf{MeCha}$, a memory-augmented baseline that confirms the protocols are sensitive enough to discriminate sequential-context-aware models from purely embedding-based ones.",
+     "authors": [
+      "Aaditya Baranwal",
+      "Madhav Kataria",
+      "Yogesh Rawat",
+      "Shruti Vyas"
+     ],
+     "keywords": [],
+     "status": "accepted",
+     "decision": "Accept (poster)",
+     "notes": []
+    },
+    {
+     "id": "zFv5xwDcsy",
+     "number": 138879,
+     "title": "AI GAMESTORE: Scalable, Open-Ended Evaluation of Machine General Intelligence with Human Games",
+     "abstract": "Rigorously evaluating machine intelligence against the broad spectrum of human general intelligence has become increasingly important and challenging in this era of rapid technological advance. Conventional AI benchmarks typically assess only narrow capabilities in a limited range of human activity. Most are also static, quickly saturating as developers explicitly or implicitly optimize for them. We propose that a more promising way to evaluate human-like general intelligence in AI systems is through a particularly strong form of general game playing: studying how and how well they play and learn to play all conceivable human games, in comparison to human players with the same level of experience, time, or other resources. We define a “human game” to be a game designed by humans for humans, and argue for the evaluative suitability of this space of all such games people can imagine and enjoy — the “Multiverse of Human Games”. Taking a first step towards this vision, we introduce the AI GAMESTORE, a scalable and open-ended platform that uses LLMs with humans-in-the-loop to synthesize new representative human games, by automatically sourcing and adapting standardized and containerized variants of game environments from popular human digital gaming platforms. As a proof of concept, we generated 100 such games based on the top charts of Apple App Store and Steam, and evaluated seven frontier vision-language models (VLMs) on short episodes of play. The best models achieved less than 10% of the human average score on the majority of the games, and especially struggled with games that challenge world-model learning, memory and planning. We conclude with a set of next steps for building out the AI GAMESTORE as a practical way to measure and drive progress toward human-like general intelligence in machines.",
+     "authors": [
+      "Lance Ying",
+      "Ryan Truong",
+      "Prafull Sharma",
+      "Kaiya Zhao",
+      "Nathan Cloos",
+      "Kelsey Allen",
+      "Tom Griffiths",
+      "Katie Collins",
+      "Jose Hernandez-Orallo",
+      "Phillip Isola",
+      "Samuel J Gershman",
+      "Josh Tenenbaum"
+     ],
+     "keywords": [],
+     "status": "accepted",
+     "decision": "Accept (poster)",
+     "notes": []
+    },
+    {
+     "id": "zC5eVCyCbo",
+     "number": 138880,
+     "title": "VFIG: Vectorizing Complex Figures in SVG with Vision-Language Models",
+     "abstract": "Scalable Vector Graphics (SVG) are essential for technical illustration and digital design, offering resolution independence and semantic editability. In practice, original vector files are frequently lost, leaving only rasterized versions (e.g., PNG, JPEG) that resist modification, while manual reconstruction is prohibitively expensive. Progress on automating raster-to-SVG conversion has been bottlenecked by two gaps: existing SVG datasets are dominated by icons and decorative graphics that lack the complexity of professional diagrams, and existing benchmarks rely on pixel- or embedding-level similarity that fails to capture structural correctness (e.g., broken connectivity, misplaced arrows). We close both gaps with paired contributions targeting diagram-centric figures (e.g., model architectures, flowcharts, schematics). For training, we introduce VFIG-Data, the largest figure-to-SVG dataset of its kind at 66K pairs, combining real paper figures converted via a describe-and-generate pipeline with programmatic diagrams that supply noise-free supervision over arrow styles, fonts, and geometry. For evaluation, we introduce VFIG-Bench, a structure-aware evaluation suite, paired with VFIG-Bench-OOD, an out-of-distribution set of figures manually curated from highly cited arXiv papers. Beyond pixel and embedding similarity, our protocol reports rubric-based VLM-Judge scores and Elo ratings from pairwise human preference evaluation. Built on these contributions, VFIG is a VLM family trained with a simple-to-complex SFT curriculum followed by RL with rendering-aware rewards. VFIG achieves state-of-the-art open-source performance, outperforming the best open-source VLM baseline by over 30\\%, and matches Claude Sonnet 4.6 on VFIG-BENCH: Gemini-Judge 78.2% vs. 76.7% and GPT-Judge 87.5% vs. 87.4%. It remains slightly behind the strongest proprietary models GPT-5.2 and Gemini-3.",
+     "authors": [
+      "Qijia He",
+      "Xunmei Liu",
+      "Hammaad Memon",
+      "Ziang Li",
+      "Zixian Ma",
+      "Jaemin Cho",
+      "Jason Ren",
+      "Daniel Weld",
+      "Ranjay Krishna"
+     ],
+     "keywords": [],
+     "status": "accepted",
+     "decision": "Accept (poster)",
      "notes": []
     }
    ]

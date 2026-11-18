@@ -18,8 +18,10 @@ server's log.
 
 `npm run db:seed` is also the reset: rerun it any time. It only touches a database on localhost. The data:
 
-- `scripts/seed/fixture.json`: 40 real ICLR papers, 2026 (accepted, rejected, withdrawn, with reviews) and 2027
-  (under review). Add a venue's sample from an OpenReview scrape with `npm run db:seed:export` (`-h` for usage).
+- `scripts/seed/fixture.json`: 45 real ICLR papers, 2026 (accepted, rejected, withdrawn, with reviews) and 2027
+  (under review), and 15 accepted NeurIPS 2026 papers from acceptodds, 5 of them rejected or withdrawn at ICLR
+  2026 first; the seed merges each such pair into one paper. Add a venue's sample from an OpenReview scrape with
+  `npm run db:seed:export`, or an acceptodds kind with `npm run db:seed:export-acceptodds` (`-h` for usage).
 - `scripts/seed/seed.ts`: people, topics and comments. Edit the lists at the top to add more.
 
 The seed runs the background consumers itself, so search, venue pages and score stats are ready. To keep them
