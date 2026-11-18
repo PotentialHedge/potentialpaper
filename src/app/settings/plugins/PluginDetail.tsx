@@ -293,7 +293,7 @@ export function Asks({
     <ul className="mt-1 list-disc pl-5">
       {permissions.map((perm) => (
         <li key={perm}>
-          {PERMISSIONS[perm] ?? perm} <code className="text-xs text-faint">{perm}</code>
+          {PERMISSIONS[perm] ?? perm}
           {pending?.has(perm) && <span className="text-muted"> · not approved yet</span>}
         </li>
       ))}
