@@ -22,6 +22,8 @@ export interface FixturePaper {
   status: SubmissionStatus | null;
   decision: string | null;
   notes: (FixtureNote | NoteInput)[];
+  /** Added to fill out the venue's score distribution, with its reviewers' scores only (`add-acceptodds-reviews`). */
+  sample?: boolean;
 }
 
 export interface FixtureVenue {
