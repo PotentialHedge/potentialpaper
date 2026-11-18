@@ -10,6 +10,7 @@ import { shownHandle } from '@/lib/profile';
 import type { PaperId } from '@/lib/paper-ids';
 import { authHref } from '@/lib/return-to';
 import type * as S from '@/server/api/schemas';
+import { Fold } from '@/components/paper/Fold';
 
 type CommentList = z.output<typeof S.CommentList>;
 type Comment = z.output<typeof S.Comment>;
@@ -132,8 +133,7 @@ export function Comments({ paper, path }: { paper: PaperId; path: string }) {
   };
 
   return (
-    <section id="discussion">
-      <h2 className={ui.groupHeading}>Discussion{first ? ` (${first.total})` : ''}</h2>
+    <Fold id="discussion" title={`Discussion${first ? ` (${first.total})` : ''}`}>
       {!first ? (
         <p className={ui.fine}>{failed ? 'The discussion could not be loaded.' : 'Loading the discussion…'}</p>
       ) : viewer?.canComment ? (
@@ -176,7 +176,7 @@ export function Comments({ paper, path }: { paper: PaperId; path: string }) {
           Load more comments
         </button>
       )}
-    </section>
+    </Fold>
   );
 }
 

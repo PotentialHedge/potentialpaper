@@ -63,7 +63,8 @@ export function LinkedDetails({ anchor, summary, children }: { anchor: string; s
   const [open, setOpen] = useState(false);
   useHash((id) => id === anchor && setOpen(true), [anchor]);
   return (
-    <details open={open} onToggle={(e) => setOpen(e.currentTarget.open)} className="mt-2">
+    // The browser opens it before hydration when the address bar links inside it; the effect agrees with it after.
+    <details open={open} onToggle={(e) => setOpen(e.currentTarget.open)} className="mt-2" suppressHydrationWarning>
       <summary className="cursor-pointer font-sans text-[13px] text-accent">{summary}</summary>
       {children}
     </details>
@@ -108,7 +109,8 @@ export function LinkedComments({ anchors, items }: { anchors: string[]; items: R
   // One more is shown rather than hidden behind a button of its own.
   const hidden = items.length > SHOWN + 1 ? items.length - SHOWN : 0;
   return (
-    <details open={open} onToggle={(e) => setOpen(e.currentTarget.open)} className="mt-2">
+    // The browser opens it before hydration when the address bar links inside it; the effect agrees with it after.
+    <details open={open} onToggle={(e) => setOpen(e.currentTarget.open)} className="mt-2" suppressHydrationWarning>
       <summary className="cursor-pointer font-sans text-[13px] text-accent">
         {items.length === 1 ? '1 comment' : `${items.length} comments`}
       </summary>

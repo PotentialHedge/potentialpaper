@@ -17,6 +17,7 @@ import {
   type SubmissionNote,
 } from '@/lib/submissions';
 import { renderComment } from '@/server/comments/render';
+import { Fold } from '@/components/paper/Fold';
 
 /**
  * A paper's submissions and what each venue published about it: the forum's notes, each review with its scores,
@@ -269,14 +270,13 @@ function SubmissionView({ submission }: { submission: Submission }) {
 
 export function SubmissionsSection({ submissions }: { submissions: Submission[] }) {
   return (
-    <section id="submissions">
-      <h2 className={ui.groupHeading}>Submissions</h2>
+    <Fold id="submissions" title="Submissions">
       {submissions.length === 0 ? (
         <p className={ui.empty}>We don&apos;t know of a submission of this paper to a venue with open reviews.</p>
       ) : (
         submissions.map((submission) => <SubmissionView key={submission.venue.id} submission={submission} />)
       )}
-    </section>
+    </Fold>
   );
 }
 
