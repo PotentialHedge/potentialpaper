@@ -57,7 +57,9 @@ export function RankedOptions({
             trailing={
               toggles
                 ? (o) =>
-                    o.locked ? null : (
+                    o.locked ? (
+                      <span className="w-8 shrink-0" aria-hidden />
+                    ) : (
                       <Switch
                         checked={!isHidden(o.value)}
                         onCheckedChange={(on) => setShown(o.value, on)}
