@@ -38,7 +38,7 @@ const manifest = (publisher: string, extra: Record<string, unknown>[] = []) => (
 });
 
 async function store(publisher: string, commit = COMMIT, extra: Record<string, unknown>[] = []) {
-  await storePluginFiles({ kind: 'github', owner: OWNER, repo: REPO, path: null, ref: null }, commit, [
+  await storePluginFiles({ kind: 'github', owner: OWNER, repo: REPO, path: '', ref: null }, commit, [
     { path: 'potentialpaper-plugin.json', bytes: Buffer.from(JSON.stringify(manifest(publisher, extra))) },
     { path: 'index.html', bytes: Buffer.from('<!doctype html><title>set</title>') },
   ]);

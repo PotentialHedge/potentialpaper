@@ -74,12 +74,31 @@ export const getColumns = route(async (req, params) => {
   const query = parseQuery(req, ColumnsQuery);
   const set = await mustFindSet(setId);
   const scope = query.scope ? await mustFindScope(query.scope) : null;
-  const etag = etagOf(signalEtagOf(set, query.signals, scope?.id ?? null, query.titles));
-  const headers = { 'Cache-Control': 'public, max-age=300, stale-while-revalidate=3600', ETag: etag };
+  // Values are matched to papers when read, so new papers change the answer too: the tag also turns every ten minutes.
+  const window = Math.floor(Date.now() / COLUMNS_TTL_MS);
+  const etag = etagOf(signalEtagOf(set, query.signals, scope?.id ?? null, query.titles, window));
+  const headers = {
+    'Cache-Control': 'public, max-age=300, stale-while-revalidate=3600',
+    'Content-Type': 'application/json',
+    ETag: etag,
+  };
   if (notModified(req, etag)) return new Response(null, { status: 304, headers });
-  const columns = await signalColumns(setId, query.signals, { scopeId: scope?.id, titles: query.titles });
-  return json(columns, { headers });
+  let body = columnsCache.get(etag);
+  if (!body) {
+    body = signalColumns(setId, query.signals, { scopeId: scope?.id, titles: query.titles }).then((c) =>
+      JSON.stringify(c),
+    );
+    columnsCache.set(etag, body);
+    body.catch(() => columnsCache.delete(etag));
+    // Keep the newest few: a map reads one or two shapes of one set.
+    while (columnsCache.size > 16) columnsCache.delete(columnsCache.keys().next().value!);
+  }
+  return new Response(await body, { headers });
 });
+
+const COLUMNS_TTL_MS = 10 * 60_000;
+/** Column reads, by ETag, so every reader of a map doesn't make the same ~20,000-row query. */
+const columnsCache = new Map<string, Promise<string>>();
 
 const NearestQuery = z.object({
   signal: z.string().min(1).max(200),
