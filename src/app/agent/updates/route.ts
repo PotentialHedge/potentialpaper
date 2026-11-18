@@ -9,6 +9,10 @@ export const dynamic = 'force-dynamic';
  */
 const UPDATES: { date: string; text: string }[] = [
   {
+    date: '2026-11-18',
+    text: 'Settings are easier to change for a person: `PATCH /api/v1/me/settings` with `{ "<key>": <value> | null }` changes only those keys (`null` puts one back to its default) and keeps the rest of their settings.json, comments included. `/schemas/settings.json`, fetched with their token, lists every key they have, their plugins\' too. New keys: `navbar.order` and `navbar.hidden` arrange the links in the site\'s navbar (`papers`, `changes`, `settings`, and plugin pages as `<plugin id>.<page id>`; `settings` can\'t be hidden). A plugin page offers a navbar link with `"nav"` in its manifest (see `/plugins.md`).',
+  },
+  {
     date: '2026-11-17',
     text: "Score statistics name more: every venue in `GET /api/v1/pages/<identifier>/scores` and `…/scores/<venue>/<field>` carries `venue.page`, the venue's own page (or `null`), whose numbers are the whole venue's where a topic's or an organisation's are only its papers'. `…/scores/<venue>/<field>?marks=true` adds `marks`: the scope's own submissions there with each paper's identifier, title, mean and outcome (`null` above 1,000). Score standing v0.2.0 uses both to draw an organisation's papers on each of its venues' distributions.",
   },

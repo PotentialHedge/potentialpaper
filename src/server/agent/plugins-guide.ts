@@ -253,9 +253,12 @@ Every field of the manifest:
   Submissions section, with \`pp.context.surface.submission.venue\` saying which; or one per kind,
   \`{ "paper": "submission", "*": "main" }\`), and \`when\`.
 - \`contributes.pages\` (up to 8): whole pages of its own at \`${origin}/x/<owner>/<name>/<page id>/…\`, each
-  \`{ "id", "title", "layout" }\`. \`layout\` \`"article"\` (the default) puts the frame under a heading in the site's
+  \`{ "id", "title", "layout", "nav" }\`. \`layout\` \`"article"\` (the default) puts the frame under a heading in the site's
   column, as tall as it asks; \`"full"\` gives it the whole window under the site's bar, with no heading, for a map
-  or a canvas: the frame is the window's size, so size to it (\`100vh\`) and leave \`ui.setHeight\` out.
+  or a canvas: the frame is the window's size, so size to it (\`100vh\`) and leave \`ui.setHeight\` out. \`nav\`
+  offers a link to the page in the site's navbar: \`true\` names it by its title, a string is the link's own text
+  (\`"map"\`). Readers move or hide it in settings, as \`<owner>/<name>.<page id>\` in \`navbar.order\` and
+  \`navbar.hidden\`.
 - \`contributes.settings\`: each by its name (letters, digits, \`-\`, \`_\`; no dots), \`{ "type", "default" }\` plus
   any of \`title\` (its label; the name spaced out when absent: \`showLegend\` is "Show legend"), \`description\`,
   \`group\` (a heading on your settings page) and \`order\` (lower first, then as listed). Each type is drawn with its

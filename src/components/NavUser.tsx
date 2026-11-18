@@ -3,8 +3,11 @@
 import Link from 'next/link';
 import { usePathname, useSearchParams } from 'next/navigation';
 import { Suspense, useEffect, useState } from 'react';
+import { NAV_ITEMS, pluginNavItems } from '@/lib/nav';
+import { arrangePanels } from '@/lib/panels';
+import { usePlugins } from '@/lib/plugins/client';
 import { authHref, VERIFY_EMAIL } from '@/lib/return-to';
-import { noteSignedIn } from '@/lib/settings/client';
+import { noteSignedIn, useSetting } from '@/lib/settings/client';
 import { ConfirmBanner } from './ConfirmBanner';
 import { SettingsImport } from './SettingsImport';
 
@@ -18,6 +21,28 @@ function SignIn() {
   const pathname = usePathname();
   const qs = useSearchParams().toString();
   return <Link href={authHref('/signin', qs ? `${pathname}?${qs}` : pathname)}>sign in</Link>;
+}
+
+/**
+ * The navbar's links (`lib/nav.ts`): the site's and installed plugins', as the reader's `navbar.order` and
+ * `navbar.hidden` arrange them. Plugins are known only once fetched, so their links join after load.
+ */
+function NavLinks({ signedIn }: { signedIn: boolean }) {
+  const order = useSetting<string[] | undefined>('navbar.order') ?? [];
+  const hidden = useSetting<string[] | undefined>('navbar.hidden') ?? [];
+  const { plugins } = usePlugins(null);
+  const items = [...NAV_ITEMS.filter((i) => signedIn || !i.signedIn), ...pluginNavItems(plugins)];
+  const byId = new Map(items.map((i) => [i.id, i]));
+  const shown = arrangePanels(
+    items.map((i) => i.id),
+    hidden.filter((id) => !byId.get(id)?.locked),
+    order,
+  );
+  return shown.map((id) => (
+    <Link key={id} href={byId.get(id)!.href}>
+      {byId.get(id)!.title}
+    </Link>
+  ));
 }
 
 /**
@@ -53,9 +78,7 @@ export function NavUser() {
         {viewer ? (
           viewer.profileComplete ? (
             <>
-              <Link href="/papers">my papers</Link>
-              <Link href="/changes">changes</Link>
-              <Link href="/settings">settings</Link>
+              <NavLinks signedIn />
               <Link href="/profile">@{viewer.handle}</Link>
             </>
           ) : (
@@ -63,8 +86,7 @@ export function NavUser() {
           )
         ) : viewer === null ? (
           <>
-            <Link href="/changes">changes</Link>
-            <Link href="/settings">settings</Link>
+            <NavLinks signedIn={false} />
             <Suspense fallback={<Link href="/signin">sign in</Link>}>
               <SignIn />
             </Suspense>

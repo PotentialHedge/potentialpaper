@@ -65,6 +65,31 @@ describe('settings.json', () => {
     expect(kept.body.values['paper.panels.hidden']).toEqual(['abstract']);
   });
 
+  it('changes some keys with PATCH, keeping the rest of the file, and null puts one back to its default', async () => {
+    const cookie = await signUp('reader@ethz.ch');
+    const text = '{\n  // Mine.\n  "paper.panels.hidden": ["abstract"]\n}\n';
+    await api('PUT', '/me/settings', { cookie, text });
+    const res = await api('PATCH', '/me/settings', {
+      cookie,
+      body: { 'navbar.order': ['changes', 'settings'], 'navbar.hidden': ['papers'] },
+    });
+    expect(res.status).toBe(200);
+    expect(res.body.text).toContain('// Mine.');
+    expect(res.body.values).toMatchObject({
+      'paper.panels.hidden': ['abstract'],
+      'navbar.order': ['changes', 'settings'],
+      'navbar.hidden': ['papers'],
+    });
+    const reset = await api('PATCH', '/me/settings', { cookie, body: { 'navbar.hidden': null } });
+    expect(reset.body.values['navbar.hidden']).toEqual([]);
+    expect(reset.body.text).not.toContain('navbar.hidden');
+
+    const bad = await api('PATCH', '/me/settings', { cookie, body: { 'navbar.hidden': ['settings'] } });
+    expect(bad.status).toBe(422);
+    expect(bad.body.error.message).toMatch(/^navbar\.hidden: /m);
+    expect((await api('PATCH', '/me/settings', { cookie, body: [1] })).status).toBe(422);
+  });
+
   it('needs an account, and a token with the write scope to change it', async () => {
     expect((await api('GET', '/me/settings')).status).toBe(401);
     const cookie = await signUp('agent-owner@ethz.ch');

@@ -5,8 +5,11 @@ import {
   checkSettings,
   EMPTY_SETTINGS,
   formatProblem,
+  isEditable,
+  isSettingsObject,
   parseSettings,
   resolveSettings,
+  setInSettings,
   type PluginSettings,
   type ResolvedSettings,
   type SettingsProblem,
@@ -118,6 +121,24 @@ export async function saveUserSettings(account: Account, text: string): Promise<
   const after = shownFromSettings(resolveSettings({ user: parseSettings(text) }), account.showInstitution);
   if (USER_SHOW_SETTINGS.some((item) => before[item] !== after[item])) await syncProfileFile(account);
   return settingsFor(account);
+}
+
+/**
+ * Change some keys of the account's settings.json, keeping the rest of the file, its comments and order, as written:
+ * each key to its new value, or out of the file (back to the default) for `null`. For agents and scripts, which
+ * then needn't rewrite the whole file. Checked and saved as a whole file is.
+ */
+export async function patchUserSettings(account: Account, changes: unknown): Promise<SettingsView> {
+  if (!isSettingsObject(changes)) {
+    throw new ApiError(422, 'validation_error', 'the body is a JSON object of settings: { "<key>": <value> | null }');
+  }
+  let { text } = await userSettingsRow(account.id);
+  if (!isEditable(text)) {
+    throw new ApiError(422, 'validation_error', "the account's settings.json doesn't parse; replace it whole with PUT");
+  }
+  for (const [key, value] of Object.entries(changes))
+    text = setInSettings(text, key, value === null ? undefined : value);
+  return saveUserSettings(account, text);
 }
 
 /**

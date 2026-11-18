@@ -53,7 +53,14 @@ import { canonicalPaperId, paperPath, parsePaperId } from '@/lib/paper-ids';
 import { findPaper, lookupPaper } from '../papers';
 import { searchPapers } from '../search';
 import { siteUrl } from '../site';
-import { saveUserSettings, settingsFor, siteSettingsView, type SettingsView, venueStatsHideUntil } from '../settings';
+import {
+  patchUserSettings,
+  saveUserSettings,
+  settingsFor,
+  siteSettingsView,
+  type SettingsView,
+  venueStatsHideUntil,
+} from '../settings';
 import { MAX_SETTINGS_BYTES } from '@/lib/settings';
 import { grantPlugin, installedPlugins, installPlugin, revokePlugin, uninstallPlugin } from '../plugins/installed';
 import {
@@ -190,6 +197,25 @@ export const putMySettings = route(async (req) => {
   }
   const text = await req.text();
   return respond(S.MySettings, presentSettings(await saveUserSettings(principal.account, text)), { principal });
+});
+
+/**
+ * Change some settings, keeping the rest of the account's settings.json: a JSON object of keys, each to its new value,
+ * or `null` to take it out of the file (back to the default). A 422 lists every error, as for `PUT`.
+ */
+export const patchMySettings = route(async (req) => {
+  const principal = await requireAuth(req);
+  const length = Number(req.headers.get('content-length') ?? 0);
+  if (length > MAX_SETTINGS_BYTES * 2) {
+    throw new ApiError(413, 'validation_error', `settings.json may be at most ${MAX_SETTINGS_BYTES / 1024} KB`);
+  }
+  let body: unknown;
+  try {
+    body = JSON.parse(await req.text());
+  } catch {
+    throw new ApiError(400, 'validation_error', 'the body must be JSON: { "<key>": <value> | null }');
+  }
+  return respond(S.MySettings, presentSettings(await patchUserSettings(principal.account, body)), { principal });
 });
 
 /** The site layer of settings and the values it gives, for readers who aren't signed in. Public. */

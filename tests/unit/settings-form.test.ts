@@ -56,6 +56,18 @@ describe('the settings form', () => {
     expect(matchesSearch(panels, 'Paper pages', 'hidden')).toBe(true);
   });
 
+  it('arranges the navbar as it does panels, with settings always shown', () => {
+    const items = coreItems((list) => (list === 'navbar' ? [{ value: 'o/p.map', label: 'map (P)' }] : []));
+    const nav = items.find((i) => i.key === 'navbar.order')!;
+    expect(nav.category).toBe('navbar');
+    expect(itemKeys(nav)).toEqual(['navbar.order', 'navbar.hidden']);
+    expect(nav.control).toMatchObject({ kind: 'rank', toggleKey: 'navbar.hidden' });
+    const choices = (nav.control as { choices: { value: string; locked?: boolean }[] }).choices;
+    expect(choices.map((c) => c.value)).toEqual(['papers', 'changes', 'settings', 'o/p.map']);
+    expect(choices.find((c) => c.value === 'settings')?.locked).toBe(true);
+    expect(items.some((i) => i.key === 'navbar.hidden')).toBe(false);
+  });
+
   it("draws a plugin's settings with the standard controls, in their order", () => {
     const items = pluginItems('o/p', {
       b: { type: 'enum', default: 'x', values: ['x', 'y'], display: 'radio', order: 2 },

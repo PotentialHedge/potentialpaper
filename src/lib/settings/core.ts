@@ -1,6 +1,7 @@
 import { z } from 'zod';
 import { HIDE_UNTIL, type HideUntil } from '../scope-stats';
 import { KINDS } from '../kinds';
+import { HIDEABLE_NAV_IDS, NAV_IDS, NAV_ITEMS } from '../nav';
 import { PAGE_PANELS, PANEL_KINDS, panelIds, SLOT_TITLES, type PanelKind } from '../panels';
 import { PLUGIN_PANEL_ID_RE } from '../plugins/manifest';
 import { parsePluginSource, sourceKey } from '../plugins/sources';
@@ -34,7 +35,7 @@ export interface CoreSetting<T = unknown> {
    */
   widget?: 'toggles' | 'order' | 'switch';
   /** The choices of a list setting, with their labels, for the form. */
-  choices?: { value: string; label: string; group?: string }[];
+  choices?: { value: string; label: string; group?: string; locked?: boolean }[];
   /**
    * Read from the site layer only: what admins decide for everyone (`plugins.default`, `plugins.blocked`). A user's
    * file may name it, with a warning, and it changes nothing.
@@ -104,6 +105,52 @@ function kindSettings(kind: PanelKind): Record<string, CoreSetting> {
     ) as CoreSetting,
   };
 }
+
+/**
+ * A list of navbar link ids, unique: the site's own (`lib/nav.ts`) and plugins' (`<plugin id>.<page id>`). Read
+ * leniently, as a panel list.
+ */
+function navList(
+  ids: string[],
+  widget: 'toggles' | 'order',
+  title: string,
+  description: string,
+): CoreSetting<string[]> {
+  const known = (id: unknown): id is string =>
+    typeof id === 'string' && (ids.includes(id) || PLUGIN_PANEL_ID_RE.test(id));
+  return {
+    schema: z
+      .array(
+        z.union([
+          z.enum(ids as [string, ...string[]]),
+          z.string().regex(PLUGIN_PANEL_ID_RE, "a built-in link's id, or a plugin's as <plugin id>.<page id>"),
+        ]),
+      )
+      .refine((list) => new Set(list).size === list.length, 'must not name a link twice'),
+    default: [],
+    title,
+    description,
+    group: 'Navbar',
+    widget,
+    choices: NAV_ITEMS.map((i) => ({ value: i.id, label: i.title, ...(i.locked ? { locked: true } : {}) })),
+    sanitize: (raw) => (Array.isArray(raw) ? [...new Set(raw.filter(known))] : undefined),
+  };
+}
+
+const NAV_SETTINGS: Record<string, CoreSetting> = {
+  'navbar.order': navList(
+    NAV_IDS,
+    'order',
+    'Navbar order',
+    `Links to show first in the navbar, in this order (${NAV_IDS.join(', ')}, or a plugin's page as <plugin id>.<page id>); the rest follow in their usual order.`,
+  ) as CoreSetting,
+  'navbar.hidden': navList(
+    HIDEABLE_NAV_IDS,
+    'toggles',
+    'Hidden navbar links',
+    `Links to leave out of the navbar, by id (${HIDEABLE_NAV_IDS.join(', ')}, or a plugin's page as <plugin id>.<page id>). Settings always shows.`,
+  ) as CoreSetting,
+};
 
 /** An installed plugin, in settings.json's `plugins` key: whether it runs, and the tag, branch or commit to run. */
 export interface PluginEntry {
@@ -219,6 +266,7 @@ const USER_SETTINGS: Record<string, CoreSetting> = Object.fromEntries(
 );
 
 export const CORE_SETTINGS: Record<string, CoreSetting> = {
+  ...NAV_SETTINGS,
   ...Object.fromEntries(PANEL_KINDS.flatMap((kind) => Object.entries(kindSettings(kind)))),
   ...USER_SETTINGS,
   ...PLUGIN_SETTINGS,

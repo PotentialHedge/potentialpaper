@@ -5,4 +5,5 @@ export const dynamic = 'force-dynamic';
 
 export const GET = h.getMySettings;
 export const PUT = h.putMySettings;
-export const { POST, PATCH, DELETE } = methodNotAllowed('GET', 'PUT');
+export const PATCH = h.patchMySettings;
+export const { POST, DELETE } = methodNotAllowed('GET', 'PUT', 'PATCH');

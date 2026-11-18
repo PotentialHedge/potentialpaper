@@ -8,6 +8,8 @@ export interface GroupedOption {
   label: ReactNode;
   /** A heading the control sets it under. */
   group?: string;
+  /** In a list with a switch per option, one that can't be switched off. */
+  locked?: boolean;
 }
 
 /** Options by their `group`, in the order each group first appears. */

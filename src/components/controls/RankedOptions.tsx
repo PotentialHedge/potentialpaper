@@ -56,14 +56,15 @@ export function RankedOptions({
             )}
             trailing={
               toggles
-                ? (o) => (
-                    <Switch
-                      checked={!isHidden(o.value)}
-                      onCheckedChange={(on) => setShown(o.value, on)}
-                      aria-label={`Show ${text(o)}`}
-                      disabled={disabled}
-                    />
-                  )
+                ? (o) =>
+                    o.locked ? null : (
+                      <Switch
+                        checked={!isHidden(o.value)}
+                        onCheckedChange={(on) => setShown(o.value, on)}
+                        aria-label={`Show ${text(o)}`}
+                        disabled={disabled}
+                      />
+                    )
                 : undefined
             }
             numbered

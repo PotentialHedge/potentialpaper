@@ -3,6 +3,8 @@
 import Link from 'next/link';
 import { useMemo, useState } from 'react';
 import { ui } from '@/components/ui';
+import { pluginNavItems } from '@/lib/nav';
+import type { PanelKind } from '@/lib/panels';
 import { usePlugins } from '@/lib/plugins/client';
 import { type InstalledPlugin, pluginPanelChoices } from '@/lib/plugins/installed';
 import { isEditable, parseSettings, resolveSettings, sameValue, setInSettings } from '@/lib/settings';
@@ -62,7 +64,11 @@ export function useSettingItems() {
     ];
     const shown = new Set(pages.map((p) => p.id));
     const items = [
-      ...coreItems((kind) => pluginPanelChoices(plugins, kind)),
+      ...coreItems((list) =>
+        list === 'navbar'
+          ? pluginNavItems(plugins).map((i) => ({ value: i.id, label: `${i.title} (${i.plugin})` }))
+          : pluginPanelChoices(plugins, list.split('.')[0] as PanelKind),
+      ),
       ...withPages.flatMap((p) => pluginItems(p.plugin!.id, p.plugin!.manifest.contributes.settings)),
     ].filter((item) => shown.has(item.category));
     return { items, pages, signedIn, loaded: settings.loaded && pluginsLoaded, plugins };

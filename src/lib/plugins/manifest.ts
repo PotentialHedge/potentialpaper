@@ -158,6 +158,13 @@ const pageSchema = z.looseObject({
     description:
       '"article" (the default): under a heading, in the site\'s column, as tall as the frame asks. "full": the whole window under the site\'s bar, with no heading, for a map or a canvas; the frame is the window\'s size and ui.setHeight is ignored.',
   }),
+  nav: z
+    .union([z.boolean(), text(30, "The link's text.")])
+    .optional()
+    .meta({
+      description:
+        'Offer a link to it in the site\'s navbar: true, named by its title, or the link\'s own text ("map"). Readers arrange and hide it in settings (navbar.order, navbar.hidden).',
+    }),
 });
 
 const commandSchema = z.looseObject({
@@ -322,7 +329,7 @@ export interface PluginManifest {
   publisher?: string;
   contributes: {
     panels: PanelContribution[];
-    pages: { id: string; title: string; layout: 'article' | 'full' }[];
+    pages: { id: string; title: string; layout: 'article' | 'full'; nav?: boolean | string }[];
     settings: Record<string, PluginSettingSpec>;
     commands: { id: string; title: string }[];
     signals: SignalSpec[];

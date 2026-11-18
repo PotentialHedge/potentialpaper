@@ -14,6 +14,8 @@ export interface Choice {
   label: string;
   /** A heading the control sets it under (a panel's part of the page). */
   group?: string;
+  /** Can't be switched off (the navbar's link to settings). */
+  locked?: boolean;
 }
 
 /** How a setting is drawn. */
@@ -90,6 +92,12 @@ const KIND_DESCRIPTION: Record<PanelKind, string> = {
 
 /** The core categories, in the sidebar's order. */
 export const CATEGORIES: Category[] = [
+  {
+    id: 'navbar',
+    title: 'Navbar',
+    description: 'Which links the bar at the top shows, and in what order.',
+    section: 'Pages',
+  },
   ...PANEL_KINDS.map((kind): Category => ({
     id: KIND_CATEGORY[kind],
     title: kind === 'user' ? "People's pages" : `${KINDS[kind].title} pages`,
@@ -113,6 +121,7 @@ export function findCategory(id: string): Category | undefined {
 function coreCategory(key: string, setting: CoreSetting): string | null {
   if (setting.siteOnly || setting.group === 'Plugins') return null;
   if (setting.group === USER_PAGE_GROUP) return 'public-page';
+  if (key.startsWith('navbar.')) return 'navbar';
   const kind = key.split('.')[0] as PanelKind;
   return PANEL_KINDS.includes(kind) ? KIND_CATEGORY[kind] : null;
 }
@@ -132,30 +141,44 @@ function coreControl(setting: CoreSetting, extra: Choice[]): Control {
 }
 
 /**
- * The core settings the form shows, in order. `pluginChoices` adds installed plugins' panels to a kind's panel lists
- * (`pluginPanelChoices`).
+ * The list a setting arranges, for settings drawn as an order with a switch per item: `<kind>.panels` for a kind's
+ * panels, `navbar` for the navbar's links. `null` for any other setting.
  */
-export function coreItems(pluginChoices: (kind: PanelKind) => Choice[] = () => []): SettingItem[] {
+export function arrangedList(key: string): string | null {
+  const m = /^(.+)\.(order|hidden)$/.exec(key);
+  if (!m) return null;
+  const [, prefix] = m;
+  if (prefix === 'navbar') return prefix;
+  const kind = prefix.split('.')[0] as PanelKind;
+  return PANEL_KINDS.includes(kind) && prefix === `${kind}.panels` ? prefix : null;
+}
+
+/**
+ * The core settings the form shows, in order. `pluginChoices` adds installed plugins' items to an arranged list
+ * (`arrangedList`): their panels to a kind's panels (`pluginPanelChoices`), their pages to the navbar.
+ */
+export function coreItems(pluginChoices: (list: string) => Choice[] = () => []): SettingItem[] {
   const out: SettingItem[] = [];
   for (const [key, setting] of Object.entries(CORE_SETTINGS)) {
     const category = coreCategory(key, setting);
     if (!category) continue;
-    const kind = key.split('.')[0] as PanelKind;
-    const panels = PANEL_KINDS.includes(kind) && setting.widget !== undefined;
-    // A kind's panels are one control: its order, with a switch per panel for `<kind>.panels.hidden`. The two stay
-    // separate keys in the file, flat lists anyone can edit by hand.
-    if (panels && setting.widget === 'toggles') continue;
-    const extra = panels ? pluginChoices(kind) : [];
-    const control = coreControl(setting, extra);
+    const list = setting.widget === undefined ? null : arrangedList(key);
+    // An arranged list is one control: its order, with a switch per item for `<list>.hidden`. The two stay separate
+    // keys in the file, flat lists anyone can edit by hand.
+    if (list && setting.widget === 'toggles') continue;
+    const control = coreControl(setting, list ? pluginChoices(list) : []);
     const pageTitle = findCategory(category)?.title.toLowerCase() ?? 'these pages';
+    const arranged = list && control.kind === 'rank';
     out.push({
       key,
-      title: panels ? 'Panels' : setting.title,
-      description: panels
-        ? `Drag to reorder the panels within each part of ${pageTitle}, and switch one off to leave it out.`
-        : setting.description,
+      title: !arranged ? setting.title : list === 'navbar' ? 'Links' : 'Panels',
+      description: !arranged
+        ? setting.description
+        : list === 'navbar'
+          ? 'Drag to reorder the links, and switch one off to leave it out.'
+          : `Drag to reorder the panels within each part of ${pageTitle}, and switch one off to leave it out.`,
       category,
-      control: panels && control.kind === 'rank' ? { ...control, toggleKey: `${kind}.panels.hidden` } : control,
+      control: arranged ? { ...control, toggleKey: `${list}.hidden` } : control,
       fallback: setting.default,
     });
   }
