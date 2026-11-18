@@ -59,18 +59,19 @@ export function PluginDetail({ id }: { id: string }) {
   > | null>(null);
 
   const commit = p?.plugin?.commit ?? null;
+  // By id, not by the entry shown: a copy loaded from localhost stands in for the installed one, which still updates.
   useEffect(() => {
-    if (!signedIn || !p || p.from === 'dev') return;
+    if (!signedIn) return;
     let cancelled = false;
-    fetchUpdates().then(
-      (list) => !cancelled && setUpdate(list.find((u) => u.source === p.source) ?? null),
+    fetchUpdates(id).then(
+      (list) => !cancelled && setUpdate(list[0] ?? null),
       () => {},
     );
     return () => {
       cancelled = true;
     };
     // Again after an update moves it to another commit.
-  }, [signedIn, p?.source, p?.from, commit]); // eslint-disable-line react-hooks/exhaustive-deps
+  }, [signedIn, id, commit]);
 
   if (!loaded) return <p className={ui.empty}>Loading the plugin…</p>;
   if (!p?.plugin) {
@@ -106,7 +107,7 @@ export function PluginDetail({ id }: { id: string }) {
   async function updateTo(approve: boolean) {
     if (!update) return;
     await run(async () => {
-      const result = await updatePluginTo(p!.source, update.latest.tag, approve);
+      const result = await updatePluginTo(update.source, update.latest.tag, approve);
       if (result.status === 'consent') {
         setAsking(result);
         return;
@@ -188,7 +189,7 @@ export function PluginDetail({ id }: { id: string }) {
           )}
           {update && signedIn && !asking && p.status !== 'consent' && (
             <p>
-              Version {update.latest.version} is out.{' '}
+              Version {update.latest.version} is out. You have {update.current.version}.{' '}
               <button className={ui.linkBtn} disabled={busy} onClick={() => updateTo(false)}>
                 Update
               </button>

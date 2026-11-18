@@ -11,11 +11,21 @@ import { listTags } from '../demos/github';
 const TAGS_TTL_MS = 10 * 60_000;
 const tagCache = new Map<string, { at: number; tags: Map<string, string> | null }>();
 
-/** A repo's tags, or `null` when GitHub couldn't be asked (an update check then says nothing). */
-export async function repoTags(owner: string, repo: string): Promise<Map<string, string> | null> {
+/** How fresh a check on one plugin's own page is: a release shows within seconds of its tag. */
+export const FRESH_TAGS_MS = 15_000;
+
+/**
+ * A repo's tags, or `null` when GitHub couldn't be asked (an update check then says nothing). `maxAgeMs`: how old a
+ * cached listing may be.
+ */
+export async function repoTags(
+  owner: string,
+  repo: string,
+  maxAgeMs: number = TAGS_TTL_MS,
+): Promise<Map<string, string> | null> {
   const key = `${owner}/${repo}`.toLowerCase();
   const hit = tagCache.get(key);
-  if (hit && Date.now() - hit.at < TAGS_TTL_MS) return hit.tags;
+  if (hit && Date.now() - hit.at < maxAgeMs) return hit.tags;
   let tags: Map<string, string> | null;
   try {
     tags = await listTags(owner, repo);
