@@ -178,8 +178,6 @@ export const papers = pgTable(
     abstractLicense: text('abstract_license'),
     /** The duplicate's survivor. Its identifiers still resolve, and redirect there. */
     mergedInto: uuid('merged_into').references((): AnyPgColumn => papers.id, { onDelete: 'set null' }),
-    /** Unique viewers, one a day each (`server/view-counter.ts`). */
-    viewCount: integer('view_count').notNull().default(0),
     search: tsvector('search')
       .notNull()
       .generatedAlwaysAs(
@@ -262,6 +260,8 @@ export const pages = pgTable(
      * address and identifier lead to the page it was merged into, and nobody commits to it again.
      */
     mergedInto: uuid('merged_into').references((): AnyPgColumn => pages.id, { onDelete: 'set null' }),
+    /** Unique viewers, one a day each (`server/view-counter.ts`). Written only there. */
+    viewCount: integer('view_count').notNull().default(0),
     createdAt: createdAt(),
   },
   (t) => [
@@ -1167,20 +1167,50 @@ export const commentMentions = pgTable(
 );
 
 /**
- * Who looked at a paper today, so that a visitor counts once a day (`server/view-counter.ts`). `visitor` is an HMAC
+ * Who looked at a page today, so that a visitor counts once a day (`server/view-counter.ts`). `visitor` is an HMAC
  * of the UTC day and the account or client network under a server secret: it cannot be reversed to an address, and,
  * the day being inside it, cannot link one day's visitor to the next. Only today's and yesterday's rows are kept;
- * `papers.view_count` is what lasts. A cache of reads, not a source of truth, so it has no foreign keys and can never
- * take a lock on a row anything else holds.
+ * `pages.view_count` is what lasts. A cache of reads, not a source of truth, so it has no foreign keys and can never
+ * take a lock on a row anything else holds. A paper's page id is the paper's id, so this covers every kind.
  */
-export const paperViews = pgTable(
-  'paper_views',
+export const pageViews = pgTable(
+  'page_views',
   {
-    paperId: uuid('paper_id').notNull(),
+    pageId: uuid('page_id').notNull(),
     day: date('day', { mode: 'string' }).notNull(),
     visitor: text('visitor').notNull(),
   },
-  (t) => [primaryKey({ columns: [t.paperId, t.day, t.visitor] }), index('paper_views_day_idx').on(t.day)],
+  (t) => [primaryKey({ columns: [t.pageId, t.day, t.visitor] }), index('page_views_day_idx').on(t.day)],
+);
+
+/**
+ * How many visitors read one page and then another (`server/view-counter.ts`): unique per visitor per day per ordered
+ * pair, summed, like `view_count`. Only the count is kept, never who or when, so nothing here is any one person's
+ * reading. The signal for related papers ("readers of this also read"), read by `GET /transitions`. No foreign keys,
+ * like `page_views`.
+ */
+export const pageTransitions = pgTable(
+  'page_transitions',
+  {
+    fromPageId: uuid('from_page_id').notNull(),
+    toPageId: uuid('to_page_id').notNull(),
+    count: integer('count').notNull().default(0),
+  },
+  (t) => [primaryKey({ columns: [t.fromPageId, t.toPageId] }), index('page_transitions_to_idx').on(t.toPageId)],
+);
+
+/**
+ * Who went from one page to another today, so a visitor counts once a day per pair. `visitor` is an HMAC of the day,
+ * the visitor and the pair, so a row cannot be joined to `page_views` or to the same visitor's other pairs. Only the
+ * last two days' rows are kept.
+ */
+export const pageTransitionVisits = pgTable(
+  'page_transition_visits',
+  {
+    day: date('day', { mode: 'string' }).notNull(),
+    visitor: text('visitor').notNull(),
+  },
+  (t) => [primaryKey({ columns: [t.day, t.visitor] })],
 );
 
 /**

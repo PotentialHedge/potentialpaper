@@ -352,8 +352,14 @@ export const CoAuthorAdded = z.object({ authorIndex: z.number().int(), authorNam
 /** Whether the viewer follows a paper (`null` when nobody is signed in), and how many do. */
 export const FollowState = z.object({ following: z.boolean().nullable(), followers: z.number().int() });
 export const FollowBody = z.object({ paper: PaperIdentifier });
-export const ViewBody = z.object({ paper: PaperIdentifier });
+/** A page's beacon: its id (a paper's is the paper's id), and the page this tab read just before, if any. */
+export const ViewBody = z.object({ page: z.uuid(), from: z.string().max(100).optional() });
 export const ViewState = z.object({ views: z.number().int() });
+export const TransitionsQuery = z.object({ min: z.coerce.number().int().min(1).default(1) });
+/** How many visitors read one page and then another, per ordered pair, most first. Totals only. */
+export const Transitions = z.object({
+  transitions: z.array(z.object({ from: z.string(), to: z.string(), count: z.number().int().min(1) })),
+});
 
 /** The signed-in account's papers (`server/my-papers.ts`, `server/follows.ts`). */
 export const MyPapers = z.object({

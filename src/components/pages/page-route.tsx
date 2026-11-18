@@ -4,6 +4,7 @@ import type { Metadata } from 'next';
 import { notFound, redirect } from 'next/navigation';
 import { cache } from 'react';
 import { ui } from '@/components/ui';
+import { ViewCount } from '@/components/ViewCount';
 import { getDb } from '@/db';
 import { pageCurrent } from '@/db/schema';
 import { type KeyedKind, keyedPagePath, keyProblem, KINDS, pageName } from '@/lib/kinds';
@@ -130,6 +131,9 @@ export async function KeyedPageRoute({ kind, segments }: { kind: KeyedKind; segm
               {kind}:{key}
             </span>{' '}
             · clone with <span className={ui.mono}>git clone {clone.https}</span>
+          </p>
+          <p className={`${ui.fine} text-center font-sans`}>
+            <ViewCount pageId={page.id} />
           </p>
           <div className="mt-5 grid grid-cols-[minmax(0,1fr)_300px] items-start gap-8 narrow:grid-cols-1">
             <div>

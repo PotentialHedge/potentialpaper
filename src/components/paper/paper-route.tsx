@@ -145,6 +145,7 @@ export async function PaperRoute({ scheme, segments }: { scheme: PaperScheme; se
           </nav>
           <TitleActions
             paper={panel.canonical}
+            pageId={paper.id}
             bibtex={bibtex({ paper, identifiers })}
             historyPath={toolPath('history', panel.canonical)}
             agentPath={agentPaperPath(panel.canonical)}

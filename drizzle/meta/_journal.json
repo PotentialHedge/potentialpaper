@@ -295,6 +295,20 @@
       "when": 1794924310580,
       "tag": "0041_paper_views",
       "breakpoints": true
+    },
+    {
+      "idx": 42,
+      "version": "7",
+      "when": 1795006432509,
+      "tag": "0042_page_views",
+      "breakpoints": true
+    },
+    {
+      "idx": 43,
+      "version": "7",
+      "when": 1795006439263,
+      "tag": "0043_drop_paper_views",
+      "breakpoints": true
     }
   ]
 }
