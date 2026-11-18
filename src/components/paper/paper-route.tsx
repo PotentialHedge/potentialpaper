@@ -18,6 +18,7 @@ import { TitleActions } from './TitleActions';
 import { cloneAddresses } from '@/server/pages/clone';
 import { linksFrom as pageLinksFrom, linksTo as pageLinksTo } from '@/server/page-links';
 import { PluginPageProvider, type PluginPageData } from '@/components/plugins/PluginPage';
+import { pageHasSignals } from '@/server/signals';
 import { formatIdentifier, pagePath } from '@/lib/kinds';
 import { scopesOfPage, submissionsHaveScores } from '@/server/plugins/pages';
 import { siteUrl } from '@/server/site';
@@ -111,7 +112,11 @@ export async function PaperRoute({ scheme, segments }: { scheme: PaperScheme; se
       name: paper.title,
     },
     scopes,
-    facts: { hasSubmissions: submissions.length > 0, hasScores: submissionsHaveScores(submissions) },
+    facts: {
+      hasSubmissions: submissions.length > 0,
+      hasScores: submissionsHaveScores(submissions),
+      hasSignals: await pageHasSignals({ id: paper.id, kind: 'paper' }),
+    },
   };
   const about = [paper.venue, paper.year].filter(Boolean).join(', ');
   const linkSources = {

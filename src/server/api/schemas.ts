@@ -843,7 +843,7 @@ export const PageResponse = PageSummary.extend({
   /** The pages above it: a paper's venues, topics and orgs; a topic's broader topics; an org's parents. */
   scopes: z.array(PageSummary),
   /** What `when` conditions test. */
-  facts: z.object({ hasScores: z.boolean(), hasSubmissions: z.boolean() }),
+  facts: z.object({ hasScores: z.boolean(), hasSubmissions: z.boolean(), hasSignals: z.boolean() }),
 });
 
 /** `GET /pages/{identifier}/files`: what `page.read` gives, only what the page shows the public. */

@@ -104,19 +104,27 @@ const NearestQuery = z.object({
   signal: z.string().min(1).max(200),
   paper: z.string().min(1).max(400),
   k: z.coerce.number().int().min(1).max(200).default(20),
+  with: z
+    .string()
+    .max(500)
+    .optional()
+    .transform((s) => (s ? s.split(',').filter(Boolean).slice(0, 10) : [])),
 });
 
-/** `GET /signal-sets/{owner}/{name}/nearest?signal=embedding&paper=openreview:abc&k=20`: the nearest papers. */
+/**
+ * `GET /signal-sets/{owner}/{name}/nearest?signal=embedding&paper=openreview:abc&k=20&with=map.xy,map.cluster`: the
+ * nearest papers, and with `with` those signals' values for the paper and each of them.
+ */
 export const getNearest = route(async (req, params) => {
   const setId = setIdOf(params);
   const query = parseQuery(req, NearestQuery);
   const page = await mustFindPage(query.paper);
   if (page.kind !== 'paper') throw new ApiError(422, 'validation_error', `${query.paper} is not a paper`);
   const set = await mustFindSet(setId);
-  const etag = etagOf(signalEtagOf(set, 'nearest', query.signal, page.id, query.k));
+  const etag = etagOf(signalEtagOf(set, 'nearest', query.signal, page.id, query.k, query.with));
   const headers = { 'Cache-Control': 'public, max-age=300', ETag: etag };
   if (notModified(req, etag)) return new Response(null, { status: 304, headers });
-  const found = await nearestPapers(setId, query.signal, page.id, query.k);
+  const found = await nearestPapers(setId, query.signal, page.id, query.k, { with: query.with });
   return json({ set: setId, signal: query.signal, ...found }, { headers });
 });
 

@@ -13,7 +13,7 @@ export interface PluginPageData {
   kind: PageKind;
   page: PageSummary;
   scopes: PageSummary[];
-  facts: { hasScores: boolean; hasSubmissions: boolean };
+  facts: { hasScores: boolean; hasSubmissions: boolean; hasSignals: boolean };
 }
 
 const PluginPageContext = createContext<PluginPageData | null>(null);

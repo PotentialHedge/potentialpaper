@@ -61,6 +61,11 @@ export interface HostServices {
   identityToken(): Promise<IdentityToken>;
   setHeight(height: number): void;
   openUrl(url: string): void;
+  /**
+   * On a plugin's own page, the rest of its address after `/x/<owner>/<name>/<page>/` (`surface.path`), replaced in the
+   * address bar without a reload, so what the reader is looking at can be shared. Rejects in a panel.
+   */
+  setPath(path: string[]): void;
 }
 
 const identifier = z
@@ -111,10 +116,12 @@ const PARAMS: Partial<Record<HostMethod, z.ZodType>> = {
     signal: z.string().min(1).max(200),
     paper: identifier,
     k: z.number().int().min(1).max(200).optional(),
+    with: z.array(z.string().min(1).max(200)).max(10).optional(),
   }),
   'signals.forPaper': z.object({ paper: identifier, set: setId.optional() }),
   'ui.setHeight': z.object({ height: z.number().finite().min(0) }),
   'ui.openUrl': z.object({ url: z.url({ protocol: /^https?$/ }).max(2000) }),
+  'ui.setPath': z.object({ path: z.array(z.string().min(1).max(200)).max(10) }),
 };
 
 const enc = encodeURIComponent;
@@ -170,15 +177,17 @@ const HANDLERS: Record<HostMethod, Handler> = {
     if (titles) query.set('titles', 'true');
     return s.api(`/signal-sets/${set as string}/columns${query.size ? `?${query}` : ''}`);
   },
-  'signals.nearest': (s, { set, signal, paper, k }) => {
+  'signals.nearest': (s, { set, signal, paper, k, with: also }) => {
     const query = new URLSearchParams({ signal: signal as string, paper: paper as string });
     if (k !== undefined) query.set('k', String(k));
+    if (also) query.set('with', (also as string[]).join(','));
     return s.api(`/signal-sets/${set as string}/nearest?${query}`);
   },
   'signals.forPaper': (s, { paper, set }) =>
     s.api(`/pages/${enc(paper as string)}/signals${set ? `?set=${enc(set as string)}` : ''}`),
   'ui.setHeight': (s, { height }) => s.setHeight(Math.min(MAX_FRAME_HEIGHT, Math.round(height as number))),
   'ui.openUrl': (s, { url }) => s.openUrl(url as string),
+  'ui.setPath': (s, { path }) => s.setPath(path as string[]),
 };
 
 export async function dispatch(services: HostServices, call: CallEnvelope) {

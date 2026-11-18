@@ -78,6 +78,10 @@ export const METHOD_DOCS: Record<keyof typeof HOST_METHODS, { call: string; does
     call: 'pp.ui.setHeight(px)',
     does: `Size your frame yourself (at most ${MAX_FRAME_HEIGHT}px). By default the SDK sizes it to your body.`,
   },
+  'ui.setPath': {
+    call: 'pp.ui.setPath(path)',
+    does: "On your own page, the rest of its address after the page's id (`surface.path`), replaced in the address bar without a reload, so a view can be shared.",
+  },
   'ui.openUrl': { call: 'pp.ui.openUrl(url)', does: 'Open an http(s) address in a new tab.' },
 };
 

@@ -119,3 +119,17 @@ Limits: 20 signals a set, 2048 dims, a writes rate limit, and a total per set th
   transaction as `consumers/run.ts` does, plus events for merges and PDFs), `inputs` and a stale list, search
   (`sig:`, `sort:`, `like: … via:`), pgvector once production is on Postgres 19, NeurIPS 2026 (acceptodds has its map
   too, as its own signals since its layout is separate), and the site's own set.
+
+### 2026-11-18: the map under many readers
+
+- **Edge cache:** a Cloudflare cache rule (zone papers.potentialhedge.com, `http_request_cache_settings`) caches GETs
+  of `/api/v1/signal-sets*` and `/api/v1/pages/*/signals` with the origin's TTLs: 5 minutes for `columns` and
+  `nearest`, 1 for the rest. A set's new generation shows within 5 minutes.
+- **`nearest … with`:** `with=map.xy,map.cluster` (up to 10 signals) returns those values for the paper and each
+  neighbour, and the titles of their labels. The ranking keeps a small sorted list in one pass instead of sorting
+  every paper. The minimap (plugin v0.4.0) draws from two such reads, `map.xy` k=100 and `embedding` k=10, a few KB
+  each, instead of the whole map's columns (1.9 MB).
+- **`page.hasSignals`:** a when-key for papers and scopes, true where some set has live values for the paper or one
+  of the scope's papers; kept 10 minutes per page. The map's panels show only there.
+- **`ui.setPath`:** a plugin page sets the rest of its address without a reload; the map page names the selected
+  paper, so a link opens on it.

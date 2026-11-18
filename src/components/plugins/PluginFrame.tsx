@@ -285,6 +285,12 @@ export function PluginFrame({
       openUrl: (url) => {
         window.open(url, '_blank', 'noopener,noreferrer');
       },
+      setPath: (path) => {
+        const { surface, plugin } = latest.current;
+        if (surface.type !== 'page') throw new HostError('Unavailable', "ui.setPath is for a plugin's own page");
+        const address = ['x', ...plugin.plugin.id.split('/'), surface.id, ...path].map(encodeURIComponent).join('/');
+        window.history.replaceState(window.history.state, '', `/${address}`);
+      },
     };
 
     function onMessage(event: MessageEvent) {

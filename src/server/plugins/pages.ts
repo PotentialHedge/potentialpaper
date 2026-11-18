@@ -8,6 +8,7 @@ import { scoreTable, type Submission } from '@/lib/submissions';
 import { ApiError } from '../api/errors';
 import { linksFrom, type PageLink } from '../page-links';
 import { rolledUp, scopeMemberCount, scopeMembers } from '../page-members';
+import { pageHasSignals } from '../signals';
 import { findPage, type PageRow } from '../pages/kinds';
 import { readCommit, readFiles } from '../pages/repo';
 import { readSections, sectionTitle } from '../pages/sections';
@@ -105,12 +106,12 @@ export function submissionsHaveScores(list: readonly Submission[]): boolean {
 export async function pageFacts(
   page: PageRow,
   database: Database = getDb(),
-): Promise<{ hasScores: boolean; hasSubmissions: boolean }> {
+): Promise<{ hasScores: boolean; hasSubmissions: boolean; hasSignals: boolean }> {
   if (page.kind === 'paper') {
-    const list = await submissionsOf(page.id, database);
-    return { hasSubmissions: list.length > 0, hasScores: submissionsHaveScores(list) };
+    const [list, signals] = await Promise.all([submissionsOf(page.id, database), pageHasSignals(page, database)]);
+    return { hasSubmissions: list.length > 0, hasScores: submissionsHaveScores(list), hasSignals: signals };
   }
-  if (!KINDS[page.kind].scope) return { hasScores: false, hasSubmissions: false };
+  if (!KINDS[page.kind].scope) return { hasScores: false, hasSubmissions: false, hasSignals: false };
   const [row] = await database
     .execute<{ submissions: boolean; scores: boolean }>(
       sql`
@@ -120,7 +121,11 @@ export async function pageFacts(
   `,
     )
     .then((result) => result.rows);
-  return { hasSubmissions: Boolean(row?.submissions), hasScores: Boolean(row?.scores) };
+  return {
+    hasSubmissions: Boolean(row?.submissions),
+    hasScores: Boolean(row?.scores),
+    hasSignals: await pageHasSignals(page, database),
+  };
 }
 
 /** The scope an identifier names, or a 404, or a 422 for a page of a kind that has no papers. */

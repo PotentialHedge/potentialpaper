@@ -394,7 +394,7 @@ export interface SignalColumns {
 export async function signalColumns(
   setId: string,
   names: string[],
-  options: { scopeId?: string; titles?: boolean; database?: Database } = {},
+  options: { scopeId?: string; titles?: boolean; database?: Db } = {},
 ): Promise<SignalColumns> {
   const database = options.database ?? getDb();
   const set = await mustFindSet(setId, database);
@@ -531,6 +531,8 @@ interface VectorIndex {
   etag: string;
   dims: number;
   paperIds: string[];
+  /** Each paper's row, by paper id. */
+  byPaperId: Map<string, number>;
   identifiers: string[];
   titles: string[];
   /** Unit vectors, `dims` numbers each (cosine); raw for `dot` and `l2`. */
@@ -541,7 +543,7 @@ interface VectorIndex {
 const indexes = new Map<string, Promise<VectorIndex>>();
 
 /** A vector signal's live values in memory, rebuilt when the set changes: fine for tens of thousands of papers. */
-async function vectorIndex(set: SetRow, signal: string, database: Database): Promise<VectorIndex> {
+async function vectorIndex(set: SetRow, signal: string, database: Db): Promise<VectorIndex> {
   const etag = signalEtagOf(set, signal);
   const key = `${set.id}:${signal}`;
   const cached = indexes.get(key);
@@ -577,13 +579,19 @@ async function vectorIndex(set: SetRow, signal: string, database: Database): Pro
     `);
     const byIdentifier = new Map(rows.map((r) => [`${r.scheme}:${r.value}`, r.paper_id]));
     const identifiers = keep.map((i) => columns.papers[i]);
+    const paperIds = identifiers.map((id) => byIdentifier.get(id) ?? '');
+    const byPaperId = new Map<string, number>();
+    paperIds.forEach((id, i) => {
+      if (id && !byPaperId.has(id)) byPaperId.set(id, i);
+    });
     return {
       etag,
       dims: spec.dims,
       metric: spec.metric,
       identifiers,
       titles: keep.map((i) => columns.titles![i]),
-      paperIds: identifiers.map((id) => byIdentifier.get(id) ?? ''),
+      paperIds,
+      byPaperId,
       data,
     };
   })();
@@ -596,42 +604,135 @@ export interface Neighbour {
   paper: string;
   title: string;
   score: number;
+  /** With `with`: its values of those signals (a label's key), `null` where it has none. */
+  values?: Record<string, unknown>;
 }
 
-/** The `k` papers nearest a paper by one of a set's vector signals, best first, without the paper itself. */
+/** The `k` best of `n` scores, best first, without sorting them all: one pass keeping a small sorted list. */
+export function topK(scores: Float32Array, k: number, skip: (i: number) => boolean): number[] {
+  const best: number[] = [];
+  for (let i = 0; i < scores.length; i++) {
+    if (skip(i)) continue;
+    const s = scores[i];
+    if (best.length === k && s <= scores[best[k - 1]]) continue;
+    let at = best.length;
+    while (at > 0 && scores[best[at - 1]] < s) at--;
+    best.splice(at, 0, i);
+    if (best.length > k) best.pop();
+  }
+  return best;
+}
+
+/** Some signals' values for some papers (by identifier), live generation, with the titles of the labels among them. */
+async function valuesOf(set: SetRow, papers: string[], names: string[], database: Db) {
+  const out = new Map<string, Record<string, unknown>>(
+    papers.map((p) => [p, Object.fromEntries(names.map((n) => [n, null]))]),
+  );
+  const labels: Record<string, Record<string, string>> = {};
+  if (papers.length === 0 || names.length === 0) return { values: out, labels };
+  const keys = papers.map((p) => paperKey(p)!);
+  const { rows } = await database.execute<{
+    signal: string;
+    scheme: string;
+    value: string;
+    num: number | null;
+    label: string | null;
+    vec: number[] | null;
+    title: string | null;
+  }>(sql`
+    select v.signal, v.scheme, v.value, v.num, v.label, v.vec, l.title
+      from signal_values v
+      left join signal_labels l on l.set_id = v.set_id and l.generation = v.generation and l.signal = v.signal
+                                and l.key = v.label
+     where v.set_id = ${set.id} and v.generation = ${set.liveGeneration} and v.signal in ${names}
+       and (v.scheme, v.value) in (${sql.join(
+         keys.map((k) => sql`(${k.scheme}, ${k.value})`),
+         sql`, `,
+       )})
+  `);
+  for (const r of rows) {
+    const entry = out.get(`${r.scheme}:${r.value}`);
+    if (!entry) continue;
+    entry[r.signal] = r.vec ?? r.num ?? r.label;
+    if (r.label !== null && r.title !== null) (labels[r.signal] ??= {})[r.label] = r.title;
+  }
+  return { values: out, labels };
+}
+
+/**
+ * The `k` papers nearest a paper by one of a set's vector signals, best first, without the paper itself. `with` names
+ * other signals of the set to send for the paper and each neighbour (a map's `map.xy` and `map.cluster`, so a minimap
+ * draws from this answer alone), and `labels` the titles of the label values among them.
+ */
 export async function nearestPapers(
   setId: string,
   signal: string,
   paperId: string,
   k: number,
-  database: Database = getDb(),
-): Promise<{ paper: string | null; neighbours: Neighbour[] }> {
+  options: { with?: string[]; database?: Db } = {},
+): Promise<{
+  paper: string | null;
+  values?: Record<string, unknown>;
+  neighbours: Neighbour[];
+  labels?: Record<string, Record<string, string>>;
+}> {
+  const database = options.database ?? getDb();
   const set = await mustFindSet(setId, database);
   const index = await vectorIndex(set, signal, database);
-  const self = index.paperIds.indexOf(paperId);
-  if (self < 0) return { paper: null, neighbours: [] };
+  const self = index.byPaperId.get(paperId);
+  if (self === undefined) return { paper: null, neighbours: [] };
   const { dims, data } = index;
   const n = index.paperIds.length;
   const scores = new Float32Array(n);
+  const base = self * dims;
   for (let i = 0; i < n; i++) {
     let s = 0;
+    const at = i * dims;
     if (index.metric === 'l2') {
-      for (let d = 0; d < dims; d++) s -= (data[i * dims + d] - data[self * dims + d]) ** 2;
+      for (let d = 0; d < dims; d++) s -= (data[at + d] - data[base + d]) ** 2;
     } else {
-      for (let d = 0; d < dims; d++) s += data[i * dims + d] * data[self * dims + d];
+      for (let d = 0; d < dims; d++) s += data[at + d] * data[base + d];
     }
     scores[i] = s;
   }
-  const order = [...scores.keys()]
-    .filter((i) => i !== self && index.paperIds[i] !== paperId)
-    .sort((a, b) => scores[b] - scores[a])
-    .slice(0, k);
-  return {
-    paper: index.identifiers[self],
-    neighbours: order.map((i) => ({
-      paper: index.identifiers[i],
-      title: index.titles[i],
-      score: Math.round(scores[i] * 1e4) / 1e4,
-    })),
-  };
+  const order = topK(scores, k, (i) => i === self || index.paperIds[i] === paperId);
+  const neighbours: Neighbour[] = order.map((i) => ({
+    paper: index.identifiers[i],
+    title: index.titles[i],
+    score: Math.round(scores[i] * 1e4) / 1e4,
+  }));
+  const paper = index.identifiers[self];
+  if (!options.with?.length) return { paper, neighbours };
+  const known = new Set((await setSignals(set.id, database)).map((s) => s.name));
+  const unknown = options.with.filter((name) => !known.has(name));
+  if (unknown.length) throw new ApiError(404, 'not_found', `${set.id} has no signal "${unknown[0]}"`);
+  const { values, labels } = await valuesOf(set, [paper, ...neighbours.map((x) => x.paper)], options.with, database);
+  for (const x of neighbours) x.values = values.get(x.paper);
+  return { paper, values: values.get(paper), neighbours, labels };
+}
+
+const HAS_SIGNALS_TTL_MS = 10 * 60_000;
+const hasSignalsCache = new Map<string, { at: number; value: Promise<boolean> }>();
+
+/**
+ * `page.hasSignals`: whether a paper has a value in any set's live generation, or a scope has a paper that does. A
+ * plugin that draws signals shows its panel only there, so pages without any start no frame and fetch nothing. Kept
+ * ten minutes per page, as a scope's answer can take a scan of its members.
+ */
+export function pageHasSignals(page: { id: string; kind: string }, database: Db = getDb()): Promise<boolean> {
+  const cached = hasSignalsCache.get(page.id);
+  if (cached && Date.now() - cached.at < HAS_SIGNALS_TTL_MS) return cached.value;
+  const live = sql`join signal_values v on v.scheme = i.scheme and v.value = i.value
+                   join signal_sets s on s.id = v.set_id and s.live_generation = v.generation`;
+  const query =
+    page.kind === 'paper'
+      ? sql`select exists (select 1 from papers p join paper_identifiers i on i.paper_id = p.id ${live}
+                            where coalesce(p.merged_into, p.id) = ${page.id}::uuid) as found`
+      : sql`select exists (select 1 from page_members m join paper_identifiers i on i.paper_id = m.paper_id ${live}
+                            where m.scope_page_id in (${scopePagesOf(page.id)})) as found`;
+  const value = database.execute<{ found: boolean }>(query).then((r) => Boolean(r.rows[0]?.found));
+  hasSignalsCache.set(page.id, { at: Date.now(), value });
+  value.catch(() => hasSignalsCache.delete(page.id));
+  if (hasSignalsCache.size > 20_000) hasSignalsCache.delete(hasSignalsCache.keys().next().value!);
+  return value;
 }

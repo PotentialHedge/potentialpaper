@@ -94,6 +94,7 @@ export const HOST_METHODS = {
   'signals.forPaper': null,
   'ui.setHeight': null,
   'ui.openUrl': null,
+  'ui.setPath': null,
 } as const satisfies Record<string, PluginPermission | null>;
 export type HostMethod = keyof typeof HOST_METHODS;
 

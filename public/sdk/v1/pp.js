@@ -328,6 +328,9 @@
         autoHeight = on !== false;
         if (autoHeight) reportHeight();
       },
+      setPath: function (path) {
+        return call('ui.setPath', { path: [].concat(path).map(String) });
+      },
       openUrl: function (url) {
         return call('ui.openUrl', { url: String(url) });
       },

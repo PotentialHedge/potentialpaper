@@ -6,6 +6,7 @@ import { afterAll, beforeAll, beforeEach, describe, expect, it } from 'vitest';
 import { getDb } from '@/db';
 import { accounts } from '@/db/schema';
 import { storePluginFiles } from '@/server/plugins/snapshot';
+import { pageHasSignals } from '@/server/signals';
 import { mintToken } from '@/server/tokens';
 import { api, closePool, resetDatabase, signUp } from './helpers';
 
@@ -127,6 +128,7 @@ describe('signals', () => {
     await paper('aaaaaa', 'Paper A');
     await paper('bbbbbb', 'Paper B');
     await paper('cccccc', 'Paper C');
+    const bare = await paper('dddddd', 'Paper D');
 
     const values = [
       { paper: 'openreview:aaaaaa', signal: 'map.xy', value: [0, 0] },
@@ -142,6 +144,11 @@ describe('signals', () => {
       { paper: 'openreview:cccccc', signal: 'embedding', value: [0, 0, 1] },
     ];
     expect((await api('PUT', `/signal-sets/${SET}/values`, { token: ben.token, body: { values } })).status).toBe(200);
+    expect(await pageHasSignals({ id: bare, kind: 'paper' })).toBe(false);
+    const [a] = (
+      await getDb().execute<{ id: string }>(sql`select paper_id as id from paper_identifiers where value = 'aaaaaa'`)
+    ).rows;
+    expect(await pageHasSignals({ id: a.id, kind: 'paper' })).toBe(true);
     await api('PUT', `/signal-sets/${SET}/labels`, {
       token: ben.token,
       body: { signal: 'map.region', labels: [{ key: 'r1', title: 'agents' }] },
@@ -160,6 +167,18 @@ describe('signals', () => {
 
     const near = (await api('GET', `/signal-sets/${SET}/nearest?signal=embedding&paper=openreview%3Aaaaaaa&k=2`)).body;
     expect(near.neighbours.map((n: { paper: string }) => n.paper)).toEqual(['openreview:bbbbbb', 'openreview:cccccc']);
+
+    // With `with`, the values a minimap draws come along, so it needs no other read.
+    const drawn = (
+      await api('GET', `/signal-sets/${SET}/nearest?signal=map.xy&paper=openreview%3Aaaaaaa&k=1&with=map.xy,map.region`)
+    ).body;
+    expect(drawn.values).toEqual({ 'map.xy': [0, 0], 'map.region': 'r1' });
+    expect(drawn.neighbours).toMatchObject([
+      { paper: 'openreview:bbbbbb', title: 'Paper B', values: { 'map.xy': [1, 1], 'map.region': 'r1' } },
+    ]);
+    expect(drawn.labels).toEqual({ 'map.region': { r1: 'agents' } });
+    const unknown = await api('GET', `/signal-sets/${SET}/nearest?signal=map.xy&paper=openreview%3Aaaaaaa&with=nope`);
+    expect(unknown.status).toBe(404);
 
     // A rebuild: staged, written, and invisible until published.
     const staged = await api('POST', `/signal-sets/${SET}/generations`, { token: ben.token });

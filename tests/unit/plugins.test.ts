@@ -289,6 +289,7 @@ function services(
     },
     setHeight: (h) => calls.push(`height ${h}`),
     openUrl: (url) => calls.push(`open ${url}`),
+    setPath: (path) => calls.push(`path ${path.join('/')}`),
     ...overrides,
   };
 }
