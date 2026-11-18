@@ -19,3 +19,15 @@ if ! grep -q '"success":true' <<<"$response"; then
   exit 1
 fi
 echo "purged $host"
+
+# The plugin SDK, served at the user content domain's apex and cached for a day: a deploy that changes it would
+# otherwise leave plugins calling methods the cached copy doesn't have.
+sdk_zone=${PPUSERCONTENT_ZONE_ID:-5505fa145d8a89e1758d313b91733ef3}
+response=$(curl -sS -X POST "https://api.cloudflare.com/client/v4/zones/$sdk_zone/purge_cache" \
+  -H "Authorization: Bearer $CLOUDFLARE_API_TOKEN" -H 'Content-Type: application/json' \
+  --data '{"files":["https://ppusercontent.com/sdk/v1/pp.js","https://ppusercontent.com/sdk/v1/pp.d.ts"]}')
+if ! grep -q '"success":true' <<<"$response"; then
+  echo "SDK purge failed: $response" >&2
+  exit 1
+fi
+echo "purged the plugin SDK"
