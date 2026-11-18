@@ -103,3 +103,22 @@ export function AgentIcon({ className = 'size-3.5' }: { className?: string }) {
     </svg>
   );
 }
+
+/** Two chain links: a link to this spot on the page. */
+export function LinkIcon({ className = 'size-[1em]' }: { className?: string }) {
+  return (
+    <svg {...line} className={className}>
+      <path d="M6.75 9.25a2.5 2.5 0 0 0 3.54 0l2.5-2.5a2.5 2.5 0 0 0-3.54-3.54l-.75.75" />
+      <path d="M9.25 6.75a2.5 2.5 0 0 0-3.54 0l-2.5 2.5a2.5 2.5 0 0 0 3.54 3.54l.75-.75" />
+    </svg>
+  );
+}
+
+/** A tick: done, e.g. copied. */
+export function CheckIcon({ className = 'size-[1em]' }: { className?: string }) {
+  return (
+    <svg {...line} strokeWidth={1.75} className={className}>
+      <path d="M3 8.5l3.25 3.25L13 4.5" />
+    </svg>
+  );
+}

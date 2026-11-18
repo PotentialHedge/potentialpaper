@@ -1,7 +1,8 @@
-import type { ReactNode } from 'react';
+import { LinkedComments, LinkedDetails, Permalink } from '@/components/paper/ReviewLinks';
 import { SubmissionPanels } from '@/components/plugins/SubmissionPanels';
 import { ui } from '@/components/ui';
 import { sourceName } from '@/lib/paper-ids';
+import { reviewMath } from '@/lib/review-math';
 import {
   formatScore,
   formOf,
@@ -15,11 +16,12 @@ import {
   type Submission,
   type SubmissionNote,
 } from '@/lib/submissions';
+import { renderComment } from '@/server/comments/render';
 
 /**
  * A paper's submissions and what each venue published about it: the forum's notes, each review with its scores,
- * laid out as acceptodds lays out a paper's reviews. Plain HTML, so the cached page needs no script: a review opens
- * as a `<details>`.
+ * laid out as acceptodds lays out a paper's reviews. Each note has a permalink (`#review-…`, `#comment-…`) that opens
+ * it; without script a review still opens as a `<details>`.
  */
 
 const DATE = new Intl.DateTimeFormat('en-GB', { day: 'numeric', month: 'short', year: 'numeric', timeZone: 'UTC' });
@@ -39,8 +41,10 @@ function licenseLabel(license: string): string {
   return /^CC/.test(license) ? license.replace(/-/g, ' ').replace(/ (\d\.\d)$/, ' $1') : license;
 }
 
-function anchor(submission: Submission, externalId: string): string {
-  return `note-${submission.externalId}-${externalId}`.replace(/[^\w-]/g, '_');
+/** A note's permalink on the page: `#review-<id>`, `#comment-<id>`, or `#note-<id>` for a decision and the like. */
+function anchor(note: SubmissionNote): string {
+  const prefix = note.kind === 'review' || note.kind === 'comment' ? note.kind : 'note';
+  return `${prefix}-${note.externalId}`.replace(/[^\w-]/g, '_');
 }
 
 function reviewCount(submission: Submission): number {
@@ -54,8 +58,12 @@ function standing(submission: Submission): string {
   return [status, reviews ? `${reviews} review${reviews === 1 ? '' : 's'}` : null].filter(Boolean).join(' · ');
 }
 
-/** A note's heading: who signed it, what it is unless a review, and the day, on the right. */
+/**
+ * A note's heading: who signed it, what it is unless a review, and on the right the note at its source and the
+ * day, which is its permalink (copied on click).
+ */
 function Heading({ submission, note }: { submission: Submission; note: SubmissionNote }) {
+  const source = note.url ? sourceName(note.url) : null;
   return (
     <header className="flex flex-wrap items-baseline justify-between gap-x-3">
       <span>
@@ -64,9 +72,16 @@ function Heading({ submission, note }: { submission: Submission; note: Submissio
           <span className="font-sans text-[13px] text-muted"> · {noteLabel(submission, note)}</span>
         )}
       </span>
-      <time dateTime={note.createdAt.toISOString()} className="font-sans text-xs text-muted">
-        {DATE.format(note.createdAt)}
-      </time>
+      <span className="flex gap-3 font-sans text-xs text-muted">
+        {note.url && (
+          <a href={note.url} className="text-muted hover:text-accent hover:underline" rel="noopener" target="_blank">
+            {source} ↗
+          </a>
+        )}
+        <Permalink anchor={anchor(note)} kind={note.kind === 'comment' ? 'comment' : 'review'}>
+          <time dateTime={note.createdAt.toISOString()}>{DATE.format(note.createdAt)}</time>
+        </Permalink>
+      </span>
     </header>
   );
 }
@@ -90,25 +105,25 @@ function Scores({ fields }: { fields: ShownField[] }) {
   );
 }
 
+/**
+ * A passage as HTML: OpenReview's notes are Markdown with TeX, written every way there is (`\\(x\\)`, `$x$`), set
+ * as `$…$` first. Rendered as comments are, so a tag is text, links are `nofollow` and only GIFs embed.
+ */
+function markdown(text: string): string {
+  return renderComment(reviewMath(text));
+}
+
 /** The passages, each under its label. */
 function Sections({ fields }: { fields: ShownField[] }) {
   return fields
     .filter((field) => field.type === 'text')
     .map((field) => (
       <div key={field.key} className="mt-2 text-[15px]">
-        <h5 className="font-sans text-[13px] font-semibold text-subtle">{field.label}</h5>
-        <p className="break-words whitespace-pre-wrap">{field.text}</p>
+        {/* A comment's one passage needs no label. */}
+        {field.key !== 'comment' && <h5 className="font-sans text-[13px] font-semibold text-subtle">{field.label}</h5>}
+        <div className="md comment-md break-words" dangerouslySetInnerHTML={{ __html: markdown(field.text) }} />
       </div>
     ));
-}
-
-function Collapsed({ summary, children }: { summary: string; children: ReactNode }) {
-  return (
-    <details className="mt-2">
-      <summary className="cursor-pointer font-sans text-[13px] text-accent">{summary}</summary>
-      {children}
-    </details>
-  );
 }
 
 /** Every reply below a note, however deep, oldest first: a forum's nesting reads poorly in a column. */
@@ -121,22 +136,37 @@ function descendants(thread: NoteThread): SubmissionNote[] {
 function Comments({ submission, notes }: { submission: Submission; notes: SubmissionNote[] }) {
   if (notes.length === 0) return null;
   return (
-    <Collapsed summary={notes.length === 1 ? '1 comment' : `${notes.length} comments`}>
-      {notes.map((note) => {
-        const fields = shownFields(note, formOf(submission, note));
-        return (
-          <div
-            key={note.externalId}
-            id={anchor(submission, note.externalId)}
-            className="mt-3 border-l-2 border-rule pl-3"
-          >
-            <Heading submission={submission} note={note} />
-            <Scores fields={fields} />
-            <Sections fields={fields} />
-          </div>
-        );
-      })}
-    </Collapsed>
+    <LinkedComments
+      anchors={notes.map(anchor)}
+      items={notes.map((note) => (
+        <Comment key={note.externalId} submission={submission} note={note} />
+      ))}
+    />
+  );
+}
+
+/**
+ * One comment as a card of its own, headed on a tinted strip, so a long exchange reads as separate turns. The one
+ * a link points at is outlined (`:target`, or `data-linked` once `LinkedComments` has shown it).
+ */
+function Comment({ submission, note }: { submission: Submission; note: SubmissionNote }) {
+  const fields = shownFields(note, formOf(submission, note));
+  const title = fields.find((field) => field.key === 'title');
+  const rest = fields.filter((field) => field !== title);
+  return (
+    <div
+      id={anchor(note)}
+      className="mt-3 scroll-mt-4 border border-rule bg-card target:border-accent target:ring-1 target:ring-accent data-linked:border-accent data-linked:ring-1 data-linked:ring-accent"
+    >
+      <div className="border-b border-rule-soft bg-highlight px-3 py-1.5">
+        <Heading submission={submission} note={note} />
+        {title && <p className="mt-0.5 text-[15px] font-semibold">{title.text}</p>}
+      </div>
+      <div className="px-3 pb-2.5">
+        <Scores fields={rest} />
+        <Sections fields={rest} />
+      </div>
+    </div>
   );
 }
 
@@ -149,17 +179,18 @@ function Note({ submission, thread }: { submission: Submission; thread: NoteThre
   const fields = shownFields(note, formOf(submission, note));
   const hasText = fields.some((field) => field.type === 'text');
   return (
-    <article id={anchor(submission, note.externalId)} className="mt-5 border-t border-rule pt-3">
+    <article id={anchor(note)} className="mt-5 scroll-mt-4 border-t border-rule pt-3">
       <Heading submission={submission} note={note} />
       <Scores fields={fields} />
       {hasText && (
-        <Collapsed
+        <LinkedDetails
+          anchor={anchor(note)}
           summary={`Read ${noteLabel(submission, note)
             .replace(/^Official /i, '')
             .toLowerCase()}`}
         >
           <Sections fields={fields} />
-        </Collapsed>
+        </LinkedDetails>
       )}
       <Comments submission={submission} notes={descendants(thread)} />
     </article>
