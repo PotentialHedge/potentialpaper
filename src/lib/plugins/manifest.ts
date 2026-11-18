@@ -161,6 +161,64 @@ const commandSchema = z.looseObject({
   title: text(60, 'What it does, as its menu entry says it: "Copy as CSV".'),
 });
 
+/** A signal's name in its set: dotted lower-case words, so a group reads as one (`map.xy`, `map.region`). */
+export const SIGNAL_NAME_RE = /^[a-z][a-z0-9-]{0,39}(?:\.[a-z][a-z0-9-]{0,39}){0,3}$/;
+/** The most dimensions a vector signal may have. */
+export const MAX_SIGNAL_DIMS = 2048;
+
+const signalCommon = {
+  id: z
+    .string()
+    .regex(SIGNAL_NAME_RE, 'a signal\'s id is dotted lower-case words, like "map.xy" or "rigour"')
+    .meta({ description: "The signal's id in the set, `<set id>:<id>` everywhere else. Stable." }),
+  title: text(60, 'Its name, as readers see it.'),
+  description: text(300, 'What it captures, in a sentence, shown wherever it is used.').optional(),
+};
+
+const signalSchema = z
+  .discriminatedUnion('kind', [
+    z.looseObject({
+      kind: z.literal('vector'),
+      dims: z.number().int().min(1).max(MAX_SIGNAL_DIMS).meta({ description: 'How many numbers each value has.' }),
+      metric: z
+        .enum(['cosine', 'dot', 'l2'])
+        .default('cosine')
+        .meta({ description: 'How two values are compared, for nearest papers.' }),
+      ...signalCommon,
+    }),
+    z.looseObject({
+      kind: z.literal('number'),
+      min: z.number().optional(),
+      max: z.number().optional(),
+      higher: z
+        .enum(['better', 'worse', 'neither'])
+        .default('neither')
+        .meta({ description: 'Which end is better, if either.' }),
+      ...signalCommon,
+    }),
+    z.looseObject({
+      kind: z.literal('label'),
+      ...signalCommon,
+    }),
+  ])
+  .meta({
+    description:
+      'A value it computes for each paper: a vector (an embedding, a position on a map), a number or a label. The publisher writes the values through the API.',
+  });
+
+export type SignalSpec =
+  | { kind: 'vector'; id: string; title: string; description?: string; dims: number; metric: 'cosine' | 'dot' | 'l2' }
+  | {
+      kind: 'number';
+      id: string;
+      title: string;
+      description?: string;
+      min?: number;
+      max?: number;
+      higher: 'better' | 'worse' | 'neither';
+    }
+  | { kind: 'label'; id: string; title: string; description?: string };
+
 export const manifestSchema = z
   .looseObject({
     $schema: z.string().optional(),
@@ -202,6 +260,10 @@ export const manifestSchema = z
       description:
         'The handle of the bot account whose files on pages this plugin shows, so the approval prompt can say where its data comes from. Naming a bot grants nothing.',
     }),
+    publisher: z.string().regex(HANDLE_PATTERN, "an account's handle, without the @").optional().meta({
+      description:
+        "The handle of the account that writes this plugin's signals (contributes.signals). Committing it here is how the repo's owner names that account.",
+    }),
     contributes: z
       .looseObject({
         panels: z.array(panelSchema).max(8).default([]).meta({ description: 'Panels on pages, each a frame.' }),
@@ -219,8 +281,15 @@ export const manifestSchema = z
           .max(16)
           .default([])
           .meta({ description: "Commands, listed in each of its panels' menus." }),
+        signals: z
+          .array(signalSchema)
+          .max(20)
+          .default([])
+          .meta({
+            description: 'Values it publishes about papers, for any plugin and search to use. Needs a publisher.',
+          }),
       })
-      .default({ panels: [], pages: [], settings: {}, commands: [] }),
+      .default({ panels: [], pages: [], settings: {}, commands: [], signals: [] }),
   })
   .meta({
     title: MANIFEST_FILE,
@@ -249,11 +318,14 @@ export interface PluginManifest {
   network: string[];
   /** The bot account whose files on pages it shows (`handoffs/plugins.md` Phase 5); informational. */
   bot?: string;
+  /** The account that writes its signals (`handoffs/signals.md`). */
+  publisher?: string;
   contributes: {
     panels: PanelContribution[];
     pages: { id: string; title: string }[];
     settings: Record<string, PluginSettingSpec>;
     commands: { id: string; title: string }[];
+    signals: SignalSpec[];
   };
 }
 
@@ -286,13 +358,26 @@ function unknownFields(raw: Record<string, unknown>, warn: (path: string, messag
   };
   check(raw, Object.keys(manifestSchema.shape), '');
   const contributes = raw.contributes;
-  check(contributes, ['panels', 'pages', 'settings', 'commands'], 'contributes');
+  check(contributes, ['panels', 'pages', 'settings', 'commands', 'signals'], 'contributes');
   if (!isObject(contributes)) return;
   const each = (list: unknown, known: string[], at: string) =>
     Array.isArray(list) && list.forEach((item, i) => check(item, known, `${at}[${i}]`));
   each(contributes.panels, Object.keys(panelSchema.shape), 'contributes.panels');
   each(contributes.pages, Object.keys(pageSchema.shape), 'contributes.pages');
   each(contributes.commands, Object.keys(commandSchema.shape), 'contributes.commands');
+  if (Array.isArray(contributes.signals)) {
+    const common = ['kind', ...Object.keys(signalCommon)];
+    const fields: Record<string, string[]> = {
+      vector: [...common, 'dims', 'metric'],
+      number: [...common, 'min', 'max', 'higher'],
+      label: common,
+    };
+    contributes.signals.forEach((spec, i) => {
+      if (isObject(spec) && typeof spec.kind === 'string' && fields[spec.kind]) {
+        check(spec, fields[spec.kind], `contributes.signals[${i}]`);
+      }
+    });
+  }
   if (isObject(contributes.settings)) {
     const common = ['type', 'default', ...Object.keys(settingCommon)];
     const fields: Record<string, string[]> = {
@@ -324,7 +409,7 @@ function crossChecks(
   error: (path: string, message: string) => void,
   warn: (path: string, message: string) => void,
 ) {
-  const { panels, pages, settings, commands } = manifest.contributes;
+  const { panels, pages, settings, commands, signals } = manifest.contributes;
   const unique = (list: { id: string }[], at: string, what: string) => {
     const seen = new Set<string>();
     list.forEach((item, i) => {
@@ -335,6 +420,15 @@ function crossChecks(
   unique(panels, 'contributes.panels', 'panel');
   unique(pages, 'contributes.pages', 'page');
   unique(commands, 'contributes.commands', 'command');
+  unique(signals, 'contributes.signals', 'signal');
+  signals.forEach((signal, i) => {
+    if (signal.kind === 'number' && signal.min !== undefined && signal.max !== undefined && signal.min > signal.max) {
+      error(`contributes.signals[${i}]`, 'its min is above its max');
+    }
+  });
+  if (signals.length > 0 && !manifest.publisher) {
+    error('publisher', 'signals need a publisher: the handle of the account that writes them');
+  }
 
   panels.forEach((panel, i) => {
     const at = `contributes.panels[${i}]`;
@@ -395,8 +489,8 @@ function crossChecks(
   if (manifest.permissions.includes('identity') && manifest.network.length === 0) {
     warn('permissions', '"identity" gives a token for your own backend, and "network" names none to send it to');
   }
-  if (panels.length === 0 && pages.length === 0) {
-    warn('contributes', 'adds no panels or pages, so it never runs');
+  if (panels.length === 0 && pages.length === 0 && signals.length === 0) {
+    warn('contributes', 'adds no panels, pages or signals, so it never runs');
   }
 }
 

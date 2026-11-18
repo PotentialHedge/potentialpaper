@@ -98,7 +98,7 @@ export function scoreFieldsOf(forms: VenueForms, invitations: readonly string[])
 }
 
 /** A scope and the scopes under it, as a subquery. */
-function scopePagesOf(scopeId: string) {
+export function scopePagesOf(scopeId: string) {
   return sql`select ${scopeId}::uuid as id union select page_id from page_ancestors where ancestor_id = ${scopeId}`;
 }
 

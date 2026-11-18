@@ -27,6 +27,7 @@ export const API_ERROR_CODES = [
   'edit_conflict',
   'paper_merged',
   'page_busy',
+  'generation_conflict',
   'claim_taken',
   'claim_decided',
   'page_exists',

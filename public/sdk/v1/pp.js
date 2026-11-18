@@ -275,6 +275,27 @@
         });
       },
     },
+    signals: {
+      set: function (set) {
+        return call('signals.set', { set: set });
+      },
+      columns: function (set, options) {
+        return call('signals.columns', Object.assign({ set: set }, options || {}));
+      },
+      nearest: function (set, signal, paper, options) {
+        return ready.then(function () {
+          var params = Object.assign({ set: set, signal: signal, paper: page(paper) }, options || {});
+          return call('signals.nearest', params);
+        });
+      },
+      forPaper: function (paper, set) {
+        return ready.then(function () {
+          var params = { paper: page(paper) };
+          if (set) params.set = set;
+          return call('signals.forPaper', params);
+        });
+      },
+    },
     reviews: {
       forPaper: function (identifier) {
         return ready.then(function () {

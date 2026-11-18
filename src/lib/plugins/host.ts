@@ -1,6 +1,6 @@
 import { z } from 'zod';
 import { parseIdentifier } from '../kinds';
-import { sanitizeSettingValue, type PluginSettingSpec } from '../settings/spec';
+import { PLUGIN_ID_RE, sanitizeSettingValue, type PluginSettingSpec } from '../settings/spec';
 import {
   type CallEnvelope,
   errorOf,
@@ -68,6 +68,9 @@ const identifier = z
   .max(400)
   .refine((text) => parseIdentifier(text) !== null, 'not a page identifier');
 
+/** A signal set's id, `<owner>/<name>` (`handoffs/signals.md`). */
+const setId = z.string().regex(PLUGIN_ID_RE, 'a set id is "<owner>/<name>"');
+
 const PARAMS: Partial<Record<HostMethod, z.ZodType>> = {
   'settings.set': z.object({ name: z.string().max(100), value: z.unknown() }),
   'storage.get': z.object({ key: z.string().regex(STORAGE_KEY_RE).optional() }),
@@ -96,6 +99,20 @@ const PARAMS: Partial<Record<HostMethod, z.ZodType>> = {
     after: z.uuid().optional(),
     limit: z.number().int().min(1).max(MAX_PAPERS_CHUNK).optional(),
   }),
+  'signals.set': z.object({ set: setId }),
+  'signals.columns': z.object({
+    set: setId,
+    signals: z.array(z.string().min(1).max(200)).max(20).optional(),
+    scope: identifier.optional(),
+    titles: z.boolean().optional(),
+  }),
+  'signals.nearest': z.object({
+    set: setId,
+    signal: z.string().min(1).max(200),
+    paper: identifier,
+    k: z.number().int().min(1).max(200).optional(),
+  }),
+  'signals.forPaper': z.object({ paper: identifier, set: setId.optional() }),
   'ui.setHeight': z.object({ height: z.number().finite().min(0) }),
   'ui.openUrl': z.object({ url: z.url({ protocol: /^https?$/ }).max(2000) }),
 };
@@ -144,6 +161,22 @@ const HANDLERS: Record<HostMethod, Handler> = {
     return s.apiLines(`/pages/${enc(identifier as string)}/papers?${query}`);
   },
   'identity.token': (s) => s.identityToken(),
+  'signals.sets': (s) => s.api('/signal-sets'),
+  'signals.set': (s, { set }) => s.api(`/signal-sets/${set as string}`),
+  'signals.columns': (s, { set, signals, scope, titles }) => {
+    const query = new URLSearchParams();
+    if (signals) query.set('signals', (signals as string[]).join(','));
+    if (scope) query.set('scope', scope as string);
+    if (titles) query.set('titles', 'true');
+    return s.api(`/signal-sets/${set as string}/columns${query.size ? `?${query}` : ''}`);
+  },
+  'signals.nearest': (s, { set, signal, paper, k }) => {
+    const query = new URLSearchParams({ signal: signal as string, paper: paper as string });
+    if (k !== undefined) query.set('k', String(k));
+    return s.api(`/signal-sets/${set as string}/nearest?${query}`);
+  },
+  'signals.forPaper': (s, { paper, set }) =>
+    s.api(`/pages/${enc(paper as string)}/signals${set ? `?set=${enc(set as string)}` : ''}`),
   'ui.setHeight': (s, { height }) => s.setHeight(Math.min(MAX_FRAME_HEIGHT, Math.round(height as number))),
   'ui.openUrl': (s, { url }) => s.openUrl(url as string),
 };

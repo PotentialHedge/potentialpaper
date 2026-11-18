@@ -184,6 +184,33 @@ declare namespace PP {
     outcome: Outcome;
   }
 
+  interface SignalSet {
+    id: string;
+    name: string;
+    description: string | null;
+    source: string;
+    commit: string;
+    publisher: string;
+    generation: number;
+    staged: number | null;
+    changedAt: string;
+    signals: { name: string; kind: 'vector' | 'number' | 'label'; spec: Record<string, unknown>; count: number }[];
+  }
+
+  interface SignalColumns {
+    set: { id: string; name: string; generation: number };
+    /** Each paper's identifier, as its publisher gave it. */
+    papers: string[];
+    /** With `titles: true`. */
+    titles?: string[];
+    signals: Record<
+      string,
+      | { kind: 'vector'; dims: number; /** Flat: `dims` numbers a paper, `null` where it has none. */ values: (number | null)[] }
+      | { kind: 'number'; values: (number | null)[] }
+      | { kind: 'label'; keys: string[]; titles: (string | null)[]; /** Indexes into `keys`. */ values: (number | null)[] }
+    >;
+  }
+
   /** A paper of a scope, as `scope.papers` gives it. */
   interface BulkPaper {
     identifier: string | null;
@@ -291,6 +318,31 @@ declare namespace PP {
           onChunk?: (rows: BulkPaper[]) => void;
         },
       ): Promise<BulkPaper[]>;
+    };
+    /** Signals (`handoffs/signals.md`): values apps compute about papers, in sets. Public: no permission needed. */
+    signals: {
+      /** A set: its signals, their kinds and how many papers each covers. */
+      set(set: string): Promise<SignalSet>;
+      /**
+       * Some of a set's signals (all by default) for every paper that has one, by column. `scope` keeps one venue's,
+       * topic's or org's papers. Index `i` of every column is `papers[i]`.
+       */
+      columns(
+        set: string,
+        options?: { signals?: string[]; scope?: string; titles?: boolean },
+      ): Promise<SignalColumns>;
+      /** The `k` (20) papers nearest a paper (the current one by default) by a vector signal, best first. */
+      nearest(
+        set: string,
+        signal: string,
+        paper?: string,
+        options?: { k?: number },
+      ): Promise<{ set: string; signal: string; paper: string | null; neighbours: { paper: string; title: string; score: number }[] }>;
+      /** A paper's values (the current one by default), by set. */
+      forPaper(
+        paper?: string,
+        set?: string,
+      ): Promise<{ sets: { id: string; name: string; values: Record<string, { kind: string; value: unknown; title?: string | null }> }[] }>;
     };
     reviews: {
       /** Needs `reviews.read`: a paper's submissions, notes and venue forms. The current paper by default. */

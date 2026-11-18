@@ -1,3 +1,12 @@
+import * as paperSignalsRoute from '@/app/api/v1/pages/[identifier]/signals/route';
+import * as signalSetsRoute from '@/app/api/v1/signal-sets/route';
+import * as signalSetRoute from '@/app/api/v1/signal-sets/[owner]/[name]/route';
+import * as signalColumnsRoute from '@/app/api/v1/signal-sets/[owner]/[name]/columns/route';
+import * as signalNearestRoute from '@/app/api/v1/signal-sets/[owner]/[name]/nearest/route';
+import * as signalValuesRoute from '@/app/api/v1/signal-sets/[owner]/[name]/values/route';
+import * as signalLabelsRoute from '@/app/api/v1/signal-sets/[owner]/[name]/labels/route';
+import * as signalGenerationsRoute from '@/app/api/v1/signal-sets/[owner]/[name]/generations/route';
+import * as signalPublishRoute from '@/app/api/v1/signal-sets/[owner]/[name]/generations/[generation]/publish/route';
 /* eslint-disable @typescript-eslint/no-explicit-any -- response bodies are checked field by field */
 import { sql } from 'drizzle-orm';
 import * as authRoute from '@/app/api/auth/[...all]/route';
@@ -75,7 +84,7 @@ export const ORIGIN = 'http://test.local';
 
 export async function resetDatabase(): Promise<void> {
   await getDb().execute(sql`
-    truncate table page_views, page_transitions, page_transition_visits, identity_keys, topic_suggestions, page_protection, org_members_due, page_redirects, scope_stats, scope_state, page_claims, plugin_refs, plugin_snapshots, user_plugin_grants, user_plugin_storage, site_settings, user_settings, page_links, page_members, page_member_sources, page_scope_names, page_parents, page_ancestors, pages, paper_follows, search_docs, bot_grants, comment_mentions, comment_aliases, comments, lfs_objects, ssh_keys, evidence_files, agent_posts, agent_files, api_tokens, agent_codes, author_claims, demo_pins, demo_snapshots, submission_notes, submissions, venues, pdf_documents, consumer_cursors, page_events, page_current, page_revisions, page_refs, page_objects, commit_identities, paper_lookup_misses, paper_identifiers, papers, institution_domains, affiliations, accounts, rate_limit_buckets,
+    truncate table signal_values, signal_labels, signals, signal_sets, page_views, page_transitions, page_transition_visits, identity_keys, topic_suggestions, page_protection, org_members_due, page_redirects, scope_stats, scope_state, page_claims, plugin_refs, plugin_snapshots, user_plugin_grants, user_plugin_storage, site_settings, user_settings, page_links, page_members, page_member_sources, page_scope_names, page_parents, page_ancestors, pages, paper_follows, search_docs, bot_grants, comment_mentions, comment_aliases, comments, lfs_objects, ssh_keys, evidence_files, agent_posts, agent_files, api_tokens, agent_codes, author_claims, demo_pins, demo_snapshots, submission_notes, submissions, venues, pdf_documents, consumer_cursors, page_events, page_current, page_revisions, page_refs, page_objects, commit_identities, paper_lookup_misses, paper_identifiers, papers, institution_domains, affiliations, accounts, rate_limit_buckets,
       session, account, verification, "user"
     restart identity cascade
   `);
@@ -141,6 +150,15 @@ const ROUTES: [RegExp, any][] = [
   [/^\/pages\/(?<identifier>[^/?]+)\/scores(\?.*)?$/, pageScoresRoute],
   [/^\/pages\/(?<identifier>[^/?]+)\/scores\/(?<venue>[^/?]+)\/(?<field>[^/?]+)(\?.*)?$/, pageScoreFieldRoute],
   [/^\/pages\/(?<identifier>[^/?]+)\/papers(\?.*)?$/, pagePapersRoute],
+  [/^\/pages\/(?<identifier>[^/?]+)\/signals(\?.*)?$/, paperSignalsRoute],
+  [/^\/signal-sets(\?.*)?$/, signalSetsRoute],
+  [/^\/signal-sets\/(?<owner>[^/?]+)\/(?<name>[^/?]+)\/columns(\?.*)?$/, signalColumnsRoute],
+  [/^\/signal-sets\/(?<owner>[^/?]+)\/(?<name>[^/?]+)\/nearest(\?.*)?$/, signalNearestRoute],
+  [/^\/signal-sets\/(?<owner>[^/?]+)\/(?<name>[^/?]+)\/values(\?.*)?$/, signalValuesRoute],
+  [/^\/signal-sets\/(?<owner>[^/?]+)\/(?<name>[^/?]+)\/labels(\?.*)?$/, signalLabelsRoute],
+  [/^\/signal-sets\/(?<owner>[^/?]+)\/(?<name>[^/?]+)\/generations$/, signalGenerationsRoute],
+  [/^\/signal-sets\/(?<owner>[^/?]+)\/(?<name>[^/?]+)\/generations\/(?<generation>\d+)\/publish$/, signalPublishRoute],
+  [/^\/signal-sets\/(?<owner>[^/?]+)\/(?<name>[^/?]+)$/, signalSetRoute],
   [/^\/pages\/(?<identifier>[^/?]+)\/topic$/, topicRoute],
   [/^\/pages\/(?<identifier>[^/?]+)\/topics$/, paperTopicsRoute],
   [/^\/pages\/(?<identifier>[^/?]+)\/topic-papers(\?.*)?$/, topicPapersRoute],

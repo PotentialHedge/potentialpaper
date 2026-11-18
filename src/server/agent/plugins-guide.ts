@@ -57,6 +57,23 @@ export const METHOD_DOCS: Record<keyof typeof HOST_METHODS, { call: string; does
     call: 'pp.identity.token()',
     does: 'A short-lived token naming the signed-in reader to your own backend ([Your own backend](#your-own-backend)). `pp.identity.fetch(url, init)` sends it as `Authorization: Bearer …`.',
   },
+  'signals.sets': { call: "pp.call('signals.sets')", does: 'Every signal set: its id, name and publisher.' },
+  'signals.set': {
+    call: 'pp.signals.set(set)',
+    does: 'A signal set ([Signals](#signals)): its signals, their kinds and how many papers each covers.',
+  },
+  'signals.columns': {
+    call: 'pp.signals.columns(set, { signals, scope, titles })',
+    does: "Some of a set's signals for every paper that has one, by column: a map's whole input in one call.",
+  },
+  'signals.nearest': {
+    call: 'pp.signals.nearest(set, signal, [paper], { k })',
+    does: "The papers nearest one paper by a set's vector signal, best first.",
+  },
+  'signals.forPaper': {
+    call: 'pp.signals.forPaper([paper], [set])',
+    does: "One paper's values, by set: the current paper by default.",
+  },
   'ui.setHeight': {
     call: 'pp.ui.setHeight(px)',
     does: `Size your frame yourself (at most ${MAX_FRAME_HEIGHT}px). By default the SDK sizes it to your body.`,
@@ -330,6 +347,48 @@ origin's IndexedDB) and ask again with the tag. Statistics are recomputed a few 
 and percentiles are yours to do from \`values\`. A site may withhold a venue's statistics until its decisions are out
 (\`hidden: true\`, with no values). Reviews are CC BY 4.0: show each one's licence and link with what you draw from
 it. The OpenAPI description of these routes is at ${origin}/openapi.json.
+
+## Signals
+
+A **signal** is one value per paper that an app computes: an embedding, a position on a map, a score ("rigour",
+0 to 1), a label ("uses diffusion"). Signals come in **sets**, one per app, and any plugin, and search, can use any set:
+one person's way of reasoning about papers becomes everyone's tool. Every value is shown with the set it came from.
+
+**Publish a set.** Declare its signals in your manifest's \`contributes.signals\`, and name the account that writes
+them as \`publisher\` (its handle). Committing that file to your repo is how you say the account is yours.
+
+\`\`\`json
+{
+  "id": "<owner>/<name>",
+  "publisher": "<your handle>",
+  "contributes": {
+    "signals": [
+      { "id": "map.xy", "kind": "vector", "dims": 2, "title": "Position on the map" },
+      { "id": "map.region", "kind": "label", "title": "Region" },
+      { "id": "embedding", "kind": "vector", "dims": 64, "metric": "cosine", "title": "Embedding" },
+      { "id": "rigour", "kind": "number", "min": 0, "max": 1, "higher": "better", "title": "Rigour" }
+    ]
+  }
+}
+\`\`\`
+
+Kinds: \`vector\` (\`dims\` up to 2048, \`metric\` \`cosine\`, \`dot\` or \`l2\`), \`number\` (\`min\`, \`max\`, \`higher\`
+\`better\`, \`worse\` or \`neither\`) and \`label\` (a key per paper; its titles are written separately, since a map's
+regions change with every rebuild). Then, as the publisher, with an API key that may write (made on your profile):
+
+- \`POST ${origin}/api/v1/signal-sets\` \`{ "source": "github:<owner>/<repo>" }\` registers the set, or takes its
+  manifest again after you change it.
+- \`PUT ${origin}/api/v1/signal-sets/<owner>/<name>/values\` \`{ "values": [{ "paper": "openreview:abc", "signal":
+  "rigour", "value": 0.8 }] }\`, up to 5,000 a request; \`"value": null\` removes one. Papers are named by identifier
+  and matched when read, so a value may arrive before its paper does.
+- \`PUT …/labels\` \`{ "signal": "map.region", "labels": [{ "key": "3", "title": "llm agents · skills" }] }\`.
+- **A rebuild swaps in at once:** \`POST …/generations\` starts a new generation beside the live one; write all of it
+  with \`?generation=<n>\` on the two routes above; then \`POST …/generations/<n>/publish\` makes it live and drops the
+  old one. Without \`?generation\`, writes go to the live generation.
+
+**Read a set** with \`pp.signals\` (no permission needed: signals are public), or over HTTP:
+\`GET ${origin}/api/v1/signal-sets\`, \`…/<owner>/<name>\`, \`…/<owner>/<name>/columns?signals=a,b&scope=<identifier>&titles=true\`,
+\`…/<owner>/<name>/nearest?signal=<id>&paper=<identifier>&k=20\`, and \`GET ${origin}/api/v1/pages/<identifier>/signals\`.
 
 ## Your own backend
 

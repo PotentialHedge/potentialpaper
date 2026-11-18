@@ -87,6 +87,11 @@ export const HOST_METHODS = {
   'scope.scores': 'scope.read',
   'scope.papers': 'scope.read',
   'identity.token': 'identity',
+  'signals.sets': null,
+  'signals.set': null,
+  'signals.columns': null,
+  'signals.nearest': null,
+  'signals.forPaper': null,
   'ui.setHeight': null,
   'ui.openUrl': null,
 } as const satisfies Record<string, PluginPermission | null>;

@@ -12,6 +12,7 @@ import {
   jsonb,
   pgTable,
   primaryKey,
+  real,
   smallint,
   text,
   timestamp,
@@ -1476,5 +1477,95 @@ export const pageProtection = pgTable(
   },
   () => [
     check('page_protection_level_check', sql.raw(`level in (${PROTECTION_LEVELS.map((s) => `'${s}'`).join(', ')})`)),
+  ],
+);
+
+/**
+ * Signals (`handoffs/signals.md`): values an app computes about papers, in sets. A set is a plugin's
+ * `contributes.signals`, registered by the account its manifest names as `publisher`, who alone writes its values.
+ * Values are kept per **generation**: the publisher writes a whole new one beside the live one and then publishes it,
+ * so a rebuilt map never shows half its old layout; `live_generation` is what readers see, `staged_generation` the
+ * one being written. Not page content, and not in git: the publisher can always push them again.
+ */
+export const signalSets = pgTable('signal_sets', {
+  /** The plugin id, `<owner>/<name>`. */
+  id: text('id').primaryKey(),
+  /** `github:<owner>/<repo>[/<path>]`. */
+  source: text('source').notNull(),
+  commit: text('commit').notNull(),
+  publisherId: uuid('publisher_id')
+    .notNull()
+    .references(() => accounts.id, { onDelete: 'cascade' }),
+  name: text('name').notNull(),
+  description: text('description'),
+  liveGeneration: integer('live_generation').notNull().default(1),
+  stagedGeneration: integer('staged_generation'),
+  /** When the live generation last changed: the ETag of every read of the set. */
+  changedAt: timestamp('changed_at', { withTimezone: true, mode: 'date' })
+    .notNull()
+    .default(sql`clock_timestamp()`),
+  createdAt: createdAt(),
+});
+
+export const SIGNAL_KINDS = ['vector', 'number', 'label'] as const;
+export type SignalKind = (typeof SIGNAL_KINDS)[number];
+
+/** A set's signals, as its manifest at `signal_sets.commit` declares them. */
+export const signals = pgTable(
+  'signals',
+  {
+    setId: text('set_id')
+      .notNull()
+      .references(() => signalSets.id, { onDelete: 'cascade' }),
+    name: text('name').notNull(),
+    kind: text('kind', { enum: SIGNAL_KINDS }).notNull(),
+    /** The manifest's entry: title, description, and `dims`/`metric`, `min`/`max`/`higher`. */
+    spec: jsonb('spec').$type<Record<string, unknown>>().notNull(),
+  },
+  (t) => [
+    primaryKey({ columns: [t.setId, t.name] }),
+    check('signals_kind_check', sql.raw(`kind in (${SIGNAL_KINDS.map((k) => `'${k}'`).join(', ')})`)),
+  ],
+);
+
+/** The names of a label signal's values in one generation: a map's regions change with every rebuild. */
+export const signalLabels = pgTable(
+  'signal_labels',
+  {
+    setId: text('set_id')
+      .notNull()
+      .references(() => signalSets.id, { onDelete: 'cascade' }),
+    generation: integer('generation').notNull(),
+    signal: text('signal').notNull(),
+    key: text('key').notNull(),
+    title: text('title').notNull(),
+  },
+  (t) => [primaryKey({ columns: [t.setId, t.generation, t.signal, t.key] })],
+);
+
+/**
+ * One paper's value of one signal, keyed by the paper's identifier as the publisher gave it (`openreview:abc`) and
+ * matched to papers when read, so a value can arrive before its paper does. Exactly one of `num`, `label`, `vec`.
+ */
+export const signalValues = pgTable(
+  'signal_values',
+  {
+    setId: text('set_id')
+      .notNull()
+      .references(() => signalSets.id, { onDelete: 'cascade' }),
+    generation: integer('generation').notNull(),
+    signal: text('signal').notNull(),
+    scheme: text('scheme').notNull(),
+    value: text('value').notNull(),
+    num: real('num'),
+    label: text('label'),
+    vec: real('vec').array(),
+    updatedAt: timestamp('updated_at', { withTimezone: true, mode: 'date' })
+      .notNull()
+      .default(sql`clock_timestamp()`),
+  },
+  (t) => [
+    primaryKey({ columns: [t.setId, t.generation, t.signal, t.scheme, t.value] }),
+    index('signal_values_paper_idx').on(t.scheme, t.value),
   ],
 );

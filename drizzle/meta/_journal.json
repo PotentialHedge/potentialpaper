@@ -309,6 +309,13 @@
       "when": 1795006439263,
       "tag": "0043_drop_paper_views",
       "breakpoints": true
+    },
+    {
+      "idx": 44,
+      "version": "7",
+      "when": 1795010810826,
+      "tag": "0044_signals",
+      "breakpoints": true
     }
   ]
 }
