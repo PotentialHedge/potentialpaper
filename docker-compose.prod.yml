@@ -77,7 +77,7 @@ services:
       - traefik.http.routers.${COMPOSE_PROJECT_NAME:-potentialpaper}.rule=Host(`${APP_HOST}`)
       - traefik.http.routers.${COMPOSE_PROJECT_NAME:-potentialpaper}.entrypoints=websecure
       - traefik.http.routers.${COMPOSE_PROJECT_NAME:-potentialpaper}.tls=true
-      - traefik.http.routers.${COMPOSE_PROJECT_NAME:-potentialpaper}.middlewares=${COMPOSE_PROJECT_NAME:-potentialpaper}-ratelimit
+      - traefik.http.routers.${COMPOSE_PROJECT_NAME:-potentialpaper}.middlewares=${COMPOSE_PROJECT_NAME:-potentialpaper}-ratelimit,${COMPOSE_PROJECT_NAME:-potentialpaper}-compress
       - traefik.http.services.${COMPOSE_PROJECT_NAME:-potentialpaper}.loadbalancer.server.port=3000
       # A dumb-HTTP clone asks for each git object separately: over a thousand quick requests for a page with
       # a few hundred edits, all small primary-key reads. It would trip the limit below, and git gives up on a 429.
@@ -97,7 +97,11 @@ services:
       - traefik.http.routers.${COMPOSE_PROJECT_NAME:-potentialpaper}-demos.entrypoints=websecure
       - traefik.http.routers.${COMPOSE_PROJECT_NAME:-potentialpaper}-demos.tls=true
       - traefik.http.routers.${COMPOSE_PROJECT_NAME:-potentialpaper}-demos.service=${COMPOSE_PROJECT_NAME:-potentialpaper}
-      - traefik.http.routers.${COMPOSE_PROJECT_NAME:-potentialpaper}-demos.middlewares=${COMPOSE_PROJECT_NAME:-potentialpaper}-git-ratelimit
+      - traefik.http.routers.${COMPOSE_PROJECT_NAME:-potentialpaper}-demos.middlewares=${COMPOSE_PROJECT_NAME:-potentialpaper}-git-ratelimit,${COMPOSE_PROJECT_NAME:-potentialpaper}-compress
+      # Compression for the app and user content (Next's own is off: next.config.ts): zstd, br or gzip, whichever the
+      # client (Cloudflare) takes first, streamed responses included. Not on /git/: its objects are compressed already.
+      - traefik.http.middlewares.${COMPOSE_PROJECT_NAME:-potentialpaper}-compress.compress.encodings=zstd,br,gzip
+      - traefik.http.middlewares.${COMPOSE_PROJECT_NAME:-potentialpaper}-compress.compress.excludedcontenttypes=image/png,image/jpeg,image/webp,image/avif,image/gif,application/pdf,application/zip,application/gzip,video/mp4,font/woff2
       # Anonymous traffic is the edge's job, keyed on the real client IP, which is trustworthy
       # because only Cloudflare can reach this origin.
       - traefik.http.middlewares.${COMPOSE_PROJECT_NAME:-potentialpaper}-ratelimit.ratelimit.average=${RATE_LIMIT_AVERAGE:-30}

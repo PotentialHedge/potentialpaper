@@ -1,4 +1,3 @@
-import { gunzipSync } from 'node:zlib';
 import { eq } from 'drizzle-orm';
 import { afterAll, beforeEach, describe, expect, it } from 'vitest';
 import { getDb } from '@/db';
@@ -407,7 +406,7 @@ describe('scope statistics (A)', () => {
 });
 
 describe("a scope's papers in bulk (B)", () => {
-  it('streams NDJSON with submissions, statuses and score vectors, gzipped, ETagged and in chunks', async () => {
+  it('streams NDJSON with submissions, statuses and score vectors, ETagged and in chunks', async () => {
     await venuePages();
     await submitted(ICLR_2027, 'accepted', [8, '6: marginally above']);
     await submitted(ICLR_2027, 'rejected', [3]);
@@ -451,16 +450,6 @@ describe("a scope's papers in bulk (B)", () => {
     );
     expect(bareRow.submissions).toBeUndefined();
     expect((await api('GET', `${path}?fields=votes`)).status).toBe(400);
-
-    // Gzipped for a client that takes it.
-    const zipped = await get(path, papersRoute, { 'accept-encoding': 'gzip, br' });
-    expect(zipped.headers.get('content-encoding')).toBe('gzip');
-    expect(
-      gunzipSync(Buffer.from(await zipped.arrayBuffer()))
-        .toString('utf8')
-        .trim()
-        .split('\n'),
-    ).toHaveLength(3);
 
     // ETag on the scope's last change: the same until something changes.
     const etag = res.headers.get('etag')!;

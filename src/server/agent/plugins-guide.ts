@@ -350,7 +350,7 @@ segment (\`venue%3Aiclr%2F2027\`). Each answer is cached a minute.
   \`venue.page\`'s statistics and mark the scope's papers on it, as score standing's org view does
 - \`GET ${origin}/api/v1/pages/<identifier>/papers?fields=submissions,scores,status&limit=&after=\`: a scope's papers
   as NDJSON, one a line, with every submission, its status and each review's score vector (\`scope.papers\`). Without
-  \`limit\`, all of them in one stream; with it, one chunk and the next cursor in \`X-Next-Cursor\`. Gzipped when asked.
+  \`limit\`, all of them in one stream; with it, one chunk and the next cursor in \`X-Next-Cursor\`. Compressed when asked.
 
 The score and paper routes send an \`ETag\` and answer \`If-None-Match\` with a 304: cache what you fetch (in your
 origin's IndexedDB) and ask again with the tag. Statistics are recomputed a few seconds after a change; curve-fitting

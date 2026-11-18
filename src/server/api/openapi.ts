@@ -265,7 +265,7 @@ export function openApiDocument(origin: string) {
       '/pages/{identifier}/papers': {
         get: {
           summary: "A scope's papers in bulk",
-          description: `NDJSON, one paper a line, in a stable order: each with every submission, its status and decision, and each review's score vector. Without \`limit\`, every paper in one stream; with it, one chunk and the next chunk's cursor in \`X-Next-Cursor\`. Gzipped when the request accepts it. The \`ETag\` changes with the scope's last change. ${CACHED}`,
+          description: `NDJSON, one paper a line, in a stable order: each with every submission, its status and decision, and each review's score vector. Without \`limit\`, every paper in one stream; with it, one chunk and the next chunk's cursor in \`X-Next-Cursor\`. Compressed (zstd, br or gzip) when the request accepts it. The \`ETag\` changes with the scope's last change. ${CACHED}`,
           parameters: [
             identifier,
             query(

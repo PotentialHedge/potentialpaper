@@ -1194,7 +1194,8 @@ const PAPERS_CHUNK = 500;
 /**
  * A scope's papers in bulk (data for plugins B, `scope.papers`), as NDJSON: one paper a line with its submissions,
  * their statuses and every review's score vector. Public: the reviews are CC BY, and each carries its licence and
- * source link. ETagged on the scope's last change, gzipped when the client takes it. With `limit`, one chunk, and the
+ * source link. ETagged on the scope's last change. Compressed by the proxy in front (`docker-compose.prod.yml`), not here: Next drops a
+ * route's own `Content-Encoding`. With `limit`, one chunk, and the
  * cursor for the next in `X-Next-Cursor`.
  */
 export const getPagePapers = route(async (req, params) => {
@@ -1241,11 +1242,6 @@ export const getPagePapers = route(async (req, params) => {
         }
       },
     });
-  }
-  const gzip = /\bgzip\b/.test(req.headers.get('accept-encoding') ?? '');
-  if (gzip) {
-    body = body.pipeThrough(new CompressionStream('gzip') as unknown as TransformStream<Uint8Array, Uint8Array>);
-    headers['Content-Encoding'] = 'gzip';
   }
   return new Response(body, { status: 200, headers: { ...headers, 'Content-Type': 'application/x-ndjson' } });
 });

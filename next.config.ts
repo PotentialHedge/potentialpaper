@@ -38,6 +38,9 @@ const CSP = [
 const nextConfig: NextConfig = {
   // No `X-Powered-By: Next.js`: it tells a scanner which advisories to try.
   poweredByHeader: false,
+  // Traefik compresses instead (zstd, br or gzip, streams too: `docker-compose.prod.yml`). Next's is gzip only, and it
+  // drops a route's own `Content-Encoding`, so a route can't compress for itself.
+  compress: false,
   // A demo's folder needs its slash, or its relative addresses resolve one level up. `proxy.ts` removes the
   // slash on the app's own host, as Next would.
   skipTrailingSlashRedirect: true,
