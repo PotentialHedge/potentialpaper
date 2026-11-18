@@ -5485,6 +5485,823 @@
        "modifiedAt": "2025-11-18T15:53:52.248Z"
       }
      ]
+    },
+    {
+     "id": "0eEtTsnmyo",
+     "number": 12686,
+     "title": "On Uniformly Scaling Flows: A Density-Aligned Approach to Deep One-Class Classification",
+     "abstract": "Unsupervised anomaly detection is often framed around two widely studied paradigms. Deep one-class classification, exemplified by Deep SVDD, learns compact latent representations of normality, while density estimators realized by normalizing flows directly model the likelihood of nominal data. In this work, we show that uniformly scaling flows (USFs), normalizing flows with a constant Jacobian determinant, precisely connect these approaches. Specifically, we prove how training a USF via maximum-likelihood reduces to a Deep SVDD objective with a unique regularization that inherently prevents representational collapse. This theoretical bridge implies that USFs inherit both the density faithfulness of flows and the distance-based reasoning of one-class methods. We further demonstrate that USFs induce a tighter alignment between negative log-likelihood and latent norm than either Deep SVDD or non-USFs, and how recent hybrid approaches combining one-class objectives with VAEs can be naturally extended to USFs. Consequently, we advocate using USFs as a drop-in replacement for non-USFs in modern anomaly detection architectures. Empirically, this substitution yields consistent performance gains and substantially improved training stability across multiple benchmarks and model backbones for both tabular and image anomaly detection. These results unify two major anomaly detection paradigms, advancing both theoretical understanding and practical performance.",
+     "authors": [
+      "Faried Abu Zaid",
+      "Tim Katzke",
+      "Emmanuel Mueller",
+      "Daniel Neider"
+     ],
+     "keywords": [
+      "anomaly detection",
+      "normalizing flows",
+      "one-class classification",
+      "representation learning"
+     ],
+     "status": "rejected",
+     "decision": "Reject",
+     "notes": [
+      {
+       "externalId": "uB4iYlR9fV",
+       "replyTo": null,
+       "kind": "review",
+       "invitation": "Official_Review",
+       "signature": "Reviewer U6Ni",
+       "content": {
+        "summary": "The paper connects Deep SVDD and normalizing flows for anomaly detection by introducing a subclass called Uniformly Scaling Flows (USFs), where the Jacobian determinant is constant across inputs. Under this setup, the maximum-likelihood objective of a flow becomes equivalent to the Deep SVDD loss, offering a simple link between one-class classification and flow-based modeling. The authors argue that this keeps the stability and invertibility benefits of flows while avoiding the collapse issues of Deep SVDD. In experiments, they replace affine coupling layers with additive USF layers in existing flow-based detectors (FastFlow, CFlow, U-Flow) using frozen pretrained backbones. Results on MVTec AD and VisA show that the USF variants reach similar or slightly better accuracy, with improved training stability and less sensitivity to initialization. The paper positions USFs as a lightweight and theoretically grounded alternative to standard flow-based anomaly detectors.",
+        "soundness": 2,
+        "presentation": 3,
+        "contribution": 2,
+        "strengths": "- The paper formalizes a clear theoretical link between Deep SVDD and a subclass of normalizing flows with constant Jacobian determinants, unifying two separate paradigms of anomaly detection through an analytical derivation.\n- The paper reinforces previous observations that the log-determinant term can dominate likelihood in flow-based detectors, and systematically validates that removing input-dependent volume terms leads to more stable training.\n- The paper includes a range of controlled experiments and ablations that clearly isolate the effect of the proposed change, making the empirical findings easy to interpret.\n- The paper is generally easy to follow, with clean derivations and consistent notation. The theory-to-experiments flow is coherent, and the ablation results are presented in a readable and well-organized manner.",
+        "weaknesses": "- The paper builds its main theoretical motivation on Deep SVDD, a 2018 one-class method that has largely fallen out of use in both image and tabular anomaly detection. Modern benchmarks (e.g., ADBench, MVTec, VisA) consistently show that simple feature-based or transformer-based approaches, contrastive learning, and diffusion-based detectors far outperform Deep SVDD, which is now mostly cited for historical context. As a result, grounding the paper’s core theory around an outdated baseline places it in an awkward position. The conceptual bridge it draws may be elegant, but its practical impact is limited unless validated against current methods.\n-  The paper frames Uniformly Scaling Flows (USFs) as a key innovation for removing input-dependent volume effects, but constant-Jacobian / volume-preserving flows have long existed in the literature (e.g., NICE; FlowSVDD; OneFlow), and have already been applied specifically to anomaly detection to avoid SVDD-style collapse. As such, the only substantial novelty lies in the formal SVDD–USF MLE equivalence and the controlled additive-vs-affine ablations, not in the idea of using constant-determinant flows itself. \n- The empirical section mostly replaces affine coupling with additive coupling in pre-existing architectures (FastFlow, CFlow, U-Flow) using pretrained frozen features. The practical contribution is thus modest. It is more of an architectural ablation than a fundamentally new detection framework. The theoretical bridge to Deep SVDD does not clearly lead to a new practical algorithm beyond this substitution.\n- Each baseline uses a different pretrained backbone (ResNet-18, WRN-50-2, CaiT), so absolute numbers are not directly comparable across architectures; only within-architecture swaps are fair. A shared backbone control would strengthen the empirical claims.\n- In the main text, in Proposition 1, $F_\\alpha(x)=x/(\\alpha||x||)$ gives $||F_\\alpha(x)||\\equiv 1/\\alpha$ for all $x\\neq0$, so the claimed monotonicity $||x||\\uparrow\\Rightarrow||F_\\alpha(x)||\\downarrow$ is false; yet the loss is then (incorrectly) written as $\\alpha^{-2}\\mathbb{E}||x||^{-2}$. In Appendix B.4, $F_\\alpha$ is redefined as the scalar $1/(\\alpha|x|)$ but treated as vector-valued, creating a type mismatch with the Deep-SVDD loss $\\mathbb{E}||F(X)-c||^2$. A minimal fix is the vector-valued radial inversion $F_\\alpha(x)=x/(\\alpha||x||^2)$ with $F_\\alpha(0)=0$, which yields the intended ordering and $L=\\alpha^{-2}\\mathbb{E}\\big[1/||x||^2\\big]=1/\\big(\\alpha^2(d-2)\\big)$ for $d>2$.\n- The citations should be in parentheses using \\citep.",
+        "questions": "- How sensitive are the reported gains to the choice of pretrained backbone? Would the same improvements hold if all methods shared an identical architecture or were trained from scratch?\n- How does the proposed USF formulation differ from prior work such as FlowSVDD, which also uses constant-Jacobian (volume-preserving) flows for anomaly detection and explicitly argues that this avoids hypersphere collapse?\n- How does the improved flow baselines compared to state-of-the-art non-flow baselines?\n- The experiments rely on MVTec AD and VisA, both image datasets, even though all features come from pretrained ImageNet backbones. Why restrict the evaluation to images? If the method is architecture-agnostic, testing on tabular anomaly detection (e.g. ADBench) could better show its generality.",
+        "flag_for_ethics_review": [
+         "No ethics review needed."
+        ],
+        "rating": 4,
+        "confidence": 4,
+        "code_of_conduct": "Yes"
+       },
+       "license": "CC-BY-4.0",
+       "url": "https://openreview.net/forum?id=0eEtTsnmyo&noteId=uB4iYlR9fV",
+       "createdAt": "2025-10-17T22:02:15.375Z",
+       "modifiedAt": "2025-11-12T04:58:43.501Z"
+      },
+      {
+       "externalId": "nbrtiZPC8h",
+       "replyTo": null,
+       "kind": "review",
+       "invitation": "Official_Review",
+       "signature": "Reviewer b6fW",
+       "content": {
+        "summary": "This paper proposes Uniformly Scaling Flows (USFs), a restricted class of normalizing flows where the Jacobian determinant is constant across the input space. The authors show that maximum-likelihood training of such a flow can be reformulated as a Deep SVDD-style objective with an implicit regularization term preventing collapse. Experiments on replacing standard coupling layers in FastFlow, CFlow, and U-Flow with USF variants showed moderate AUROC improvements and notably reduced run-to-run variance on MVTec AD and VisA benchmarks.",
+        "soundness": 2,
+        "presentation": 2,
+        "contribution": 2,
+        "strengths": "1. The paper provides a clean mathematical connection between one-class classification and flow-based objectives.\n2. This work empirically shows improved training stability across several flow architectures.\n3. The idea of exploring Jacobian regularization may inspire follow-up work on stable density modeling.",
+        "weaknesses": "1. The theoretical equivalence is mathematically valid but largely follows from simplifying the log-det term in standard flows. It does not lead to a new learning principle.\n2. The main idea is an extension of the prior hybrid flow–SVDD and One-Flow works. The difference from these prior works is a mild variation rather than a substantive theoretical or algorithmic innovation.\n3. Only modest empirical improvements are shown on many classes in the experiments.\n4. The evaluation is limited to two industrial anomaly detection datasets, and the experimental comparisons are limited to flow-based methods. They didn't include the latest SOTA methods into the experimental comparisons.",
+        "questions": "1. The derivations are internally consistent and reproduce known properties of flow-based AD models. However, the equivalence theorem is straightforward once the constant determinant assumption is applied, and the empirical validation does not seem to justify the claimed unification.\n2. Section 5 on experiments reads like an afterthought and does not deeply analyze why stability is improved.",
+        "flag_for_ethics_review": [
+         "No ethics review needed."
+        ],
+        "rating": 2,
+        "confidence": 4,
+        "code_of_conduct": "Yes"
+       },
+       "license": "CC-BY-4.0",
+       "url": "https://openreview.net/forum?id=0eEtTsnmyo&noteId=nbrtiZPC8h",
+       "createdAt": "2025-11-01T05:21:01.711Z",
+       "modifiedAt": "2025-11-12T04:58:43.117Z"
+      },
+      {
+       "externalId": "iFNzLzX8LO",
+       "replyTo": null,
+       "kind": "review",
+       "invitation": "Official_Review",
+       "signature": "Reviewer cPS3",
+       "content": {
+        "summary": "The theory is clear and careful: training a uniformly scaling flow (USF) with MLE reduces to a Deep-SVDD-style objective with an implicit weight regularizer, which explains why collapse is avoided. The constant-Jacobian view cleanly links density level sets to latent norms. Empirically, the drop-in USF swap improves stability strongly and often accuracy across MVTec AD and VisA on CFlow and U-Flow (e.g., ~72.5→90.8 and ~92.7→94.5), while FastFlow is roughly neutral. The scope is mainly image AD; dimensionality-reduction needs the proposed VAE hybrid. Overall, technically solid.",
+        "soundness": 4,
+        "presentation": 3,
+        "contribution": 3,
+        "strengths": "1. Clear theoretical link between USFs and Deep SVDD that explains behavior and avoids collapse.\n2. Practical “drop-in” recipe that substantially reduces run-to-run variance; accuracy gains on CFlow/U-Flow are convincing.\n3. Broad evaluation across datasets, metrics, and architectures; ablations isolate the US modification.\n4. Writing is professional; related work coverage is adequate.",
+        "weaknesses": "1. Architectural novelty is incremental (additive/volume-preserving flows are known); the novelty depends mostly on the connection and analysis.\n2. Expressivity trade-off vs. affine coupling is under-analyzed; FastFlow gains are limited.\n3. Evaluation scope is visual AD; no results on tabular/time-series or non-vision AD.\n4, VAE-USF section is promising but under-evaluated (few settings, limited ablations).\n5. Baselines emphasize flow variants; adding non-flow one-class/reconstruction baselines would strengthen the broader claim.",
+        "questions": "1. Beyond isotropic Gaussian bases, do heavy-tailed or mixture bases preserve the same alignment benefits in USFs?\n2. For FastFlow, why are gains small? Capacity, optimization, or interaction with 2D conv flows?\n3. Did you actually apply the log-normal prior on det(J) during training, and how sensitive are results to its hyperparameters?\n4. In VAE-USF, how did you set the reconstruction vs. likelihood weighting, and did varying latent dimension change the story?\n5. Any path to dimension reduction without the VAE (e.g., relaxed invertibility or partial flows)?",
+        "flag_for_ethics_review": [
+         "No ethics review needed."
+        ],
+        "rating": 6,
+        "confidence": 4,
+        "code_of_conduct": "Yes"
+       },
+       "license": "CC-BY-4.0",
+       "url": "https://openreview.net/forum?id=0eEtTsnmyo&noteId=iFNzLzX8LO",
+       "createdAt": "2025-11-01T10:57:49.613Z",
+       "modifiedAt": "2025-11-12T04:58:42.688Z"
+      },
+      {
+       "externalId": "VLyO4VirnE",
+       "replyTo": null,
+       "kind": "comment",
+       "invitation": "Official_Comment",
+       "signature": "Authors",
+       "content": {
+        "title": "General Response to All Reviewers",
+        "comment": "We sincerely thank all reviewers for their thoughtful and constructive feedback. We appreciate the recognition of our theoretical contributions and empirical validation. We address the common concerns raised across reviews below, with detailed responses to individual reviewers following.\n\n### On Practical Value and Scope of Experiments\n\nSeveral reviewers noted the limited experimental scope (image-only datasets) and requested broader validation. We acknowledge this limitation and are actively extending our experiments to address these concerns. Our survey of current flow-based anomaly detection libraries reveals that USF architectures are largely absent from mainstream implementations:\n\n- **GANF** (Graph AD with NFs): Only non-USFs\n- **STG-NF**: Contains both USF and non-USF variants\n- **Anomalib**: Only non-USFs  \n- **SanFlow**: Only non-USFs\n\nThis gap underscores the practical value of our investigation. Since the fundamental differences in latent space alignment and their consequences for anomaly detection are currently under-investigated, our experiments clearly indicate that USF architectures have the potential to improve a large number of highly performant AD methods in a drop-in fashion. A well-grounded theory that connects density estimation and latent norm-based reasoning allows practitioners to make informed decisions during AD algorithm design, which can have substantial influence as our experiments demonstrate.\n\nWe note that recent theoretical work has analyzed conditions under which volume-preserving flows may be suboptimal, particularly for multi-modal distributions (Draxler et al., ICML 2024, \"On the Universality of Volume-Preserving and Coupling-Based Normalizing Flows\"). Interestingly, their analysis reveals that when the latent distribution is rotationally symmetric with density decreasing from the origin—exactly our setup with isotropic Gaussian bases—volume-preserving flows learn the same transport map as more expressive alternatives. This theoretical insight supports our empirical finding that USF substitution improves performance in the anomaly detection setting, where the base distribution satisfies these conditions.\n\n### On Novelty Beyond Prior Work (FlowSVDD, OneFlow)\n\nMultiple reviewers questioned the novelty relative to FlowSVDD and OneFlow. We emphasize that while these works employ volume-preserving flows, they fundamentally differ from our approach:\n\n1. **Different Loss Functions**: Both FlowSVDD and OneFlow develop custom loss functions rather than using maximum likelihood estimation. FlowSVDD jointly learns a decision radius, breaking the direct connection to density estimation. OneFlow uses a custom loss based on Bernstein polynomial quantile estimates and volume minimizations.\n\n2. **Different Theoretical Guarantees**: Their theoretical analyses focus solely on collapse prevention through bijectivity. Our argument relies on both bijectivity *and* the direct connection to maximum likelihood training—i.e., minimization of the reverse KL-divergence to a Gaussian in latent space—which provides provably non-degenerate optima (Section 4.2).\n\n3. **Latent Space Alignment Analysis**: Neither work analyzes the monotonic alignment between data density and latent norm that we establish in Section 4.3. This property is crucial for understanding why USFs provide superior anomaly ranking and is not merely a consequence of avoiding collapse.\n\n4. **Unified Perspective**: Our contribution lies in revealing that standard MLE training of USFs *already implements* an effective Deep SVDD variant with implicit regularization, unifying density estimation and one-class classification principles. This theoretical bridge has not been previously established in the literature.\n\n### On Experimental Design and Future Work\n\nWe designed our experiments to isolate the causal effect of the USF substitution through controlled within-architecture comparisons. While this means absolute numbers may be lower than current leaderboards (as we did not perform model-specific tuning), it ensures that observed improvements are attributable to the architectural change rather than hyperparameter optimization artifacts. We are extending our evaluation to include additional datasets and modalities in the revised manuscript."
+       },
+       "license": "CC-BY-4.0",
+       "url": "https://openreview.net/forum?id=0eEtTsnmyo&noteId=VLyO4VirnE",
+       "createdAt": "2025-11-21T09:41:04.134Z",
+       "modifiedAt": "2025-11-21T09:41:04.134Z"
+      },
+      {
+       "externalId": "Ovzp0T0cYV",
+       "replyTo": "iFNzLzX8LO",
+       "kind": "comment",
+       "invitation": "Official_Comment",
+       "signature": "Authors",
+       "content": {
+        "title": "Response to Reviewer cPS3",
+        "comment": "We thank the reviewer for the positive assessment (Rating 6, Soundness 4) and for recognizing our theoretical contributions and empirical validation. We address your specific questions and concerns below.\n\nQuestions\n\nQ1: Beyond isotropic Gaussian bases, do heavy-tailed or mixture bases preserve the same alignment benefits in USFs?\n\nAll uniformly scaling flows preserve density alignment in the sense that $p_X(x) < p_X(y) \\Leftrightarrow p_{\\phi(X)}(\\phi(x)) < p_{\\phi(X)}(\\phi(y))$. However, to preserve alignment of the density with the latent norm (i.e., $p_X(x) < p_X(y) \\Leftrightarrow \\|\\phi(x)\\| > \\|\\phi(y)\\|$), the base distribution needs to be radially monotonic—density must be a monotonic function of the distance from the center. \n\nHeavy-tailed radial distributions can preserve this property, while mixture bases would not guarantee monotonic alignment. However, we believe that such flexible base distributions might help produce solutions with higher fidelity in complex, multi-modal scenarios, which is an interesting direction for future work. We will clarify this in the revised manuscript.\n\nQ2: For FastFlow, why are gains small? Capacity, optimization, or interaction with 2D conv flows?\n\nThe \"small gains\" statement is relative to the MVTec dataset and image-level metrics. On VisA, we observed much more pronounced gains for FastFlow, especially for pixel-level metrics (96.3→98.8%, Table 2). The architecture-specific behavior likely reflects interactions between the 2D convolutional structure and the flow modification, but a complete analysis across all dataset-architecture combinations is beyond the scope of this work given the combinatorial explosion (3 architectures × 2 datasets × 2 metric types).\n\nThe key message from our ablation is that a simple, uniform architectural change—which aligns the objective with both density estimation and latent norm reasoning principles—consistently produces improved stability and often improved accuracy across a wide range of architectures, even in the highly optimized domain of industrial anomaly detection. We believe this demonstrates the high practical relevance of our theoretical analysis.\n\nQ3: Did you actually apply the log-normal prior on det(J) during training, and how sensitive are results to its hyperparameters?\n\nYes, we applied a log-normal prior with default scale σ = 1.0 (library default) for all USF experiments. The training is typically not very sensitive to the scale hyperparameter in the range [0.5, 3.0], as the penalty converges toward zero during late-stage training.\n\nExploding determinants are not common with our adjoint-action architecture (where affine transforms are applied as $A^{-1} \\circ C \\circ A$). However, if affine transforms were simply prepended before each coupling layer, exploding determinants would be frequent due to the multiplicative nature of determinants. We conducted limited ablations on the prior's influence for Section 5 architectures, showing slight improvements over the non-regularized variant. We will include these results in the revised appendix.\n\nQ4: In VAE-USF, how did you set the reconstruction vs. likelihood weighting, and did varying latent dimension change the story?\n\nWe used β = 1.0 (standard VAE weighting) for the β-VAE component, following the default setting. We did not extensively explore different β values or varying latent dimensions in the current work, as our focus was on demonstrating proof-of-concept for dimensionality reduction with USFs. \n\nQ5: Any path to dimension reduction without the VAE (e.g., relaxed invertibility or partial flows)?\n\nThis is an excellent question. There is growing work on injective networks that map from lower-dimensional to higher-dimensional spaces, which could offer an alternative path. While we believe this line of research may yield interesting candidates for anomaly detection, exploring it was beyond the scope of our current work. We will add a discussion of this promising direction in the revised manuscript.\n\nAddressing Weaknesses\n\nOn limited evaluation scope (visual AD only): As mentioned in the general response, we are extending our experiments to additional domains. We will update the manuscript with results on non-image data in the coming days.\n\nOn VAE-USF being under-evaluated: We agree and are conducting additional experiments."
+       },
+       "license": "CC-BY-4.0",
+       "url": "https://openreview.net/forum?id=0eEtTsnmyo&noteId=Ovzp0T0cYV",
+       "createdAt": "2025-11-21T09:43:21.834Z",
+       "modifiedAt": "2025-11-23T19:14:41.487Z"
+      },
+      {
+       "externalId": "QeLt6V84Hg",
+       "replyTo": "nbrtiZPC8h",
+       "kind": "comment",
+       "invitation": "Official_Comment",
+       "signature": "Authors",
+       "content": {
+        "title": "Response to Reviewer b6fW",
+        "comment": "We thank the reviewer for their feedback. While we respectfully disagree with the assessment, we appreciate the opportunity to clarify our contributions.\n\nAddressing Weaknesses\nW1: \"The theoretical equivalence... does not lead to a new learning principle.\"\nWe disagree. Our analysis reveals that USFs unify density estimation and latent space alignment under a single MLE objective. This is a novel insight with key implications:\n\nMLE training of USFs inherently implements a regularized Deep SVDD objective, provably preventing collapse.\n\nUSFs guarantee monotonic alignment between data density and latent norm, a property absent in standard Deep SVDD or non-USF flows.\n\nWe identify pathological solutions in Deep SVDD that invert densities, a deficiency unaddressed in prior work.\n\nThis leads to a new design principle: prefer USF architectures for density-based anomaly detection as they naturally align likelihood and distance.\n\nW2: \"The main idea is an extension of prior hybrid flow-SVDD...\"\nThis mischaracterizes our contribution. Prior works (FlowSVDD, OneFlow) use custom loss functions that break the connection to density estimation. Our key insight is that standard MLE training of USFs intrinsically provides the desired properties without custom objectives—a fundamentally different finding.\n\nW3: \"Only modest empirical improvements are shown...\"\nWe demonstrate substantial improvements in stability (reduced variance) across all architectures and datasets, with notable accuracy gains (e.g., CFlow: +18.3 on MVTec; U-Flow: +1.8 on MVTec). Even where average gains appear modest, we see large improvements on difficult classes (e.g., FastFlow on 'screw': +16.2 points). These gains come from a simple drop-in replacement, showcasing the broad applicability of our insights in a saturated benchmark space.\n\nW4: \"The evaluation is limited...\"\nWe acknowledge this and are extending experiments. Our ablation was designed to isolate the effect of the USF property itself; including non-flow methods would conflate architectural differences with our core contribution.\n\nAddressing Questions\n\"The equivalence theorem is straightforward... empirical validation does not justify the claimed unification.\"\nWhile the algebra is simple, the implications are not. Our analysis shows the connection is profound: collapse avoidance stems from minimizing reverse KL-divergence, and the constant Jacobian leads to full monotonic alignment. Our empirical results confirm these theoretical insights translate to consistent stability and accuracy improvements.\n\n\"Section 5... does not deeply analyze why stability is improved.\"\nThe stability gains are directly motivated by our theory. Variable log-det terms can have high gradients in low-density regions, causing instability. The USF objective provides a more stable signal for tail estimation. We will add an explicit discussion connecting these points in the revision."
+       },
+       "license": "CC-BY-4.0",
+       "url": "https://openreview.net/forum?id=0eEtTsnmyo&noteId=QeLt6V84Hg",
+       "createdAt": "2025-11-21T09:47:12.245Z",
+       "modifiedAt": "2025-11-21T09:47:12.245Z"
+      },
+      {
+       "externalId": "gODjw4DJBU",
+       "replyTo": "uB4iYlR9fV",
+       "kind": "comment",
+       "invitation": "Official_Comment",
+       "signature": "Authors",
+       "content": {
+        "title": "Response to Reviewer U6Ni",
+        "comment": "We thank the reviewer for the thorough review and positive comments on presentation. We address your concerns below.\n\nAddressing Weaknesses\nW1: \"Deep SVDD is an outdated baseline...\"\nWe respectfully disagree. Deep SVDD variants remain relevant in current research (e.g., Zhang et al. ICLR 2024 builds on Deep SVDD principles). Our analysis shows that addressing its latent space alignment issues improves modern AD methods. The Deep SVDD connection explains why USFs work, not that Deep SVDD itself is state-of-the-art.\n\nOur experiments demonstrate practical impact: USF substitution improves CFlow (72.5→90.8%), U-Flow (92.7→94.5%), and reduces variance across methods on modern benchmarks against modern flow-based detectors.\n\nW2: \"Constant-Jacobian flows have long existed...\"\nOur novelty extends beyond the equivalence:\n\nDifferent training: FlowSVDD/OneFlow use custom losses; we show standard MLE suffices.\n\nStronger guarantees: Collapse prevention via KL-divergence minimization.\n\nAlignment analysis: We prove monotonic density-norm alignment.\n\nPathology identification: We characterize density inversion in Deep SVDD.\n\nW3: \"Different backbones mean numbers not comparable.\"\nThis is intentional. We used default backbones to reflect out-of-the-box deployment. We claim within-architecture improvements are robust, not that cross-architecture numbers are comparable.\n\nW4: Mathematical error in Proposition 1\nWe apologize for this error. The intended definition is $F_\\alpha(x) = 1/(\\alpha|x|)$ with $F_\\alpha(0)=0$. The correction $x/(\\alpha|x|^2)$ is equivalent in loss and ranking. We will correct this.\n\nW5: Citations should use \\citep\nWe will revise the citation formatting.\n\nAddressing Questions\nQ1: Sensitivity to pretrained backbone?\nBackbones were determined by Anomalib defaults—no deliberate selection. We expect robustness to backbone choice and are validating this.\n\nQ2: How does USF differ from FlowSVDD?\n\nFlowSVDD uses specialized losses breaking density connection\n\nOur collapse prevention combines bijectivity with KL-divergence\n\nWe analyze density-norm monotonicity not considered in FlowSVDD\n\nQ3: Comparison to non-flow SOTA?\nOur ablation isolates the USF effect within flow architectures. Non-flow comparisons would confound architectural differences. We will add contextual leaderboard comparisons.\n\nQ4: Why restrict to images?\nThis reflects Anomalib's current scope. We are extending to tabular data to strengthen generality claims."
+       },
+       "license": "CC-BY-4.0",
+       "url": "https://openreview.net/forum?id=0eEtTsnmyo&noteId=gODjw4DJBU",
+       "createdAt": "2025-11-21T09:51:15.986Z",
+       "modifiedAt": "2025-11-21T10:03:12.303Z"
+      },
+      {
+       "externalId": "MyEntmb2ti",
+       "replyTo": "gODjw4DJBU",
+       "kind": "comment",
+       "invitation": "Official_Comment",
+       "signature": "Reviewer U6Ni",
+       "content": {
+        "comment": "I thank the authors for their response. I have reviewed your feedback and the current state of the manuscript.\n\n**Relevance of Deep SVDD**. I looked further into the literature, and your point about Deep SVDD’s continued relevance holds up. Recent work such as Zhang et al. (ICLR 2024), along with several other papers I found, confirms that hypersphere collapse is still an active research problem. \n\n**Theoretical Contribution vs. Empirical Validation**. I appreciate the elegance of the proposed theoretical unification. Connecting Deep SVDD to Normalizing Flows via the standard MLE objective (rather than the custom losses used in FlowSVDD or OneFlow) is a valuable contribution. However, to fully validate the practical utility of this \"cleaner\" theoretical formulation, it is essential to compare it empirically against those existing volume-preserving baselines. Since FlowSVDD and OneFlow are the direct competitors using constant-Jacobian flows, demonstrating that your MLE-based USF matches (or exceeds) their performance is necessary to show that this theoretical bridge translates into effective practice.\n\n**Experimental Scope and Saturation**. MVTec AD and VisA are restricted to industrial visual inspection and are arguably saturated benchmarks, making small performance gains less significant. Furthermore, performance on these datasets is heavily dependent on the frozen pretrained backbones used. To support a general claim about flow-based anomaly detection, the method should be evaluated on semantic anomaly detection or tabular data where the flow must learn the distribution from scratch. I note your promise to add tabular experiments, but they are currently missing.\n\nAs there have been no changes to the manuscript text as of now, I cannot fully assess the quality of the promised corrections or the impact of the new experiments. I am maintaining my score for now, but I am willing to increase it if the promised changes are explicitly incorporated into the manuscript. To be clear, my main reservation is that the empirical claims are weak without these broader validations."
+       },
+       "license": "CC-BY-4.0",
+       "url": "https://openreview.net/forum?id=0eEtTsnmyo&noteId=MyEntmb2ti",
+       "createdAt": "2025-11-27T00:02:49.565Z",
+       "modifiedAt": "2025-11-27T00:02:49.565Z"
+      },
+      {
+       "externalId": "liopFKQtAs",
+       "replyTo": "MyEntmb2ti",
+       "kind": "comment",
+       "invitation": "Official_Comment",
+       "signature": "Authors",
+       "content": {
+        "comment": "We thank the reviewer for the positive reassessment and the constructive feedback. We acknowledge that the empirical validations are crucial.\n\nCurrently, we are conducting additional experiments to address your concerns:\n1.  **ADBench tabular tests** against FlowSVDD and OneFlow to demonstrate generality and direct competitive performance.\n2.  **Re-runs of the industrial benchmarks** for all methods using a common backbone to ensure fair comparison.\n\nDue to the high computational demand of these experiments, the updated manuscript with all results and corrections will likely be ready towards the end of the rebuttal period. We are confident these additions will fully address your reservations and hope the final version will merit an increased score."
+       },
+       "license": "CC-BY-4.0",
+       "url": "https://openreview.net/forum?id=0eEtTsnmyo&noteId=liopFKQtAs",
+       "createdAt": "2025-11-27T13:40:54.150Z",
+       "modifiedAt": "2025-11-27T13:40:54.150Z"
+      },
+      {
+       "externalId": "kQohwgpWaS",
+       "replyTo": null,
+       "kind": "comment",
+       "invitation": "Official_Comment",
+       "signature": "Area Chair JxGc",
+       "content": {
+        "comment": "Dear Reviewers,\n\nThank you for your valuable time and expertise in reviewing this paper.\n\nThe authors have now submitted their rebuttal. We would appreciate it if you could review their responses and assess whether your concerns have been addressed.\n\nBest regards,\n\nAC"
+       },
+       "license": "CC-BY-4.0",
+       "url": "https://openreview.net/forum?id=0eEtTsnmyo&noteId=kQohwgpWaS",
+       "createdAt": "2025-11-28T01:20:03.059Z",
+       "modifiedAt": "2025-11-28T01:20:03.059Z"
+      },
+      {
+       "externalId": "P9kw4uaz6Y",
+       "replyTo": null,
+       "kind": "comment",
+       "invitation": "Official_Comment",
+       "signature": "Authors",
+       "content": {
+        "title": "Final comment by the authors",
+        "comment": "We thank the reviewers for their thoughtful feedback and constructive dialogue. In response to the consensus on broadening the empirical validation we have conducted comprehensive additional benchmark experiments on tabular data using ADBench. These new results directly compare our USFlows and VAE-USFlow against their non-US counterparts, as well as the most recent state-of-the-art Deep SVDD variants (DOHSC, and DO2HSC) and the most recent Flow–SVDD hybrid that also relies on a constant-Jacobian determinant flow mentioned by the reviewers (OneFlow, as FlowSVDD is a previous variant proposed by the same authors), across 47 classical tabular datasets. The experiments show that uniformly scaling flows, trained with standard maximum likelihood, perform on par with or outperform these methods while substantially improving performance stability, reinforcing that our theoretical bridge yields practical gains beyond image-based benchmarks.\n\nThis addition, detailed in the revised manuscript (Section 5.1), addresses the central request for validation against volume-preserving flows and other state-of-the-art baselines and demonstrates the generality of our approach. Together with the previously presented gains in stability and performance on MVTec AD and VisA for image anomaly detection, we now provide evidence that the USF principle is beneficial across data modalities.\n\nFurthermore, we extended the ablation study with regard to the impact of the proposed log-determinant prior regularization, as well as the impact of changing the model backbone.\n\nWe have also corrected the minor technical issue in Proposition 1 and refined the narrative to further clarify our novelty relative to prior works like FlowSVDD and OneFlow: our core contribution is showing that *standard MLE training* of a USF inherently recovers a well-regularized Deep SVDD objective, guaranteeing density-aligned latent spaces without custom loss functions. Additionally, we added a discussion to directly relate the observed experimental results, especially the stability improvement, with our theoretical analysis.\n\nWe believe the strengthened empirical evaluation and clarified theoretical contributions fully address the concern of all three reviewers thoroughly. Especially, we kindly point out that the 3rd reviewer already explicitly indicated his willingness to raise their score given the continued relevancy of Deep SVDD, as well as the fix of the minor error in the formal derivation, and the strengthening of the empirical results through further data modalities and ablations.\n\nThank you again for your time and valuable insights, which we agree to that addressing them has significantly improved the quality of the paper."
+       },
+       "license": "CC-BY-4.0",
+       "url": "https://openreview.net/forum?id=0eEtTsnmyo&noteId=P9kw4uaz6Y",
+       "createdAt": "2025-12-03T18:34:39.676Z",
+       "modifiedAt": "2025-12-03T18:34:39.676Z"
+      },
+      {
+       "externalId": "gBVPcUUhms",
+       "replyTo": null,
+       "kind": "meta_review",
+       "invitation": "Meta_Review",
+       "signature": "Area Chair qTAr",
+       "content": {
+        "summary": "This paper proposes Uniformly Scaling Flows (USFs), a restricted class of normalizing flows where the Jacobian determinant is constant across the input space. We receive three reviews whose scores are 2, 4 and 6. Both the strengths and weaknesses are distinct. The strength is mainly on the novel and insightful monotonic density–norm alignment, while the weakness is on the experiment validation with only MVTec AD and VisA, making the performance gains hard to assess.  While no reviewer is willing to champion this paper, I tend to reject.",
+        "reviewer_concerns": "The experiment validation with only MVTec AD and VisA are not addressed.",
+        "reviewer_scores": "The scores are 2, 4 and 6. Reviewer U6Ni (4) have discussed with the authors but decided to keep the original score."
+       },
+       "license": "CC-BY-4.0",
+       "url": "https://openreview.net/forum?id=0eEtTsnmyo&noteId=gBVPcUUhms",
+       "createdAt": "2026-01-07T12:04:33.445Z",
+       "modifiedAt": "2026-02-09T06:42:32.545Z"
+      },
+      {
+       "externalId": "Hi1wtVVCUZ",
+       "replyTo": null,
+       "kind": "decision",
+       "invitation": "Decision",
+       "signature": "Program Chairs",
+       "content": {
+        "title": "Paper Decision",
+        "decision": "Reject",
+        "comment": ""
+       },
+       "license": "CC-BY-4.0",
+       "url": "https://openreview.net/forum?id=0eEtTsnmyo&noteId=Hi1wtVVCUZ",
+       "createdAt": "2026-01-26T08:43:15.669Z",
+       "modifiedAt": "2026-02-06T04:58:52.844Z"
+      }
+     ]
+    },
+    {
+     "id": "35KC8ozdIO",
+     "number": 24736,
+     "title": "Diversity of Transformer Layers: One Aspect of Parameter Scaling Laws",
+     "abstract": "Transformers deliver outstanding performance across a wide range of tasks and are now a dominant backbone architecture for large language models (LLMs). Their task-solving performance is improved by increasing parameter size, as shown in the recent studies on the Scaling Law for parameters. Although recent mechanistic-interpretability studies have deepened our understanding of internal behavior by analyzing the residual stream, the relationship between these internal mechanisms and the Scaling Law for parameters remains unclear. That hinders the efficient performance improvement of Transformers. To bridge this gap, we propose a theoretical framework that formulates the contribution of each layer, composed of modules such as the embedding layer, Multi-head Attention (MHA), and Multi-layer Perceptron (MLP) within the residual stream through a bias–diversity decomposition. The decomposition separates (i) bias, the error of each layer's output from the ground truth, and (ii) diversity, which indicates how much the outputs of each layer differ from each other. Analyzing Transformers under this framework reveals that performance improves when individual layers make predictions close to the correct answer and remain mutually diverse. We show that diversity becomes especially critical when individual layers' outputs are far from the ground truth. Furthermore, we introduce an information-theoretic treatment of bias and diversity and indicate that adding layers enhances performance only when those layers behave differently, i.e., are diverse. Moreover, we also reveal the performance gains from increasing the number of layers exhibit submodularity: marginal improvements diminish as additional layers increase, mirroring the logarithmic convergence predicted by the Scaling Law for parameters. Moreover, experiments on multiple semantic-understanding tasks with various LLMs empirically confirm the theoretical properties derived in this study. Our code will be available at https://github.com/[Anonymous].",
+     "authors": [
+      "Hidetaka Kamigaito",
+      "Ying Zhang",
+      "Jingun Kwon",
+      "Katsuhiko Hayashi",
+      "Manabu Okumura",
+      "Taro Watanabe"
+     ],
+     "keywords": [
+      "Transformer",
+      "Residual Stream",
+      "Logit Lens",
+      "Scaling Law"
+     ],
+     "status": "rejected",
+     "decision": "Reject",
+     "notes": [
+      {
+       "externalId": "3oPcKbKuAm",
+       "replyTo": null,
+       "kind": "review",
+       "invitation": "Official_Review",
+       "signature": "Reviewer Ufo2",
+       "content": {
+        "summary": "The work introduces a bias-diversity decomposition framework to theoretically analyze the contributions of individual layers (e.g., embedding, attention, MLP), aiming to explain some phenomena and outcomes of layer scaling.",
+        "soundness": 2,
+        "presentation": 1,
+        "contribution": 2,
+        "strengths": ">s1: Proposes a bias-diversity decomposition for analyzing layer-wise contributions in Transformer residual streams.\n\n>s2: The work integrates the bias-diversity decomposition with an information-theoretic lens.\n\n>s3: It has a theoretical and empirical analysis.",
+        "weaknesses": ">w1: **There is a critical point of confusion and error in the technical details. Equation (1) implies that the outputs of the embedding layer, all MHA layers, and all MLP layers are summed together directly. This is incorrect.** For the correct sequential structure, please refer to [1].\n>\n> [1] On layer normalization in the transformer architecture. ICML 2020.\n\n>w2: For Section 3.1. Omitting the softmax operation, while understandable for analytical convenience, requires explicit justification to ensure the theoretical rigor of the analysis.\n\n>w3: Line 135-137. **Theorem 1, derived from Equation 1, requires further validation (See w1).** The authors should provide additional supporting assumptions and evidence to substantiate its theoretical soundness.\n\n>w4: The formulation of Theorem 2 requires refinement for clarity. Please state its central claim and underlying rationale more explicitly.\n\n>w5: I have concerns regarding Theorem 4. The application of the information-theoretic chain rule appears incomplete, as the dependencies among the variables {$u_i$} are not adequately accounted for in the derivation, especially as manifested in Equation (13).\n\n>w6: **Line 250-252 \"These results seem to indicate that\". There are some gaps between the theory and the conclusions, requiring more details of the actual contributions. Instead of simply using expressions like \"seem\" to attempt an explanation.**\n\n>w7: Section 5. The authors used relatively simple tasks such as SST-2 and RTE for models like llama3-8B, and more complex tasks are needed to validate their conclusions. For instance, in Lora+ [2], Roberta-base can already achieve over 0.9 accuracy on the SST-2 task.\n\n>[2] LoRA+: Efficient Low Rank Adaptation of Large Models. ICML 2024.",
+        "questions": "See Weaknesses. The authors provided an invalid anonymous link.",
+        "flag_for_ethics_review": [
+         "No ethics review needed."
+        ],
+        "rating": 2,
+        "confidence": 4,
+        "code_of_conduct": "Yes"
+       },
+       "license": "CC-BY-4.0",
+       "url": "https://openreview.net/forum?id=35KC8ozdIO&noteId=3oPcKbKuAm",
+       "createdAt": "2025-10-20T05:48:58.515Z",
+       "modifiedAt": "2025-11-12T10:26:20.587Z"
+      },
+      {
+       "externalId": "HZHsBHArNi",
+       "replyTo": null,
+       "kind": "review",
+       "invitation": "Official_Review",
+       "signature": "Reviewer 2UE7",
+       "content": {
+        "summary": "This paper investigates the role of layer-wise diversity in Transformers and its connection to parameter scaling laws. The authors propose a bias-diversity decomposition framework for the residual stream to theoretically and empirically analyze how the interplay between diversity and bias across layers and modules (e.g., attention, MLP) influences model performance. By introducing an information-theoretic perspective, they explain why increasing depth yields diminishing returns, aligning with the submodularity observed in scaling laws. Experiments on various LLMs and NLP benchmarks substantiate these theoretical findings.",
+        "soundness": 2,
+        "presentation": 2,
+        "contribution": 2,
+        "strengths": "1. A key strength of this work is its novel theoretical framework for bias-diversity decomposition, which it tailors specifically to the Transformer's residual stream. While grounded in ensemble learning, the formulation (Theorem 1, Eq. 8) provides an original and principled lens to quantify the contributions of individual layers and modules (e.g., attention, MLP) in granular, interpretable terms.\n2. A particularly deep theoretical contribution is the reframing of diversity via information-theoretic measures (Eq. 13). This formalism allows the authors to establish a direct, causal link between layer stacking and submodularity, theoretically deriving—rather than just observing—the diminishing returns that characterize LLM scaling laws.\n3. The experiments robustly substantiate the theory across a wide range of models and tasks. The evidence is compelling and multi-level: heatmaps (Fig. 3) establish macro-level correlations, module graphs (Fig. 4) offer microscopic insights into component behavior, and ablation figures (Fig. 5-7) meticulously track the interplay of key variables, collectively demonstrating the theory's robustness and generality.",
+        "weaknesses": "1. The notation used throughout the paper is inconsistent and poorly standardized. Many symbols are not clearly defined upon their first appearance. The authors should provide a unified and clear definition for all symbols used in the theorems and mathematical formulae.\n2. The results in Figures 3 and 5 do not strongly support the authors' viewpoint. In Figure 3, there is no clear correlation shown between bias, diversity, and accuracy, while the strong correlation between MSE and accuracy is not surprising. As for Figure 5, the changes in model performance across multiple tasks do not show a clear pattern.\n3. Across all tasks shown in Figure 5, regardless of how performance changes, diversity consistently demonstrates a similar trend: it first remains unchanged and then suddenly increases. Moreover, in the few effective task groups, the rise in diversity clearly lags behind the decrease in bias. This phenomenon indicates that the authors' view on the trade-off between bias and diversity does not necessarily hold true.",
+        "questions": "see weakness.",
+        "flag_for_ethics_review": [
+         "No ethics review needed."
+        ],
+        "rating": 4,
+        "confidence": 4,
+        "code_of_conduct": "Yes"
+       },
+       "license": "CC-BY-4.0",
+       "url": "https://openreview.net/forum?id=35KC8ozdIO&noteId=HZHsBHArNi",
+       "createdAt": "2025-10-20T09:34:34.234Z",
+       "modifiedAt": "2025-11-12T10:26:20.324Z"
+      },
+      {
+       "externalId": "IPKLj5UqJZ",
+       "replyTo": null,
+       "kind": "review",
+       "invitation": "Official_Review",
+       "signature": "Reviewer Joen",
+       "content": {
+        "summary": "This paper investigates how the diversity among Transformer layers influences model performance and connects it to parameter scaling laws. Using a bias–diversity decomposition framework, the authors show that optimal performance arises when layers produce outputs that are both accurate (low bias) and mutually different (high diversity). The study also demonstrates that adding layers improves performance only when they contribute diverse behaviors, and that such gains diminish submodularly, consistent with scaling laws. Experiments on various LLMs and NLP tasks empirically confirm that diversity is a key factor driving performance improvements.",
+        "soundness": 3,
+        "presentation": 1,
+        "contribution": 3,
+        "strengths": "The paper introduces an original bias–diversity decomposition framework to connect internal Transformer dynamics with scaling laws, offering theoretical insight.\n\nThe work presents some theorems to formalize key relationships: \n\n(1) the decomposition of prediction error into bias and diversity; \n\n(2) the trade-off between bias and diversity; \n\n(3) the submodularity of performance gains from adding layers \n\nComprehensive experiments across multiple LLMs (e.g., LLaMA, Phi, Mistral) and NLP benchmarks confirm the theoretical predictions",
+        "weaknesses": "1. Theorems 5 and 6 indicate that increasing the number of model layers does not necessarily improve performance. This paper does not provide relevant experimental examples to illustrate this phenomenon. Both Conditional Redundancy and Redundancy increase monotonically, but their difference may still increase or decrease monotonically.\n\n2. Theorem 7 assumes that when U_i are independent, the improvement of model performance is submodular. This paper doesn’t explain the rationality of the independence assumption for U_i. In practice, U_i should be correlated.\n\n3.What conclusions can be drawn from Figure 3? The correlations between Diversity, Bias and accuracy vary significantly across tasks, which is inconsistent with the previous theoretical analysis (decomposition of Diversity and Bias).\n\n4.The trade-off between Diversity and Bias means that reducing bias leads to a decrease in Diversity. In Figure 5, does \"no performance improvement\" refer to the ARC dataset, while \"performance improvement\" refers to the AG News dataset? The paper needs to provide more detailed explanations of this. Additionally, Section 5.4 mentions that bias does not tend to zero in practice, and this point also requires more detailed elaboration. Furthermore, Section 5.4 doesn’t explain when the Trade-off will fail and the reasons for such failure.\n\n\n5.The experiments in Figure 6 are overly simple. Specifically, as the number of layers increases, performance first increases and then decreases, instead of ” the effectiveness of increasing layers actually decreases”. Additionally, more elaboration is required on why the conclusion that Conditional Redundancy is greater than 0 can be drawn.",
+        "questions": "See the weakness above.",
+        "flag_for_ethics_review": [
+         "No ethics review needed."
+        ],
+        "details_of_ethics_concerns": "N/A",
+        "rating": 2,
+        "confidence": 3,
+        "code_of_conduct": "Yes"
+       },
+       "license": "CC-BY-4.0",
+       "url": "https://openreview.net/forum?id=35KC8ozdIO&noteId=IPKLj5UqJZ",
+       "createdAt": "2025-10-30T02:15:50.744Z",
+       "modifiedAt": "2025-11-12T10:26:20.014Z"
+      },
+      {
+       "externalId": "fp9Rz7ObDt",
+       "replyTo": null,
+       "kind": "review",
+       "invitation": "Official_Review",
+       "signature": "Reviewer Q2CT",
+       "content": {
+        "summary": "This paper bridges mechanistic interpretability and parameter scaling laws in pre-layer normalization Transformers by decomposing prediction error in the residual stream via a bias-diversity framework, where bias measures per-layer deviation from ground-truth logits and diversity captures inter-layer output differences, revealing that low bias + high diversity minimizes MSE",
+        "soundness": 3,
+        "presentation": 3,
+        "contribution": 3,
+        "strengths": "1. Introduces a bias–diversity decomposition framework to analyze Transformer layers, offering a novel theoretical lens linking internal mechanisms to scaling laws.\n2. Bridges mechanistic interpretability and empirical scaling-law studies, a connection rarely explored.\n3. Strong theoretical grounding with multiple theorems supported by rigorous proofs.\n4. Empirical validation across diverse LLM families and NLP benchmarks strengthens claims.\n5. The paper is clearly structured, with smooth transitions between theoretical and empirical sections.",
+        "weaknesses": "1. While the theory links diversity to performance, concrete architectural or training recommendations (e.g., diversity regularization or pruning criteria) are missing. Demonstrating such interventions could make the work more actionable.\n2. Experiments focus only on NLP benchmarks. Testing on multimodal or vision Transformers could demonstrate broader applicability and confirm whether the diversity–scaling relationship generalizes beyond text models.\n3. Although the work aims to connect interpretability and scaling laws, the link remains largely conceptual. More explicit layer-wise interpretability analyses (e.g., probing or attribution) could better ground the theoretical findings in observable model behavior.\n4. the link of the code is invalid.",
+        "questions": "1. Could the authors elaborate on how their information-theoretic diversity measure relates to previously used diversity notions in ensemble learning or representation learning (e.g., orthogonality, mutual information between features)?\n2. The theory assumes that the number of layers is proportional to parameter count and that layers are independent given the output label. How sensitive are the results to violations of these assumptions, for example, in shared-layer or MoE architectures?\n3. Could the authors discuss potential architectural or training interventions (e.g., promoting inter-layer diversity or penalizing redundancy) that might emerge from this framework? Would such interventions alter scaling behavior in practice?\n4. is the same bias–diversity scaling relationship expected to hold in vision or multimodal Transformers, where layer specialization and redundancy differ? Any preliminary evidence or reasoning would be helpful.",
+        "flag_for_ethics_review": [
+         "No ethics review needed."
+        ],
+        "rating": 4,
+        "confidence": 3,
+        "code_of_conduct": "Yes"
+       },
+       "license": "CC-BY-4.0",
+       "url": "https://openreview.net/forum?id=35KC8ozdIO&noteId=fp9Rz7ObDt",
+       "createdAt": "2025-10-30T07:18:34.414Z",
+       "modifiedAt": "2025-11-12T10:26:19.719Z"
+      },
+      {
+       "externalId": "dlanPrltBX",
+       "replyTo": null,
+       "kind": "meta_review",
+       "invitation": "Meta_Review",
+       "signature": "Area Chair 5BjF",
+       "content": {
+        "summary": "Several theorems are experimentally unsubstantiated and not tied to reasonable assumptions, and all reviewers pointed to multiple issues. The issue highlighted by the most reviewers was that the experiments do not substantiate a correlation between bias, diversity, and accuracy.",
+        "reviewer_concerns": "No rebuttal N/A",
+        "reviewer_scores": "No rebuttal, same scores."
+       },
+       "license": "CC-BY-4.0",
+       "url": "https://openreview.net/forum?id=35KC8ozdIO&noteId=dlanPrltBX",
+       "createdAt": "2026-01-05T19:58:03.659Z",
+       "modifiedAt": "2026-02-09T06:50:40.856Z"
+      },
+      {
+       "externalId": "m2jLjOhNia",
+       "replyTo": null,
+       "kind": "decision",
+       "invitation": "Decision",
+       "signature": "Program Chairs",
+       "content": {
+        "title": "Paper Decision",
+        "decision": "Reject",
+        "comment": ""
+       },
+       "license": "CC-BY-4.0",
+       "url": "https://openreview.net/forum?id=35KC8ozdIO&noteId=m2jLjOhNia",
+       "createdAt": "2026-01-26T08:53:35.750Z",
+       "modifiedAt": "2026-02-06T05:06:10.119Z"
+      }
+     ]
+    },
+    {
+     "id": "4vXNp4wujY",
+     "number": 6570,
+     "title": "AMS-Quant: Adaptive Mantissa Sharing for Floating-Point Quantization",
+     "abstract": "Large language models (LLMs) have demonstrated remarkable capabilities in various kinds of tasks, while the billion or even trillion parameters bring storage and efficiency bottlenecks for inference. Quantization, particularly floating-point quantization, is known to be capable of speeding up LLM inference by reducing memory footprint and data movement during the inference process. For the first time, we advance the floating-point quantization exploration from integer bit-widths to non-integer bit-widths, namely AMS-Quant, to further approach the quantization sweet spot. AMS-Quant incorporates two novel techniques to put it into effect: (1) it proposes Mantissa-bit Sharing, which groups k quantized weights and lets them share the least significant mantissa bit, allowing us to further approach the minimum quantization bit-width without accuracy loss. (2) It introduces Adaptive Searching, which employs an offline optimization strategy to minimize the accuracy degradation introduced by sharing. Moreover, AMS-Quant is also prototyped as efficient CUDA Linear kernels, which translates memory savings into wall-clock latency reduction by reducing memory access. Extensive experiments on large-scale datasets and models show that AMS-Quant can quantize the model to FP-5.33-e2m3 and FP4.25-e2m2, and significantly speed up the LLM decoding over FP16 inference (2.8$\\times$ and 3.2$\\times$), with negligible accuracy loss.",
+     "authors": [
+      "Mengtao Lv",
+      "Ruiqi Zhu",
+      "xinyu wang",
+      "Yun Li"
+     ],
+     "keywords": [
+      "Large Language Model",
+      "Quantization"
+     ],
+     "status": "rejected",
+     "decision": "Reject",
+     "notes": [
+      {
+       "externalId": "010tKaXCZw",
+       "replyTo": null,
+       "kind": "review",
+       "invitation": "Official_Review",
+       "signature": "Reviewer k41G",
+       "content": {
+        "summary": "This paper proposes AMS-Quant, a novel floating-point quantization method that enables non-integer bit-width representations for LLMs. The method is based on two key components:\n- Mantissa-bit Sharing: groups of k quantized weights share their least significant mantissa bit, reducing the effective bit-width.\n- Adaptive Searching: an offline optimization that selects the shared bit value minimizing mean squared error across the group.\n\n\nAuthors complement the algorithm with an efficient CUDA kernel implementation that restore quantized weights using bit-level operations.",
+        "soundness": 4,
+        "presentation": 3,
+        "contribution": 3,
+        "strengths": "- Idea is novel and timely. While existing works have explored sharing exponent bits or scaling factors, mantissa sharing is surprisingly unexplored. \n- The paper is aptly written and clearly organized.\n- The proposed adaptive searching for mantissa bits provides an effective mechanism to manage accuracy loss.\n- Authors provide substantial experimental results to validate their proposed method.",
+        "weaknesses": "- Authors did not report search time for adaptive mantissa sharing algorithm. While it is run offline, it is essential to ascertain the computational cost associated with the search process.\n- Non-integer bit-widths based on packing and unpacking bits cannot be integrated with inference frameworks like TensorRT. Likewise, deployment on other hardware devices like TPUs, NPUs etc may need extra effort.",
+        "questions": "- What is the time and compute cost for running adaptive mantissa search, especially for large models?\n- Can this method be combined with existing methods like GPTQ or AWQ with ease?\n- Can this method be extended to activation quantization?",
+        "flag_for_ethics_review": [
+         "No ethics review needed."
+        ],
+        "rating": 8,
+        "confidence": 3,
+        "code_of_conduct": "Yes"
+       },
+       "license": "CC-BY-4.0",
+       "url": "https://openreview.net/forum?id=4vXNp4wujY&noteId=010tKaXCZw",
+       "createdAt": "2025-10-26T16:48:40.800Z",
+       "modifiedAt": "2025-11-12T03:41:48.185Z"
+      },
+      {
+       "externalId": "9sNSxnlXvx",
+       "replyTo": null,
+       "kind": "review",
+       "invitation": "Official_Review",
+       "signature": "Reviewer 5aq1",
+       "content": {
+        "summary": "This paper presents AMS-Quant, a weight-only floating-point quantization framework for LLMs. It includes two major techniques, i.e., mantissa-bit sharing to boost compression and adaptive searching to reduce quantization error. A custom GPU kernel is developed to realize practical speedups. Experiments show that AMS-Quant achieves these gains with only minimal accuracy degradation.",
+        "soundness": 2,
+        "presentation": 3,
+        "contribution": 2,
+        "strengths": "1. The paper is well-written and the core ideas are clear to understand.\n2. The major contributions of this quantization framework are mantissa sharing and adaptive searching, which are both sound for improved floating-point quantization.\n3. The experimental results not only show the quantization accuracy but also the actual acceleration enabled by the proposed methods.",
+        "weaknesses": "1. This work is for weight-only quantization, if it can be further extended to an activation and weight quantization, more efficiency gains should be obtained.\n2. The mantissa-sharing operation is analogous to block floating-point quantization and micro-scaling formats (e.g., MXINT, MXFP), which share exponents instead. Additional experiments should be conducted to more thoroughly validate the superiority of the proposed methods.\n3. Mantissa sharing is applied along the input-channel dimension of the weight tensor. However, this choice is less cache- and memory-friendly than sharing along the output-channel dimension. While the paper justifies the design by noting that activation outliers are typically aligned with input channels, it may be worthwhile to incorporate a small calibration set into the mantissa-sharing and adaptive search procedure to reduce quantization loss, while enabling mantissa sharing along the output-channel dimension for more efficient memory access.\n\nOverall, this is a good-quality paper and I will raise my score if my concerns are well addressed.",
+        "questions": "See weaknesses.",
+        "flag_for_ethics_review": [
+         "No ethics review needed."
+        ],
+        "rating": 4,
+        "confidence": 4,
+        "code_of_conduct": "Yes"
+       },
+       "license": "CC-BY-4.0",
+       "url": "https://openreview.net/forum?id=4vXNp4wujY&noteId=9sNSxnlXvx",
+       "createdAt": "2025-10-30T07:52:56.216Z",
+       "modifiedAt": "2025-11-12T03:41:47.651Z"
+      },
+      {
+       "externalId": "CHAGtNuL4i",
+       "replyTo": null,
+       "kind": "review",
+       "invitation": "Official_Review",
+       "signature": "Reviewer j2b7",
+       "content": {
+        "summary": "This paper focuses on weight-only quantization by leveraging mantissa-bit sharing, resulting in non-integer bit widths for individual weight elements. It also proposes an adaptive search strategy to determine the optimal shared mantissa value. Based on these techniques and a bit-slicing packing strategy, the authors implement CUDA linear kernels and demonstrate improved latency through more efficient memory access.",
+        "soundness": 1,
+        "presentation": 2,
+        "contribution": 1,
+        "strengths": "They implement CUDA kernels using an efficient restoration algorithm based on the bit-slicing technique.",
+        "weaknesses": "A major limitation of this paper is the lack of comparison with existing methods. Numerous prior works achieve higher (even 2-bit in QuIP or AQLM) compression rates while maintaining comparable accuracy. Without extensive benchmarking against these methods, it is difficult to evaluate the advantages of the proposed strategy. Furthermore, many weight-activation quantization (e.g., Quarot) approaches exist that effectively address KV cache and high-precision computation overhead in attention mechanisms, which makes the proposed method less compelling.\n\nAdditionally, the rationale for mantissa-bit sharing is not clearly justified. The method - merely sharing the least significant bits of the mantissa and selecting the optimal value via brute-force search - appears simplistic and does not convincingly constitute a novel contribution. From a practical perspective, applying techniques that reduce additional 1 or 2 bits more substantially might be more impactful than the minor gains achieved through mantissa sharing.\n\nRegarding the packaging and restoration techniques, the approach shows limited novelty compared to the TC-FPx framework and appears largely as an engineering implementation. Finally, the figures do not effectively convey the core concepts and seem to underutilize the available space, reducing their clarity and impact.",
+        "questions": "What are the advantages of using non-integer bit widths and the mantissa-sharing strategy compared to existing quantization methods? Please clarify how this approach provides benefits in terms of accuracy, compression, or computational efficiency relative to prior work.",
+        "flag_for_ethics_review": [
+         "No ethics review needed."
+        ],
+        "rating": 0,
+        "confidence": 4,
+        "code_of_conduct": "Yes"
+       },
+       "license": "CC-BY-4.0",
+       "url": "https://openreview.net/forum?id=4vXNp4wujY&noteId=CHAGtNuL4i",
+       "createdAt": "2025-10-31T06:17:25.257Z",
+       "modifiedAt": "2025-11-12T03:41:47.177Z"
+      },
+      {
+       "externalId": "p3z9zAmqra",
+       "replyTo": null,
+       "kind": "review",
+       "invitation": "Official_Review",
+       "signature": "Reviewer VgPA",
+       "content": {
+        "summary": "The authors propose mantissa-bit sharing, sharing the least significant mantissa bit across groups of k quantized weights, resulting in formats like FP5.33-e2m3 and FP4.25-e2m2 (1:3 / 1:4 sharing). Per group 1-bit search minimizies the quantization MSE. Further, they implement bit-packing + register level ops for restoring FP16 for CUDA linear kernels. Speedup over FP16 kernels are demonstrated. Finally, their FP5.3(e2m3) hits the sweet-spot across IFEval GSM8k and MMLU on 3 models.",
+        "soundness": 3,
+        "presentation": 2,
+        "contribution": 2,
+        "strengths": "- Simple to implement and leverage\n- design is sound, kernel also obtains a speedup in memory-bound settings at the kernel-level.",
+        "weaknesses": "- baselines seem to be limited, AWQ.GPTQ, NF4 should be discussed.\n- Are the speedups only kernel-level? it is very important to see full decode latency,  specifically is that a speedup for the model, or for just the kernel in Figure 6? I think its the latter so it might be better to not label them as real model speedups.",
+        "questions": "- Beyond notes on the weaknesses, it would be interesting to see an ablation of increasing k.",
+        "flag_for_ethics_review": [
+         "No ethics review needed."
+        ],
+        "rating": 4,
+        "confidence": 3,
+        "code_of_conduct": "Yes"
+       },
+       "license": "CC-BY-4.0",
+       "url": "https://openreview.net/forum?id=4vXNp4wujY&noteId=p3z9zAmqra",
+       "createdAt": "2025-10-31T21:02:46.826Z",
+       "modifiedAt": "2025-11-12T03:41:46.846Z"
+      },
+      {
+       "externalId": "SMnjYuM87R",
+       "replyTo": "CHAGtNuL4i",
+       "kind": "comment",
+       "invitation": "Official_Comment",
+       "signature": "Authors",
+       "content": {
+        "comment": "### Q1: Lack of comparison with existing methods. \nThank you for your suggestion on providing more baselines, and correspondingly, we compared our method with AWQ, GPTQ and NF4  methods across different models and datasets (the best results are highlighted).\n\n\n| Model                              | Method              | IFEval    | GSM8k     | MMLU      | AVG       |\n| ---------------------------------- | ------------------- | --------- | --------- | --------- | --------- |\n| **Qwen3\\-4B\\-2507\\-Instruct**      | *FP16*              | *80.96*   | *89.69*   | *72.45*   | *81.03*   |\n|                                    | AWQ                 | 79.85     | 86.5      | 70.84     | 79.06     |\n|                                    | GPTQ                | 80.41     | **89.92** | 71.01     | 80.45     |\n|                                    | NF4                 | 79.85     | 89.08     | 71.33     | 80.09     |\n|                                    | **AMSQuant(fp4.5)** | 80.04     | 88.7      | 71.49     | 80.08     |\n|                                    | **AMSQuant(fp5.3)** | **81.7**  | 88.86     | **71.74** | **80.77** |\n| **Meta\\-Llama\\-3.1\\-8B\\-Instruct** | *FP16*              | *73.57*   | *84.15*   | *68.93*   | *75.55*   |\n|                                    | AWQ                 | 72.83     | 83.78     | 66.98     | 74.53     |\n|                                    | GPTQ                | 73.75     | 82.03     | 67.31     | 74.36     |\n|                                    | NF4                 | 72.83     | 81.12     | 66.16     | 73.37     |\n|                                    | **AMSQuant(fp4.5)** | **75.60** | 81.73     | 67.51     | 74.95     |\n|                                    | **AMSQuant(fp5.3)** | 74.86     | **84.46** | **68.53** | **75.95** |\n| **Meta\\-Llama\\-3.2\\-3B\\-Instruct** | *FP16*              | *68.21*   | *77.41*   | *61.73*   | *69.12*   |\n|                                    | AWQ                 | 68.95     | 76.88     | 60.57     | 68.80     |\n|                                    | GPTQ                | 67.1      | 71.11     | 57.94     | 65.38     |\n|                                    | NF4                 | 69.5      | 73.84     | 59.94     | 67.76     |\n|                                    | **AMSQuant(fp4.5)** | **71.72** | 74.83     | 59.76     | 68.77     |\n|                                    | **AMSQuant(fp5.3)** | 70.43     | **76.88** | **61.82** | **69.71** |\n| **Qwen2.5\\-7B\\-Instruct**          | *FP16*              | *71.72*   | *80.97*   | *71.77*   | *74.82*   |\n|                                    | AWQ                 | 70.06     | **81.05** | 70.91     | 74.01     |\n|                                    | GPTQ\\-Int4          | 70.79     | 80.97     | 70.18     | 73.98     |\n|                                    | NF4                 | 69.13     | 78.24     | 69.47     | 72.28     |\n|                                    | **AMSQuant(fp4.5)** | **72.46** | 80.06     | 70.68     | 74.40     |\n|                                    | **AMSQuant(fp5.3)** | 72.27     | 80.36     | **71.97** | **74.87** |\n\n\n\nAs shown in the tables above, our method continuously outperformed other frequently\\-used weight\\-only quantization methods, and is nearly lossless compared to the original FP16 results."
+       },
+       "license": "CC-BY-4.0",
+       "url": "https://openreview.net/forum?id=4vXNp4wujY&noteId=SMnjYuM87R",
+       "createdAt": "2025-11-28T12:07:02.397Z",
+       "modifiedAt": "2025-11-28T14:37:57.883Z"
+      },
+      {
+       "externalId": "Nr1d3Zh1kU",
+       "replyTo": "9sNSxnlXvx",
+       "kind": "comment",
+       "invitation": "Official_Comment",
+       "signature": "Authors",
+       "content": {
+        "comment": "### Q1: Further extended to an activation and weight quantization.\n\nThank you for your advice on extending our methods to activation and weight quantizatio. Results of wXa8 quantized models are as follows. The w5.33a8 experiment is set up with RTN FP8 activation quantization, while w8a8 SmoothQuant weights are directly downloaded from [HuggingFace official repos](https://huggingface.co/RedHatAI).\n\n| **Model**              | method               | **IFEval** | **GSM8k** |\n| ---------------------- | -------------------- | ---------- | --------- |\n| Qwen3-4B-Instruct-2507 | w16a16               | 80.96      | 89.69     |\n| | w8a8(SmoothQuant)    | 82.26      | 88.86     |\n| | **w5.3a8(AMSQuant)** | 80.96      | 89.46     |\n| Llama-3.2_3B-Instruct  | w16a16               | 68.21      | 77.41     |\n| | w8a8(SmoothQuant)    | 68.95      | 77.86     |\n| | **w5.3a8(AMSQuant)** | 68.95      | 76.16     |\n| Qwen2.5-7B-Instruct    | w16a16               | 71.72      | 80.59     |\n| | w8a8(SmoothQuant)    | 71.16      | 79.98     |\n| | **w5.3a8(AMSQuant)** | 69.13      | 81.12     |\n| Llama-3.1-8B-Instruct  | w16a16               | 73.57      | 84.15     |\n| | w8a8(SmoothQuant)    | 72.46      | 84.31     |\n| | **w5.3a8(AMSQuant)** | 75.6       | 84.9      |\n\nThe result shows that **our method can be integrated with the activation quantization method without significant accuracy loss compared with the FP16 original model**. Further study will dig into finer\\-grained activation quantization and lower bits for activations.\n\n### Q2: Comparison to micro\\-scaling formats such as \\(MXFP/MXINT\\).\n\nHere are the results of micro\\-scaling formats' models for weight\\-only quantization tests:\n\n| **Model**                  | method              | **IFEval** | **GSM8k** | MMLU      | AVG       |\n| -------------------------- | ------------------- | ---------- | --------- | --------- | --------- |\n| Meta-Llama-3.1-8B-Instruct | *FP16*              | *73.57*    | *84.15*   | *68.93*   | *75.55*   |\n| | MXFP4               | 66.91      | 69.14     | 61.72     | 65.92     |\n| | **AMSQuant(fp4.5)** | **75.6**   | 81.73     | 67.51     | 74.95     |\n| | **AMSQuant(fp5.3)** | 74.86      | **84.46** | **68.53** | **75.95** |\n| Meta-Llama-3.2-3B-Instruct | *FP16*              | *68.21*    | *77.41*   | *61.73*   | *69.12*   |\n| | MXFP4               | 63.77      | 69.52     | 57.9      | 63.73     |\n| | **AMSQuant(fp4.5)** | **71.72**  | 74.83     | 59.76     | 68.77     |\n| | **AMSQuant(fp5.3)** | 70.43      | **76.88** | **61.82** | **69.71** |\n\n\\(For the MXFP4 method, we use E8M0 per\\-block scales with block size of 32\\)\n\nAs shown in the tables above, **our method consistently outperforms micro-scaling format quantization**. During our accuracy experiments, we found that the dynamic range of weight tensors in LLMs is far smaller than activations. *Hence, it is be a better choice to assign more bits to mantissa that control granularity instead of exponents which contribute to dynamic ranges.*\n\nSimilar conclusions can be found in a paper [1] comparing FP4/MXFP4/NVFP4 that granularity is more important than dynamic range when it comes to weight-only quantization.\n\n### Q3: Channels to choose in the mantissa sharing.\n\nThank you for your suggestion of applying mantissa sharing on the output channel, and we agree that it will benefit at kernel level in CUDA environments. The accuracy results of \"output\\-channel\\-wise mantissa sharing\" are as below. \\(Following the setting of AWQ, we used around 100 calibration data samples to make quantization aware of activation outliers.\\)\n\n\n| **Model**                 | method              | **IFEval** | **GSM8k** | MMLU        | AVG       |\n| ------------------------- | ------------------- | ---------- | --------- | ----------- | --------- |\n| **Llama-3.2-3B-Instruct** | *FP16*              | *68.21*    | *77.41*   | *61.73*     | *69.12*   |\n| | FP5.3(AMSQuant)     | 70.43      | 76.88     | **61.82**   | 69.71     |\n| | FP5.3(AMSQuant+AWQ) | **70.79**  | **78.01** | 61.56       | **70.12** |\n| **Llama-3.1-8B-Instruct** | *FP16*              | *73.57*    | *84.15*   | ***68.93*** | *75.55*   |\n| | FP5.3(AMSQuant)     | **74.86**  | **84.46** | 68.53       | **75.95** |\n| | FP5.3(AMSQuant+AWQ) | 73.38      | 84.31     | 68.55       | 75.41     |\n\nAs shown in the tables above, \"output channel mantissa\\-sharing\" combined with \"Activation\\-aware calibration\" did not outperform \"input channel mantissa \\-sharing\". Furthermore, the current design naturally takes activation outliers into consideration, while saving the overhead of calibration.\n\n---\n\nWe hope these responses fully address your questions. Thank you again for your constructive feedback\\! We welcome any further discussion or suggestions.\n\n[1] Egiazarian, Vage, et al. \"Bridging the Gap Between Promise and Performance for Microscaling FP4 Quantization.\""
+       },
+       "license": "CC-BY-4.0",
+       "url": "https://openreview.net/forum?id=4vXNp4wujY&noteId=Nr1d3Zh1kU",
+       "createdAt": "2025-11-28T12:11:46.793Z",
+       "modifiedAt": "2025-11-28T15:51:53.155Z"
+      },
+      {
+       "externalId": "hQ2fc7b5rH",
+       "replyTo": "p3z9zAmqra",
+       "kind": "comment",
+       "invitation": "Official_Comment",
+       "signature": "Authors",
+       "content": {
+        "comment": "### Q1: Baselines seem to be limited, AWQ, GPTQ, NF4 should be discussed.\n\nThank you for your suggestion on providing more baselines, and correspondingly, we compared our method with AWQ, GPTQ and NF4  methods across different models and datasets (the best results are highlighted).\n\n| Model                              | Method              | IFEval    | GSM8k     | MMLU      | AVG       |\n| ---------------------------------- | ------------------- | --------- | --------- | --------- | --------- |\n| **Qwen3\\-4B\\-2507\\-Instruct**      | *FP16*              | *80.96*   | *89.69*   | *72.45*   | *81.03*   |\n|                                    | AWQ                 | 79.85     | 86.5      | 70.84     | 79.06     |\n|                                    | GPTQ                | 80.41     | **89.92** | 71.01     | 80.45     |\n|                                    | NF4                 | 79.85     | 89.08     | 71.33     | 80.09     |\n|                                    | **AMSQuant(fp4.5)** | 80.04     | 88.7      | 71.49     | 80.08     |\n|                                    | **AMSQuant(fp5.3)** | **81.7**  | 88.86     | **71.74** | **80.77** |\n| **Meta\\-Llama\\-3.1\\-8B\\-Instruct** | *FP16*              | *73.57*   | *84.15*   | *68.93*   | *75.55*   |\n|                                    | AWQ                 | 72.83     | 83.78     | 66.98     | 74.53     |\n|                                    | GPTQ                | 73.75     | 82.03     | 67.31     | 74.36     |\n|                                    | NF4                 | 72.83     | 81.12     | 66.16     | 73.37     |\n|                                    | **AMSQuant(fp4.5)** | **75.60** | 81.73     | 67.51     | 74.95     |\n|                                    | **AMSQuant(fp5.3)** | 74.86     | **84.46** | **68.53** | **75.95** |\n| **Meta\\-Llama\\-3.2\\-3B\\-Instruct** | *FP16*              | *68.21*   | *77.41*   | *61.73*   | *69.12*   |\n|                                    | AWQ                 | 68.95     | 76.88     | 60.57     | 68.80     |\n|                                    | GPTQ                | 67.1      | 71.11     | 57.94     | 65.38     |\n|                                    | NF4                 | 69.5      | 73.84     | 59.94     | 67.76     |\n|                                    | **AMSQuant(fp4.5)** | **71.72** | 74.83     | 59.76     | 68.77     |\n|                                    | **AMSQuant(fp5.3)** | 70.43     | **76.88** | **61.82** | **69.71** |\n| **Qwen2.5\\-7B\\-Instruct**          | *FP16*              | *71.72*   | *80.97*   | *71.77*   | *74.82*   |\n|                                    | AWQ                 | 70.06     | **81.05** | 70.91     | 74.01     |\n|                                    | GPTQ\\-Int4          | 70.79     | 80.97     | 70.18     | 73.98     |\n|                                    | NF4                 | 69.13     | 78.24     | 69.47     | 72.28     |\n|                                    | **AMSQuant(fp4.5)** | **72.46** | 80.06     | 70.68     | 74.40     |\n|                                    | **AMSQuant(fp5.3)** | 72.27     | 80.36     | **71.97** | **74.87** |\n\n\\(AWQ and GPTQ weights are directly downloaded from official repos on HuggingFace, while NF4 weights are reproduced based on the source code of Qlora[1], and block size is set to 64 for all models\\). As shown in the table above,\n1. The FP5.33 quantization consistently outperforms the other quantization baselines, with the average score being roughly one point higher. Its performance is also nearly lossless compared to the original full\\-precision model.\n2. The FP4.5 quantization achieves accuracy that is generally comparable to or better than the other baseline methods, with a negligible accuracy loss of no more than 0.5%\n\nThis leads to the conclusion that **our method can better maintain the original model's accuracy than other frequently-used weight-only quantization methods**.\n\n[1] https://github.com/artidoro/qlora"
+       },
+       "license": "CC-BY-4.0",
+       "url": "https://openreview.net/forum?id=4vXNp4wujY&noteId=hQ2fc7b5rH",
+       "createdAt": "2025-11-28T12:12:23.589Z",
+       "modifiedAt": "2025-11-28T15:26:26.020Z"
+      },
+      {
+       "externalId": "7dEx4gBd7A",
+       "replyTo": "010tKaXCZw",
+       "kind": "comment",
+       "invitation": "Official_Comment",
+       "signature": "Authors",
+       "content": {
+        "comment": "### Q1: Offline search time for mantissa sharing algorithm.\n\nWe counted the time spent on our AMS\\-Quant method across different model sizes, the results are as follows:\n\n|Model|Qwen3-4B|Qwen3-8B|\n|---|---|---|\n|Offline processing time spent|~15min|~30min|\n\nThe process is executed on a single 4\\-core/2.1GHZ CPU, and as shown in the table above, our method offers negligible overhead offline and can be simply executed without specific calibration. Offline overhead should be better with stronger CPU setups.\n\n### Q2: Extra effort of deployment under different frameworks and hardware platforms.\n\nThank you very much for the reviewer’s helpful comment. We would like to clarify that our method was designed with practical hardware considerations in mind.\n\nFirst, for offline storage, our kernel stores weights in aligned segments \\(32\\-bit and 16\\-bit aligned\\). This layout matches the alignment requirements commonly found on GPUs, NPUs, and TPUs, making the format easier to integrate into existing deployment pipelines and Inference framework like TensorRT.\n\nSecond, for decoding, we use a small set of bitwise shift\\-and\\-or operations. These operations are extremely cheap on almost all hardware platforms, so the decoding overhead remains minimal and hardware\\-friendly.\n\nThird, besides the CUDA results shown in the paper, we also tested our method on an NPU backend, where we observed similar kernel speedups over the FP16 baseline. This further suggests that the approach can be adapted to different hardware platforms.\n\nWe appreciate the reviewer’s comment, as it helps us better clarify the practicality of our method. Thank you again for the valuable feedback.\n\n### Q3: Can this method be combined with existing methods like GPTQ or AWQ with ease?\n\nThank you for your advice\\! Theoretically it can be combined with outlier\\-suppression methods like GPTQ or AWQ, and we did some experiments on AWQ+AMS. We used around 100 calibration data samples to make quantization aware of activation outliers\\(AWQ scales are calibrated using the same method as official repos of the AWQ [1] ). Results are as follows.\n\n| **Model**                 | method              | **IFEval** | **GSM8k** | MMLU      | AVG       |\n| ------------------------- | ------------------- | ---------- | --------- | --------- | --------- |\n| **Llama-3.2-3B-Instruct** | FP16                | 68.21      | 77.41     | 61.73     | 69.12     |\n|                           | FP5.3(AMSQuant)     | 70.43      | 76.88     | **61.82** | 69.71     |\n|                           | FP5.3(AMSQuant+AWQ) | **70.79**  | **78.01** | 61.56     | **70.12** |\n| **Llama-3.1-8B-Instruct** | FP16                | 73.57      | 84.15     | **68.93** | 75.55     |\n|                           | FP5.3(AMSQuant)     | **74.86**  | **84.46** | 68.53     | **75.95** |\n|                           | FP5.3(AMSQuant+AWQ) | 73.38      | 84.31     | 68.55     | 75.41     |\n\nAs shown in the tables above, AWQ+AMS\\-Quant did not outperform pure AMS\\-Quant under every setup. We think the rationale lies under that the AMS\\-format's dynamic range is better than INT\\-format, which leads to a better endurance for outliers in weight tensors. Consequently, combining with AWQ does not bring consistent additional accuracy improvement. Thank you for your advice on combining existing methods and our method, and further study will delve into this aspect.\n\n### Q4: Can this method be extended to activation quantization?\n\nThank you for your advice. We did extend AMS\\-Quant to activation quantization, and here is the result of wXa8 quantization.\n\n| **Model**              | method               | **IFEval** | **GSM8k** |\n| ---------------------- | -------------------- | ---------- | --------- |\n| Qwen3-4B-Instruct-2507 | w16a16               | 80.96      | 89.69     |\n| | w8a8(SmoothQuant)    | 82.26      | 88.86     |\n| | **w5.3a8(AMSQuant)** | 80.96      | 89.46     |\n| Llama-3.2_3B-Instruct  | w16a16               | 68.21      | 77.41     |\n| | w8a8(SmoothQuant)    | 68.95      | 77.86     |\n| | **w5.3a8(AMSQuant)** | 68.95      | 76.16     |\n| Qwen2.5-7B-Instruct    | w16a16               | 71.72      | 80.59     |\n| | w8a8(SmoothQuant)    | 71.16      | 79.98     |\n| | **w5.3a8(AMSQuant)** | 69.13      | 81.12     |\n| Llama-3.1-8B-Instruct  | w16a16               | 73.57      | 84.15     |\n| | w8a8(SmoothQuant)    | 72.46      | 84.31     |\n| | **w5.3a8(AMSQuant)** | 75.60       | 84.91      |\n\n**The result shows that our method can be integrated with the activation quantization method without significant accuracy loss.** It shows that the AMS\\-Quant can be well extended to activation quantization.\n\nWe hope these responses fully address your questions. Thank you again for your constructive feedback\\! We welcome any further discussion or suggestions.\n\n---\n\n[1] https://github.com/mit-han-lab/llm-awq/tree/main/awq"
+       },
+       "license": "CC-BY-4.0",
+       "url": "https://openreview.net/forum?id=4vXNp4wujY&noteId=7dEx4gBd7A",
+       "createdAt": "2025-11-28T12:20:45.081Z",
+       "modifiedAt": "2025-11-28T15:53:21.542Z"
+      },
+      {
+       "externalId": "7uBRi9aIeH",
+       "replyTo": "p3z9zAmqra",
+       "kind": "comment",
+       "invitation": "Official_Comment",
+       "signature": "Authors",
+       "content": {
+        "comment": "### Q2: Are the speedups only kernel\\-level?\nThank you for pointing out the potential ambiguity of speedup conclusions, and exactly as you assumed, it's kernel-level speedups in the original paper. To avoid confusion, we will revise the paper in future versions.\n\nWhat’s more, we made some effort to integrate our kernel into inference frameworks to validate E2E speedups: Due to hardware limitations, we compress model size and approximate E2E performance using models with fewer layers, whilst maintaining the same shape for each layer. We focused on memory\\-bound scenarios as it's the main purpose of doing weight\\-only quantization. The efficiency results of Qwen3-32B and Qwen3-8B of different batch sizes are as follows.\n\n\n|   Qwen3 - 8B       |   fp6    |  fp5.33  |   fp5    |  fp4.25  |\n|----------|:--------:|:--------:|:--------:|:--------:|\n| bs=1     | $1.54 \\times$ | $1.61 \\times$ | $1.64 \\times$ | $1.70 \\times$ |\n| bs=4     | $1.32 \\times$ | $1.41 \\times$ | $1.42 \\times$ | $1.46 \\times$ |\n| bs=8     | $1.14 \\times$ | $1.17 \\times$ | $1.19 \\times$ | $1.22 \\times$ |\n\n|     Qwen3 - 32B      |   fp6    |  fp5.3   |   fp5    |  fp4.25  |\n|----------|:--------:|:--------:|:--------:|:--------:|\n| bs=1     | $1.93 \\times$ | $2.04 \\times$ | $2.09 \\times$ | $2.21 \\times$ |\n| bs=4     | $1.80 \\times$ | $1.89 \\times$ | $1.93 \\times$ | $2.01 \\times$ |\n| bs=8     | $1.55 \\times$ | $1.67 \\times$ | $1.69 \\times$ | $1.74 \\times$ |\n\n\n\n(Numbers in the table are speedup ratios compared to the FP16-format model) As shown in the table above, kernel-level speedup can be extended to model\\-level, as in memory-bound scenarios, it is the data copy of weights that takes up most of the inference time.\n\n### Q3: Ablation study of increasing K.\nThank you for your advice on experiments on increasing K. We gradually increased K and reduced the average bit width between 4\\-5 bits. The model's average accuracy showed a slow downward trend, while it consistently exceeded the accuracy of the FP4 model, which again shows the effectiveness of the proposed AMS\\-Quant. Results of ablation study are as follows.\n\n| Llama-3.1-8B-Instruct | **K** | **IFEval (Strict)** | **GSM8k** | **MMLU** | **AVG** |\n| --------------------- | ----- | ------------------- | --------- | -------- | ------- |\n| fp16                  | /     | 73.57               | 84.15     | 68.93    | 75.55   |\n| fp4                   | /     | 70.24               | 76.8      | 65.04    | 70.69   |\n| fp4.1                 | 10    | 74.49               | 80.29     | 66.51    | 73.76   |\n| fp4.125               | 8     | 72.54               | 80.82     | 66.31    | 73.22   |\n| fp4.167               | 6     | 75.97               | 80.06     | 66.21    | 74.08   |\n| fp4.25                | 4     | 73.75               | 81.27     | 66.97    | 74.00   |\n| fp4.33                | 3     | 74.49               | 81.12     | 66.8     | 74.14   |\n| fp4.5                 | 2     | 75.6                | 81.73     | 67.51    | 74.95   |\n\n| **Llama-3.2-3B-Instruct** | **K** | **IFEval (Strict)** | **GSM8k** | **MMLU** | **AVG** |\n| ------------------------- | ----- | ------------------- | --------- | -------- | ------- |\n| fp16                      | /     | 68.21               | 77.41     | 61.73    | 69.12   |\n| fp4                       | /     | 65.25               | 69.22     | 56.74    | 63.74   |\n| fp4.1                     | 10    | 65.99               | 70.51     | 57.87    | 64.79   |\n| fp4.125                   | 8     | 65.62               | 70.58     | 58.12    | 64.77   |\n| fp4.167                   | 6     | 68.39               | 71.34     | 58.35    | 66.03   |\n| fp4.25                    | 4     | 69.13               | 73.09     | 59.16    | 67.13   |\n| fp4.33                    | 3     | 68.58               | 73.92     | 59.38    | 67.29   |\n| fp4.5                     | 2     | 71.72               | 74.83     | 59.76    | 68.77   |\n\nWe hope these responses fully addressed your questions. Thank you again for your constructive feedback!"
+       },
+       "license": "CC-BY-4.0",
+       "url": "https://openreview.net/forum?id=4vXNp4wujY&noteId=7uBRi9aIeH",
+       "createdAt": "2025-11-28T12:39:51.233Z",
+       "modifiedAt": "2025-11-28T14:57:27.386Z"
+      },
+      {
+       "externalId": "kxh3mIyHS2",
+       "replyTo": "CHAGtNuL4i",
+       "kind": "comment",
+       "invitation": "Official_Comment",
+       "signature": "Authors",
+       "content": {
+        "comment": "### Q2: Comparison to extreme low bit quantization, such as 2 or 3 bits.\n\nThe proposed AMS\\-Quant aims to approach the lower\\-bound bit\\-width of the model while keeping the full accuracy level instead of pursuing extreme efficiency at the cost of  sacrificing model accuracy. According to the accuracy results provided in official papers of QuIP[1] and AQLM[2], when it comes to extremely low bits quantization under 3bits with model size of 4\\-13B, accuracy loss was around 2 to 5 points on average. In our paper, we showed that our method can maintain nearly lossless accuracy.\n\nFrom a practical perspective, many realistic cases are sensitive to accuracy loss, such as autonomous driving scenarios, under which the accuracy loss of extremely low bit quantization can be unacceptable. Furthermore, the accuracy between a 14B model and a 32B model or a 4B model and a 8B moodel are merely 5 points on average [3] [4], so we consider that such 2 to 5 points accuracy loss would hurt the competence of the original model. In conclusion, it is important to pursue \"nearly lossless\" low\\-bit quantization, which is exactly one of our method's motivation.\n\n### Q3: QuaRot, integration with KVCache and attention compression.\n\nOur method is orthogonal to activation compression and KVCache compression methods, such as AWQ and QuaRot, so it can be combined with these activation and KVCache compression methods. Thank you for your advice on extending our method, and we will take this into consideration in our future studies.\n\n### Q4: Rationale of mantissa sharing.\n\nAs is stated in section 3.1, the optimization objective of mantissa sharing is the same as round\\-to\\-nearest quantization, that is, to minimize the reconstruction error of quantized weight.\n\nWe used MSE \\(Mean Squared Error\\) as the objective function, and the results demonstrated in this paper have shown that it is a simple but effective criterion of reconstruction error. Thank you for your advice on trying a different approach to find the shared bit.\n\n### Q5: Kernel novelty compared to TC\\-FPx kernels.\n\nThank you for your question. As we stated in Section 3.2, our kernel implementation is based on the TC\\-FPx framework. We shall highlight that **the novelty of this paper does not lie in the kernel, but our adaptive mantissa sharing method to approach the minimum required bit\\-width of a model at the full original accuracy level.**\n\n### Q6: Clarity of figures of kernel efficiency.\n\nThank you for your opinion on the figures of our paper, and we will polish our main figure in the revision.\n\n---\n\nWe hope these responses fully address your questions. Thank you again for your constructive feedback\\! We welcome any further discussion or suggestions.\n\n\n\n[1] Tseng et al. \"QuIP\\#: Even Better LLM Quantization with Hadamard Incoherence and Lattice Codebooks.\"\n\n[2] Egiazarian et al. \"Extreme Compression of Large Language Models via Additive Quantization.\"\n\n[3] Yang, An, et al. \"Qwen2.5 Technical Report\"\n\n[4] Yang, An, et al. \"Qwen3 technical report.\""
+       },
+       "license": "CC-BY-4.0",
+       "url": "https://openreview.net/forum?id=4vXNp4wujY&noteId=kxh3mIyHS2",
+       "createdAt": "2025-11-28T12:43:25.686Z",
+       "modifiedAt": "2025-11-28T15:45:45.381Z"
+      },
+      {
+       "externalId": "roMKrn70eK",
+       "replyTo": null,
+       "kind": "comment",
+       "invitation": "Official_Comment",
+       "signature": "Authors",
+       "content": {
+        "comment": "We thank all reviewers for their constructive feedback and thoughtful questions. Across the reviews, several common strengths of our work were highlighted, including:\n- **The novelty of our adaptive mantissa sharing mechanism design is acknowledged.**\n- The clear motivation around improving low-bit floating-point quantization in both aspects of accuracy and efficiency.\n- The close algorithm–system co-design of our quantization and kernel optimizations.\nWe are grateful for these recognitions. Below, we summarize the major revisions and clarifications made in response to reviewers’ comments. All primary conclusions of the paper remain unchanged.\n\n### Expanded baseline comparisons (AWQ, GPTQ, NF4).\n\nReviewers VgPA suggested including more baselines—particularly AWQ, GPTQ, and NF4. We have added comprehensive comparisons across various models (see response to Reviewer VgPA and j2b7). The results our AMS-Quant can outperform the all the added mentioned state-of-the-art methods.  \n\n###  Combination of existing methods with our method.\n\nWe combined activation-aware methods(AWQ) with our method, using the same method to calibrate AWQ-scales according to the AWQ official repo to ensure consistency. AmsQuant results have been updated (see response to Reviewer k41G).\n\n### Extension to activation quantization (w5.3a8).\n\nWe combined the activation quantization method with our weight-only quantization method across Llama family Models and compared accuracy results to w8a8 smoothquant models and original models(see response to Reviewer 5aq1 and k41G). Results show that our method can extend to activation quantization with no significant accuracy loss.\n\n### Ablation study on increasing K.\n\nReviewer VgPA suggests that we make an ablation study of increasing K (see response to Reviewer VgPA). Through the ablation study, fp4.x of our method continuously outperformed fp4 format with a moderate degradation of accuracy when K increases, which shows the effectiveness of our method."
+       },
+       "license": "CC-BY-4.0",
+       "url": "https://openreview.net/forum?id=4vXNp4wujY&noteId=roMKrn70eK",
+       "createdAt": "2025-11-28T13:03:49.112Z",
+       "modifiedAt": "2025-11-28T16:28:25.473Z"
+      },
+      {
+       "externalId": "z60cO9gAkN",
+       "replyTo": null,
+       "kind": "meta_review",
+       "invitation": "Meta_Review",
+       "signature": "Area Chair 75wD",
+       "content": {
+        "summary": "This paper presents AMS-Quant, a floating-point quantization framework for LLMs. It includes two major techniques, i.e., mantissa-bit sharing to boost compression and adaptive search to reduce quantization error. A custom GPU kernel is developed to realize practical speedups. Experiments show that AMS-Quant achieves these gains with only minimal accuracy degradation over FP16 inference. Four reviewers provided their reviews, but none responded to the rebuttal in a timely manner. The authors supplied more experimental results comparing more baselines, combination with existing methods, extension to activation quantization, and an ablation on k. These new results strengthen the paper. \n\nHowever, the AC does not think the authors have successfully addressed all proposed concerns. Specifically, the AC agrees with reviewer j2b7's concerns about low-bit baselines, and the rationale for mantissa-bit sharing is not clearly justified. Therefore, the AC is slightly inclined to reject this submission and encourage the authors to include these improvements for a future submission.",
+        "reviewer_concerns": "1. Reviewer VgPA (mostly addressed).\n2. Reviewer j2b7 (minorly addressed). Unsolved concerns: 1)comparison with 2-3 bits baselines 2) the rationale for mantissa-bit sharing is not clearly justified and limited novelty 3) the figures do not effectively convey the core concepts \n3. Reviewer 5aq1(partly addressed). The AC believe it's better to include the real inference latency to Q2, which can measure the overehead of applying mantissa sharing on the input channel\n4. Reviewer k41G (mostly addressed)",
+        "reviewer_scores": "1. Reviewer VgPA would keep 4 or increase the score to 6.\n2. Reviewer j2b7 would keep the score as 0 or at most, increase it to 2.\n3. Reviewer 5aq1 would keep 4 or increase the score to 6.\n4. Reviewer k41G  would keep the score as 8."
+       },
+       "license": "CC-BY-4.0",
+       "url": "https://openreview.net/forum?id=4vXNp4wujY&noteId=z60cO9gAkN",
+       "createdAt": "2025-12-22T07:41:35.847Z",
+       "modifiedAt": "2026-02-09T06:37:50.541Z"
+      },
+      {
+       "externalId": "w4VWw0MO0C",
+       "replyTo": null,
+       "kind": "decision",
+       "invitation": "Decision",
+       "signature": "Program Chairs",
+       "content": {
+        "title": "Paper Decision",
+        "decision": "Reject",
+        "comment": ""
+       },
+       "license": "CC-BY-4.0",
+       "url": "https://openreview.net/forum?id=4vXNp4wujY&noteId=w4VWw0MO0C",
+       "createdAt": "2026-01-26T08:38:14.373Z",
+       "modifiedAt": "2026-02-06T04:54:56.276Z"
+      }
+     ]
+    },
+    {
+     "id": "57bSlUHBfV",
+     "number": 3713,
+     "title": "AVRT: Audio-Visual Reasoning Transfer through Single-Modality Teachers",
+     "abstract": "While recent advances in reasoning models have shown remarkable progress in text-based domains, the development of effective reasoning capabilities in multimodal settings, particularly audio-visual, remains still a challenge, mainly because of the limited availability of high-quality reasoning data in target multimodal combinations. To address this problem, we introduce AVRT, a novel framework that generates high-quality audio-visual reasoning data by distilling knowledge from specialized single-modality teachers. To this end, we generate high-quality reasoning traces via a vision-reasoning and a audio-reasoning teacher and merge the resulting traces with an LLM merger model. This enables an two stage training with a supervised fine-tuning of student models as cold start followed by a reinforcement learning. The evaluation show that the resulting models achieves competitve performance on various datasets, i.a. OmniBench, DailyOmni, and MMAR, establishing a new pipeline for an effective training of audio-visual reasoning models.",
+     "authors": [
+      "Edson Araujo",
+      "Saurabhchand Bhati",
+      "Muhammad Jehanzeb Mirza",
+      "Andrew Rouditchenko",
+      "Brian Kingsbury",
+      "Samuel Thomas",
+      "Rogerio Feris",
+      "James R. Glass",
+      "Hilde Kuehne"
+     ],
+     "keywords": [
+      "reasoning",
+      "multi-modal learning",
+      "audio-visual"
+     ],
+     "status": "withdrawn",
+     "decision": null,
+     "notes": [
+      {
+       "externalId": "UWOvVBNalr",
+       "replyTo": null,
+       "kind": "review",
+       "invitation": "Official_Review",
+       "signature": "Reviewer Ko9m",
+       "content": {
+        "summary": "This paper proposes a way to create audio-visual reasoning data from audio-only and visual-only models. The authors show the data created is helpful to achieve better performance in reasoning in a somewhat limited setup.",
+        "soundness": 2,
+        "presentation": 2,
+        "contribution": 2,
+        "strengths": "1. The data creating pipeline is clear and the paper is easy to follow.\n2. Delving into better SFT data for cold-starting audio-visual LLM reasoning is a useful direction.",
+        "weaknesses": "1. The completeness of the evaluation:\nThe authors have listed a range of 7B models, whereas only showing results for 3B models using their data. Also the author should compare to some reasoning-oriented benchmark such as RivaBench [1].\n[1] Sun et al. \"video-SALMONN-o1: Reasoning-enhanced Audio-visual Large Language Model\". Proc. ICML. 2025.\n\n2. Missing ablation studies:\nA core contribution of the dataset is to use a merger to merge audio and visual-only reasoning for SFT so it would be useful to see how the model performs when only SFT stage is used, and an analysis of how this affects the later RL stage should be given.\n\n3. Contribution seems limited:\nFrom a perspective of someone who have hands-on experience of creating SFT training data for reasoning, I do not feel such a data creation pipeline worth publishing, unless some unexpected conclusions or findings are provided, together with strong theoretical grounding. I did not find either in this paper.",
+        "questions": "Have the author tried actual or deeper distillation from audio-only or visual-only teachers? Not just creating data.",
+        "flag_for_ethics_review": [
+         "No ethics review needed."
+        ],
+        "rating": 2,
+        "confidence": 4,
+        "code_of_conduct": "Yes"
+       },
+       "license": "CC-BY-4.0",
+       "url": "https://openreview.net/forum?id=57bSlUHBfV&noteId=UWOvVBNalr",
+       "createdAt": "2025-10-23T14:21:28.741Z",
+       "modifiedAt": "2025-11-12T03:09:00.200Z"
+      },
+      {
+       "externalId": "qDma2O4tle",
+       "replyTo": null,
+       "kind": "review",
+       "invitation": "Official_Review",
+       "signature": "Reviewer Rz8Y",
+       "content": {
+        "summary": "The paper proposes a pipeline for generating synthetic reasoning traces over audio. The approach first processes joint audio–video data with modality-specific reasoning models, producing separate audio and video reasoning traces. These traces are then merged by an LLM into a unified reasoning trace, resulting in audio–video reasoning data. Using this data, the authors fine-tune 3B-parameter models with a combination of supervised finetuning and reinforcement learning, achieving performance comparable to larger 7B-parameter models.",
+        "soundness": 2,
+        "presentation": 2,
+        "contribution": 2,
+        "strengths": "- The authors introduce a dataset that has clear potential value for the community, and their experiments demonstrate consistent performance gains across multiple benchmarks relative to the base model.\n- The results reinforce prior findings [(Lu et al., 2025), (Kulkarni & Fazli, 2025)] that reasoning traces can enhance the performance of audio–video models.\n- In contrast to earlier approaches [(Lu et al., 2025), (Kulkarni & Fazli, 2025), (Goel et al., 2025)], the proposed reasoning traces are more natural, as they integrate both audio and video, rather than relying on separate modality-specific reasoning [(Kulkarni & Fazli, 2025)] or exclusively on LLM-generated reasoning [(Lu et al., 2025)].\n- An interesting aspect of the experiments is that supervised finetuning on the dataset prior to reinforcement learning further boosts performance.",
+        "weaknesses": "- The central contribution lies in extracting reasoning signals independently from audio and video and then merging them into a single reasoning trace. However, there is no ablation study isolating the impact of reasoning traces from a single modality. The closest analysis appears in Table 4, but my understanding is that the evaluated model there is trained on full audio–visual reasoning traces rather than on modality-specific traces.\n- In Table 3, the comparison between the final row and Qwen2.5 Omni* (the base model) does not demonstrate statistically significant improvements, making it difficult to justify the method’s effectiveness.\n- The paper highlights that supervised finetuning on reasoning traces provides a stronger starting point for reinforcement learning (in the abstract, introduction, and Figure 1), yet offers little analysis of why this occurs. For example, does SFT make it easier for the RL agent to obtain positive feedback?",
+        "questions": "- It is unclear whether the proposed setup actually improves performance. In Table 3, the reported gains appear minimal, if present at all.\n- Independent of overall performance, reasoning traces could be an important contribution. Are there specific benefits obtained by combining reasoning from both modalities, as opposed to using each one individually?\n- Do you have insights into why supervised finetuning provides a better cold start for the reinforcement learning stage?",
+        "flag_for_ethics_review": [
+         "No ethics review needed."
+        ],
+        "rating": 4,
+        "confidence": 3,
+        "code_of_conduct": "Yes"
+       },
+       "license": "CC-BY-4.0",
+       "url": "https://openreview.net/forum?id=57bSlUHBfV&noteId=qDma2O4tle",
+       "createdAt": "2025-10-23T22:42:28.560Z",
+       "modifiedAt": "2025-11-12T03:08:59.996Z"
+      },
+      {
+       "externalId": "HD34b5JoEs",
+       "replyTo": null,
+       "kind": "review",
+       "invitation": "Official_Review",
+       "signature": "Reviewer rCKC",
+       "content": {
+        "summary": "The paper proposes AVRT, a pipeline that builds an audio‑visual reasoning dataset by distilling chain‑of‑thought (CoT) traces from two single‑modality teachers: an audio teacher and a visual teacher and then merging the two traces with a text‑only LLM merger. The merged trace is used to SFT a student model with vision/audio encoders frozen, followed by GRPO with a simple reward on output format and multiple‑choice answer accuracy. The authors construct AVRT‑20K dataset (approx. 18.3k train and 945 val). With the integration of proposed reasoning chains in the AV modes, the authors report performance gains.",
+        "soundness": 2,
+        "presentation": 3,
+        "contribution": 2,
+        "strengths": "- The paper is clearly structured, with an informative pipeline diagram.\n- Concise and Readable sections and tables.\n- Simple and modular recipe for building AV reasoning traces without multimodal annotation.\n- The proposed dataset could be used to train the AV models in future,",
+        "weaknesses": "- Most scores in  Table 3 of main paper are empty which makes it hard to establish the effectiveness of the proposed method.\n- It seems that there is data leakage in the training. The merger LLM already sees the gold label. The merger prompt includes the correct answer, which undermines the central claim about the “composed reasoning.”\n- Filtering to reasoning traces where both teachers are correct induces data bias. By keeping only items where both teachers are correct the dataset may over‑represent easy/teacher‑friendly cases and omit the conflict‑resolution scenarios most indicative of cross‑modal reasoning benefits. It is worth checking if the same reasoning traces are filtered out using other teachers and derive some insights out of it.\n- The comparison scope is limited. Main comparisons rely on a reproduced Qwen2.5‑Omni‑3B baseline and reported numbers for several 7B systems.\n- Training uses 8 frames per video and 10‑second audio for teachers; it would help to analyze how such input pruning affects temporal reasoning and transfer to single‑image + audio setups like OmniBench.\n- Apart from the SFT, the proposed method has lot of similarities with the recent work \"AURELIA\" [1] which distills reasoning at the test-time. The paper is not cited by the authors although being very relevant. How does your method compare with AURELIA? \n- Overall the merger’s access to the gold answer and the both‑teachers‑correct filtering substantially weaken the claim that AVRT constructs high‑quality, label‑agnostic cross‑modal reasoning traces\n\n\nReferences:\n\n[1] Sanjoy Chowdhury, Hanan Gani, ..et al. AURELIA : Test‑time Reasoning Distillation in Audio‑Visual LLMs. ICCV 2025.",
+        "questions": "- Do the Table 4 results include the Reasoning chain with the query when SFT and RL are not used? If not, what  happens when we simply pass the reasoning chain with the query without SFT? Also what happens when passing the reasoning chain with query without both SFT and RL (kind of zero-shot)?\n- Do traces stay consistent if you mask either modality at inference? Any counterfactual tests to check whether the CoT actually uses both streams.",
+        "flag_for_ethics_review": [
+         "No ethics review needed."
+        ],
+        "rating": 2,
+        "confidence": 5,
+        "code_of_conduct": "Yes"
+       },
+       "license": "CC-BY-4.0",
+       "url": "https://openreview.net/forum?id=57bSlUHBfV&noteId=HD34b5JoEs",
+       "createdAt": "2025-10-30T21:55:03.800Z",
+       "modifiedAt": "2025-11-12T03:08:59.733Z"
+      },
+      {
+       "externalId": "n2Ik5EQdF0",
+       "replyTo": null,
+       "kind": "withdrawal",
+       "invitation": "Withdrawal",
+       "signature": "Authors",
+       "content": {
+        "withdrawal_confirmation": "I have read and agree with the venue's withdrawal policy on behalf of myself and my co-authors."
+       },
+       "license": "CC-BY-4.0",
+       "url": "https://openreview.net/forum?id=57bSlUHBfV&noteId=n2Ik5EQdF0",
+       "createdAt": "2025-11-13T18:11:34.450Z",
+       "modifiedAt": "2025-11-13T18:11:34.450Z"
+      }
+     ]
+    },
+    {
+     "id": "5Vih2mSvOo",
+     "number": 14531,
+     "title": "Differentially Private Wasserstein Barycenters",
+     "abstract": "A Wasserstein barycenter is the mean of a set of probability measures under the optimal transport metric, and it has numerous applications spanning machine learning, statistics, and computer graphics. In applications, the input measures are often empirical distributions formed from datasets, hence privatizing the output barycenter is desired if the input datasets contain sensitive records. We provide the first differentially private algorithms for approximate computation of Wasserstein barycenters between empirical distributions. Our algorithms essentially matches the approximation guarantees of any non-private algorithm for Wasserstein barycenters, while only incurring small additive errors.",
+     "authors": [
+      "Anming Gu",
+      "Sasidhar Kunapuli",
+      "Edward Chien",
+      "Mark Bun",
+      "Kristjan Greenewald"
+     ],
+     "keywords": [
+      "Wasserstein barycenters",
+      "differential privacy"
+     ],
+     "status": "withdrawn",
+     "decision": null,
+     "notes": [
+      {
+       "externalId": "NQr584NZUj",
+       "replyTo": null,
+       "kind": "withdrawal",
+       "invitation": "Withdrawal",
+       "signature": "Authors",
+       "content": {
+        "withdrawal_confirmation": "I have read and agree with the venue's withdrawal policy on behalf of myself and my co-authors."
+       },
+       "license": "CC-BY-4.0",
+       "url": "https://openreview.net/forum?id=5Vih2mSvOo&noteId=NQr584NZUj",
+       "createdAt": "2025-09-25T18:36:04.908Z",
+       "modifiedAt": "2026-02-12T15:11:42.872Z"
+      }
+     ]
     }
    ]
   },
@@ -36847,6 +37664,530 @@
       }
      ],
      "sample": true
+    },
+    {
+     "id": "vCJtlrWM46",
+     "number": 59451,
+     "title": "On Uniformly Scaling Flows: A Density-Aligned Approach to Deep One-Class Classification",
+     "abstract": "Unsupervised anomaly detection is commonly approached through two major paradigms: deep one-class methods learn compact representations of nominal data, whereas deep density estimators such as normalizing flows model exact likelihoods. We show that uniformly scaling flows (USFs), normalizing flows with a constant Jacobian determinant, provide a principled bridge between these paradigms. Specifically, we prove that maximum-likelihood training of a USF reduces to a one-class objective whose inherent regularization mechanism prevents representational collapse and incentivizes density-aligned latent representations. This connection implies that USFs inherit both the density faithfulness of flows and the distance-based reasoning of one-class methods: their negative log-likelihood is monotonic in the latent norm, whereas in non-USFs the Jacobian term can entangle likelihood with local volume changes.\nConsequently, we advocate USFs as drop‑in replacements for non‑USFs in modern anomaly detection architectures and identify mechanisms that recover expressivity and enhance numerical stability. Across tabular and image benchmarks, this substitution simplifies optimization, markedly reduces run-to-run variability, and consistently matches or improves detection quality, while mitigating severe failure modes. Thus, our results unify two central perspectives on anomaly detection, indicating that normalizing flow-based methods benefit more from density-faithful geometry than from greater nominal expressivity.",
+     "authors": [],
+     "keywords": [
+      "normalizing flows",
+      "one-class classification",
+      "anomaly detection",
+      "representation learning"
+     ],
+     "status": "under_review",
+     "decision": null,
+     "notes": [
+      {
+       "externalId": "o1MUiTX1Aa",
+       "signature": "Reviewer knPE",
+       "license": "CC-BY-4.0",
+       "url": "https://openreview.net/forum?id=vCJtlrWM46&noteId=o1MUiTX1Aa",
+       "createdAt": "2026-10-13T14:15:50.156Z",
+       "modifiedAt": null,
+       "replyTo": null,
+       "kind": "review",
+       "invitation": "Official_Review",
+       "content": {
+        "rating": 2,
+        "confidence": 3,
+        "informativeness": 2,
+        "presentation": 2,
+        "soundness": 2,
+        "paper_summary": "This work investigates the theoretical connection between uniformly scaling flows (USFs) and deep one-class classification, and claims that maximum-likelihood training of a USF reduces to a one-class objective with implicit volume regularization. The authors further argue that USFs inherently guarantee density-aligned latent representations, and demonstrate improved training stability and competitive detection performance across tabular and image anomaly detection benchmarks.",
+        "critical_strengths": "1. The paper provides a clean and step-by-step formal derivation of the equivalence between USF maximum likelihood estimation and the deep one-class objective, which offers a useful reference for understanding the relationship between the two paradigms.\n2. The empirical evaluation covers both tabular and image modalities, includes clean/contaminated training settings and pixel-/image-level evaluation, and reports extensive ablation studies.",
+        "critical_weaknesses": "1. Limited theoretical novelty, with worst-case constructions that lack real-world relevance. Uniformly scaling flows are not a new concept, dating back to NICE. Constant-Jacobian flows for anomaly detection were already explored by OneFlow. The core claimed theoretical contribution that MLE training of USFs reduces to a one-class distance objective is a straightforward algebraic consequence of the change-of-variables formula under a constant Jacobian. This connection has been implicitly understood in the field and lacks technical depth; formalizing it does not constitute a substantial theoretical advance.\n2. Unfair baseline comparisons and insufficient SOTA context. The stability advantage of USFs is tested against a weakly optimized non-USF baseline. The paper only applies simple tanh clamping to affine coupling layers, ignoring the large body of established stabilization techniques for normalizing flows. Without thorough hyperparameter tuning for the non-USF side, the conclusion that USFs are more stable is unconvincing. Also, the paper lacks comparison to current state-of-the-art anomaly detection methods.\n3. The paper claims to unify two central perspectives on anomaly detection, but the connection only holds for the narrow subclass of USFs, which have far weaker expressivity than general normalizing flows. This framing exaggerates the scope of the work; it does not unify the two broader paradigms.\n4. The repeated claim that density alignment is more valuable than expressivity is not universally supported by the authors' own data. On multiple tabular datasets, USFs underperform non-USFs by large margins. The paper only reports aggregate averages and does not analyze these failure cases, nor does it define boundary conditions for when USFs help or hurt.\n5. The paper fails to clearly delineate its contribution relative to OneFlow, the most closely related work. OneFlow also uses constant-Jacobian flows for one-class anomaly detection with a minimum-volume objective. The only core difference is that this work uses MLE instead of a custom minimum-volume loss, but the paper never demonstrates that MLE is superior, nor does it provide direct head-to-head comparison with OneFlow.",
+        "questions_for_authors": "Please see Weaknesses"
+       }
+      },
+      {
+       "externalId": "HPlqpp3fT0",
+       "signature": "Reviewer UfQV",
+       "license": "CC-BY-4.0",
+       "url": "https://openreview.net/forum?id=vCJtlrWM46&noteId=HPlqpp3fT0",
+       "createdAt": "2026-10-19T12:00:38.808Z",
+       "modifiedAt": null,
+       "replyTo": null,
+       "kind": "review",
+       "invitation": "Official_Review",
+       "content": {
+        "rating": 2,
+        "confidence": 3,
+        "informativeness": 2,
+        "presentation": 2,
+        "soundness": 3,
+        "paper_summary": "Authors argue that constraining a normalizing flow to expand and contract space at the same rate everywhere yields anomaly detectors that are more stable and more interpretable. To this end, they unify two major lines of deep anomaly detection research. One-class methods such as Deep SVDD map normal data close to a single center in latent space and use the distance from that center as the anomaly score, whereas normalizing flows estimate the data density directly and flag samples with low likelihood as anomalous. However, the former are prone to representational collapse, in which all embeddings converge to a single point, while in the latter the input-dependent Jacobian term can decouple likelihood from latent distance and make training numerically unstable. To address these limitations, the paper introduces uniformly scaling flows (USFs), whose Jacobian determinant is constant across inputs, as a theoretical bridge between the two paradigms. Specifically, the authors show that maximum-likelihood training of a USF decomposes into a center-distance term and a regularization term that prevents volume collapse, mirroring the Deep SVDD objective, so that the model likelihood decreases monotonically with distance from the latent center. Building on this result, they propose a drop-in modification that replaces affine coupling with additive coupling in existing flow-based detectors such as FastFlow, CFlow, and U-Flow, and demonstrate on tabular and image benchmarks that it maintains or improves detection performance while substantially reducing run-to-run variability.",
+        "critical_strengths": "S1. The proposed modification is simple and practical, as it only replaces affine coupling with additive coupling. It can therefore be applied as a drop-in change to existing flow-based detectors such as FastFlow, CFlow, and U-Flow without altering other components.\n\nS2. By showing that maximum-likelihood training of a USF reduces to a Deep SVDD–like objective, the paper provides a novel and intuitive theoretical link between one-class and density-based anomaly detection.\n\nS3. The presented experimental results show consistent improvements in training stability. USFs substantially reduce run-to-run variance across tabular and image benchmarks and eliminate severe failure cases of affine baselines, such as CFlow on MVTec metal_nut and toothbrush. This is further supported by the clamp sensitivity analysis in Fig. 3b and the normalization experiments.",
+        "critical_weaknesses": "W1. The connection between the theoretical analysis and the empirical gains is weak. In practice, the non-USF is already nearly aligned (Fig. 3a, r = 0.996), and USF achieves higher AUC-ROC despite a worse NLL (Table 7). This suggests that the performance gains stem primarily from improved training stability rather than from density alignment. Moreover, the restriction that USFs can only represent unimodal densities is not discussed.\n\nW2. The claim of improved training stability is supported only by the variance of the final scores over three seeds. Direct evidence, such as training loss curves, gradient norms, or the evolution of the log-determinant during training, is lacking.\n\nW3. The image experiments compare only untuned flow-based models, whose performance falls well below the originally reported results (e.g., 72.5 for CFlow on MVTec AD). Even if improvements are observed, comparisons with and citations of recent state-of-the-art methods, including diffusion-based and multimodal (e.g., vision–language) approaches, are insufficient.\n\nW4. Failure cases (e.g., FastFlow on cable and CFlow on grid) are not analyzed, and it would be worth discussing region-wise approaches as a potential remedy. In addition, neither qualitative anomaly maps nor the PRO metric is provided.",
+        "questions_for_authors": "Q1. Given Fig. 3a and Table 7, it is unclear how much of the performance gain comes from density alignment rather than training stability. It would also be helpful to know how USFs perform on multimodal normal data.\n\nQ2. Showing the training dynamics, such as loss curves and the evolution of the log-determinant, together with results over more seeds, would make the stability claim more convincing.\n\nQ3. The paper would benefit from comparisons with properly tuned baselines and recent SOTA methods. An explanation of the performance drops on classes such as cable and grid is also needed."
+       }
+      },
+      {
+       "externalId": "TErfS5diVS",
+       "signature": "Reviewer MHV2",
+       "license": "CC-BY-4.0",
+       "url": "https://openreview.net/forum?id=vCJtlrWM46&noteId=TErfS5diVS",
+       "createdAt": "2026-10-21T03:21:51.924Z",
+       "modifiedAt": null,
+       "replyTo": null,
+       "kind": "review",
+       "invitation": "Official_Review",
+       "content": {
+        "rating": 2,
+        "confidence": 3,
+        "informativeness": 2,
+        "presentation": 3,
+        "soundness": 2,
+        "paper_summary": "This paper proposes uniformly scaling flows (USFs) for anomaly detection. The main idea is to use a constant Jacobian determinant to make latent distance consistent with the learned density. The authors provide theoretical analysis and experiments on tabular and image datasets.",
+        "critical_strengths": "1. The motivation is clear, and the theoretical connection between latent distance and likelihood is interesting.\n2. The method can be applied to existing flow-based methods such as FastFlow, U-Flow and CFlow without changing the overall framework.\n3. Some experiments show clear improvements in training stability. The appendix also provides useful ablation results.",
+        "critical_weaknesses": "1. Limited theoretical guarantee. The theory mainly guarantees alignment with the model's learned density, not the true data distribution. I am not sure how well this works for more complex or multimodal normal data.\n2. The source of improvement is unclear. It is difficult to tell whether the gains come from density alignment or simply better training stability. The current experiments do not clearly separate these effects.\n3. Baseline comparison is questionable. The reported CFlow baseline achieves only 72.5% AUROC on MVTec AD, while the original paper reports 98.26%. Although the settings may differ, this gap is quite large and needs explanation.\n4. Improvements are not always consistent. The average gains on tabular datasets are quite small (around 0.4–0.5%), while some image classes show large performance drops, such as cable and grid. These results make the overall effectiveness less convincing.",
+        "questions_for_authors": "1. Can the authors explain how the method handles multimodal normal data? Does the theoretical guarantee still hold with a more flexible base distribution?\n2. How can we know that the improvement comes from density alignment rather than training stability? A more direct ablation would be helpful.\n3. Why is the CFlow baseline much lower than the original result? Also, could the authors explain the large performance drops on some image classes?"
+       }
+      },
+      {
+       "externalId": "ir6owi3tXr",
+       "signature": "Authors",
+       "license": "CC-BY-4.0",
+       "url": "https://openreview.net/forum?id=vCJtlrWM46&noteId=ir6owi3tXr",
+       "createdAt": "2026-11-17T22:30:35.179Z",
+       "modifiedAt": null,
+       "replyTo": "TErfS5diVS",
+       "kind": "comment",
+       "invitation": "Official_Comment",
+       "content": {
+        "comment": "**W1 / Q1 (theoretical guarantee; multimodal normal data)**\n\nThe guarantee indeed concerns the learned density, as the paper states (Section 4.3, after Proposition 1: agreement with the true density additionally depends on the quality of the fit). This is the strongest guarantee a likelihood-based detector can offer, and non-USFs and Deep SVDD lack even this one: a non-USF can fit $p_X$ well and still place high-density points far from the latent centre (Item (b)).\n\n*More flexible bases.* Item (c) does not depend on the base: for any USF that maps $p_X$ to the base $p_B$, we have $p(x) \\propto p_B(\\phi(x))$. The model's density ordering is thus the base-density ordering of the latent code, for *every* base. For radial monotone bases, this is the ordering by latent norm. For a learned radial base with a non-monotone norm density, the ordering is still exact, but by base density rather than by norm alone.\n\n*Multimodal normal data.* With a Gaussian base, a USF inherits the unimodality of the base; modes can only be connected by (arbitrarily thin) bridges (Draxler et al., 2024). The revised limitations state this explicitly (App. H), and the Gaussian mixture of G2 shows that a USF fits bimodal nominal data well (Section 4.3). The paper also evaluates the remedy, learnable radial bases (Section 4.4; Zaid et al., 2024), now in the main text (Section 5.1, Table 2b; details in App. C.3). A radial base whose norm distribution is a mixture of 20 Gamma distributions lowers held-out nominal NLL relative to the Gaussian-base USF (median 1.25 per dimension, interquartile range $[0.47, 1.81]$) and below the non-USF on 17/20 (clamp 1.0) and 19/20 (clamp 2.0) datasets, while keeping the constant Jacobian. Detection improves on average (+0.84 AUC-ROC points), though not uniformly.\n\n**W2 / Q2 (density alignment vs. training stability)**\n\nPlease see G1 and G2. In short: both effects stem from the same input-dependent log-determinant, so no ablation can remove one while keeping the other; the alignment view is the geometric account of why removing it helps detection. Its predictions are borne out by Fig. 3a (12/20 non-USF datasets and 38/60 individual fits off the diagonal), the clamp sweep in Fig. 3b, and Tables 7/9 (at least 11 datasets where the non-USF fits the nominal density better yet detects worse). In a controlled experiment with known density (G2), the latent geometry is density-faithful only for the USF, and the latent radius of the non-USF loses discriminative power under contamination.\n\n**W3 / Q3a (CFlow baseline 72.5% vs. 98.26%)**\n\nPlease see G4. While preparing this response, we found that the Anomalib v2.0.0 implementation of CFlow normalizes the scores per test batch, whereas the original implementation normalizes over the whole test set. Scores from different batches are therefore not comparable, although AUC-ROC is computed over the test set. This affects both CFlow variants and plausibly explains much of the gap to $98.26$, including the collapsed seeds (e.g., metal\\_nut $32.6\\pm42.6$). FastFlow and U-Flow are not affected. Otherwise, all image models run in the identical pipeline with the hyperparameters of the original papers and no tuning. We are re-evaluating the trained CFlow models (inference only) and will report corrected numbers; we will also make the protocol explicit in the paper.\n\n**W4 / Q3b (small tabular gains; drops on cable and grid)**\n\n*Tabular gains.* The 0.4–0.5 points are the margin over the *best competing method* (OneFlow clean, Deep SVDD contaminated). Against the directly comparable non-USF, the gain is $+2.2$ (clean) and $+1.0$ (contaminated) points (Section 5.1). Over the 20 datasets, the USF wins on 17/20 in the clean regime (Wilcoxon signed-rank $p=0.0056$), with less than half the run-to-run variability (mean std $1.5$ vs. $3.9$). In the contaminated regime, it wins on 14/20, but the difference is not significant ($p=0.11$). Section 5.1 now reports these statistics.\n\n*Cable and grid.* Please see G4. The drops occur at image level only; at pixel level, the USF variant is better on cable ($94.9 \\to 97.2$, the best of all six models) and nearly unchanged on grid ($97.4 \\to 96.7$). For cable, localization works and the loss arises when the anomaly map is aggregated into an image score; grid (CFlow) will be re-assessed after the re-evaluation. We will discuss these classes explicitly in the paper."
+       }
+      },
+      {
+       "externalId": "yxrLotMV5C",
+       "signature": "Authors",
+       "license": "CC-BY-4.0",
+       "url": "https://openreview.net/forum?id=vCJtlrWM46&noteId=yxrLotMV5C",
+       "createdAt": "2026-11-17T22:31:42.744Z",
+       "modifiedAt": null,
+       "replyTo": "HPlqpp3fT0",
+       "kind": "comment",
+       "invitation": "Official_Comment",
+       "content": {
+        "comment": "**W1 / Q1 (theory vs. empirical gains; Fig. 3a, Table 7; unimodality)**\n\nWe address this in G1 and G2. The non-USF is less aligned than $r=0.996$ suggests (over individual fits, $0.921$; G1), and the performance effects are moderate. Alignment and stability are not competing explanations. Both follow from the input-dependent log-determinant, and the alignment view explains geometrically *why* removing it helps detection. Table 7 supports this view: better nominal NLL with worse AUC (at least 11 of 20 datasets at clamp 1.0) is the decoupling of likelihood and latent geometry that Proposition 1 predicts. With known density (G2), the latent geometry of the non-USF is not density-faithful and degrades under contamination, while that of the USF is exact. We have revised the presentation accordingly (Section 4.4).\n\nUnimodality: we agree and have added it to the limitations (App. H). Learnable radial bases (now Section 5.1, Table 2b) lower the held-out NLL of the USF below that of the non-USF on 17/20 (clamp 1.0) and 19/20 (clamp 2.0) datasets while keeping the constant Jacobian (see MHV2, Q1).\n\n**W2 / Q2 (direct evidence for stability; training dynamics; more seeds)**\n\nBeyond the three-seed variance, the paper contains more direct evidence:\n- *Collapsed runs.* With LU-parameterized mixing, the non-USF loses 26.6 AUC-ROC points on average vs. 0.57 for the USF (App. E, Table 14); hence Householder mixing for the non-USF in the main results. With spectral normalization at clamp 2.0, 10 of 60 non-USF runs fall below 50% AUC-ROC, none for any USF configuration (App. C.4). On images, affine U-Flow seeds collapse on individual classes (e.g., metal\\_nut, $82.7\\pm29.9$ vs. $100.0\\pm0.0$ for the USF variant; Table 13); the USF variants never do. In the configuration search of the Gaussian-mixture experiment (G2), 14 of 30 non-USF trials for $d\\geq8$ diverge in the first epoch, none of the USF trials with identical configurations (App. F).\n- *Mechanism.* App. E traces the failures to locally exploding log-determinants, which compound across layers (Section 4.2).\n- *Statistics.* In the clean regime, the gap to the non-USF is significant (Wilcoxon signed-rank $p=0.0056$, 17/20 wins) at less than half the seed variability; in the contaminated regime, it is not ($p=0.11$, 14/20). Both are now reported in Section 5.1.\n\n*New: training dynamics.* We retrained USF and non-USF on five tabular datasets (Arrhythmia, Optdigits, Pendigits, Campaign, NSL-KDD) with the configuration of the paper over ten seeds, logging per epoch the training loss, gradient norms, test AUC-ROC, and the spread of $\\log|\\det J|$ over 1000 fixed training points (new Fig. 4 in Section 5.1; full results in App. E). In the clean regime:\n- On Arrhythmia, Optdigits and Pendigits, the final AUC-ROC of the non-USF varies 3–9$\\times$ more across seeds (std $6.2/6.2/7.3$ vs. $2.1/1.1/0.8$), its test AUC-ROC changes 2–6$\\times$ more between epochs (mean absolute change $3.8/4.4/2.5$ vs. $0.6/1.1/1.4$ points), and gradient spikes (maximum $>10\\times$ median within an epoch) occur in 5–10% of epochs vs. at most 1%. Single non-USF seeds drop permanently to 35–60% AUC-ROC; no USF seed does.\n- The spread of $\\log|\\det J|$ stays at 3–55 nats for the non-USF and is exactly zero for the USF. This is the input-dependent term that G1 identifies as the common source of instability and misalignment.\n- The effect is not universal: on Campaign, both models behave alike; on NSL-KDD, the non-USF is stable and better ($92.7$ vs. $86.7$), consistent with the moderate average effect.\n\nIn the contaminated regime, both models overfit the anomalies similarly, so the curves do not discriminate (shown in the appendix). The runs reproduce the three-seed means of the paper (e.g., Arrhythmia, seeds 42–44: $70.1/79.3$ vs. $69.0/78.9$ reported)."
+       }
+      },
+      {
+       "externalId": "oOvOGGnIU5",
+       "signature": "Authors",
+       "license": "CC-BY-4.0",
+       "url": "https://openreview.net/forum?id=vCJtlrWM46&noteId=oOvOGGnIU5",
+       "createdAt": "2026-11-17T22:32:29.696Z",
+       "modifiedAt": null,
+       "replyTo": "HPlqpp3fT0",
+       "kind": "comment",
+       "invitation": "Official_Comment",
+       "content": {
+        "comment": "**W3 / Q3a (untuned baselines; SOTA comparison and citations)**\n\nOn tabular data, the comparison focuses on the most recent methodologically related approaches, namely, recent one-class and flow-based (hybrid) detectors: DOHSC (ICLR 2024), DASVDD (TKDE 2024) and URD (NeurIPS 2025), alongside Deep SVDD and OneFlow. Against these, the USF attains the best mean AUC-ROC and the best mean rank in both regimes (Table 1). On images (G4), the experiments test a drop-in substitution with the hyperparameters of the original authors for the affine models; the CFlow numbers are affected by a per-batch normalization in the Anomalib evaluation, which we found while preparing this response, and are being re-evaluated. We make no state-of-the-art claim on images, but rather argue for the pair-wise advantages of using USF-based backbones in flow-based anomaly detection methods. We will add references to recent diffusion-based and vision–language-based detectors.\n\n**W4 / Q3b (failure cases cable/grid; region-wise approaches; anomaly maps; PRO)**\n\nPlease see G4. The drops on cable (FastFlow) and grid (CFlow) occur at image level only. At pixel level, the USF variant is better on cable ($94.9 \\to 97.2$, the best of all six models) and nearly unchanged on grid ($97.4 \\to 96.7$). For cable (FastFlow), the anomalies are thus localized correctly, and the loss arises in aggregating the anomaly map into an image score; grid (CFlow) will be re-assessed after the CFlow re-evaluation. This makes region-wise approaches, as you suggest, a natural remedy, and we will discuss this in the paper. We report pixel-level AUC-ROC for all classes (App. D) and agree that PRO and qualitative maps would complement it."
+       }
+      },
+      {
+       "externalId": "WXPoVfvfeZ",
+       "signature": "Authors",
+       "license": "CC-BY-4.0",
+       "url": "https://openreview.net/forum?id=vCJtlrWM46&noteId=WXPoVfvfeZ",
+       "createdAt": "2026-11-17T22:33:20.303Z",
+       "modifiedAt": null,
+       "replyTo": "o1MUiTX1Aa",
+       "kind": "comment",
+       "invitation": "Official_Comment",
+       "content": {
+        "comment": "**W1 (theoretical novelty; NICE; OneFlow; worst-case constructions)**\n\nWe do not claim that USFs are new; the paper introduces them with reference to NICE (Section 2), and we agree that the derivation is short. Our contribution is its consequence: MLE training of a USF *is* a one-class objective with built-in collapse prevention, and USFs are exactly the flows for which this holds (G3). This yields a density-alignment guarantee that non-USFs and Deep SVDD provably lack (Proposition 1).\n\nRegarding \"implicitly understood\": the literature reports the empirical advantage of constant-Jacobian flows without explaining it. OneFlow finds its constant-Jacobian variant stronger than the general one; recent tabular evidence highlights likelihood-based detection with USFs (Kim et al., 2026); Behrmann et al. (2021) give stability bounds favouring additive coupling. None of these attribute the advantage to the density alignment of the latent geometry. Moreover, established flow-based detectors (FastFlow, CFlow, U-Flow) all default to affine coupling, suggesting that this connection may not yet be widely reflected and its implication considered in detector design. We would welcome references to prior work that states it explicitly and would be happy to cite them.\n\n*Worst-case constructions.* We agree that they are not realistic data-generating processes, as the paper says (Remark 1, Limitations). They show that the setups of Deep SVDD and non-USFs provide no guarantee of alignment, not that misalignment is typical. That it arises in benign settings is shown by Fig. 3a and the Gaussian-mixture experiment in G2. OneFlow is addressed under W5.\n\n**W2 (non-USF baseline strength; stabilization techniques; SOTA comparison)**\n\nWe respectfully note that the non-USF is not examined under tanh clamping alone. The paper evaluates several established stabilization techniques:\n- *Normalization layers.* ActNorm and spectral normalization, for both models on all 20 datasets (App. C.4, Table 9; Section 5.1). Neither closes the gap to the base USF; both widen it. With ActNorm, the non-USF remains $2.30$ (clamp 1.0) and $3.14$ (clamp 2.0) points below; with spectral normalization, $7.10$ and $16.94$, and at clamp 2.0, 10 of 60 runs fall below 50% AUC-ROC, none for any USF configuration.\n- *Clamp strength.* Fig. 3b sweeps the log-scale clamp. The non-USF improves almost monotonically as the clamp is tightened, and the zero-clamp endpoint is the uniformly scaling limit. Even the best non-zero clamp (1.0, Table 9) stays below the USF ($87.47\\pm3.30$ vs. $88.28\\pm1.49$), with more than twice the run-to-run variability. Clamp 2.0 in the main results is the default of common implementations (Akcay et al., 2022).\n- *Feature mixing.* Both models use Householder reflections, because LU-parameterized mixing costs the non-USF 26.6 points vs. 0.57 for the USF (App. E).\n\n*Tuning.* USF, non-USF and OneFlow share one configuration of identical capacity (Section 5.1); the study tests a mechanism under controlled conditions and is not a leaderboard comparison (Limitations). Where tuning matters most for affine flows (clamp, mixing), it was done in favour of the non-USF. In the Gaussian-mixture experiments, both models are selected by the same hyperparameter search; on images, we use the hyperparameters of the original authors for the affine models (G4).\n\n*SOTA context.* On tabular data, the comparison includes recent detectors, DOHSC (ICLR 2024), DASVDD (TKDE 2024) and URD (NeurIPS 2025), alongside Deep SVDD and OneFlow; the USF attains the best mean AUC-ROC and mean rank in both regimes (Table 1). On images, the experiments test a drop-in substitution; we make no state-of-the-art claim there and will add references to recent diffusion-based and vision–language-based detectors (G4)."
+       }
+      },
+      {
+       "externalId": "t53ZxcZqEK",
+       "signature": "Authors",
+       "license": "CC-BY-4.0",
+       "url": "https://openreview.net/forum?id=vCJtlrWM46&noteId=t53ZxcZqEK",
+       "createdAt": "2026-11-17T22:34:19.060Z",
+       "modifiedAt": null,
+       "replyTo": "o1MUiTX1Aa",
+       "kind": "comment",
+       "invitation": "Official_Comment",
+       "content": {
+        "comment": "**W3 (scope of the \"unification\" claim; USF expressivity)**\n\nWe agree that \"unify\" overstates the scope and have replaced it by \"connect\". As detailed in G3, the MLE objective of a flow is a Deep-SVDD-type objective, i.e., a latent-distance term plus a term independent of $x$, if and only if the flow is a USF. The connection is therefore specific to USFs by necessity, not by choice. We agree that USFs with a Gaussian base are less expressive; learnable radial bases keep the constant Jacobian and lower the held-out NLL below that of the non-USF on 17/20 and 19/20 datasets (now Section 5.1, Table 2b).\n\n**W4 (density alignment vs. expressivity; tabular failure cases; boundary conditions)**\n\nThe paper does not report aggregate averages only. App. C gives per-dataset AUC-ROC for all eight methods in both regimes (Tables 5 and 6); Table 8 reports paired per-dataset effects of the learnable radial base against the Gaussian-base USF and the non-USF, with the number of seeds with a positive effect; App. D gives per-class image results.\n\nWe agree that the USF does not win everywhere; on some datasets (e.g., NSL-KDD, clean) it trails the non-USF clearly. We do not claim that alignment always outweighs expressivity. The claim is suite-level: the USF wins on 17/20 (clean) and 14/20 (contaminated) datasets against the non-USF; the clean difference is significant (Wilcoxon $p=0.0056$), the contaminated one is not ($p=0.11$). Section 5.1 now states this, including the win/loss counts.\n\nOn boundary conditions, the theory makes a clear prediction. A USF must realize all density variation by transport under constant volume change. It is therefore at a disadvantage when the nominal data require strongly varying local volume change, e.g., components of very different scale. A controlled experiment in the revised paper confirms this: with anomalies just outside the narrow component of the Gaussian mixture (G2), the USF falls clearly behind the non-USF in high dimension ($89.5$ vs. $98.2$ AUC-ROC at $d=128$), and a learnable radial base does not close the gap (App. F; stated as a limitation in App. H). We will add a per-dataset failure analysis of the tabular results.\n\n**W5 (delineation from OneFlow; MLE vs. minimum-volume loss; head-to-head comparison)**\n\nA head-to-head comparison is part of the paper. OneFlow and its non-constant-Jacobian variant OneFlow-Gen are baselines in all tabular experiments (Table 1; per dataset in Tables 5 and 6), trained with the same coupling architecture and budget as USF and non-USF (Section 5.1, App. C). The comparison thus isolates the objective: maximum likelihood vs. minimal volume. The USF achieves a higher mean AUC-ROC ($88.3$ vs. $87.9$ clean; $75.7$ vs. $74.9$ contaminated) and a better mean rank ($3.15$ vs. $3.20$; $3.05$ vs. $4.25$). The gap between OneFlow and OneFlow-Gen mirrors that between USF and non-USF (Section 5.1), consistent with the constant Jacobian being the main driver in both families.\n\n*Conceptual delineation.* The difference is not only the loss. OneFlow learns a minimum-volume hypersphere through a quantile-based criterion: only the points inside the target quantile shape the objective, and the model is not trained as a density estimator. Nothing ties the ordering by latent distance to density outside the sphere, which is where anomalies lie. MLE training of a USF yields $p(x) \\propto p_B(\\phi(x))$ on the whole space (Proposition 1(c)), so the alignment holds everywhere, including the tails. Both ingredients are needed: the constant Jacobian (without it, alignment fails, Proposition 1(b)) and the likelihood objective (without it, there is no density to align with). In practice, USFs need no custom objective and can replace affine flows inside existing likelihood-based detectors, as the image experiments show. We do not claim that MLE outperforms OneFlow's criterion; the margins are small. Our claim is equal-or-better performance together with a guarantee and drop-in compatibility."
+       }
+      }
+     ],
+     "resubmission": true
+    },
+    {
+     "id": "G5EhnpRWXn",
+     "number": 52230,
+     "title": "Diversity of Transformer Layers: One Aspect of Parameter Scaling Laws",
+     "abstract": "Transformers improve predictably with model scale, yet the internal mechanisms underlying this behavior remain unclear. We study Transformer residual-stream components through bias–diversity decomposition, viewing their projected outputs as an ensemble. This perspective characterizes how component accuracy, diversity, and importance jointly affect prediction quality. We further develop an information-theoretic formulation in which adding informative layers monotonically improves prediction-error bounds. We characterize departures from diminishing returns by a dependence-increase term and show that the bounds exhibit approximate diminishing marginal improvements when this term is small. This provides a layer-level mechanism qualitatively consistent with the diminishing returns observed in parameter scaling laws. Experiments across eight NLP tasks and multiple LLM families show systematic relationships among bias, diversity, and accuracy. We also find that component reweighting alters the bias–diversity balance and that recurrent layer sharing substantially reduces measured diversity. Overall, our results establish layer diversity as a useful lens for understanding how Transformer components cooperate as model depth increases.",
+     "authors": [],
+     "keywords": [
+      "Bias-diversity",
+      "Scaling-law",
+      "Submodular",
+      "Residual Stream"
+     ],
+     "status": "under_review",
+     "decision": null,
+     "notes": [
+      {
+       "externalId": "4UNRUuy3As",
+       "signature": "Reviewer nJu2",
+       "license": "CC-BY-4.0",
+       "url": "https://openreview.net/forum?id=G5EhnpRWXn&noteId=4UNRUuy3As",
+       "createdAt": "2026-10-19T03:42:22.940Z",
+       "modifiedAt": null,
+       "replyTo": null,
+       "kind": "review",
+       "invitation": "Official_Review",
+       "content": {
+        "rating": 1,
+        "confidence": 3,
+        "informativeness": 1,
+        "presentation": 1,
+        "soundness": 1,
+        "paper_summary": "This work analyzes transformers using their residual stream (i.e., the embedding, multi-head attention, MLP, RMSNorm, projection, and logits), where the loss is first rewritten as a sum of bias (the expected loss with respect to the true logits) and variance (the expected loss with respect to the predicted logits). The work aims to find the relationship between MSE, dias, and diversity. Experiments with different datasets and models are provided to explore this relationship. Overall, I found the writing and organization of the paper very confusing to fully understand the claims and experiments in the paper.",
+        "critical_strengths": "- The paper analyzes the MSE of logits in transformer residual streams (i.e., the embedding, multi-head attention, MLP, RMSNorm, projection, and logits) by decomposing the MSE loss between bias and diversity and then analyzes the relationship between diversity and MSE. The paper also provides some information theoretic analysis on the benefits of adding layers in transformers\n- The paper provides experiments to analyze the relationship between MSE and diversity.",
+        "critical_weaknesses": "- The paper needs major rewriting to clearly write the problem being addressed, the proposed solution and what the experiments want to validate. Currently the writing does not do a good job. More details follow: a) in Abstract, the authors directly discuss the “residual stream components” without describing what it is, then the authors describe “departures from diminishing returns” without describing what it means in this context; b) Section 3.1.1 goes directly into bias-diversity decomposition, then in Section 3.1.2, the authors separately describe the weighted case, instead of describing them together and describing before; c) Section 3.2 suddenly introduces information-theoretic bounds without fully defining the terms or motivating this section; d) In Section 5.1, there is no clear description of the experiments performed (not adding even the basic experimental details in main content is not easy to read); e) Fig. 4 is very difficult to read or interpret. Unless there is a major reorganization of the paper, I am unable to understand the paper or provide a good review.",
+        "questions_for_authors": "Please address the concerns raised in the weakness section."
+       }
+      },
+      {
+       "externalId": "hHumkPLe2H",
+       "signature": "Reviewer hEcw",
+       "license": "CC-BY-4.0",
+       "url": "https://openreview.net/forum?id=G5EhnpRWXn&noteId=hHumkPLe2H",
+       "createdAt": "2026-10-21T19:13:56.955Z",
+       "modifiedAt": null,
+       "replyTo": null,
+       "kind": "review",
+       "invitation": "Official_Review",
+       "content": {
+        "rating": 2,
+        "confidence": 1,
+        "informativeness": 2,
+        "presentation": 2,
+        "soundness": 3,
+        "paper_summary": "This paper investigates how the diversity and complementary contributions of Transformer layers influence prediction performance and explain the diminishing returns observed in model scaling laws. The authors treat residual-stream components as an ensemble, applying bias–diversity decomposition and information-theoretic analysis to characterize their contributions to prediction error and derive conditions for diminishing marginal improvements as layers are added. Experiments across eight NLP benchmarks and multiple LLM families reveal systematic relationships among bias, diversity, and accuracy, demonstrate the effects of component reweighting, and show substantially reduced diversity in models with recurrent layer sharing, providing qualitative support for the theoretical analysis.",
+        "critical_strengths": "1. Theoretical contribution. The paper introduces a bias–diversity and information-theoretic framework to analyze Transformer layers. Its theoretical results offer useful insights into the diminishing returns observed in model scaling.\n\n2. Extensive empirical evaluation. The paper evaluates its findings across diverse LLM families and eight NLP benchmarks. The results provide empirical support for the theoretical analysis and demonstrate the relevance of layer diversity to model performance.",
+        "critical_weaknesses": "This paper is kind out of my scope, and I found it hard to follow this paper despite authors reveal their findings and conclusion in Introdution. I don't have clear preference on the decision to this paper.",
+        "questions_for_authors": "none"
+       }
+      },
+      {
+       "externalId": "N2NQ1XR30S",
+       "signature": "Reviewer 5Dxt",
+       "license": "CC-BY-4.0",
+       "url": "https://openreview.net/forum?id=G5EhnpRWXn&noteId=N2NQ1XR30S",
+       "createdAt": "2026-10-31T16:15:44.225Z",
+       "modifiedAt": null,
+       "replyTo": null,
+       "kind": "review",
+       "invitation": "Official_Review",
+       "content": {
+        "rating": 1,
+        "confidence": 3,
+        "informativeness": 1,
+        "presentation": 1,
+        "soundness": 1,
+        "paper_summary": "The paper studies how Transformer residual-stream components contribute to model predictions through bias and diversity. It develops a theoretical analysis of component contributions and diminishing returns, and conducts experiments across multiple LLM families and eight NLP tasks. The results provide insights into layer diversity, component reweighting, and recurrent layer sharing, although the connection to parameter scaling laws remains largely qualitative.",
+        "critical_strengths": "The paper analyzes transformer components in terms of bias and diversity, providing an interpretable perspective on model architecture. It also presents some theoretical analyses and empirical observations. The authors evaluate multiple open LLM families across eight NLP tasks and discuss the limitations of their work.",
+        "critical_weaknesses": "- Theorem 4 (Eq. 9) states that diversity cannot exceed bias. However, Table 2 reports a bias of $25\\times10^2$ and diversity of $54\\times10^2$ for MobileLLM-350M on SST-2. These reported values directly contradict the theoretical result.\n\n- In Appendix C.5, the proof of Theorem 8 simply argues that the theorem holds because Theorem 4 holds. However, Theorem 4 establishes an inequality, whereas Theorem 8 introduces a bias-variance-covariance identity (Eq. 22). The former does not establish the latter, leaving the proof insufficient.\n\n- Theorem 9 relies on conditional independence between layer outputs given the label, an assumption whose limitations are acknowledged by the authors in Appendix A.2. Furthermore, Figure 6 provides only an uncontrolled comparison across model families rather than a controlled depth-scaling experiment (Appendix A.4). Consequently, the empirical evidence supporting the proposed connection to parameter scaling laws remains limited and qualitative.\n\n- According to Eq. 16, MSE measures the squared difference between the model’s softmax output and the one-hot gold label. Therefore, its high correlation with accuracy (Figure 2, average Spearman correlation of 0.73) is expected. However, bias and diversity, which are central to the paper’s theoretical analysis, show considerably weaker correlations (approximately 0.4-0.5). This raises the question of whether these quantities provide much additional insight beyond what MSE already captures.",
+        "questions_for_authors": "- Can you estimate $\\epsilon$ for real-world models and show whether the marginal information gain actually decreases with layer index within a single model?\n\n- Could you provide justification for deriving Theorem 8 from Theorem 4?"
+       }
+      },
+      {
+       "externalId": "iIEbym2uD2",
+       "signature": "Reviewer JQYu",
+       "license": "CC-BY-4.0",
+       "url": "https://openreview.net/forum?id=G5EhnpRWXn&noteId=iIEbym2uD2",
+       "createdAt": "2026-11-02T03:43:57.591Z",
+       "modifiedAt": null,
+       "replyTo": null,
+       "kind": "review",
+       "invitation": "Official_Review",
+       "content": {
+        "rating": 2,
+        "confidence": 1,
+        "informativeness": 1,
+        "presentation": 2,
+        "soundness": 1,
+        "paper_summary": "This paper treats the embedding, attention and MLP outputs in the residual stream as an ensemble. It applies a bias-diversity decomposition and gives information-theoretic error bounds. It proposes two reweighting methods, Unit and Map. Experiments use eight classification tasks and 32 open models. The paper links this layer view to diminishing returns in scaling laws.",
+        "critical_strengths": "**S1.** The limitations are stated honestly in App. A. But the title and §4.3 still claim more.\n\n**S2.** Unit is simple and usually helps. In Table 6, it beats Base on 27 of 32 models.",
+        "critical_weaknesses": "**W1. The measured bias and diversity are not the quantities in the theorems. Some results do not match each other.**\n\nMy main concerns include: 1) The paper gives no formula for the measured diversity. The values in Table 2 are hard to read, for example MSE 23.0, Bias 23.3 and Diversity 12.2 for MobileLLM-125M; 2) Theorem 8 seems wrong as printed. In a simple example, Eq. 5 and the definitions under Eq. 22 give two different bias values; 3) As for the Figure 4, in the caption: the red frame shows no improvement. But AG News and SST-2 clearly go up there; 4) The accuracies in Table 2 match no row of Table 6.\n\n**W2. Lack of novelty. Also, the link to scaling laws is not tested.**\n\nMy main concerns include: 1)  Much of the theory follows earlier ensemble work, and the decomposition and Base come from Chang et al. 2024. §1 does not say which results are known; 2) Some terms in the bounds are never measured; 3) In the Figure 6, it shows Qwen2.5-7B at about 76, but Table 6 gives Base 80.4.",
+        "questions_for_authors": "**Questions**\n\n**Q1.** How exactly is the measured diversity computed?\n\n**Q2.** What is the None baseline? Many models share the same None values in Table 6. Base, Map and Unit use 2,000 labeled examples, so why is None the main comparison?\n\n**Q3.** How stable is the reweighting? Please report the number of runs, the variance and the split for early stopping.\n\n**Q4.** Which setting gives Figure 6 and Table 2? Why are Qwen2.5-1.5B and Qwen3-4B removed in App. D.3?\n\n**Q5.** How do the bounds relate to the real error of the model?\n\n---\n\n**Suggestions**\n\n**Suggestion 1** Please add Base with standardized features. Unit helps most where Base is weak.\n\n**Suggestion 2**  In section 4.3, it replacing layers with neurons keeps the claims valid. Please show this or drop it."
+       }
+      },
+      {
+       "externalId": "7tjD29qho0",
+       "signature": "Reviewer JQYu",
+       "license": "CC-BY-4.0",
+       "url": "https://openreview.net/forum?id=G5EhnpRWXn&noteId=7tjD29qho0",
+       "createdAt": "2026-11-17T16:44:01.234Z",
+       "modifiedAt": null,
+       "replyTo": "iIEbym2uD2",
+       "kind": "comment",
+       "invitation": "Official_Comment",
+       "content": {
+        "comment": "Dear Authors and AC,\n\nBecause the system flagged that my review comments were written by AI: to be completely honest, my native language is not Chinese.\n\nHowever, rewriting the review will take time. If you have already completed your rebuttal or are currently working on it, please continue with your rebuttal. I will make sure my rewritten review covers my current core concerns. \n\nHowever, this will take time, and I hope to finish the rewrite before the deadline and carefully consider both your rebuttal and the paper.\n\nBest regards,\n\nReviewer",
+        "title": "Reply to AI use in this review"
+       }
+      }
+     ],
+     "resubmission": true
+    },
+    {
+     "id": "dZVIGLXkqO",
+     "number": 10129,
+     "title": "AMS-Quant: Adaptive Mantissa Sharing for Floating-Point Quantization",
+     "abstract": "Large language models (LLMs) have demonstrated remarkable capabilities in various kinds of tasks, while the billion or even trillion parameters bring storage and efficiency bottlenecks for inference. Quantization, particularly floating-point quantization, is known to be capable of speeding up LLM inference by reducing memory footprint and data movement during the inference process. For the first time, we advance the floating-point quantization exploration from integer bit-widths to non-integer bit-widths, namely AMS-Quant, to further approach the quantization sweet spot. AMS-Quant incorporates two novel techniques to put it into effect: (1) it proposes Mantissa-bit Sharing, which groups k quantized weights and lets them share the least significant mantissa bit, allowing us to further approach the minimum quantization bit-width without accuracy loss. (2) It introduces Adaptive Searching, which employs an offline optimization strategy to minimize the accuracy degradation introduced by sharing. Moreover, AMS-Quant is also prototyped as efficient CUDA Linear kernels, which translates memory savings into wall-clock latency reduction by reducing memory access. Extensive experiments on large-scale datasets and models show that AMS-Quant can quantize the model to FP-5.33-e2m3 and FP4.25-e2m2, and significantly speed up the LLM decoding over FP16 inference (2.8$\\times$ and 3.2$\\times$), with negligible accuracy loss.",
+     "authors": [],
+     "keywords": [
+      "Large Language Model",
+      "Quantization"
+     ],
+     "status": "under_review",
+     "decision": null,
+     "notes": [
+      {
+       "externalId": "lXuzm9R3ac",
+       "signature": "Reviewer UxKM",
+       "license": "CC-BY-4.0",
+       "url": "https://openreview.net/forum?id=dZVIGLXkqO&noteId=lXuzm9R3ac",
+       "createdAt": "2026-10-12T10:28:07.126Z",
+       "modifiedAt": null,
+       "replyTo": null,
+       "kind": "review",
+       "invitation": "Official_Review",
+       "content": {
+        "rating": 2,
+        "confidence": 3,
+        "informativeness": 2,
+        "presentation": 2,
+        "soundness": 3,
+        "paper_summary": "The paper proposes AMS-Quant, a weight-only floating-point quantization scheme in which groups of k weights share their least significant mantissa bit. Starting from channel-wise RTN quantization, the method chooses the shared bit by minimizing group-wise weight reconstruction error, yielding nominal rates such as 5.33 and 4.25 bits per weight. The authors also implement packed CUDA linear kernels. Experiments on five Llama/Qwen models report near-FP16 average accuracy at 5.33 bits and improved accuracy over RTN FP4 at 4.25 bits. Selected memory-bound linear layers obtain up to 2.77× and 3.30× speedups over FP16.",
+        "critical_strengths": "1. Sharing one mantissa bit gives a concrete mechanism for intermediate storage rates with a lightweight offline search and straightforward bit reconstruction.\n2. The packed representation and CUDA results provide evidence that fractional nominal rates can translate into useful linear-layer latency reductions, beyond merely reducing an abstract bit count\n3. Table 2 reports instruction following, mathematical reasoning, and knowledge accuracy separately. The 5.33-bit results are consistently close to the FP16 averages across the tested models.",
+        "critical_weaknesses": "1. The accuracy baselines are limited to RTN quantization. Comparisons with other floating-point PTQ methods, such as AFPQ and LLM-FP4, are needed.\n2. Table 2 covers too few downstream tasks. More challenging benchmarks, such as MATH, GPQA, and HumanEval, should be added.\n3. The kernel evaluation is limited and lacks end-to-end speed comparisons. The gains in Table 3 seem mainly due to reduced memory traffic at lower bit widths. They do not isolate the benefits of the kernel design.",
+        "questions_for_authors": "1. Could you clarify the mathematical rationale and steps of Adaptive Searching?\n2. Could you compare FP4.25 with MXFP4 at a matched storage budget, including scale overhead?"
+       }
+      },
+      {
+       "externalId": "gE3PcAnenj",
+       "signature": "Reviewer JbTQ",
+       "license": "CC-BY-4.0",
+       "url": "https://openreview.net/forum?id=dZVIGLXkqO&noteId=gE3PcAnenj",
+       "createdAt": "2026-10-20T18:04:54.336Z",
+       "modifiedAt": null,
+       "replyTo": null,
+       "kind": "review",
+       "invitation": "Official_Review",
+       "content": {
+        "rating": 1,
+        "confidence": 4,
+        "informativeness": 1,
+        "presentation": 2,
+        "soundness": 1,
+        "paper_summary": "This paper proposes AMS-Quant, a weight-only floating-point quantization method for LLMs. It first applies round-to-nearest quantization and then lets groups of weights share the least significant mantissa bit. A search selects the shared bit to minimize weight reconstruction error. Experiments on Llama and Qwen models show that the FP5.33 configuration largely preserves FP16 accuracy. The authors also implement CUDA kernels that accelerate memory-bound linear layers.",
+        "critical_strengths": "None",
+        "critical_weaknesses": "1. Insufficient comparison with established low-bit quantization methods. The main accuracy experiment (Table 2) compares AMS-Quant only with FP16 and vanilla round-to-nearest (RTN) floating-point quantization formats. However, RTN is a basic quantization baseline. Although the paper discusses established PTQ methods such as GPTQ and AWQ, it does not include experimental comparisons with them. The paper also lacks discussion of other relevant approaches, such as OmniQuant and rotation-based quantization methods like SpinQuant. I consider this a major limitation because demonstrating a better accuracy–storage trade-off within a restricted set of RTN-based formats does not establish the practical advantages of AMS-Quant over existing methods. \n\n2. Insufficient justification for the proposed search. AMS-Quant first applies RTN and then optimizes only the shared least significant mantissa bit, keeping the remaining bits fixed. However, the initial RTN assignment may no longer be optimal once the shared-bit constraint is imposed. The search only selects the better of two candidates with fixed high bits.The paper neither analyzes this potential error gap nor compares the proposed search with re-rounding each weight under the same constraint. Therefore, it remains unclear how much avoidable quantization error results from fixing the initial RTN assignment.",
+        "questions_for_authors": "1. The paper does not provide an ablation that isolates the contribution of Adaptive Searching. Could the authors compare it with simpler strategies, such as always setting the shared mantissa bit to 0 or 1, while keeping the quantization format and group size unchanged?\n\n2. The paper does not report perplexity results. Could the authors include perplexity evaluations on language-modeling datasets such as WikiText-2 and C4 to complement the downstream task results? \n\n3. End-to-end inference latency. Section 4.2 reports only kernel-level performance for MLP-down linear layers. These results do not establish end-to-end inference speedups. Could the authors also report full-model inference latency and throughput? \n\n4. Figure 6 is difficult to read because the legend is too small. It is also unclear how many layers were tested and whether the results were averaged over all MLP-down layers or measured using representative matrix shapes. Could the authors clarify the measurement procedure and enlarge the legend? The titles and axis labels in Figure 5 should also be enlarged.\n\n5. Table 2 does not clearly distinguish AMS-Quant configurations from the baselines. Without carefully reading the main text, it is difficult to identify which results were obtained using the proposed method. Please explicitly label the AMS-Quant rows in the table. \n\n6. In Section 4.1, the authors state that FP5.33 is a better quantization bit-width than both FP6 and FP5 in terms of model accuracy and inference efficiency. However, Table 3 shows that FP5 is faster than FP5.33 in every reported configuration. Could the authors clarify or revise this statement?"
+       }
+      },
+      {
+       "externalId": "cYmXkVij7J",
+       "signature": "Reviewer 6cNC",
+       "license": "CC-BY-4.0",
+       "url": "https://openreview.net/forum?id=dZVIGLXkqO&noteId=cYmXkVij7J",
+       "createdAt": "2026-10-21T05:42:27.432Z",
+       "modifiedAt": null,
+       "replyTo": null,
+       "kind": "review",
+       "invitation": "Official_Review",
+       "content": {
+        "rating": 1,
+        "confidence": 3,
+        "informativeness": 2,
+        "presentation": 3,
+        "soundness": 3,
+        "paper_summary": "The paper proposes mantissa-bit sharing in floating point representations of neural net/LLM weights. Groups of k weights share the mantissa's least significant bit, thereby reducing the total number of bits. It chooses how that shared bit is selected via an offline search. The paper also presents numerical experiments to illustrate the performance of the proposed idea.",
+        "critical_strengths": "- The idea of bit-sharing is very reasonable and interesting in the context of floating point weights.",
+        "critical_weaknesses": "- The idea, while natural, is not sufficient to make this a strong ICLR contribution. For example, there is no meaningful theoretical analysis of the approach, and no comparison against PTQ methods like GPTQ either theoretically or numerically. \n- The ``adaptive search\" part of the contribution is rather basic, and done on an MSE loss targeting W-Q, with no emphasis on X(W-Q) which is a better proxy for the error the method will cause.",
+        "questions_for_authors": "- This is a suggestion for improvement: Figure 2 is not very convincing. If it is supposed to show that the distribution of FP6 formats resembles that of the actual weights of neural networks, more experiments are needed, and a better visualization. \n- Why focus on MSE of the weights, and not on the error associated with XW? I understand it is easier, but the latter should be better. \n- How well does the idea empirically perform with more sophisticated quantization methods than round-to-nearest like GPTQ, GPFQ, etc... ? \n- In table 2, some of the lower bit representation (e.g., FP5.33, FP4.5) outperforms FP6  on some tasks, and on average. This seems odd. Do you have a good explanation? \n- In the paragraph starting \"We noted that it is possible for GPTQ to realize non-integer quantization by performing per-group\nquantization and adjusting the grid size...\", it is natural to ask why you didn't compare against these methods?"
+       }
+      }
+     ],
+     "resubmission": true
+    },
+    {
+     "id": "A3bMBp8vfy",
+     "number": 57196,
+     "title": "AVRT: Audio-Visual Reasoning Transfer through Single-Modality Teachers",
+     "abstract": "Recent advances in reasoning models have shown remarkable progress in text-based domains, but transferring those capabilities to multimodal settings, e.g., to allow reasoning over audio-visual data, still remains a challenge, i.a., because of the limited availability of high-quality reasoning data in targeted multimodal combinations. To address this problem, we introduce AVRT, a novel framework that generates high-quality audio-visual reasoning traces from single-modality teacher models. We generate independent vision- and audio-reasoning traces via models specialized to reason over their respective modalities and merge the resulting traces with an LLM merger model. The resulting multimodal traces are used in a supervised fine-tuning (SFT) cold start to adapt the target model to audio-visual reasoning traces first, before training it in a second reinforcement learning stage on larger-scale data. Our evaluation shows that the proposed pipeline based on generated multimodal traces for SFT allows models to achieve superior performance on various datasets, i.a., OmniBench and DailyOmni compared to RL alone, establishing a new training pipeline for audio-visual reasoning models and opening ways to train reasoning models on multimodal data.",
+     "authors": [],
+     "keywords": [
+      "Multimodal Learning",
+      "Reinforcement Learning",
+      "Video Understanding"
+     ],
+     "status": "under_review",
+     "decision": null,
+     "notes": [
+      {
+       "externalId": "12R2XVD7pt",
+       "signature": "Reviewer HaEq",
+       "license": "CC-BY-4.0",
+       "url": "https://openreview.net/forum?id=A3bMBp8vfy&noteId=12R2XVD7pt",
+       "createdAt": "2026-10-19T12:30:38.370Z",
+       "modifiedAt": "2026-11-17T06:49:53Z",
+       "replyTo": null,
+       "kind": "review",
+       "invitation": "Official_Review",
+       "content": {
+        "rating": 3,
+        "confidence": 3,
+        "informativeness": 2,
+        "presentation": 3,
+        "soundness": 2,
+        "paper_summary": "This paper introduce AVRT, an audio-visual training recipe which compose of 2 training stages from SFT and RL. The framework generate independent vision and audio reasoning traces from different teacher model and then merge them with an LLM merger. The final results achieve state of the art results among comparable size models, with average 60.3 points on average across 6 audio visual benchmarks.",
+        "critical_strengths": "- With only 20K SFT samples, AVRT substantially outperforms comparable-size models, which demonstrates the data efficiency of the proposed pipeline.\n- The paper shows that although cross-modal reasoning data is rare, combining the knowledge of different single-modality teachers into one unified reasoning trace can still yield state-of-the-art performance compared with other methods.",
+        "critical_weaknesses": "- The RL stage appears rather data-inefficient: it uses substantially more training data than the SFT stage, yet yields only a marginal improvement.\n- An ablation for the SFT-only setting is missing, which is essential for isolating the actual contribution of the RL stage.",
+        "questions_for_authors": "The effectiveness of RL seems limited in this paper. What do the authors attribute this to?"
+       }
+      },
+      {
+       "externalId": "OVxWxCqaML",
+       "signature": "Reviewer qZPa",
+       "license": "CC-BY-4.0",
+       "url": "https://openreview.net/forum?id=A3bMBp8vfy&noteId=OVxWxCqaML",
+       "createdAt": "2026-10-20T08:53:38.616Z",
+       "modifiedAt": null,
+       "replyTo": null,
+       "kind": "review",
+       "invitation": "Official_Review",
+       "content": {
+        "rating": 3,
+        "confidence": 2,
+        "informativeness": 2,
+        "presentation": 2,
+        "soundness": 3,
+        "paper_summary": "This paper proposes AVRT, a framework for transferring single-modality reasoning capabilities to audio-visual reasoning models. Specifically, the authors employ specialized audio and visual teacher models to independently generate modality-specific reasoning traces, which are subsequently integrated into unified audio-visual reasoning traces using a text-only LLM merger. These generated traces are used for supervised fine-tuning (SFT), followed by reinforcement learning with GRPO to further improve reasoning performance. Experiments on multiple audio-visual and audio-only benchmarks demonstrate consistent improvements over the base models at both 3B and 7B scales.",
+        "critical_strengths": "1.\tThe paper addresses a practical and relevant problem of constructing high-quality reasoning data for audio-visual understanding. Leveraging specialized single-modality teachers offers a reasonable alternative to relying on a powerful native multimodal teacher.\n2.\tThe proposed approach achieves consistent improvements across multiple benchmarks and model scales. The results demonstrate that the generated reasoning traces provide useful supervision for improving downstream performance.\n3.\tThe paper provides relatively comprehensive experimental analyses, including ablations on training stages, reasoning trace types, merger models, reward components, and data filtering strategies.",
+        "critical_weaknesses": "1.\tThe novelty of the method is limited. The proposed framework primarily combines existing techniques, including reasoning trace generation with specialized teacher models, LLM-based information aggregation, SFT, and GRPO. While applying this pipeline to audio-visual reasoning is practically meaningful, the methodological novelty appears relatively limited. In particular, the LLM merger is implemented through prompting an existing language model, without introducing a dedicated mechanism for cross-modal information alignment or reasoning integration. The authors should better clarify the methodological contributions beyond combining existing components into a unified training pipeline.\n2.\tThe paper claims that the proposed method enables genuine cross-modal reasoning transfer. However, the experimental evidence primarily relies on improvements in downstream answer accuracy, which does not necessarily demonstrate enhanced cross-modal reasoning capabilities.  For example, Table 4 shows that AVRT improves performance under both audio-only and visual-only inputs, suggesting that part of the improvement in audio-visual settings may stem from enhanced single-modality understanding rather than stronger cross-modal integration.",
+        "questions_for_authors": "See weakness"
+       }
+      },
+      {
+       "externalId": "PL9wpdlnT8",
+       "signature": "Reviewer hPMs",
+       "license": "CC-BY-4.0",
+       "url": "https://openreview.net/forum?id=A3bMBp8vfy&noteId=PL9wpdlnT8",
+       "createdAt": "2026-10-22T05:01:52.553Z",
+       "modifiedAt": null,
+       "replyTo": null,
+       "kind": "review",
+       "invitation": "Official_Review",
+       "content": {
+        "rating": 2,
+        "confidence": 3,
+        "informativeness": 2,
+        "presentation": 3,
+        "soundness": 2,
+        "paper_summary": "The paper proposes AVRT for transferring reasoning from separate audio and visual teachers into an audio-visual student. A text-only LLM merges the two teacher traces. The authors retain examples where both teachers answer correctly. These traces are used for supervised fine-tuning followed by GRPO on the full AVQA training set.\n\nThe resulting 3B and 7B models improve over their Qwen2.5-Omni baselines across several audio-visual and audio benchmarks. The paper also studies teacher-trace types, filtering, merger models and reasoning-length rewards.",
+        "critical_strengths": "1. Using separate audio and visual teachers avoids requiring a strong native audio-visual reasoning teacher. The text merger also provides a simple way to standardize different teacher outputs. This is a useful approach for modality combinations with limited reasoning data.\n\n2. The audio-visual average improves from 49.9% to 57.7% for 3B and from 55.3% to 60.3% for 7B. Audio-only performance also improves. On OmniBench, the full approach exceeds RL-only training by 4 points. The appendix adds useful controls and openly examines hallucinations in the generated traces.",
+        "critical_weaknesses": "1. Table 5 compares merged traces against either teacher alone. It does not compare against simply concatenating both traces or combining their factual descriptions without explicit reasoning. These controls would help establish whether the gain comes from cross-modal reasoning composition or from providing more useful information during SFT.\n\n2. The answer-only SFT plus RL control reaches only 12.5% on OmniBench. The appendix attributes this partly to a mismatch between SFT outputs and the RL format reward. The format only control also collapses. These results show problems under the chosen training setup. They provide weaker evidence that reasoning supervision itself is necessary. A stable control with compatible formatting and rewards would be more convincing.\n\n3. The filter retains questions that both teachers answer correctly from their own modality. Appendix B.2 acknowledges this. The missing-modality results are useful but do not isolate reasoning that requires combining complementary evidence. Also, the hard-subset gains are compared with the base model rather than RL-only training. That comparison would better separate the contribution of merged traces from subsequent RL.\n\n4. Section 4.5 reports 64 questions where both teachers are correct and 456 where exactly one is correct. This implies a summed teacher accuracy of 51.3% across 1139 questions. Table 3 instead reports 33.5% and 28.9%, which sum to 62.4%. The authors should clarify whether different runs or prompts were used. \n\n5. Changing the merger from Gemma3-12B to Qwen2.5-14B produces a large difference. However, these models also differ in output quality and style. This comparison does not isolate shared architecture or tokenization as the cause. The explanation should be presented as a hypothesis unless supported by more controlled evidence.\n\n6. The paper should specify the RL update count and the bonus value in the length reward. It should also clearly report student evaluation settings for frame sampling, audio duration and output length. The eight-frame setup is described for teacher generation. The corresponding evaluation protocol is not clear enough, especially for long videos.",
+        "questions_for_authors": "1. How does the method compare with concatenated teacher traces or combined audio-visual descriptions on the same training examples?\n\n2. Can the answer-only control be trained with compatible output formatting and rewards so that the comparison is not dominated by collapse?\n\n3. Can you reconcile the OmniBench subset counts with Table 3? Is it also possible to report RL-only performance on these subsets?\n\n4. Is there evidence that the merger gap comes from model-family alignment after controlling for trace quality and length?\n\n5. Please provide the RL training duration, length-reward bonus and evaluation input settings."
+       }
+      }
+     ],
+     "resubmission": true
+    },
+    {
+     "id": "fBfpcyw9yp",
+     "number": 33417,
+     "title": "Differentially Private Wasserstein Barycenters",
+     "abstract": "The Wasserstein barycenter is defined as the mean of a set of probability measures under the optimal transport metric, and has numerous applications in machine learning. In practice these input measures are empirical distributions, often built from sensitive datasets. We present, to our knowledge, the first algorithms for computing Wasserstein barycenters under differential privacy. Empirically, on large-scale US population datasets, our methods produce high-quality private barycenters with strong accuracy-privacy tradeoffs. As a byproduct of our analysis we give a simple reduction that can significantly accelerate the runtime for non-private barycenters, which may be of broader interest.",
+     "authors": [],
+     "keywords": [
+      "differential privacy",
+      "optimal transport",
+      "Wasserstein barycenters",
+      "clustering"
+     ],
+     "status": "under_review",
+     "decision": null,
+     "notes": [
+      {
+       "externalId": "l6KHSldDIi",
+       "signature": "Reviewer RyQC",
+       "license": "CC-BY-4.0",
+       "url": "https://openreview.net/forum?id=fBfpcyw9yp&noteId=l6KHSldDIi",
+       "createdAt": "2026-10-20T09:31:18.555Z",
+       "modifiedAt": null,
+       "replyTo": null,
+       "kind": "review",
+       "invitation": "Official_Review",
+       "content": {
+        "rating": 2,
+        "confidence": 2,
+        "informativeness": 2,
+        "presentation": 2,
+        "soundness": 2,
+        "paper_summary": "The paper studies DP Wasserstein barycenters of multiple empirical distributions, with a prescribed number of equally weighted output atoms. It proposes two approaches: constructing DP Wasserstein coresets and learning shared private cluster centers with noisy group-specific counts. Both use a non-DP barycenter solver after preprocessing. The theoretical contributions include approximation guarantees conditional on the underlying solver, an excess-cost lower bound through private mean estimation, and a clustering reduction for accelerating non-private computation. Experiments on census-derived spatial data and higher-dimensional synthetic data evaluate objective values, runtime, and privacy–utility tradeoffs. The reported results show some advantages of proposed method.",
+        "critical_strengths": "1. A useful, modular reduction from private clustering to private barycenter computation.\n\n2. Empirical evidence of computational and privacy-utility benefits",
+        "critical_weaknesses": "1. The novelty claim is too broad, and the closest prior work is insufficiently addressed.\n\nThe claim of providing the first differentially private Wasserstein barycenter algorithms needs qualification in light of earlier private barycenter methods, including Xian et al. (2024) and Han et al. (2024).  The paper needs a sharper distinction between its general multidimensional, record-level privacy setting and existing results.\n\n2. Important gaps remain between the stated guarantees and the algorithmic specification.\n\nProposition 3 is not formulated appropriately for arbitrary approximate solver outputs, and duplicating atoms to represent rational weights can cause exponential growth in input size. In addition, the experimental description does not sufficiently specify the private clustering implementation and bounded-domain preprocessing.",
+        "questions_for_authors": "Except the weaknesses,\n\n1. Which private clustering implementation and privacy-budget allocation were used in the experiments?\n\n2. What normalization or clipping rules were applied to the geographic coordinates and Gaussian samples to satisfy Assumption 1?\n\n3. Does “exact barycenter” refer to exact transport subproblems or global barycenter optimality, and are all reported objective values evaluated using unregularized transport?\n\n4. Do the reported runtimes include clustering and preprocessing, and are initialization and stopping criteria shared across the compared methods?"
+       }
+      },
+      {
+       "externalId": "rSexhQwFkt",
+       "signature": "Reviewer r5Q5",
+       "license": "CC-BY-4.0",
+       "url": "https://openreview.net/forum?id=fBfpcyw9yp&noteId=rSexhQwFkt",
+       "createdAt": "2026-10-21T18:59:15.274Z",
+       "modifiedAt": null,
+       "replyTo": null,
+       "kind": "review",
+       "invitation": "Official_Review",
+       "content": {
+        "rating": 1,
+        "confidence": 3,
+        "informativeness": 2,
+        "presentation": 1,
+        "soundness": 3,
+        "paper_summary": "Main idea : to provide  Differentially Private algorithms for the Wasserstein barycenter problem and establish properties and guaranties of such algorithms.\n\nThe paper is  structured in the following way :\n- the introduction mostly convers the related works and states the contributions of the article\n- the preliminary part is very small : it defines the Wasserstein distance and gives a definition of an differentially private algorithm.\n* matrix Pi is used for Projection and transport plan*\n\n- the next section define the Wassertsein barycenter problem and gives assumption on the support size and shape of the barycenter measure, as well as defining Neighbouring datasets.\n\nIt is clear that this two parts could have been regrouped and restructured (for example OT subsection, DP subsection)\n\n- the next section is a first proposition of a DP algorith. As the Algorithm 1 isn’t refered in the text it is not exactly clear from a reader point-of-view. From what I understand, each measure is given a private proxy that is projected on a subspace. From these measures an approximate Wasserstein barycenter is computed. The barycenter in the original space is then reconstructed from the projected barycenter and the original measure following a reference (Izzo et al.).\n\nThe algorithm 1, is mostly an adaptation of Izzo et al. with private coreset. In the text there is also a reference to the algorithm of He et al., but this article contains several algorithms. From what I understand, the author wants to adapt the algorithm from Izzo et al., and need a DP algorithm to obtain the proxy. This task is done in He et al. 2023, with guarantees. Then the privacy is propagated through parallel composition. Proposition 1 DP-caracterizes the proxy operations. Theorem 1 the whole algorithm.\n\n- Section 5 introduces a DP clustering  step and numerous steps of privacy to construct the proxy measures (in the same dimensionnal space). The authors then provides a Theorem stating the privacy guarantee of the algorithm.\n\n- Section 6 presents experiments on the US Census data and one case of \"highly\" dimensional (d=25) data. \n\n- There are no conclusion or perpectives.",
+        "critical_strengths": "The proposal of a guaranteed DP WB is a good idea, and the theoritical work appears sound.\n\nHowever the paper needs works as its actual structure and writing lacks clarity.",
+        "critical_weaknesses": "My opinion is that the article is \"not yet finished\" and should be majorly restuctured to enounce more clearly the contributions. \n\nFor example, Algorithm 1 is not referred in the text nor is the fact that Algorithm 1 adapts to DP an algorithm from Izzo et al..\nAlgorithm 1 is the core of the first contribution.\n\nIn a similar way, if the 'non-private' clustering WB algorithm provides an approximation of the WB and is new it should be presented and studied either in the article or the appendix and then DP modification could be presented and analysed.\n\nMoreover the experimental part lacks structure and insights. There a lot of figures with the US census data, which is good example, but in order to discuss the theoritical part, synthetic data could be used to produce more experiments than the one provided. A classical way is to introduce \"questions\" and build the experiments to give answers.\n\nIt is a good practice to offer the reader a short summary of each section of the paper at the end of the inroduction and to close the paper with a very short summary of the whole article and perspectives. Another good pratice is to give sketch of the proof for some of the main results.",
+        "questions_for_authors": "One of the hidden assumptions of the work is that all measure share the supprt cardinality (n).\nCould this assumption be removed ?\n\nDoes the clustering approach converges exactly to WB when the number of cluster tends to kn ?\nCould you provide names and insights to the different parts (3-6, 7-11) of Algorithm 2 ?"
+       }
+      },
+      {
+       "externalId": "7kAEwnKCes",
+       "signature": "Reviewer 9Lpd",
+       "license": "CC-BY-4.0",
+       "url": "https://openreview.net/forum?id=fBfpcyw9yp&noteId=7kAEwnKCes",
+       "createdAt": "2026-10-22T09:45:14.039Z",
+       "modifiedAt": null,
+       "replyTo": null,
+       "kind": "review",
+       "invitation": "Official_Review",
+       "content": {
+        "rating": 2,
+        "confidence": 3,
+        "informativeness": 2,
+        "presentation": 2,
+        "soundness": 2,
+        "paper_summary": "The paper studies the problem of computing Wasserstein barycenters under differential privacy. The authors propose two approaches: a private coreset-based method that constructs private approximations of input distributions, and a private clustering-based method that compresses the data using differentially private clustering and noisy histograms before applying a standard barycenter solver. They establish theoretical utility guarantees for both approaches, derive a lower bound on the privacy-induced error, and provide a clustering-based reduction that can also accelerate non-private barycenter computation. Experiments on US census and synthetic datasets demonstrate the effectiveness of the proposed methods and illustrate their privacy–utility tradeoffs.",
+        "critical_strengths": "1. The paper develops two differentially private algorithms for Wasserstein barycenters with provable utility guarantees. In particular, the clustering-based reduction is a useful contribution, as it enables existing non-private barycenter solvers to operate on privately compressed data while retaining theoretical guarantees.\n2. Beyond the algorithmic upper bounds, the paper establishes a lower bound on privacy-induced error and provides a reduction that can accelerate non-private barycenter computation. These complementary results provide a more complete understanding of the problem and broaden the applicability of the proposed framework.",
+        "critical_weaknesses": "1. The paper does not discuss Differentially Private Post-Processing for Fair Regression (Xian et al., ICML 2024), which also computes Wasserstein barycenters from privately estimated distributions. Although the problem settings and theoretical guarantees differ, the underlying private-preprocessing framework is closely related. A more explicit comparison would help clarify the novelty and distinct contributions of the proposed methods.\n2. The experimental implementation of the private clustering algorithm is not clearly described, making it difficult to assess its consistency with the theoretical guarantees. Furthermore, the lack of comparisons with alternative private baselines and end-to-end runtime measurements limits the evaluation of the proposed methods' practical effectiveness.",
+        "questions_for_authors": "1. The relationship to Differentially Private Post-Processing for Fair Regression (Xian et al., ICML 2024) deserves further discussion. How do the proposed methods differ in their algorithmic design and theoretical guarantees, and what are the main additional technical contributions?\n2. It would be helpful to clarify which private clustering algorithm is used in the experiments and whether its implementation satisfies the assumptions underlying Theorem 2.\n3. The experiments demonstrate computational benefits, but the end-to-end efficiency of the private methods remains unclear. Could the authors clarify the overall computational cost and how it compares with alternative private approaches under comparable privacy budgets?"
+       }
+      }
+     ],
+     "resubmission": true
     }
    ]
   },

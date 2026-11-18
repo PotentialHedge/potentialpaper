@@ -1,9 +1,7 @@
 import { readFileSync, writeFileSync } from 'node:fs';
-import { DatabaseSync } from 'node:sqlite';
 import { parseArgs } from 'node:util';
-import { normalizeTitle } from '@/lib/versions';
-import { parseReply, submissionStatus, type OpenReviewNote, type ParsedNote } from '@/server/venue-sources/openreview';
 import { FIXTURE_PATH, type Fixture, type FixturePaper } from './fixture';
+import { resubmitted } from './scrape';
 
 const USAGE = `Adds a sample of one acceptodds kind (its accepted papers, e.g. "NeurIPS 2026") to the dev fixture
 (${FIXTURE_PATH}) as an OpenReview venue, replacing that venue's papers if it is there. Some are picked because
@@ -17,9 +15,6 @@ e.g. npm run db:seed:export-acceptodds -- "NeurIPS 2026" NeurIPS.cc/2026/Confere
        --scrape ../papermarket/scraping/iclr2026.sqlite ICLR.cc/2026/Conference "ICLR 2026"`;
 
 const ACCEPTODDS = 'https://acceptodds.com/api/v1';
-/** Forums with more replies than this are skipped, to keep the fixture small. */
-const MAX_REPLIES = 15;
-
 interface Listing {
   slug: string;
   title: string;
@@ -81,59 +76,8 @@ async function main() {
   if (!earlier) throw new Error(`${scrapeGroup} is not in the fixture yet: db:seed:export it first`);
 
   const { titles } = await get<{ titles: Record<string, string> }>(`/map/titles?kind=${encodeURIComponent(kind)}`);
-  const byTitle = new Map(Object.entries(titles).map(([slug, title]) => [normalizeTitle(title), slug]));
-
   // The scrape's papers that came back at this venue, a spread of how they fared there.
-  const sqlite = new DatabaseSync(values.scrape, { readOnly: true });
-  const candidates = sqlite
-    .prepare(
-      `select s.id, s.number, s.title, s.abstract, s.authors, s.keywords, s.venueid
-       from submissions s join (select forum, count(*) n from replies group by forum) r on r.forum = s.id
-       where length(s.abstract) >= 200 and r.n <= ${MAX_REPLIES} order by s.id`,
-    )
-    .all() as unknown as {
-    id: string;
-    number: number | null;
-    title: string;
-    abstract: string;
-    authors: string | null;
-    keywords: string | null;
-    venueid: string | null;
-  }[];
-  const repliesOf = sqlite.prepare(`select raw from replies where forum = ? order by cdate`);
-  const want = Number(values.overlaps);
-  const perStatus = new Map<string, number>();
-  const pairs: { earlier: FixturePaper; slug: string }[] = [];
-  for (const row of candidates) {
-    if (pairs.length >= want) break;
-    const slug = byTitle.get(normalizeTitle(row.title));
-    if (!slug || earlier.papers.some((p) => p.id === row.id)) continue;
-    const notes = (repliesOf.all(row.id) as { raw: string }[])
-      .map(({ raw }) => parseReply(JSON.parse(raw) as OpenReviewNote))
-      .filter((note): note is ParsedNote => note !== null)
-      .map((note) => ({ ...note, forum: undefined }));
-    const decision = notes.find((note) => note.kind === 'decision')?.content.decision;
-    const decisionText = typeof decision === 'string' ? decision.trim() : null;
-    const status = submissionStatus(row.venueid, decisionText);
-    // At most half of them one status, so rejected, withdrawn and desk-rejected all show up.
-    if ((perStatus.get(status ?? '') ?? 0) >= Math.ceil(want / 2)) continue;
-    perStatus.set(status ?? '', (perStatus.get(status ?? '') ?? 0) + 1);
-    pairs.push({
-      slug,
-      earlier: {
-        id: row.id,
-        number: row.number,
-        title: row.title,
-        abstract: row.abstract,
-        authors: JSON.parse(row.authors ?? '[]') as string[],
-        keywords: JSON.parse(row.keywords ?? '[]') as string[],
-        status,
-        decision: decisionText,
-        notes,
-      },
-    });
-  }
-  sqlite.close();
+  const pairs = resubmitted(values.scrape, titles, Number(values.overlaps), new Set(earlier.papers.map((p) => p.id)));
 
   const papers: FixturePaper[] = [];
   let overlapping = 0;

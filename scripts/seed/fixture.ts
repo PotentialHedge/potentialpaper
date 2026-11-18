@@ -24,6 +24,8 @@ export interface FixturePaper {
   notes: (FixtureNote | NoteInput)[];
   /** Added to fill out the venue's score distribution, with its reviewers' scores only (`add-acceptodds-reviews`). */
   sample?: boolean;
+  /** Was at an earlier fixture venue too, and added for that (`add-acceptodds-reviews --resubmissions`). */
+  resubmission?: boolean;
 }
 
 export interface FixtureVenue {

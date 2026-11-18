@@ -15,6 +15,7 @@ import { runConsumer } from '@/server/consumers/run';
 import { IMPORT_RATE_LIMIT, importReviews } from '@/server/import-reviews';
 import { importSubmissions } from '@/server/import-submissions';
 import { mergePapers } from '@/server/merge-papers';
+import { ApiError } from '@/server/api/errors';
 import type { Actor } from '@/server/pages/check';
 import { findPage } from '@/server/pages/kinds';
 import { createTopic, linkPaperToTopic } from '@/server/topic-pages';
@@ -149,6 +150,19 @@ async function papers(fixture: Fixture) {
  * papers:merge leaves it: the earlier venue's is merged into the later one's, keeping both as versions. As an
  * admin, as on the site: the system may not move the imported reviews.
  */
+/** `fn`, again after the wait an edit rate limit asks for: the seed edits as people, who are limited. */
+async function unhurried<T>(fn: () => Promise<T>): Promise<T> {
+  for (;;) {
+    try {
+      return await fn();
+    } catch (err) {
+      if (!(err instanceof ApiError) || err.code !== 'rate_limited') throw err;
+      const wait = Number((err.details as { retryAfterSeconds?: number } | undefined)?.retryAfterSeconds ?? 1);
+      await new Promise((r) => setTimeout(r, Math.max(1, wait) * 1000));
+    }
+  }
+}
+
 async function merges(fixture: Fixture, actor: Actor) {
   const seen = new Map<string, { id: string; venue: string }>();
   for (const venue of fixture.venues) {
@@ -162,14 +176,16 @@ async function merges(fixture: Fixture, actor: Actor) {
         findPage(`openreview:${p.id}`),
       ]);
       if (!duplicate || !survivor) continue;
-      await mergePapers(
-        {
-          duplicateId: duplicate.id,
-          survivorId: survivor.id,
-          from: `openreview:${before.id} (${before.venue})`,
-          evidence: [forumUrl(before.id), forumUrl(p.id)],
-        },
-        actor,
+      await unhurried(() =>
+        mergePapers(
+          {
+            duplicateId: duplicate.id,
+            survivorId: survivor.id,
+            from: `openreview:${before.id} (${before.venue})`,
+            evidence: [forumUrl(before.id), forumUrl(p.id)],
+          },
+          actor,
+        ),
       );
       console.log(`merged ${before.venue} into ${venue.name}: ${p.title}`);
     }
@@ -183,7 +199,7 @@ async function topics(fixture: Fixture, actor: Actor) {
     const members = all.filter((p) => p.keywords.some((k) => topic.match.test(k))).slice(0, 6);
     for (const p of members) {
       const page = await findPage(`openreview:${p.id}`);
-      if (page) await linkPaperToTopic(page, { topic: `topic:${topic.slug}` }, actor);
+      if (page) await unhurried(() => linkPaperToTopic(page, { topic: `topic:${topic.slug}` }, actor));
     }
   }
 }

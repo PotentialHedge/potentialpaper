@@ -2,18 +2,25 @@ import { readFileSync, writeFileSync } from 'node:fs';
 import { parseArgs } from 'node:util';
 import { forumUrl } from '@/server/venue-sources/openreview';
 import { FIXTURE_PATH, type Fixture, type FixtureNote, type FixturePaper } from './fixture';
+import { resubmitted } from './scrape';
 
 const USAGE = `Fills one fixture venue's papers (${FIXTURE_PATH}) with their reviews and comments from acceptodds, for a
 venue still under review that the OpenReview scrape has none of. Papers are found by their submission number
 (acceptodds' <kind>-<number>, e.g. iclr2027-37553), and checked against their forum id.
 
   npm run db:seed:acceptodds-reviews -- <OpenReview group> [--sample 400]
+                                         [--resubmissions 5 --scrape <scrape.sqlite> <earlier group>]
 
 --sample  also adds that many more of the venue's papers (an even spread of acceptodds' list), with only their
           reviewers' scores, so the venue's score distribution has its real shape (the full reviews of all of them
           would make the fixture megabytes). Replaces the sample added before.
+--resubmissions  also adds that many of the venue's papers that were at an earlier fixture venue too, found by
+          title in that venue's OpenReview scrape: each with its reviews here, and with its notes from the scrape
+          at the earlier venue. db:seed merges each pair into one paper.
 
-e.g. npm run db:seed:acceptodds-reviews -- ICLR.cc/2027/Conference --sample 400`;
+e.g. npm run db:seed:acceptodds-reviews -- ICLR.cc/2027/Conference --sample 400
+     npm run db:seed:acceptodds-reviews -- ICLR.cc/2027/Conference --resubmissions 5 \\
+       --scrape ../papermarket/scraping/iclr2026.sqlite ICLR.cc/2026/Conference`;
 
 const ACCEPTODDS = 'https://acceptodds.com/api/v1';
 
@@ -118,10 +125,15 @@ async function get<T>(path: string, tries = 8): Promise<T | null> {
 async function main() {
   const { values, positionals } = parseArgs({
     allowPositionals: true,
-    options: { sample: { type: 'string' }, help: { type: 'boolean', short: 'h' } },
+    options: {
+      sample: { type: 'string' },
+      resubmissions: { type: 'string' },
+      scrape: { type: 'string' },
+      help: { type: 'boolean', short: 'h' },
+    },
   });
-  const [group] = positionals;
-  if (values.help || !group) {
+  const [group, earlierGroup] = positionals;
+  if (values.help || !group || (values.resubmissions && (!values.scrape || !earlierGroup))) {
     console.log(USAGE);
     process.exitCode = values.help ? 0 : 1;
     return;
@@ -130,12 +142,46 @@ async function main() {
   const venue = fixture.venues.find((v) => v.group === group);
   if (!venue) throw new Error(`${group} is not in the fixture`);
   const prefix = venue.name.toLowerCase().replace(/[^a-z0-9]/g, '');
-  // The sample from a run before goes; the papers picked by hand stay.
-  venue.papers = venue.papers.filter((p) => !p.sample);
+  const want = Number(values.sample ?? 0);
+  // A new sample replaces the one from a run before; the papers picked by hand stay.
+  if (want > 0) venue.papers = venue.papers.filter((p) => !p.sample);
+
+  const resubmissions = Number(values.resubmissions ?? 0);
+  if (resubmissions > 0) {
+    const earlier = fixture.venues.find((v) => v.group === earlierGroup);
+    if (!earlier) throw new Error(`${earlierGroup} is not in the fixture`);
+    const { titles } = (await get<{ titles: Record<string, string> }>(
+      `/map/titles?kind=${encodeURIComponent(venue.name)}`,
+    ))!;
+    const have = new Set(fixture.venues.flatMap((v) => v.papers.map((p) => p.id)));
+    // More than wanted: some have no reviews here yet.
+    for (const pair of resubmitted(values.scrape!, titles, resubmissions * 3, have)) {
+      if (venue.papers.filter((p) => p.resubmission).length >= resubmissions) break;
+      const listing = await get<Listing>(`/listings/${pair.slug}`);
+      const forum = listing && forumOf(listing);
+      if (!listing || !forum || have.has(forum)) continue;
+      const body = await get<{ reviews: Review[] }>(`/listings/${pair.slug}/reviews`);
+      if (!body?.reviews.some((r) => r.kind === 'review')) continue;
+      earlier.papers.push(pair.earlier);
+      venue.papers.push({
+        id: forum,
+        number: Number(pair.slug.split('-').pop()),
+        title: listing.title,
+        abstract: listing.summary,
+        authors: [],
+        keywords: listing.keywords,
+        status: 'under_review',
+        decision: null,
+        notes: [],
+        resubmission: true,
+      });
+      console.log(`${pair.earlier.status} at ${earlier.name}, now at ${venue.name}: ${listing.title}`);
+    }
+  }
 
   let notes = 0;
   for (const paper of venue.papers) {
-    if (paper.number === null) continue;
+    if (paper.number === null || paper.sample) continue;
     const slug = `${prefix}-${paper.number}`;
     const listing = await get<Listing>(`/listings/${slug}`);
     if (!listing?.links.some((l) => l.url.includes(`id=${paper.id}`))) {
@@ -148,7 +194,6 @@ async function main() {
     console.log(`${paper.id}: ${paper.notes.length} notes`);
   }
 
-  const want = Number(values.sample ?? 0);
   if (want > 0) {
     const { slugs } = (await get<{ slugs: string[] }>(`/map/scores?kind=${encodeURIComponent(venue.name)}`))!;
     const have = new Set(venue.papers.map((p) => `${prefix}-${p.number}`));
