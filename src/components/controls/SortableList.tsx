@@ -26,7 +26,8 @@ import { iconButtonClass } from './fields';
  * A list to put in order: drag a row by its handle (dnd-kit), or with the keyboard (focus the handle, Space to pick
  * it up, the arrows to move it, Space to drop it), or with each row's up and down buttons. Generic over its items;
  * `actions` adds buttons of the caller's to each row (remove, edit), shown on hover; `trailing` adds a control of the
- * caller's at the end of each row, always shown (a switch).
+ * caller's at the end of each row, always shown (a switch); `below` adds content under a row that moves with it (its
+ * sub-items).
  */
 export function SortableList<T>({
   items,
@@ -36,8 +37,10 @@ export function SortableList<T>({
   renderItem,
   actions,
   trailing,
+  below,
   label,
   numbered = false,
+  nested = false,
   disabled,
   empty = 'Nothing yet',
 }: {
@@ -50,10 +53,13 @@ export function SortableList<T>({
   renderItem?: (item: T, index: number) => ReactNode;
   actions?: (item: T, index: number) => ReactNode;
   trailing?: (item: T, index: number) => ReactNode;
+  below?: (item: T, index: number) => ReactNode;
   /** Names the list for assistive tech. */
   label: string;
   /** Number the rows, for a ranking. */
   numbered?: boolean;
+  /** Drawn inside another list's row, as its sub-items: no box of its own. */
+  nested?: boolean;
   disabled?: boolean;
   empty?: ReactNode;
 }) {
@@ -100,7 +106,10 @@ export function SortableList<T>({
       onDragEnd={onDragEnd}
     >
       <SortableContext items={ids} strategy={verticalListSortingStrategy} disabled={disabled}>
-        <ol aria-label={label} className="relative max-w-[520px] divide-y divide-rule-soft border border-rule bg-card">
+        <ol
+          aria-label={label}
+          className={`relative max-w-[520px] divide-y divide-rule-soft ${nested ? 'border-l border-rule-soft' : 'border border-rule bg-card'}`}
+        >
           {items.length === 0 && <li className="px-2 py-1.5 text-faint italic">{empty}</li>}
           {items.map((item, i) => (
             <SortableRow
@@ -114,6 +123,7 @@ export function SortableList<T>({
               onMove={(by) => onReorder(arrayMove(items, i, i + by))}
               actions={actions?.(item, i)}
               trailing={trailing?.(item, i)}
+              below={below?.(item, i)}
             >
               {renderItem ? renderItem(item, i) : getLabel(item)}
             </SortableRow>
@@ -145,6 +155,7 @@ function SortableRow({
   onMove,
   actions,
   trailing,
+  below,
   children,
 }: {
   id: string;
@@ -156,6 +167,7 @@ function SortableRow({
   onMove: (by: number) => void;
   actions?: ReactNode;
   trailing?: ReactNode;
+  below?: ReactNode;
   children: ReactNode;
 }) {
   const { attributes, listeners, setNodeRef, setActivatorNodeRef, transform, transition, isDragging } = useSortable({
@@ -166,45 +178,46 @@ function SortableRow({
     <li
       ref={setNodeRef}
       style={{ transform: CSS.Translate.toString(transform), transition }}
-      className={`group flex min-h-8 items-center gap-1.5 bg-card py-0.5 pr-2 pl-0.5 ${
-        isDragging ? 'relative z-10 shadow-md ring-1 ring-frame' : ''
-      }`}
+      className={`bg-card ${isDragging ? 'relative z-10 shadow-md ring-1 ring-frame' : ''}`}
     >
-      <button
-        type="button"
-        ref={setActivatorNodeRef}
-        {...attributes}
-        {...listeners}
-        aria-label={`Drag ${label}`}
-        disabled={disabled}
-        className={`${iconButtonClass} cursor-grab touch-none text-faint active:cursor-grabbing`}
-      >
-        <GripIcon />
-      </button>
-      {numbered && <span className="w-4 text-right text-xs text-faint tabular-nums">{index + 1}</span>}
-      <span className="min-w-0 flex-1 break-words">{children}</span>
-      <span className="flex shrink-0 gap-0.5 opacity-0 group-focus-within:opacity-100 group-hover:opacity-100 narrow:opacity-100">
-        {actions}
+      <div className="group flex min-h-8 items-center gap-1.5 py-0.5 pr-2 pl-0.5">
         <button
           type="button"
-          className={iconButtonClass}
-          disabled={disabled || index === 0}
-          aria-label={`Move ${label} up`}
-          onClick={() => onMove(-1)}
+          ref={setActivatorNodeRef}
+          {...attributes}
+          {...listeners}
+          aria-label={`Drag ${label}`}
+          disabled={disabled}
+          className={`${iconButtonClass} cursor-grab touch-none text-faint active:cursor-grabbing`}
         >
-          ↑
+          <GripIcon />
         </button>
-        <button
-          type="button"
-          className={iconButtonClass}
-          disabled={disabled || index === count - 1}
-          aria-label={`Move ${label} down`}
-          onClick={() => onMove(1)}
-        >
-          ↓
-        </button>
-      </span>
-      {trailing && <span className="ml-1 flex shrink-0 items-center">{trailing}</span>}
+        {numbered && <span className="w-4 text-right text-xs text-faint tabular-nums">{index + 1}</span>}
+        <span className="min-w-0 flex-1 break-words">{children}</span>
+        <span className="flex shrink-0 gap-0.5 opacity-0 group-focus-within:opacity-100 group-hover:opacity-100 narrow:opacity-100">
+          {actions}
+          <button
+            type="button"
+            className={iconButtonClass}
+            disabled={disabled || index === 0}
+            aria-label={`Move ${label} up`}
+            onClick={() => onMove(-1)}
+          >
+            ↑
+          </button>
+          <button
+            type="button"
+            className={iconButtonClass}
+            disabled={disabled || index === count - 1}
+            aria-label={`Move ${label} down`}
+            onClick={() => onMove(1)}
+          >
+            ↓
+          </button>
+        </span>
+        {trailing && <span className="ml-1 flex shrink-0 items-center">{trailing}</span>}
+      </div>
+      {below && <div className="pb-1 pl-7">{below}</div>}
     </li>
   );
 }

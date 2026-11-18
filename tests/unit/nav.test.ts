@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { pluginNavItems } from '@/lib/nav';
+import { pluginPanelChoices } from '@/lib/plugins/installed';
 import type { InstalledPlugin } from '@/lib/plugins/installed';
 import { validateManifest } from '@/lib/plugins/manifest';
 import { checkSettings, resolveSettings } from '@/lib/settings';
@@ -37,5 +38,25 @@ describe('navbar', () => {
     expect(resolveSettings({ user: { 'navbar.hidden': ['settings', 'papers', 'nope'] } })['navbar.hidden']).toEqual([
       'papers',
     ]);
+  });
+
+  it('sets a panel under each submission as a sub-item of the Submissions panel', () => {
+    const { manifest } = validateManifest({
+      id: 'o/s',
+      name: 'S',
+      version: '1.0.0',
+      apiVersion: 1,
+      main: 'index.html',
+      contributes: {
+        panels: [
+          { id: 'standing', title: 'Standing', kinds: ['paper', 'venue'], slot: { paper: 'submission', '*': 'main' } },
+        ],
+      },
+    });
+    const plugins = [{ plugin: { manifest, id: 'o/s' } }] as unknown as InstalledPlugin[];
+    expect(pluginPanelChoices(plugins, 'paper')).toEqual([
+      { value: 'o/s.standing', label: 'Standing (S)', group: 'Below both', parent: 'submissions' },
+    ]);
+    expect(pluginPanelChoices(plugins, 'venue')[0].parent).toBeUndefined();
   });
 });

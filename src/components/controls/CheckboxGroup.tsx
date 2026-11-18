@@ -10,6 +10,8 @@ export interface GroupedOption {
   group?: string;
   /** In a list with a switch per option, one that can't be switched off. */
   locked?: boolean;
+  /** In a ranked list, the option it is drawn under, as a sub-item. */
+  parent?: string;
 }
 
 /** Options by their `group`, in the order each group first appears. */

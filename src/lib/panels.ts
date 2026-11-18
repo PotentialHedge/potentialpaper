@@ -84,7 +84,16 @@ export const SLOT_TITLES: Record<string, string> = Object.fromEntries([
     [`${kind}.tabs`, 'Tabs'],
   ]),
   ['paper.body', 'Below both'],
+  ['paper.submission', 'Under each submission'],
 ]);
+
+/**
+ * Slots drawn inside a built-in panel, by that panel: plugins' panels there are set under it in the settings form, as
+ * sub-items with their own switches, in the parent's part of the page.
+ */
+export const SLOT_PARENTS: Record<string, { panel: string; slot: string }> = {
+  'paper.submission': { panel: 'submissions', slot: 'paper.body' },
+};
 
 export type PanelKind = keyof typeof PAGE_PANELS;
 export const PANEL_KINDS = Object.keys(PAGE_PANELS) as PanelKind[];

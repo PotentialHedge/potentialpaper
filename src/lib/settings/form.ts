@@ -16,6 +16,8 @@ export interface Choice {
   group?: string;
   /** Can't be switched off (the navbar's link to settings). */
   locked?: boolean;
+  /** The choice it is drawn under, as a sub-item (a plugin's panel under each submission). */
+  parent?: string;
 }
 
 /** How a setting is drawn. */

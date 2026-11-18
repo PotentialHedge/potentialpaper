@@ -2,7 +2,7 @@ import type { PluginEntry } from '../settings/core';
 import type { ResolvedSettings } from '../settings/document';
 import { parsePluginSource, sourceKey } from './sources';
 import type { PageKind } from '../kinds';
-import { SLOT_TITLES } from '../panels';
+import { SLOT_PARENTS, SLOT_TITLES } from '../panels';
 import { kindSlot, panelSlot, pluginPanelId, type PluginManifest, type PluginPermission } from './manifest';
 
 /**
@@ -137,13 +137,14 @@ export interface InstalledPlugin {
 
 /**
  * Installed plugins' panels on a kind's pages, as choices for that kind's `<kind>.panels.hidden` and `.order` in the
- * settings form: each by `<plugin id>.<panel id>`, named with its plugin, grouped by the slot it takes there.
+ * settings form: each by `<plugin id>.<panel id>`, named with its plugin, grouped by the slot it takes there; one in a
+ * slot drawn inside a built-in panel (`SLOT_PARENTS`) is set under that panel, as a sub-item.
  */
 export function pluginPanelChoices(
   plugins: readonly Pick<InstalledPlugin, 'plugin'>[],
   kind: PageKind,
-): { value: string; label: string; group: string }[] {
-  const out: { value: string; label: string; group: string }[] = [];
+): { value: string; label: string; group: string; parent?: string }[] {
+  const out: { value: string; label: string; group: string; parent?: string }[] = [];
   const seen = new Set<string>();
   for (const { plugin } of plugins) {
     if (!plugin) continue;
@@ -153,7 +154,14 @@ export function pluginPanelChoices(
       if (!slot || seen.has(value)) continue;
       seen.add(value);
       const at = kindSlot(kind, slot);
-      out.push({ value, label: `${panel.title} (${plugin.manifest.name})`, group: SLOT_TITLES[at] ?? at });
+      const parent = SLOT_PARENTS[at];
+      out.push({
+        value,
+        // Named with its plugin, unless its title already is the plugin's name.
+        label: panel.title === plugin.manifest.name ? panel.title : `${panel.title} (${plugin.manifest.name})`,
+        group: SLOT_TITLES[parent?.slot ?? at] ?? at,
+        ...(parent ? { parent: parent.panel } : {}),
+      });
     }
   }
   return out;
