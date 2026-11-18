@@ -280,7 +280,7 @@ export function SubmissionsSection({ submissions }: { submissions: Submission[] 
   );
 }
 
-/** One line per submission beside the page, with the mean of its first score. */
+/** One line per submission beside the page, with the mean of its first score, out of its most when known. */
 export function SubmissionsBox({ submissions }: { submissions: Submission[] }) {
   if (submissions.length === 0) return null;
   return (
@@ -299,7 +299,10 @@ export function SubmissionsBox({ submissions }: { submissions: Submission[] }) {
               {table && mean !== null && mean !== undefined && (
                 <div className={ui.kv}>
                   <span>Mean {table.columns[0].label.toLowerCase()}</span>
-                  <span className="font-mono text-[13px]">{formatScore(mean)}</span>
+                  <span className="font-mono text-[13px]">
+                    {formatScore(mean)}
+                    {table.columns[0].max !== undefined && <span className="text-faint">/{table.columns[0].max}</span>}
+                  </span>
                 </div>
               )}
             </li>

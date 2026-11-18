@@ -2,7 +2,8 @@ import type { FieldSpec, NoteForm, VenueForms } from '@/lib/submissions';
 
 /**
  * How to show ICLR's notes on OpenReview, by year. Labels and order follow each year's review form.
- * Ranges are left out where ICLR hasn't published them: guests can't read 2027's form.
+ * Guests can't read 2027's form, so its ranges are the lowest and highest scores given there: over all 37,865
+ * papers on acceptodds (Nov 2026), rating and confidence run 1–4 and the rest 1–3.
  */
 
 const META_REVIEW: NoteForm = {
@@ -61,11 +62,11 @@ export const ICLR_FORMS: Record<number, VenueForms> = {
       label: 'Official review',
       summary: ['rating', 'confidence', 'soundness', 'presentation', 'informativeness'],
       fields: [
-        { key: 'rating', label: 'Rating', type: 'score' },
-        { key: 'confidence', label: 'Confidence', type: 'score' },
-        { key: 'soundness', label: 'Soundness', type: 'score' },
-        { key: 'presentation', label: 'Presentation', type: 'score' },
-        { key: 'informativeness', label: 'Informativeness', type: 'score' },
+        { key: 'rating', label: 'Rating', type: 'score', min: 1, max: 4 },
+        { key: 'confidence', label: 'Confidence', type: 'score', min: 1, max: 4 },
+        { key: 'soundness', label: 'Soundness', type: 'score', min: 1, max: 3 },
+        { key: 'presentation', label: 'Presentation', type: 'score', min: 1, max: 3 },
+        { key: 'informativeness', label: 'Informativeness', type: 'score', min: 1, max: 3 },
         { key: 'paper_summary', label: 'Summary', type: 'text' },
         { key: 'critical_strengths', label: 'Strengths', type: 'text' },
         { key: 'critical_weaknesses', label: 'Weaknesses', type: 'text' },
