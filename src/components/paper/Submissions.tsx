@@ -17,12 +17,22 @@ import {
 } from '@/lib/submissions';
 
 /**
- * A paper's submissions and what each venue published about it: a table of the reviewers' scores, then
- * the forum's notes, laid out as acceptodds lays out a paper's reviews. Plain HTML, so the cached page
- * needs no script: a review opens as a `<details>`.
+ * A paper's submissions and what each venue published about it: the forum's notes, each review with its scores,
+ * laid out as acceptodds lays out a paper's reviews. Plain HTML, so the cached page needs no script: a review opens
+ * as a `<details>`.
  */
 
 const DATE = new Intl.DateTimeFormat('en-GB', { day: 'numeric', month: 'short', year: 'numeric', timeZone: 'UTC' });
+/** "18 Nov 2026, 09:41 UTC": in UTC, as the page is the same cached HTML for every reader. */
+const DATE_TIME = new Intl.DateTimeFormat('en-GB', {
+  day: 'numeric',
+  month: 'short',
+  year: 'numeric',
+  hour: '2-digit',
+  minute: '2-digit',
+  hourCycle: 'h23',
+  timeZone: 'UTC',
+});
 
 /** `CC-BY-4.0` → `CC BY 4.0`, as the license names itself. */
 function licenseLabel(license: string): string {
@@ -192,59 +202,7 @@ function Forum({ submission }: { submission: Submission }) {
   );
 }
 
-function ScoreTable({ submission, number }: { submission: Submission; number: number }) {
-  const table = scoreTable(submission);
-  if (!table) return null;
-  return (
-    <div className={ui.tableScroll}>
-      <table className={ui.tableCentered}>
-        <caption className={ui.tableCaption}>
-          <b>Table {number}:</b> The reviewers&apos; scores at {submission.venue.name}.
-        </caption>
-        <thead>
-          <tr>
-            <th className={ui.th()}>Reviewer</th>
-            {table.columns.map((column) => (
-              <th key={column.key} className={ui.th(true)}>
-                {column.label}
-              </th>
-            ))}
-          </tr>
-        </thead>
-        <tbody>
-          {table.rows.map(({ note, scores }) => (
-            <tr key={note.externalId}>
-              <td className={ui.td}>
-                <a href={`#${anchor(submission, note.externalId)}`} className="text-accent">
-                  {note.signature}
-                </a>
-              </td>
-              {scores.map((score, index) => (
-                <td key={table.columns[index].key} className={`${ui.td} ${ui.num}`}>
-                  {score === null ? '–' : formatScore(score)}
-                </td>
-              ))}
-            </tr>
-          ))}
-        </tbody>
-        {table.rows.length > 1 && (
-          <tfoot>
-            <tr className="border-t border-ink">
-              <td className={`${ui.td} italic`}>Mean</td>
-              {table.means.map((mean, index) => (
-                <td key={table.columns[index].key} className={`${ui.td} ${ui.num}`}>
-                  {mean === null ? '–' : formatScore(mean)}
-                </td>
-              ))}
-            </tr>
-          </tfoot>
-        )}
-      </table>
-    </div>
-  );
-}
-
-function SubmissionView({ submission, tableNumber }: { submission: Submission; tableNumber: number }) {
+function SubmissionView({ submission }: { submission: Submission }) {
   return (
     <section className="mt-5">
       <h3 className={ui.sectionHeading}>
@@ -267,8 +225,7 @@ function SubmissionView({ submission, tableNumber }: { submission: Submission; t
           </>
         )}
       </p>
-      <p className={ui.fine}>Updated {DATE.format(submission.fetchedAt)}.</p>
-      <ScoreTable submission={submission} number={tableNumber} />
+      <p className={ui.fine}>Updated {DATE_TIME.format(submission.fetchedAt)} UTC.</p>
       {/* Plugins' panels for this submission (\`paper.submission\`): score standing's figure at this venue. */}
       <SubmissionPanels
         venue={{ id: submission.venue.id, name: submission.venue.name }}
@@ -286,14 +243,7 @@ export function SubmissionsSection({ submissions }: { submissions: Submission[] 
       {submissions.length === 0 ? (
         <p className={ui.empty}>We don&apos;t know of a submission of this paper to a venue with open reviews.</p>
       ) : (
-        submissions.map((submission, index) => (
-          <SubmissionView
-            key={submission.venue.id}
-            submission={submission}
-            // Tables are numbered in page order, and only a submission with scores has one.
-            tableNumber={submissions.slice(0, index).filter((earlier) => scoreTable(earlier)).length + 1}
-          />
-        ))
+        submissions.map((submission) => <SubmissionView key={submission.venue.id} submission={submission} />)
       )}
     </section>
   );
