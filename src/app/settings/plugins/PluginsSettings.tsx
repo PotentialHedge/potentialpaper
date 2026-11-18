@@ -91,7 +91,7 @@ export function PluginsSettings() {
         ) : plugins.length === 0 ? (
           <p className={ui.fine}>No plugins installed. Find one below, or add one by its source.</p>
         ) : (
-          <ul className="max-w-[640px] divide-y divide-rule-soft border border-rule bg-card">
+          <ul className="divide-y divide-rule-soft border border-rule bg-card">
             {plugins.map((p) => {
               const manifest = p.plugin?.manifest;
               const update = updates.find((u) => u.source === p.source);
