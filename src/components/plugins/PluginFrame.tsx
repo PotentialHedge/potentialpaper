@@ -182,6 +182,7 @@ export function PluginFrame({
   viewer,
   title,
   onConnect,
+  fill = false,
 }: {
   plugin: ReadyPlugin;
   surface: PluginSurface;
@@ -189,6 +190,8 @@ export function PluginFrame({
   viewer: { signedIn: boolean; isOwner: boolean };
   title: string;
   onConnect?: (connection: Connection | null) => void;
+  /** Fill the box it is in (a `"layout": "full"` page), whatever height the frame asks for. */
+  fill?: boolean;
 }) {
   const frameRef = useRef<HTMLIFrameElement>(null);
   const [started, setStarted] = useState(false);
@@ -352,7 +355,7 @@ export function PluginFrame({
       sandbox={SANDBOX}
       referrerPolicy="no-referrer"
       className="block w-full border-0 bg-transparent"
-      style={{ height }}
+      style={{ height: fill ? '100%' : height }}
     />
   );
 }

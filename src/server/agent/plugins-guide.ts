@@ -252,7 +252,10 @@ Every field of the manifest:
   (\`main\`, \`aside\` or \`tab\`, and on a paper \`submission\`: once under each of its submissions with scores, in the
   Submissions section, with \`pp.context.surface.submission.venue\` saying which; or one per kind,
   \`{ "paper": "submission", "*": "main" }\`), and \`when\`.
-- \`contributes.pages\` (up to 8): whole pages of its own at \`${origin}/x/<owner>/<name>/<page id>/…\`.
+- \`contributes.pages\` (up to 8): whole pages of its own at \`${origin}/x/<owner>/<name>/<page id>/…\`, each
+  \`{ "id", "title", "layout" }\`. \`layout\` \`"article"\` (the default) puts the frame under a heading in the site's
+  column, as tall as it asks; \`"full"\` gives it the whole window under the site's bar, with no heading, for a map
+  or a canvas: the frame is the window's size, so size to it (\`100vh\`) and leave \`ui.setHeight\` out.
 - \`contributes.settings\`: each by its name (letters, digits, \`-\`, \`_\`; no dots), \`{ "type", "default" }\` plus
   any of \`title\` (its label; the name spaced out when absent: \`showLegend\` is "Show legend"), \`description\`,
   \`group\` (a heading on your settings page) and \`order\` (lower first, then as listed). Each type is drawn with its

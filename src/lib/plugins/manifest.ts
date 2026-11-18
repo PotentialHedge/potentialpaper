@@ -154,6 +154,10 @@ const panelSchema = z.looseObject({
 const pageSchema = z.looseObject({
   id: contributionId('page'),
   title: text(60, "The page's title."),
+  layout: z.enum(['article', 'full']).default('article').meta({
+    description:
+      '"article" (the default): under a heading, in the site\'s column, as tall as the frame asks. "full": the whole window under the site\'s bar, with no heading, for a map or a canvas; the frame is the window\'s size and ui.setHeight is ignored.',
+  }),
 });
 
 const commandSchema = z.looseObject({
@@ -281,13 +285,9 @@ export const manifestSchema = z
           .max(16)
           .default([])
           .meta({ description: "Commands, listed in each of its panels' menus." }),
-        signals: z
-          .array(signalSchema)
-          .max(20)
-          .default([])
-          .meta({
-            description: 'Values it publishes about papers, for any plugin and search to use. Needs a publisher.',
-          }),
+        signals: z.array(signalSchema).max(20).default([]).meta({
+          description: 'Values it publishes about papers, for any plugin and search to use. Needs a publisher.',
+        }),
       })
       .default({ panels: [], pages: [], settings: {}, commands: [], signals: [] }),
   })
@@ -322,7 +322,7 @@ export interface PluginManifest {
   publisher?: string;
   contributes: {
     panels: PanelContribution[];
-    pages: { id: string; title: string }[];
+    pages: { id: string; title: string; layout: 'article' | 'full' }[];
     settings: Record<string, PluginSettingSpec>;
     commands: { id: string; title: string }[];
     signals: SignalSpec[];

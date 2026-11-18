@@ -1,5 +1,4 @@
 import type { Metadata } from 'next';
-import { ui } from '@/components/ui';
 import { PluginPageView } from '@/components/plugins/PluginPageView';
 
 export const metadata: Metadata = { title: 'Plugin · PotentialPaper', robots: { index: false } };
@@ -11,7 +10,7 @@ export const metadata: Metadata = { title: 'Plugin · PotentialPaper', robots: {
 export default async function PluginRoute({ params }: { params: Promise<{ path: string[] }> }) {
   const path = (await params).path.map(decodeURIComponent);
   return (
-    <main className={ui.page}>
+    <main>
       <PluginPageView path={path} />
     </main>
   );
