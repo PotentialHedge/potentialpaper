@@ -1,6 +1,9 @@
 # Handoff: signals, values that apps compute about papers
 
-Status: plan, 2026-11-18. Nothing built yet.
+Status: 2026-11-18. Built and deployed: sets, values in generations, the public reads and the plugin RPC (Phase 1
+and the reads of Phases 2 and 3, without pgvector), and the first set, `benedict-armstrong/acceptodds-map`, which the
+Paper map plugin draws. Not built: the events feed for publishers, staleness (`inputs`), search, pgvector, the site's
+own set. See the Log.
 
 ## Goal
 
@@ -91,3 +94,28 @@ Limits: 20 signals a set, 2048 dims, a writes rate limit, and a total per set th
   worker.
 
 ## Log
+
+### 2026-11-18: signals on the site, the acceptodds map as the first set
+
+- **Decided with Benedict:** the map's publisher sends each paper's `map.xy`, `map.region`, `map.cluster` and a
+  64-dimensional `embedding`; the host computes no layout. The map is a plugin on Benedict's GitHub like score
+  standing. ICLR 2027 only for now. The copy reads acceptodds' database directly on ben-docker-1.
+- **Host** (`server/signals.ts`, `server/api/signals.ts`, migration `0044_signals`): `signal_sets`, `signals`,
+  `signal_labels` and `signal_values`, keyed by the paper identifier the publisher gave and matched to papers when
+  read. A label signal's titles are per generation (a map's regions change with each rebuild). Writes need a verified
+  account or an API key that may write, and the account the manifest names as `publisher`. Routes under
+  `/api/v1/signal-sets` (register, set, `columns`, `nearest`, `values`, `labels`, `generations`, `…/publish`) and
+  `/api/v1/pages/{identifier}/signals`. `columns` is kept in memory by ETag, which also turns every ten minutes as new
+  papers match values. `nearest` scans the vectors in memory (no pgvector yet: about 2 s cold for 42k × 64).
+  RPC `signals.sets`, `signals.set`, `signals.columns`, `signals.nearest`, `signals.forPaper`, no permission;
+  `pp.signals` in the SDK; a Signals section in `/plugins.md`. Manifest: `publisher`, `contributes.signals`.
+- **The set** `github.com/benedict-armstrong/potentialpaper-acceptodds-map`, published by the bot `acceptodds-map`
+  (so its key writes signals and nothing else). `sync.mjs` runs in a container on ben-docker-1
+  (`~/projects/potentialpaper-acceptodds-map`, `docker compose logs sync`) on acceptodds' database network, as the
+  role `potentialpaper_reader`, which may only read `map_points`, `map_topics` and `listings`. Every 30 minutes it
+  copies the map whole as a new generation if it changed. Its two secrets are in `sync.env` there. 42,429 points;
+  42,425 match papers here.
+- **Next:** the events feed for publishers (the decided design: oldest first from a cursor, following the
+  transaction as `consumers/run.ts` does, plus events for merges and PDFs), `inputs` and a stale list, search
+  (`sig:`, `sort:`, `like: … via:`), pgvector once production is on Postgres 19, NeurIPS 2026 (acceptodds has its map
+  too, as its own signals since its layout is separate), and the site's own set.
