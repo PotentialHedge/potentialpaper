@@ -171,8 +171,10 @@ services:
     ports:
       - '${GIT_SSH_PUBLISH:-2222}:2222'
     volumes:
-      # The host key, made once on the host and kept: clients remember it and warn if it ever changes.
-      - ./secrets/ssh_host_ed25519_key:/run/secrets/ssh_host_key:ro
+      # The host key, made once on the host and kept: clients remember it and warn if it ever changes. By absolute
+      # path (GIT_SSH_HOST_KEY in .env.production): a deploy from a fresh worktree has no ./secrets, and Docker would
+      # mount an empty directory in its place.
+      - ${GIT_SSH_HOST_KEY:-./secrets/ssh_host_ed25519_key}:/run/secrets/ssh_host_key:ro
     depends_on:
       postgres:
         condition: service_healthy
