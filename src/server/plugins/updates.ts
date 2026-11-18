@@ -10,7 +10,7 @@ import { ApiError } from '../api/errors';
 import { saveUserSettings, userSettingsRow } from '../settings';
 import { grantPlugin, installedPlugins } from './installed';
 import { snapshotPlugin } from './snapshot';
-import { newestReleaseTag, repoTags } from './tags';
+import { FRESH_TAGS_MS, newestReleaseTag, repoTags } from './tags';
 
 /**
  * Updates (`handoffs/plugins.md` Phase 3). A plugin is released by tagging its repo (`v1.2.0`); a reader whose plugin
@@ -37,15 +37,22 @@ function githubOf(source: string): PluginSource & { kind: 'github' } {
   return parsed;
 }
 
-/** Each installed plugin with a newer release than the version it runs. */
-export async function pluginUpdates(account: Account | null, database: Database = getDb()): Promise<PluginUpdate[]> {
+/**
+ * Each installed plugin with a newer release than the version it runs. With `pluginId`, only that one, asking GitHub
+ * afresh (its own page checks it, so a release shows there at once).
+ */
+export async function pluginUpdates(
+  account: Account | null,
+  database: Database = getDb(),
+  pluginId?: string,
+): Promise<PluginUpdate[]> {
   const plugins = await installedPlugins(account, { fetch: false, database });
   const out: PluginUpdate[] = [];
   await Promise.all(
     plugins.map(async (p) => {
-      if (!p.plugin || p.from === 'dev') return;
+      if (!p.plugin || p.from === 'dev' || (pluginId && p.plugin.id !== pluginId)) return;
       const source = githubOf(p.source);
-      const tags = await repoTags(source.owner, source.repo);
+      const tags = await repoTags(source.owner, source.repo, pluginId ? FRESH_TAGS_MS : undefined);
       if (!tags) return;
       const update = updateFor(tags.keys(), p.plugin.manifest.version);
       if (!update || update.tag === p.ref) return;

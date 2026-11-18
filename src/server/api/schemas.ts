@@ -789,6 +789,9 @@ export const DiscoveredPlugins = z.object({
   stale: z.boolean(),
 });
 
+/** `GET /me/plugins/updates?plugin=<id>`: only that plugin, checked afresh. */
+export const PluginUpdatesQuery = z.object({ plugin: z.string().min(1).max(200).optional() });
+
 /** `GET /me/plugins/updates`: installed plugins with a newer release than the version they run. */
 export const PluginUpdates = z.object({
   updates: z.array(

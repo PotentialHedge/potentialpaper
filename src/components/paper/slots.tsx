@@ -17,6 +17,7 @@ import { toolPath } from './page-tools';
 import { SubmissionsBox, SubmissionsSection } from './Submissions';
 import { VersionsBox, VersionsSection } from './Versions';
 import type { PaperVersion } from '@/lib/versions';
+import { Fold } from '@/components/paper/Fold';
 
 /**
  * A paper page is assembled from named slots, so that built-in panels can later become the first
@@ -83,17 +84,19 @@ function AuthorSection({ authorHtml, canonical, confirmedAuthors }: PanelProps) 
   const claimPath = toolPath('claim', canonical);
   const claimed = confirmedAuthors.length > 0;
   return (
-    <section id="author">
-      <h2 className={ui.groupHeading}>
-        Author section
-        {claimed && (
+    <Fold
+      id="author"
+      title="Author section"
+      extra={
+        claimed && (
           <span className="ml-3 font-sans text-xs [font-variant-caps:normal] text-faint">
             <a href={editPath} rel="nofollow">
               edit
             </a>
           </span>
-        )}
-      </h2>
+        )
+      }
+    >
       {claimed ? (
         <p className={`${ui.fine} -mt-1 mb-2 font-sans`}>
           Claimed. Maintained by {names(confirmedAuthors.map((a) => a.authorName))}.{' '}
@@ -124,23 +127,27 @@ function AuthorSection({ authorHtml, canonical, confirmedAuthors }: PanelProps) 
           ) : null
         }
       />
-    </section>
+    </Fold>
   );
 }
 
 function CommunitySection({ communityHtml, canonical }: PanelProps) {
   const editPath = EDIT;
   return (
-    <section id="community">
-      <h2 className={ui.groupHeading}>
-        Community section
-        <span className="ml-3 font-sans text-xs [font-variant-caps:normal] text-faint">
-          <a href={editPath} rel="nofollow">
-            edit
-          </a>{' '}
-          · <a href={toolPath('history', canonical)}>history</a>
-        </span>
-      </h2>
+    <Fold
+      id="community"
+      title="Community section"
+      extra={
+        <>
+          <span className="ml-3 font-sans text-xs [font-variant-caps:normal] text-faint">
+            <a href={editPath} rel="nofollow">
+              edit
+            </a>{' '}
+            · <a href={toolPath('history', canonical)}>history</a>
+          </span>
+        </>
+      }
+    >
       <PartHtml
         html={communityHtml}
         empty={
@@ -153,7 +160,7 @@ function CommunitySection({ communityHtml, canonical }: PanelProps) {
           </p>
         }
       />
-    </section>
+    </Fold>
   );
 }
 

@@ -9,6 +9,7 @@ import {
   type VersionStatus,
 } from '@/lib/versions';
 import { toolPath } from './page-tools';
+import { Fold } from '@/components/paper/Fold';
 
 /**
  * The paper's versions (`lib/versions.ts`), oldest first: where it went and what became of it, each with its
@@ -59,16 +60,20 @@ export function VersionsSection({
   const [a, b] = defaults(versions);
   const comparable = versions.length >= 2;
   return (
-    <section id="versions">
-      <h2 className={ui.groupHeading}>
-        Versions
-        <span className="ml-3 font-sans text-xs [font-variant-caps:normal] text-faint">
-          <a href="#edit" rel="nofollow">
-            {versions.length > 0 ? 'edit' : 'add'}
-          </a>{' '}
-          · <a href={toolPath('history', canonical)}>history</a>
-        </span>
-      </h2>
+    <Fold
+      id="versions"
+      title="Versions"
+      extra={
+        <>
+          <span className="ml-3 font-sans text-xs [font-variant-caps:normal] text-faint">
+            <a href="#edit" rel="nofollow">
+              {versions.length > 0 ? 'edit' : 'add'}
+            </a>{' '}
+            · <a href={toolPath('history', canonical)}>history</a>
+          </span>
+        </>
+      }
+    >
       {versions.length === 0 ? (
         <p className={ui.empty}>
           No versions are recorded yet.{' '}
@@ -178,7 +183,7 @@ export function VersionsSection({
           )}
         </form>
       )}
-    </section>
+    </Fold>
   );
 }
 

@@ -48,7 +48,9 @@
     "format": "prettier --write .",
     "format:check": "prettier --check .",
     "db:seed": "tsx scripts/seed/seed.ts",
-    "db:seed:export": "tsx scripts/seed/export-fixture.ts"
+    "db:seed:export": "tsx scripts/seed/export-fixture.ts",
+    "db:seed:export-acceptodds": "tsx scripts/seed/export-acceptodds.ts",
+    "db:seed:acceptodds-reviews": "tsx scripts/seed/add-acceptodds-reviews.ts"
   },
   "dependencies": {
     "@dnd-kit/core": "^6.3.1",

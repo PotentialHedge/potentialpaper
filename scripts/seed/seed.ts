@@ -7,12 +7,15 @@ import { migrate } from 'drizzle-orm/node-postgres/migrator';
 import { createDb, createPool, getDb, getPool } from '@/db';
 import { account, user } from '@/db/auth-schema';
 import type { Account } from '@/db/schema';
+import { normalizeTitle } from '@/lib/versions';
 import { ensureAccountForUser, updateProfile } from '@/server/accounts';
 import { postComment } from '@/server/comments';
 import { CONSUMERS, WORKER_TASKS } from '@/server/consumers';
 import { runConsumer } from '@/server/consumers/run';
 import { IMPORT_RATE_LIMIT, importReviews } from '@/server/import-reviews';
 import { importSubmissions } from '@/server/import-submissions';
+import { mergePapers } from '@/server/merge-papers';
+import { ApiError } from '@/server/api/errors';
 import type { Actor } from '@/server/pages/check';
 import { findPage } from '@/server/pages/kinds';
 import { createTopic, linkPaperToTopic } from '@/server/topic-pages';
@@ -142,6 +145,53 @@ async function papers(fixture: Fixture) {
   }
 }
 
+/**
+ * A paper submitted to two of the fixture's venues (export-acceptodds picks some) is one paper, as
+ * papers:merge leaves it: the earlier venue's is merged into the later one's, keeping both as versions. As an
+ * admin, as on the site: the system may not move the imported reviews.
+ */
+/** `fn`, again after the wait an edit rate limit asks for: the seed edits as people, who are limited. */
+async function unhurried<T>(fn: () => Promise<T>): Promise<T> {
+  for (;;) {
+    try {
+      return await fn();
+    } catch (err) {
+      if (!(err instanceof ApiError) || err.code !== 'rate_limited') throw err;
+      const wait = Number((err.details as { retryAfterSeconds?: number } | undefined)?.retryAfterSeconds ?? 1);
+      await new Promise((r) => setTimeout(r, Math.max(1, wait) * 1000));
+    }
+  }
+}
+
+async function merges(fixture: Fixture, actor: Actor) {
+  const seen = new Map<string, { id: string; venue: string }>();
+  for (const venue of fixture.venues) {
+    for (const p of venue.papers) {
+      const key = normalizeTitle(p.title);
+      const before = seen.get(key);
+      seen.set(key, { id: p.id, venue: venue.name });
+      if (!before) continue;
+      const [duplicate, survivor] = await Promise.all([
+        findPage(`openreview:${before.id}`),
+        findPage(`openreview:${p.id}`),
+      ]);
+      if (!duplicate || !survivor) continue;
+      await unhurried(() =>
+        mergePapers(
+          {
+            duplicateId: duplicate.id,
+            survivorId: survivor.id,
+            from: `openreview:${before.id} (${before.venue})`,
+            evidence: [forumUrl(before.id), forumUrl(p.id)],
+          },
+          actor,
+        ),
+      );
+      console.log(`merged ${before.venue} into ${venue.name}: ${p.title}`);
+    }
+  }
+}
+
 async function topics(fixture: Fixture, actor: Actor) {
   const all = fixture.venues.flatMap((v) => v.papers);
   for (const topic of TOPICS) {
@@ -149,7 +199,7 @@ async function topics(fixture: Fixture, actor: Actor) {
     const members = all.filter((p) => p.keywords.some((k) => topic.match.test(k))).slice(0, 6);
     for (const p of members) {
       const page = await findPage(`openreview:${p.id}`);
-      if (page) await linkPaperToTopic(page, { topic: `topic:${topic.slug}` }, actor);
+      if (page) await unhurried(() => linkPaperToTopic(page, { topic: `topic:${topic.slug}` }, actor));
     }
   }
 }
@@ -200,6 +250,7 @@ async function main() {
   await project();
   await syncVenuePages();
   const dev = people.get('dev')!;
+  await merges(fixture, { kind: 'account', accountId: dev.id, isAdmin: true });
   await topics(fixture, { kind: 'account', accountId: dev.id, isAdmin: false });
   await comments(fixture, people);
   await project();

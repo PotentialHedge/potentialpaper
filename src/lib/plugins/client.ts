@@ -272,8 +272,11 @@ export interface PluginUpdate {
   latest: { tag: string; commit: string; version: string };
 }
 
-export async function fetchUpdates(): Promise<PluginUpdate[]> {
-  return (await call<{ updates: PluginUpdate[] }>('/api/v1/me/plugins/updates', {}, 'check for updates')).updates;
+/** Installed plugins with a newer release; with `pluginId`, only that one, checked afresh. */
+export async function fetchUpdates(pluginId?: string): Promise<PluginUpdate[]> {
+  const query = pluginId ? `?plugin=${encodeURIComponent(pluginId)}` : '';
+  return (await call<{ updates: PluginUpdate[] }>(`/api/v1/me/plugins/updates${query}`, {}, 'check for updates'))
+    .updates;
 }
 
 export type UpdateResult =

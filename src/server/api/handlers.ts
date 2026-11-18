@@ -946,7 +946,12 @@ export const getDiscoveredPlugins = route(async () => {
 /** The reader's installed plugins with a newer release than the version they run. */
 export const getPluginUpdates = route(async (req) => {
   const principal = await requireAuth(req);
-  return respond(S.PluginUpdates, { updates: await pluginUpdates(principal.account) }, { principal });
+  const { plugin } = parseQuery(req, S.PluginUpdatesQuery);
+  return respond(
+    S.PluginUpdates,
+    { updates: await pluginUpdates(principal.account, undefined, plugin) },
+    { principal },
+  );
 });
 
 /**
