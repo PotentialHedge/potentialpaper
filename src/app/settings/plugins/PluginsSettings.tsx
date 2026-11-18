@@ -14,12 +14,21 @@ import {
   type PluginUpdate,
   usePlugins,
 } from '@/lib/plugins/client';
+import type { InstalledPlugin } from '@/lib/plugins/installed';
 import { parsePluginSource, sourceKey } from '@/lib/plugins/sources';
 import { pluginSettingsPath } from '@/lib/settings/form';
 import { useSettings } from '@/lib/settings/client';
+import { ApproveDialog } from './ApproveDialog';
 import { STATUS, STATUS_COLOR } from './PluginDetail';
 
 type Note = { ok: boolean; text: string } | null;
+
+/** After an install: what to call it, and whether it waits to be approved. */
+type OnInstalled = (installed: InstalledPlugin) => void;
+
+function nameOf(p: InstalledPlugin): string {
+  return `${p.plugin?.manifest.name ?? p.source}${p.ref ? ` ${p.ref}` : ''}`;
+}
 
 /** The site's origin, in the browser only (the page is the same HTML everywhere). */
 function useOrigin(): string {
@@ -36,6 +45,7 @@ export function PluginsSettings() {
   const { plugins, loaded } = usePlugins(null);
   const [updates, setUpdates] = useState<PluginUpdate[]>([]);
   const [note, setNote] = useState<Note>(null);
+  const [approving, setApproving] = useState<InstalledPlugin | null>(null);
   const origin = useOrigin();
   const signedIn = settings.loaded && settings.signedIn;
 
@@ -54,6 +64,11 @@ export function PluginsSettings() {
   }, [signedIn, installedKey]);
 
   const installed = useMemo(() => new Set(plugins.map((p) => p.source)), [plugins]);
+
+  const onInstalled: OnInstalled = (p) => {
+    if (p.status === 'consent' && p.plugin?.commit) setApproving(p);
+    else setNote({ ok: true, text: `Installed ${nameOf(p)}.` });
+  };
 
   return (
     <>
@@ -119,17 +134,32 @@ export function PluginsSettings() {
         )}
       </section>
 
-      {signedIn && <AddBySource onNote={setNote} />}
+      {signedIn && <AddBySource onNote={setNote} onInstalled={onInstalled} />}
 
-      <Discover installed={installed} signedIn={signedIn} onNote={setNote} />
+      <Discover installed={installed} signedIn={signedIn} onNote={setNote} onInstalled={onInstalled} />
 
       <DevLoad onNote={setNote} />
+
+      {approving && (
+        <ApproveDialog
+          installed={approving}
+          onDone={(approved) => {
+            setNote({
+              ok: true,
+              text: approved
+                ? `Installed and approved ${nameOf(approving)}.`
+                : `Installed ${nameOf(approving)}. Approve it on its page when you're ready.`,
+            });
+            setApproving(null);
+          }}
+        />
+      )}
     </>
   );
 }
 
 /** Install a plugin by its source: a GitHub link, `owner/repo`, or `github:owner/repo/folder@tag`. */
-function AddBySource({ onNote }: { onNote: (n: Note) => void }) {
+function AddBySource({ onNote, onInstalled }: { onNote: (n: Note) => void; onInstalled: OnInstalled }) {
   const [source, setSource] = useState('');
   const [busy, setBusy] = useState(false);
 
@@ -138,11 +168,7 @@ function AddBySource({ onNote }: { onNote: (n: Note) => void }) {
     setBusy(true);
     onNote(null);
     try {
-      const installed = await installPlugin(source);
-      onNote({
-        ok: true,
-        text: `Installed ${installed.plugin?.manifest.name ?? installed.source}${installed.ref ? ` ${installed.ref}` : ''}. Approve it on its page, or on a page it shows on.`,
-      });
+      onInstalled(await installPlugin(source));
       setSource('');
     } catch (err) {
       onNote({ ok: false, text: (err as Error).message });
@@ -180,10 +206,12 @@ function Discover({
   installed,
   signedIn,
   onNote,
+  onInstalled,
 }: {
   installed: Set<string>;
   signedIn: boolean;
   onNote: (n: Note) => void;
+  onInstalled: OnInstalled;
 }) {
   const [state, setState] = useState<Discovery>({ status: 'loading' });
   const [busy, setBusy] = useState<string | null>(null);
@@ -202,11 +230,7 @@ function Discover({
     setBusy(p.source);
     onNote(null);
     try {
-      const done = await installPlugin(p.source);
-      onNote({
-        ok: true,
-        text: `Installed ${done.plugin?.manifest.name ?? p.repo}${done.ref ? ` ${done.ref}` : ''}. Approve it on its page, or on a page it shows on.`,
-      });
+      onInstalled(await installPlugin(p.source));
     } catch (err) {
       onNote({ ok: false, text: (err as Error).message });
     } finally {
@@ -222,7 +246,7 @@ function Discover({
         <a href="https://github.com/topics/potentialpaper-plugin" rel="noopener noreferrer" target="_blank">
           potentialpaper-plugin
         </a>
-        . Check what one asks for before you approve it.
+        .
       </p>
       {state.status === 'loading' && <p className={ui.empty}>Asking GitHub…</p>}
       {state.status === 'error' && <p className={ui.note(false)}>{state.error}</p>}
