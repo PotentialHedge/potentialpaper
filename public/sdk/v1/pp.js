@@ -129,11 +129,27 @@
     });
   }
 
+  // The bottom of the body, and of the margin its last child's last child... leaves below it: a margin that collapses
+  // through the body is outside its box, and would leave the frame that much short (and scrolling).
   function measure() {
     var body = document.body;
     if (!body) return 0;
-    var style = getComputedStyle(body);
-    return Math.ceil(body.getBoundingClientRect().bottom + parseFloat(style.marginBottom || '0') + window.scrollY);
+    var bottom = body.getBoundingClientRect().bottom + parseFloat(getComputedStyle(body).marginBottom || '0');
+    var el = body;
+    for (var depth = 0; depth < 20; depth++) {
+      var last = null;
+      for (var child = el.lastElementChild; child; child = child.previousElementSibling) {
+        var position = getComputedStyle(child).position;
+        if (position !== 'absolute' && position !== 'fixed' && child.getClientRects().length > 0) {
+          last = child;
+          break;
+        }
+      }
+      if (!last) break;
+      bottom = Math.max(bottom, last.getBoundingClientRect().bottom + parseFloat(getComputedStyle(last).marginBottom || '0'));
+      el = last;
+    }
+    return Math.ceil(bottom + window.scrollY);
   }
 
   function reportHeight() {
