@@ -230,6 +230,26 @@ export function openApiDocument(origin: string) {
           query('limit', 'How many.', { type: 'integer', minimum: 1, maximum: 200, default: 50 }),
         ],
       ),
+      '/events': get(
+        'Events, oldest first',
+        "Every commit to every page, oldest first from a cursor, for a backend that keeps something current (a signal set). It never skips an event: it follows the transaction order and gives only events whose transactions have all ended. A paper's first commit is its creation (`created`); a merge names the paper folded in (`merged`), whose identifiers now lead to the survivor. Read again with `after` = `next` at once while `more` is true; then with `wait`, which holds the request until an event commits. Never cached.",
+        S.Events,
+        [
+          query(
+            'after',
+            'The cursor to read after: `next` of the last read, or `now` to start at the present. Without it, from the first event.',
+            { type: 'string' },
+          ),
+          query('kind', 'Only pages of these kinds, comma-separated.', { type: 'string' }),
+          query('limit', 'How many.', { type: 'integer', minimum: 1, maximum: 500, default: 100 }),
+          query('wait', 'With nothing to give, wait up to this many seconds for an event.', {
+            type: 'integer',
+            minimum: 0,
+            maximum: 25,
+            default: 0,
+          }),
+        ],
+      ),
       '/pages/{identifier}/scores': get(
         "A scope's score statistics",
         `The venues its papers were submitted to and each score field of their review forms, with counts, venues with the most submissions first. Each venue names its own page (\`venue.page\`), whose statistics are the whole venue's. A site may withhold a venue's numbers until its decisions are out (\`hidden\`). ${ETAGGED}`,

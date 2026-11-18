@@ -72,7 +72,7 @@ function doorbell() {
 }
 
 /** Keeps a `LISTEN` connection open, reconnecting after a failure; rings the bell on every notification. */
-function listen(url: string, ring: () => void, log: (line: string) => void, signal?: AbortSignal): () => Promise<void> {
+export function listen(url: string, ring: () => void, log: (line: string) => void, signal?: AbortSignal): () => Promise<void> {
   let client: Client | null = null;
   let stopped = false;
   let retry: NodeJS.Timeout | null = null;

@@ -396,6 +396,14 @@ regions change with every rebuild). Then, as the publisher, with an API key that
   with \`?generation=<n>\` on the two routes above; then \`POST …/generations/<n>/publish\` makes it live and drops the
   old one. Without \`?generation\`, writes go to the live generation.
 
+**Keep it current** with the events feed: \`GET ${origin}/api/v1/events?kind=paper&after=<cursor>&wait=25\` gives
+every commit to every paper, oldest first, and \`next\`, the cursor to read after. Read again at once while \`more\` is
+true; with nothing new, \`wait\` holds the request until a commit lands. It never skips one, so keep \`next\` and you can
+stop and start where you left off (or begin at \`after=now\`). Each event names the paper with all its
+\`identifiers\`, the files its commit changed (\`paths\`: recompute when the ones you read changed, e.g.
+\`metadata.json\`), \`created\` for a new paper, and \`merged\` when another paper was folded into it. A small follower:
+\`examples/signals/follow.mjs\` in the PotentialPaper repo.
+
 **Read a set** with \`pp.signals\` (no permission needed: signals are public), or over HTTP:
 \`GET ${origin}/api/v1/signal-sets\`, \`…/<owner>/<name>\`, \`…/<owner>/<name>/columns?signals=a,b&scope=<identifier>&titles=true\`,
 \`…/<owner>/<name>/nearest?signal=<id>&paper=<identifier>&k=20\`, and \`GET ${origin}/api/v1/pages/<identifier>/signals\`.

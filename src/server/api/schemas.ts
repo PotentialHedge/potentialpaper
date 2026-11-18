@@ -1245,3 +1245,39 @@ export const Changes = z.object({
   /** `before` for the next page, or `null`. */
   next: z.number().int().nullable(),
 });
+
+/** `GET /events` (`server/events-feed.ts`). */
+export const Events = z.object({
+  events: z.array(
+    z.object({
+      /** This event's cursor. */
+      cursor: z.string(),
+      type: z.literal('page.committed'),
+      at: z.string(),
+      page: z.object({
+        kind: z.string(),
+        identifier: z.string(),
+        address: z.string(),
+        url: z.string(),
+        name: z.string(),
+        /** A paper's every identifier. */
+        identifiers: z.array(z.string()).optional(),
+      }),
+      seq: z.number().int(),
+      oid: z.string(),
+      parent: z.string().nullable(),
+      kind: z.string(),
+      summary: z.string(),
+      paths: z.array(z.string()),
+      bot: z.boolean(),
+      /** The page's first commit. */
+      created: z.boolean(),
+      /** A merge: the paper folded into this one. */
+      merged: z.object({ identifier: z.string().nullable(), identifiers: z.array(z.string()) }).optional(),
+    }),
+  ),
+  /** `after` for the next read. */
+  next: z.string(),
+  /** More are ready now. */
+  more: z.boolean(),
+});

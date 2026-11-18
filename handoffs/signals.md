@@ -2,8 +2,8 @@
 
 Status: 2026-11-18. Built and deployed: sets, values in generations, the public reads and the plugin RPC (Phase 1
 and the reads of Phases 2 and 3, without pgvector), and the first set, `benedict-armstrong/acceptodds-map`, which the
-Paper map plugin draws. Not built: the events feed for publishers, staleness (`inputs`), search, pgvector, the site's
-own set. See the Log.
+Paper map plugin draws, and the events feed for publishers. Not built: staleness (`inputs`), search, pgvector, the
+site's own set. See the Log.
 
 ## Goal
 
@@ -133,3 +133,19 @@ Limits: 20 signals a set, 2048 dims, a writes rate limit, and a total per set th
   of the scope's papers; kept 10 minutes per page. The map's panels show only there.
 - **`ui.setPath`:** a plugin page sets the rest of its address without a reload; the map page names the selected
   paper, so a link opens on it.
+
+### 2026-11-18: the events feed
+
+- `GET /api/v1/events?after=<cursor>&kind=paper&limit=100&wait=25` (`server/events-feed.ts`, `server/api/events.ts`):
+  every commit, oldest first, read as the consumers read (`xid` order, only transactions that have ended), so none is
+  skipped. The cursor is `<xid>-<id>`; with nothing more ready, `next` is the horizon (the oldest running
+  transaction, id 0). `after=now` starts at the present. Kinds are filtered after reading at most 2,000 events, so a
+  narrow filter still answers quickly and moves the cursor on. `wait` (up to 25 s) holds the request on one `LISTEN`
+  connection a process (`listen` from `consumers/worker.ts`) and looks again every 5 s. Never cached.
+- Each event: the page with a paper's every identifier, `seq`, `oid`, `parent`, `paths`, `summary`, `bot`, `created`
+  (first commit) and `merged` (the merge commit now names the paper folded in: `mergedFrom` in its payload, set by
+  `mergePapers`). Papers are never deleted; topic and org pages that are deleted take their events with them.
+- `examples/signals/follow.mjs`: a follower that keeps a cursor file and writes values in batches. OpenAPI and the
+  Signals section of `/plugins.md` describe it.
+- **Next:** staleness (`inputs` on a signal, the commit a value was computed at, `GET …/stale`), pgvector on
+  Postgres 19, search.

@@ -206,6 +206,14 @@ export async function mergePapers(
       { database: tx as unknown as Database, evidence: input.evidence, recordEmpty: true },
     );
     await tx.update(papers).set({ mergedInto: survivorId }).where(eq(papers.id, duplicateId));
+    // The merge commit's event names the paper merged in, so the events feed (`server/events-feed.ts`) can tell a
+    // publisher that the duplicate's values now belong to the survivor.
+    if (result.status === 'committed') {
+      await tx.execute(sql`
+        update page_events set payload = payload || jsonb_build_object('mergedFrom', ${duplicateId}::text)
+         where page_id = ${survivorId} and seq = ${result.seq}
+      `);
+    }
     // Whoever followed the duplicate follows the survivor.
     await tx.execute(sql`
       insert into paper_follows (account_id, paper_id, created_at)

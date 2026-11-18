@@ -70,6 +70,7 @@ import * as pageScoreFieldRoute from '@/app/api/v1/pages/[identifier]/scores/[ve
 import * as pagePapersRoute from '@/app/api/v1/pages/[identifier]/papers/route';
 import * as topicsRoute from '@/app/api/v1/topics/route';
 import * as changesRoute from '@/app/api/v1/changes/route';
+import * as eventsRoute from '@/app/api/v1/events/route';
 import * as topicRoute from '@/app/api/v1/pages/[identifier]/topic/route';
 import * as paperTopicsRoute from '@/app/api/v1/pages/[identifier]/topics/route';
 import * as topicPapersRoute from '@/app/api/v1/pages/[identifier]/topic-papers/route';
@@ -169,6 +170,7 @@ const ROUTES: [RegExp, any][] = [
   [/^\/pages\/(?<identifier>[^/?]+)$/, pageSummary],
   [/^\/topics(\?.*)?$/, topicsRoute],
   [/^\/changes(\?.*)?$/, changesRoute],
+  [/^\/events(\?.*)?$/, eventsRoute],
   [/^\/settings$/, siteSettings],
   [/^\/me\/password$/, password],
   [/^\/me\/affiliations$/, affiliations],
