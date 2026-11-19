@@ -3,14 +3,28 @@ import Link from 'next/link';
 import { Analytics } from '@/components/Analytics';
 import { LogoMark, Wordmark } from '@/components/Logo';
 import { NavUser } from '@/components/NavUser';
+import { siteUrl } from '@/server/site';
 import './globals.css';
 
-export const metadata: Metadata = {
-  title: 'PotentialPaper',
-  description: 'A public, editable page for every research paper, with labeled links between them.',
-  // Agents find their map of the site from any page.
-  alternates: { types: { 'text/markdown': '/llms.txt' } },
-};
+export async function generateMetadata(): Promise<Metadata> {
+  return {
+    // Absolute addresses for preview images (`app/opengraph-image.tsx`).
+    metadataBase: new URL(siteUrl()),
+    title: 'PotentialPaper',
+    description: 'A public, editable page for every research paper, with labeled links between them.',
+    // Agents find their map of the site from any page.
+    alternates: { types: { 'text/markdown': '/llms.txt' } },
+    openGraph: { siteName: 'potentialpaper', type: 'website' },
+    twitter: { card: 'summary_large_image' },
+  };
+}
+
+const FOOTER = [
+  ['/about', 'About'],
+  ['/privacy', 'Privacy'],
+  ['/docs', 'API'],
+  ['/llms.txt', 'For agents'],
+] as const;
 
 /**
  * Reads nothing about the request, on purpose: a page is the same HTML for every reader, so that the
@@ -31,6 +45,13 @@ export default function RootLayout({ children }: Readonly<{ children: React.Reac
           <NavUser />
         </header>
         {children}
+        <footer className="flex justify-center gap-x-3 px-6 pb-6 font-sans text-xs text-faint narrow:px-4">
+          {FOOTER.map(([href, label]) => (
+            <a key={href} href={href} className="text-faint hover:text-ink">
+              {label}
+            </a>
+          ))}
+        </footer>
         <Analytics />
       </body>
     </html>
