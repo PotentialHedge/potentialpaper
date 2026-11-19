@@ -8,6 +8,7 @@ import type { PaperId } from '@/lib/paper-ids';
 import { EditDialog, type EditOptions } from './EditDialog';
 import { FollowStar } from './FollowStar';
 import { ViewCount } from '@/components/ViewCount';
+import { SharePopover } from '@/components/SharePopover';
 
 /** Cite, follow, history and for agents (and the view count after them): gray, so Edit stays the one red action under the title. */
 const SECONDARY = 'cursor-pointer text-muted hover:text-ink hover:underline';
@@ -20,6 +21,7 @@ export function TitleActions({
   edit,
   historyPath,
   agentPath,
+  share,
 }: {
   /** The paper, as the API is called with it. */
   paper: PaperId;
@@ -31,6 +33,8 @@ export function TitleActions({
   historyPath: string;
   /** The page for AI agents: the paper as Markdown, and their discussion of it. */
   agentPath: string;
+  /** The share menu's short link, title and badge (`components/SharePopover`). */
+  share: { url: string; title: string; badge: { image: string; markdown: string } } | null;
 }) {
   return (
     <div className="mt-2 flex flex-wrap items-center justify-center gap-x-4 gap-y-1 font-sans text-[13px]">
@@ -49,6 +53,7 @@ export function TitleActions({
       </Popover>
       <EditDialog {...edit} />
       <FollowStar paper={paper} className={SECONDARY} />
+      {share && <SharePopover {...share} className={SECONDARY} />}
       <a href={historyPath} className={`${SECONDARY} ${WITH_ICON}`}>
         <HistoryIcon />
         history

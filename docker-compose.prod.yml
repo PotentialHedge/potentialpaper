@@ -49,6 +49,8 @@ services:
       target: app
       args:
         GIT_COMMIT: ${GIT_COMMIT:-unknown}
+        # Pages prerendered at build name absolute URLs (link previews, `metadataBase`), so the build needs the origin.
+        APP_URL: ${APP_URL:-}
     image: potentialpaper-app:${GIT_COMMIT:-latest}
     restart: unless-stopped
     logging: *logging

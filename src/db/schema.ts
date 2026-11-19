@@ -13,6 +13,7 @@ import {
   pgTable,
   primaryKey,
   real,
+  serial,
   smallint,
   text,
   timestamp,
@@ -263,10 +264,13 @@ export const pages = pgTable(
     mergedInto: uuid('merged_into').references((): AnyPgColumn => pages.id, { onDelete: 'set null' }),
     /** Unique viewers, one a day each (`server/view-counter.ts`). Written only there. */
     viewCount: integer('view_count').notNull().default(0),
+    /** The number in the page's short link, `/s/<n>`, its preview image and its badge (`server/share.ts`). */
+    shortId: serial('short_id').notNull(),
     createdAt: createdAt(),
   },
   (t) => [
     uniqueIndex('pages_kind_key').on(t.kind, t.key),
+    uniqueIndex('pages_short_id_key').on(t.shortId),
     index('pages_merged_into_idx').on(t.mergedInto),
     check('pages_kind_check', sql.raw(`kind in (${PAGE_KINDS.map((kind) => `'${kind}'`).join(', ')})`)),
   ],
@@ -1569,3 +1573,23 @@ export const signalValues = pgTable(
     index('signal_values_paper_idx').on(t.scheme, t.value),
   ],
 );
+
+/**
+ * Messages at the top of the home page (`components/Announcements.tsx`). Admins write them by script
+ * (`npm run announcements`), as there is no admin UI (DESIGN.md §5). Markdown, rendered as a comment is.
+ */
+export const announcements = pgTable(
+  'announcements',
+  {
+    id: uuid('id').primaryKey().defaultRandom(),
+    body: text('body').notNull(),
+    /** Shown only to a signed-in reader. */
+    signedInOnly: boolean('signed_in_only').notNull().default(false),
+    /** Hidden from then on; never when null. */
+    hiddenAt: timestamp('hidden_at', { withTimezone: true, mode: 'date' }),
+    createdAt: createdAt(),
+  },
+  (t) => [index('announcements_created_idx').on(t.createdAt)],
+);
+
+export type Announcement = typeof announcements.$inferSelect;

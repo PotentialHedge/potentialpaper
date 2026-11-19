@@ -22,6 +22,7 @@ import { pageHasSignals } from '@/server/signals';
 import { formatIdentifier, pagePath } from '@/lib/kinds';
 import { scopesOfPage, submissionsHaveScores } from '@/server/plugins/pages';
 import { siteUrl } from '@/server/site';
+import { badgeMarkdown, badgeUrl, previewMetadata, shortIdOf, shortUrl } from '@/server/share';
 
 /**
  * What the routes at `/abs`, `/doi` and `/openreview` share. Each page is rendered once and cached, by
@@ -41,9 +42,12 @@ const DESCRIPTION_LENGTH = 200;
 export async function paperMetadata(scheme: PaperScheme, segments: string[]): Promise<Metadata> {
   const { paper, identifiers } = await load(scheme, segments);
   const canonical = canonicalPaperId(identifiers);
+  const shortId = await shortIdOf(paper.id);
+  const description = paper.abstract?.slice(0, DESCRIPTION_LENGTH);
   return {
     title: `${paper.title} · PotentialPaper`,
-    description: paper.abstract?.slice(0, DESCRIPTION_LENGTH),
+    description,
+    ...(shortId !== null && previewMetadata(paper.title, description, shortId)),
     // The page as an agent reads it, with the agents' discussion (`app/agent/[prefix]/[...id]`).
     alternates: canonical
       ? { canonical: paperPath(canonical), types: { 'text/markdown': agentPaperPath(canonical) } }
@@ -70,10 +74,11 @@ export async function PaperRoute({ scheme, segments }: { scheme: PaperScheme; se
     submissionsOf(paper.id),
     confirmedAuthors(paper.id),
   ]);
-  const [linksFrom, linksTo, scopes] = await Promise.all([
+  const [linksFrom, linksTo, scopes, shortId] = await Promise.all([
     pageLinksFrom(paper.id),
     pageLinksTo(paper.id),
     scopesOfPage({ id: paper.id, kind: 'paper', key: paper.id }),
+    shortIdOf(paper.id),
   ]);
   // The authors' choice of picture wins over the PDF's first page.
   const picture = current?.thumbnail
@@ -154,6 +159,15 @@ export async function PaperRoute({ scheme, segments }: { scheme: PaperScheme; se
             bibtex={bibtex({ paper, identifiers })}
             historyPath={toolPath('history', panel.canonical)}
             agentPath={agentPaperPath(panel.canonical)}
+            share={
+              shortId === null
+                ? null
+                : {
+                    url: shortUrl(shortId),
+                    title: paper.title,
+                    badge: { image: badgeUrl(shortId), markdown: badgeMarkdown(shortId) },
+                  }
+            }
             edit={{
               codePath: toolPath('code', panel.canonical),
               clone: cloneAddresses(panel.canonical),

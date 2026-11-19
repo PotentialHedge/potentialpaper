@@ -20,6 +20,8 @@ import { KindSlot } from './slots';
 import type { TopicView } from './topic-panels';
 import { topicOverview } from '@/server/topic-pages';
 import { presentTopicPapers } from '@/server/topic-papers';
+import { previewMetadata, shortIdOf, shortUrl } from '@/server/share';
+import { SharePopover } from '@/components/SharePopover';
 
 /**
  * What the routes of the kinds other than a paper share (`/v/…`, `/t/…`, `/o/…`, `/u/…`, `lib/kinds.ts`): the page
@@ -75,8 +77,10 @@ export async function keyedPageMetadata(kind: KeyedKind, segments: string[]): Pr
   const found = await load(kind, segments);
   if (!found || 'redirect' in found) return {};
   const name = found.current?.name ?? pageName(kind, found.key, null);
+  const shortId = await shortIdOf(found.page.id);
   return {
     title: `${name} · ${KINDS[kind].title} · PotentialPaper`,
+    ...(shortId !== null && previewMetadata(name, undefined, shortId)),
     alternates: { canonical: keyedPagePath(kind, found.key) },
   };
 }
@@ -87,7 +91,7 @@ export async function KeyedPageRoute({ kind, segments }: { kind: KeyedKind; segm
   if ('redirect' in found) redirect(found.redirect);
   const { page, key, current } = found;
   const scope = KINDS[kind].scope;
-  const [from, to, count, list, summaries, scopes, facts, user, org, topic] = await Promise.all([
+  const [from, to, count, list, summaries, scopes, facts, user, org, topic, shortId] = await Promise.all([
     linksFrom(page.id),
     linksTo(page.id),
     scope ? scopeMemberCount(page.id) : Promise.resolve(0),
@@ -102,6 +106,7 @@ export async function KeyedPageRoute({ kind, segments }: { kind: KeyedKind; segm
     kind === 'org' ? orgOverview(page) : Promise.resolve(null),
     // Its neighbours, papers and suggestions (`server/topic-pages.ts`).
     kind === 'topic' ? topicView(page) : Promise.resolve(null),
+    shortIdOf(page.id),
   ]);
   const summary = summaries.get(page.id)!;
   const props = {
@@ -132,7 +137,14 @@ export async function KeyedPageRoute({ kind, segments }: { kind: KeyedKind; segm
             </span>{' '}
             · clone with <span className={ui.mono}>git clone {clone.https}</span>
           </p>
-          <p className={`${ui.fine} text-center font-sans`}>
+          <p className={`${ui.fine} flex justify-center gap-x-4 font-sans`}>
+            {shortId !== null && (
+              <SharePopover
+                url={shortUrl(shortId)}
+                title={props.name}
+                className="cursor-pointer text-muted hover:text-ink hover:underline"
+              />
+            )}
             <ViewCount pageId={page.id} />
           </p>
           <div className="mt-5 grid grid-cols-[minmax(0,1fr)_300px] items-start gap-8 narrow:grid-cols-1">

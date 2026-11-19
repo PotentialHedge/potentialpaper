@@ -38,6 +38,12 @@ const CSP = [
 const nextConfig: NextConfig = {
   // No `X-Powered-By: Next.js`: it tells a scanner which advisories to try.
   poweredByHeader: false,
+  // The link-preview images read their font from disk (`server/og.tsx`); the Dockerfile copies `assets/` too, and this
+  // keeps a plain standalone build working.
+  outputFileTracingIncludes: {
+    '/opengraph-image': ['./assets/fonts/*.ttf'],
+    '/preview/[file]': ['./assets/fonts/*.ttf'],
+  },
   // Traefik compresses instead (zstd, br or gzip, streams too: `docker-compose.prod.yml`). Next's is gzip only, and it
   // drops a route's own `Content-Encoding`, so a route can't compress for itself.
   compress: false,
@@ -55,8 +61,9 @@ const nextConfig: NextConfig = {
   async headers() {
     return [
       {
-        // Everything but the web editor, which has a policy of its own (`src/editors/vscode/csp.ts`).
-        source: '/:path((?!editor/).*)',
+        // Everything but the web editor and the API reference, which have policies of their own (`src/editors/vscode/csp.ts`,
+        // `app/docs/route.ts`).
+        source: '/:path((?!editor/|docs$).*)',
         // The content domain sends its own (`proxy.ts`, `server/demos/serve.ts`).
         missing: [{ type: 'host' as const, value: CONTENT_HOST_PATTERN }],
         headers: [

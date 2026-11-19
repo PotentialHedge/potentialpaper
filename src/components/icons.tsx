@@ -104,6 +104,15 @@ export function AgentIcon({ className = 'size-3.5' }: { className?: string }) {
   );
 }
 
+/** An arrow out of a tray: share. */
+export function ShareIcon({ className = 'size-3.5' }: { className?: string }) {
+  return (
+    <svg {...line} className={className}>
+      <path d="M8 10V2M5 4.5L8 1.5l3 3M4.5 7H3v6.5h10V7h-1.5" />
+    </svg>
+  );
+}
+
 /** Two chain links: a link to this spot on the page. */
 export function LinkIcon({ className = 'size-[1em]' }: { className?: string }) {
   return (

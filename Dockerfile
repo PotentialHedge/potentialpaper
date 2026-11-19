@@ -48,6 +48,8 @@ COPY --from=vscode /build/vscode-web public/editor/vscode/${VSCODE_VERSION}
 RUN test -n "$(grep -F "VSCODE_VERSION = '${VSCODE_VERSION}'" src/editors/vscode/index.ts)" \
  && npm run editor:extension
 ENV NEXT_TELEMETRY_DISABLED=1
+# The public origin, for the absolute URLs of pages prerendered here (`metadataBase`, link previews).
+ARG APP_URL=
 # The cache mount keeps Next's compiler cache between builds: with one shared core
 # the compile is nearly all of a deploy's time, and most modules do not change.
 RUN --mount=type=cache,target=/app/.next/cache npm run build
@@ -68,6 +70,8 @@ COPY --from=build --chown=node:node /app/.next/static ./.next/static
 COPY --from=build --chown=node:node /app/public ./public
 # Read at runtime from the working directory (INSTITUTION_DOMAINS_PATH overrides).
 COPY --chown=node:node config ./config
+# The link-preview images' font (`src/server/og.tsx`).
+COPY --chown=node:node assets ./assets
 USER node
 EXPOSE 3000
 CMD ["node", "server.js"]
