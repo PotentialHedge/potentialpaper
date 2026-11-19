@@ -1,7 +1,9 @@
 import { cookies, headers } from 'next/headers';
 import Link from 'next/link';
+import { Announcements } from '@/components/Announcements';
 import { Collapsible } from '@/components/Collapsible';
 import { HomeNextStep } from '@/components/HomeNextStep';
+import { InstitutionStrip } from '@/components/InstitutionStrip';
 import { redirect } from 'next/navigation';
 import { FilterIcon, MoreIcon } from '@/components/icons';
 import { Pager } from '@/components/Pager';
@@ -11,9 +13,12 @@ import { SearchSyntax } from '@/components/paper/SearchSyntax';
 import { Popover, PopoverClose, PopoverContent, PopoverTrigger } from '@/components/Popover';
 import { SearchInput } from '@/components/SearchInput';
 import { ui } from '@/components/ui';
+import { DISMISSED_COOKIE, parseDismissed } from '@/lib/announcements';
 import { paperIdFromText, paperPath, sourceLinks } from '@/lib/paper-ids';
 import { parseSearch } from '@/lib/query';
 import { normalizeSearch, SEARCH_MAX_LENGTH, SEARCH_SORTS, type SearchSort } from '@/lib/search';
+import { institutionNames } from '@/server/affiliations';
+import { currentAnnouncements } from '@/server/announcements';
 import { viewerFromHeaders } from '@/server/auth';
 import { SEARCH_PAGE_SIZE, searchPapers, topVenues, type SearchFilter, type SearchHit } from '@/server/search';
 
@@ -86,7 +91,7 @@ export default async function Home({
   // theirs and followed is under My papers. Not while searching, nor when the list is already only followed papers.
   const pins = me !== null && !q && !onlyFollowed;
   const browse = { venue, sort };
-  const [all, mine, followed, topVenueList] = await Promise.all([
+  const [all, mine, followed, topVenueList, announced, institutions] = await Promise.all([
     pageOf(sp.page, SEARCH_PAGE_SIZE, {
       q,
       venue: venueFilter,
@@ -98,11 +103,14 @@ export default async function Home({
     pins ? pageOf(sp.mpage, MINE_PAGE, { ...browse, authoredBy: me }) : null,
     pins ? pageOf(sp.fpage, FOLLOWING_PAGE, { ...browse, followedBy: me, exceptAuthoredBy: me }) : null,
     topVenues(),
+    currentAnnouncements(viewer !== null),
+    institutionNames(),
   ]);
   const venues = venue && !topVenueList.includes(venue) ? [...topVenueList, venue] : topVenueList;
   const cookieJar = await cookies();
   const mineOpen = cookieJar.get(MINE_COOKIE)?.value !== '0';
   const followingOpen = cookieJar.get(FOLLOWING_COOKIE)?.value !== '0';
+  const dismissed = new Set(parseDismissed(cookieJar.get(DISMISSED_COOKIE)?.value));
   const pinnedCount = (mine?.total ?? 0) + (followed?.total ?? 0);
 
   // Filter links keep the search; `q: ''` drops it (and its relevance sort). They go back to page 1:
@@ -143,10 +151,12 @@ export default async function Home({
 
   return (
     <main className={ui.page}>
+      <Announcements items={announced.filter((a) => !dismissed.has(a.id))} />
       <header className="mt-12 pb-6 text-center narrow:mt-8">
         <h1 className="mt-2 mb-3 text-[30px] leading-snug font-normal narrow:text-2xl">
           A public page for every paper
         </h1>
+        <InstitutionStrip names={institutions} />
         {!q && (
           <div className="mx-auto mt-5 max-w-[min(680px,85%)] text-[14px] leading-[1.55]">
             <HomeNextStep />

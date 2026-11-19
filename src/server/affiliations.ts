@@ -287,3 +287,35 @@ export async function removeAffiliation(
     await syncAccount(tx, input.accountId);
   });
 }
+
+/** An institution is named on the home page only once this many people are confirmed there, so no one person shows. */
+export const MIN_INSTITUTION_PEOPLE = 3;
+/** How long the counts are kept: they scan every account, and a new institution may show up a minute late. */
+const INSTITUTION_COUNTS_TTL_MS = 60_000;
+let institutionCountsCache: { at: number; names: Promise<string[]> } | null = null;
+
+/**
+ * The institutions at least {@link MIN_INSTITUTION_PEOPLE} people (not bots) are confirmed at, by name: the home
+ * page's strip. Counts only, never who; read from `accounts.institutions`, the cache of confirmed affiliations.
+ */
+export function institutionNames(database: Database = getDb()): Promise<string[]> {
+  const compute = async () => {
+    const result = await database.execute<{ name: string }>(sql`
+      select i.name
+        from ${accounts} a, unnest(a.institutions) as i(name)
+       where not a.is_bot
+       group by i.name
+      having count(*) >= ${MIN_INSTITUTION_PEOPLE}
+       order by i.name
+    `);
+    return result.rows.map((r) => r.name);
+  };
+  if (database !== getDb()) return compute();
+  const now = Date.now();
+  if (!institutionCountsCache || now - institutionCountsCache.at > INSTITUTION_COUNTS_TTL_MS) {
+    const names = compute();
+    institutionCountsCache = { at: now, names };
+    names.catch(() => (institutionCountsCache = null));
+  }
+  return institutionCountsCache.names;
+}

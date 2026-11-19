@@ -42,6 +42,13 @@
       opacity: 0;
     }
   }
+  /* `InstitutionStrip`: the doubled row slides by one copy, then repeats. Its duration is set per name there. */
+  --animate-marquee: marquee 60s linear infinite;
+  @keyframes marquee {
+    to {
+      transform: translateX(-50%);
+    }
+  }
 }
 
 @custom-variant narrow (@media (max-width: 720px));
