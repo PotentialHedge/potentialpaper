@@ -1,11 +1,13 @@
 'use client';
 
+import Link from 'next/link';
 import { type ReactNode, useMemo, useRef, useState } from 'react';
 import { Popover, PopoverClose, PopoverContent, PopoverTrigger } from '@/components/Popover';
 import { ui } from '@/components/ui';
 import { grantPlugin, usePlugins } from '@/lib/plugins/client';
 import type { Connection } from '@/lib/plugins/host';
 import { useSetting } from '@/lib/settings/client';
+import { pluginSettingsPath } from '@/lib/settings/form';
 import {
   kindSlot,
   OWNERS_PLACES,
@@ -201,10 +203,10 @@ function PluginPanel({
     <div className="mb-1 flex items-baseline justify-between gap-2 font-sans text-xs text-faint">
       <span>
         {!inTabs && <span className={`${ui.runIn} mr-2`}>{panel.title}</span>}
-        <a href={plugin.plugin.sourceUrl} rel="noopener noreferrer" target="_blank" className="text-faint">
+        <Link href={pluginSettingsPath(plugin.plugin.id)} className="text-faint">
           {plugin.plugin.manifest.name}
           {plugin.from === 'dev' ? ' (dev)' : ''}
-        </a>
+        </Link>
       </span>
       {plugin.status === 'ready' && <CommandsMenu plugin={plugin} connection={connection} />}
     </div>

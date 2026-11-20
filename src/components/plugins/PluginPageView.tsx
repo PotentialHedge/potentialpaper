@@ -4,6 +4,7 @@ import Link from 'next/link';
 import { useEffect, useState } from 'react';
 import { ui } from '@/components/ui';
 import { usePlugins } from '@/lib/plugins/client';
+import { pluginSettingsPath } from '@/lib/settings/form';
 import { PluginFrame, type ReadyPlugin } from './PluginFrame';
 import { ConsentPrompt } from './PluginPanel';
 
@@ -52,10 +53,7 @@ export function PluginPageView({ path }: { path: string[] }) {
       <article>
         <h1 className="mt-6 text-center text-[26px] leading-tight font-normal">{page.title}</h1>
         <p className={`${ui.fine} mb-5 text-center font-sans`}>
-          from the plugin{' '}
-          <a href={plugin.plugin.sourceUrl} rel="noopener noreferrer" target="_blank">
-            {plugin.plugin.manifest.name}
-          </a>
+          from the plugin <Link href={pluginSettingsPath(plugin.plugin.id)}>{plugin.plugin.manifest.name}</Link>
         </p>
         {plugin.status === 'consent' ? <ConsentPrompt plugin={plugin} signedIn={viewer.signedIn} /> : frame(false)}
       </article>
