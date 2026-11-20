@@ -18,13 +18,14 @@ describe('settings.json', () => {
   it('keeps the text as written, comments and all, and resolves it over the site layer', async () => {
     await saveSiteSettings('{ "paper.panels.hidden": ["discussion"], "paper.panels.order": ["submissions"] }');
     const cookie = await signUp('reader@ethz.ch');
-    const text = '{\n  // Abstract last.\n  "paper.panels.order": ["author", "abstract"],\n  "later/plugin.x": 1,\n}\n';
+    const text =
+      '{\n  // Abstract last.\n  "paper.panels.order": ["sections", "abstract"],\n  "later/plugin.x": 1,\n}\n';
     const put = await api('PUT', '/me/settings', { cookie, text });
     expect(put.status).toBe(200);
     expect(put.body.text).toBe(text);
     expect(put.body.values).toMatchObject({
       'paper.panels.hidden': ['discussion'],
-      'paper.panels.order': ['author', 'abstract'],
+      'paper.panels.order': ['sections', 'abstract'],
     });
     expect(put.body.problems).toEqual([
       expect.objectContaining({ severity: 'warning', key: 'later/plugin.x', line: 4 }),

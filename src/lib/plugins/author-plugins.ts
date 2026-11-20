@@ -2,14 +2,14 @@ import { z } from 'zod';
 import { PLUGIN_PANEL_ID_RE } from './manifest';
 
 /**
- * `author/plugins.json`: the plugins' panels a paper's authors let into its author section (`paper.author`). Only
- * confirmed authors write under `author/` (`server/pages/rules.ts`), so only they decide. Listing a panel installs
+ * `owners/plugins.json`: the plugins' panels a paper's authors let into its author section (`paper.author`). Only
+ * confirmed authors write under `owners/` (`server/pages/rules.ts`), so only they decide. Listing a panel installs
  * nothing: a reader sees it only if they have the plugin installed and running, and the panel's manifest offers the
  * author section (`"slot": { "paper": "author" }`). What it may read there is what it may read anywhere; nothing a
  * plugin does writes to the page. Each entry's `settings` reach the frame as `pp.context.surface.config`, so the
  * authors can say what it shows for their paper.
  */
-export const AUTHOR_PLUGINS_PATH = 'author/plugins.json';
+export const AUTHOR_PLUGINS_PATH = 'owners/plugins.json';
 export const MAX_AUTHOR_PANELS = 8;
 /** Of one entry's settings, as JSON. */
 export const MAX_AUTHOR_CONFIG_BYTES = 4096;

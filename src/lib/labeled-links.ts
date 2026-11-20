@@ -3,7 +3,7 @@ import { formatIdentifier, type PageKind, parseIdentifier } from './kinds';
 
 /**
  * Labeled links (DESIGN.md §8): statements made on the source page about a target page of any kind, one JSON
- * object a line in a part's `links.jsonl` (`community/links.jsonl`, `author/links.jsonl`), so they get history,
+ * object a line in a part's `links.jsonl` (`community/links.jsonl`, `owners/links.jsonl`), so they get history,
  * revert and blame like everything else. Where the file is says who asserts them: the page's owners (its
  * confirmed authors, organisers, members) or the community. `page_links` (`server/page-links.ts`) is the index
  * that answers "what links here".
@@ -154,7 +154,7 @@ export const labeledLinkSchema = z
   .meta({
     title: 'Labeled link',
     description:
-      'One line of a links.jsonl: a labeled link from this page to a page of any kind. author/links.jsonl is asserted by the owners, community/links.jsonl by the community.',
+      'One line of a links.jsonl: a labeled link from this page to a page of any kind. owners/links.jsonl is asserted by the owners, community/links.jsonl by the community.',
   });
 
 export type LabeledLinkLine = z.output<typeof labeledLinkSchema>;

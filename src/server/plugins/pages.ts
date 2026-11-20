@@ -23,7 +23,7 @@ import { type UserPageView, userPageView } from '../user-pages';
  * public REST routes under `/api/v1/pages/{identifier}`, so a plugin's own backend reads the same data.
  *
  * **Only what the page shows the public.** A plugin sees exactly what a reader of the page does; a user page's is its
- * `about/` and links and never anything that ties the handle to an author identity (DESIGN.md §5.3), and that rule
+ * `owners/` and links and never anything that ties the handle to an author identity (DESIGN.md §5.3), and that rule
  * lives here, in what the `user` kind gives, not in the plugins.
  */
 
@@ -166,7 +166,7 @@ function presentLink(link: PageLink) {
 /**
  * `page.read`, `GET /pages/{identifier}/files`: the page's kind file, its sections (Markdown, in order, part by part)
  * and its labeled links, at its current commit. A paper's "kind file" is its metadata. A user page gives its
- * `about/`, its links, and `userKindFile`: only what its account shows (`server/user-pages.ts`).
+ * `owners/`, its links, and `userKindFile`: only what its account shows (`server/user-pages.ts`).
  */
 export async function readPageForPlugins(identifier: string, database: Database = getDb()) {
   const page = await mustFindPage(identifier, database);

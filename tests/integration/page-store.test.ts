@@ -173,7 +173,7 @@ describe('every repo passes git fsck --strict', () => {
     )
     .chain((names) =>
       fc
-        .constantFrom('community', 'community', 'community', 'community', 'author', 'extensions')
+        .constantFrom('community', 'community', 'community', 'community', 'owners', 'extensions')
         .map((top) => [top, ...names].join('/')),
     );
   const content = fc.oneof(
@@ -432,7 +432,7 @@ describe('rebuilding the projections', () => {
       one.oid,
       admin,
       [
-        { path: 'author/10-overview.md', content: 'Authors\n' },
+        { path: 'owners/10-overview.md', content: 'Authors\n' },
         { path: 'versions/v_k3x9q2ab.json', content: '{"kind":"preprint","label":"arXiv v1"}\n' },
       ],
       'Author section',
@@ -537,7 +537,7 @@ describe('commitPage', () => {
 
     for (const [actor, path] of [
       [person, '.potentialpaper/metadata.json'],
-      [person, 'author/10-overview.md'],
+      [person, 'owners/10-overview.md'],
       [unverified, 'community/10-summary.md'],
       [admin, 'extensions/x/data.json'],
       [admin, 'README.md'],
@@ -554,14 +554,14 @@ describe('commitPage', () => {
         person,
         [
           { path: 'community/10-summary.md', content: 'x' },
-          { path: 'author/10-overview.md', content: 'x' },
+          { path: 'owners/10-overview.md', content: 'x' },
         ],
         'Edit',
       ),
     );
     expect(await getDb().select().from(pageObjects)).toEqual([]);
 
-    await commitPage(paperId, null, admin, [{ path: 'author/10-overview.md', content: 'x' }], 'Edit');
+    await commitPage(paperId, null, admin, [{ path: 'owners/10-overview.md', content: 'x' }], 'Edit');
     await commitPage(
       paperId,
       await readHead(getDb(), paperId),
@@ -850,14 +850,14 @@ describe('revert', () => {
       paperId,
       one.oid,
       admin,
-      [{ path: 'author/10-overview.md', content: 'B\n' }],
+      [{ path: 'owners/10-overview.md', content: 'B\n' }],
       'Author',
     );
     expect((await refusal(revertCommit(paperId, author.oid!, person))).code).toBe('forbidden');
     await revertCommit(paperId, one.oid!, person);
     // The summary someone wrote goes; the starter files stay, as the metadata does.
     expect([...filesAt(await exportRepo(paperId)).keys()].sort(byBytes)).toEqual(
-      firstPaths('author/10-overview.md').filter((path) => path !== 'community/10-summary.md'),
+      firstPaths('owners/10-overview.md').filter((path) => path !== 'community/10-summary.md'),
     );
     expect((await refusal(revertCommit(paperId, 'd'.repeat(40), person))).code).toBe('not_found');
   });

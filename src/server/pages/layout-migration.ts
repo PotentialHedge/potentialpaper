@@ -1,5 +1,6 @@
 import { linkProblem, type TitleLink } from '@/lib/paper-links';
 import { encodeVersionFile, parseVersionFile, type PaperVersion } from '@/lib/versions';
+import { OWNERS_DIR, type PageKind } from '@/lib/kinds';
 import type { FileChange } from './commit';
 import { linkChanges, versionChanges } from './content';
 import { shiftHeadings, splitSections } from './markdown';
@@ -12,7 +13,6 @@ import {
   layoutProblem,
   layoutVersionOf,
   METADATA_PATH,
-  PAGE_PARTS,
   PAPER_PDF_PATH,
   PDF_PATH,
   PDF_TYPE,
@@ -32,6 +32,8 @@ import { planSections } from './sections';
  */
 
 const MOVED: Record<string, string> = { 'metadata.json': METADATA_PATH, 'pdf.json': PDF_PATH };
+/** A paper's parts in the first layout, before layout 4 named the owners' `owners/`. */
+const FIRST_PARTS = ['author', 'community'] as const;
 const OLD_LINKS = 'links.json';
 const OLD_VERSIONS = 'versions.jsonl';
 /** Reserved in the first layout and never written; links say the same now. */
@@ -85,15 +87,15 @@ export function planLayout(files: ReadonlyMap<string, string>): LayoutPlan {
       changes.push({ path, content: null }, ...versionChanges([], oldVersions(text)));
     } else if (DROPPED.has(path)) {
       changes.push({ path, content: null });
-    } else if (PAGE_PARTS.some((part) => path === `${part}/page.md`)) {
-      const part = PAGE_PARTS.find((p) => path === `${p}/page.md`)!;
+    } else if (FIRST_PARTS.some((part) => path === `${part}/page.md`)) {
+      const part = FIRST_PARTS.find((p) => path === `${p}/page.md`)!;
       // Sections were `##` headings; now each is a file whose title is its `#` heading.
       const parts = splitSections(shiftHeadings(text, -1)).map((section) => ({
         title: section.title ?? 'Introduction',
         text: section.text,
       }));
       changes.push({ path, content: null }, ...planSections([], part, 0, 0, parts));
-    } else if (layoutProblem(path)) {
+    } else if (layoutProblem(path) && !path.startsWith('author/')) {
       left.push(path);
     }
   }
@@ -197,4 +199,33 @@ export function planLfs(files: ReadonlyMap<string, string>): LfsPlan {
     );
   }
   return { changes, stored };
+}
+
+/** The owners' folder each kind had before layout 4. */
+const OLD_OWNERS: Record<PageKind, string | null> = {
+  paper: 'author',
+  venue: 'organizers',
+  org: 'members',
+  user: 'about',
+  topic: null,
+};
+
+/**
+ * To layout 4: the owners' part moved from the folder its kind had (`author/`, `organizers/`, `members/`, `about/`) to
+ * `owners/`, as it is on every kind now, and layout 4 in `metadata.json`. Pure: `scripts/migrate-page-owners.ts`
+ * commits what this says. None if the page is there.
+ */
+export function planOwners(kind: PageKind, files: ReadonlyMap<string, string>): FileChange[] {
+  const changes: FileChange[] = [];
+  const metadata = files.get(METADATA_PATH);
+  if (metadata === undefined || (layoutVersionOf(metadata) ?? 0) >= 4) return changes;
+  const old = OLD_OWNERS[kind];
+  for (const [path, text] of files) {
+    if (old && path.startsWith(`${old}/`)) {
+      changes.push({ path, content: null }, { path: `${OWNERS_DIR}/${path.slice(old.length + 1)}`, content: text });
+    }
+  }
+  const stamped = withLayoutVersion(metadata, 4);
+  if (stamped) changes.push({ path: METADATA_PATH, content: stamped });
+  return changes;
 }

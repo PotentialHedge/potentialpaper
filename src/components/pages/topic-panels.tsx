@@ -24,8 +24,8 @@ export interface TopicView {
   papers: PresentedTopicPapers;
 }
 
-/** Its other names, where it is edited, and whether it is protected. */
-export function TopicAbout({ pageKey, topic }: KindPanelProps) {
+/** Its other names, and whether it is protected. */
+export function TopicAbout({ topic }: KindPanelProps) {
   if (!topic) return null;
   const { aliases, protection, mergedFrom } = topic.overview;
   const facts: ReactNode[] = [];
@@ -33,7 +33,6 @@ export function TopicAbout({ pageKey, topic }: KindPanelProps) {
   if (mergedFrom.length > 0) {
     facts.push(<>Merged with {mergedFrom.map((key) => formatIdentifier({ kind: 'topic', key })).join(', ')}</>);
   }
-  facts.push(<a href={`${keyedPagePath('topic', pageKey)}/edit`}>Edit this topic</a>);
   facts.push(<a href="/new/topic">New topic</a>);
   return (
     <div>
@@ -52,23 +51,6 @@ export function TopicAbout({ pageKey, topic }: KindPanelProps) {
         </p>
       )}
     </div>
-  );
-}
-
-/** The article, the community's sections; or how to start it. */
-export function TopicArticle({ communityHtml, pageKey }: KindPanelProps) {
-  return (
-    <section id="community">
-      <h2 className={ui.groupHeading}>Article</h2>
-      {communityHtml ? (
-        <div className="md" dangerouslySetInnerHTML={{ __html: communityHtml }} />
-      ) : (
-        <p className={ui.empty}>
-          Nobody has written the article yet. <a href={`${keyedPagePath('topic', pageKey)}/edit`}>Write it</a>: what it
-          is, its key ideas, its history and its open problems.
-        </p>
-      )}
-    </section>
   );
 }
 

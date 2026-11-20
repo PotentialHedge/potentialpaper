@@ -233,7 +233,7 @@ async function activateAnywhere(
     formatters = vscode.Disposable.from(
       ...roots.map((root) =>
         vscode.languages.registerDocumentFormattingEditProvider(
-          { language: 'markdown', pattern: new vscode.RelativePattern(root, '{author,community}/*.md') },
+          { language: 'markdown', pattern: new vscode.RelativePattern(root, '{owners,community}/*.md') },
           markdownFormatter(),
         ),
       ),
@@ -500,8 +500,8 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
       async (folder?: vscode.Uri) => {
         const dir = folder ? pathOf(folder) : 'community';
         const part = dir.split('/')[0];
-        if (part !== 'community' && part !== 'author') {
-          void vscode.window.showInformationMessage('Sections go in community/ or author/.');
+        if (part !== 'community' && part !== 'owners') {
+          void vscode.window.showInformationMessage('Sections go in community/ or owners/.');
           return;
         }
         const title = await vscode.window.showInputBox({

@@ -83,7 +83,7 @@ export class Preview implements vscode.Disposable {
     const file = this.sectionOf(editor);
     if (!file || !editor) {
       void vscode.window.showInformationMessage(
-        'Open a section in community/ or author/ to see it as the page will show it.',
+        'Open a section in community/ or owners/ to see it as the page will show it.',
       );
       return;
     }

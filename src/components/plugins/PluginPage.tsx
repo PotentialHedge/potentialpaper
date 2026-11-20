@@ -15,7 +15,7 @@ export interface PluginPageData {
   page: PageSummary;
   scopes: PageSummary[];
   facts: { hasScores: boolean; hasSubmissions: boolean; hasSignals: boolean };
-  /** A paper's `author/plugins.json`: the panels its authors let into the author section. */
+  /** A paper's `owners/plugins.json`: the panels its authors let into the author section. */
   authorPanels?: AuthorPanel[];
 }
 

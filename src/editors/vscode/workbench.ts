@@ -1,4 +1,4 @@
-import type { PaperId } from '@/lib/paper-ids';
+import type { PageRef } from '@/lib/kinds';
 import { siteUrl } from '@/server/site';
 import { webviewTemplate } from './csp';
 import { VSCODE_BASE } from './index';
@@ -17,7 +17,7 @@ function attribute(value: unknown): string {
     .replaceAll('>', '&gt;');
 }
 
-export function workbenchHtml(paper: PaperId & { title: string }): string {
+export function workbenchHtml(paper: PageRef & { title: string }): string {
   const site = siteUrl();
   const origin = new URL(site);
   const base = `${site}${VSCODE_BASE}`;

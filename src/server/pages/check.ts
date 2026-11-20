@@ -74,55 +74,49 @@ export const SYSTEM_ACTOR: Actor = { kind: 'system' };
  */
 export type ActorRoles = Roles & { bot: boolean; claimIdentity: string | null; kind: PageKind; established: boolean };
 
-/** Who the actor is on a page of a kind other than a paper: a user page's account, a venue's organisers. */
-async function keyedRoles(db: Reader, actor: Actor, page: PageRow): Promise<ActorRoles> {
-  const none = { owner: false, claimed: false, claimIdentity: null, kind: page.kind, established: false };
-  if (actor.kind === 'system') {
-    const { claimed } = await pageClaimRoles(db, page, null);
-    return { ...none, claimed, system: true, admin: false, verified: false, bot: false };
+/**
+ * Whether an account owns the page, by its kind's claim policy (`KINDS[kind].owners.claim`), and whether anyone does:
+ * a paper's confirmed authors (with the claim's `a_…` identity they sign with), a venue's confirmed organisers here or
+ * on the series above it (`page-claims.ts`), an org's verified members by address (`org-roles.ts`), a person's page's
+ * account. `account` is `null` for the system. A bot owns nothing.
+ */
+async function ownership(
+  db: Reader,
+  page: PageRow,
+  account: { id: string; isBot: boolean; verified: boolean; handle: string | null } | null,
+): Promise<{ owner: boolean; claimed: boolean; claimIdentity: string | null }> {
+  const person = account && !account.isBot ? account : null;
+  switch (KINDS[page.kind].owners?.claim) {
+    case 'authors': {
+      const confirmed = await db
+        .select({ accountId: authorClaims.accountId, identityId: authorClaims.identityId })
+        .from(authorClaims)
+        .where(and(eq(authorClaims.paperId, page.id), eq(authorClaims.status, 'confirmed')));
+      const claim = person ? confirmed.find((c) => c.accountId === person.id) : undefined;
+      // On their own paper an author is always named, never their handle (DESIGN.md §5.3).
+      return { owner: claim !== undefined, claimed: confirmed.length > 0, claimIdentity: claim?.identityId ?? null };
+    }
+    case 'organisers':
+      return { ...(await pageClaimRoles(db, page, person?.id ?? null)), claimIdentity: null };
+    case 'domain':
+      return {
+        owner: person !== null && person.verified && (await isOrgMember(db, page, person.id)),
+        claimed: false,
+        claimIdentity: null,
+      };
+    case 'self':
+      // A user page is its account's, and its agents' tokens act as the account.
+      return { owner: person !== null && person.handle === page.key, claimed: false, claimIdentity: null };
+    default:
+      return { owner: false, claimed: false, claimIdentity: null };
   }
-  const [account] = await db
-    .select({ isBot: accounts.isBot, verifiedAt: accounts.verifiedAt, handle: accounts.handle })
-    .from(accounts)
-    .where(eq(accounts.id, actor.accountId));
-  if (!account) throw new ApiError(404, 'not_found', 'no such account');
-  const grants = account.isBot
-    ? (
-        await db
-          .select({ pattern: botGrants.pattern })
-          .from(botGrants)
-          .where(and(eq(botGrants.accountId, actor.accountId), eq(botGrants.kind, page.kind)))
-      ).map((row) => row.pattern)
-    : [];
-  // A venue's confirmed organisers, here or on the series above it (`page-claims.ts`).
-  const claims = await pageClaimRoles(db, page, account.isBot ? null : actor.accountId);
-  // An org's verified members, by address, here or on an org above it (`org-roles.ts`).
-  const member = !account.isBot && account.verifiedAt !== null && (await isOrgMember(db, page, actor.accountId));
-  return {
-    ...none,
-    system: false,
-    admin: actor.isAdmin,
-    verified: account.isBot || account.verifiedAt !== null,
-    established: isEstablished(account.verifiedAt),
-    // A user page is its account's, and its agents' tokens act as the account.
-    owner: (page.kind === 'user' && !account.isBot && account.handle === page.key) || claims.owner || member,
-    claimed: claims.claimed,
-    bot: account.isBot,
-    grants,
-  };
 }
 
-/** Who the actor is on the page: its roles under the path rules of its kind (`rules.ts`). */
+/** Who the actor is on the page: its roles under the path rules of its kind (`rules.ts`), the same way on every kind. */
 export async function rolesOf(db: Reader, actor: Actor, pageId: string): Promise<ActorRoles> {
   const page = await mustPage(db, pageId);
-  if (page.kind !== 'paper') return keyedRoles(db, actor, page);
-  const paperId = pageId;
-  const confirmed = await db
-    .select({ accountId: authorClaims.accountId, identityId: authorClaims.identityId })
-    .from(authorClaims)
-    .where(and(eq(authorClaims.paperId, paperId), eq(authorClaims.status, 'confirmed')));
-  const claimed = confirmed.length > 0;
   if (actor.kind === 'system') {
+    const { claimed } = await ownership(db, page, null);
     return {
       system: true,
       admin: false,
@@ -131,13 +125,12 @@ export async function rolesOf(db: Reader, actor: Actor, pageId: string): Promise
       claimed,
       bot: false,
       claimIdentity: null,
-      kind: 'paper',
+      kind: page.kind,
       established: false,
     };
   }
-  const claim = confirmed.find((c) => c.accountId === actor.accountId);
   const [account] = await db
-    .select({ isBot: accounts.isBot, verifiedAt: accounts.verifiedAt })
+    .select({ isBot: accounts.isBot, verifiedAt: accounts.verifiedAt, handle: accounts.handle })
     .from(accounts)
     .where(eq(accounts.id, actor.accountId));
   if (!account) throw new ApiError(404, 'not_found', 'no such account');
@@ -147,21 +140,27 @@ export async function rolesOf(db: Reader, actor: Actor, pageId: string): Promise
         await db
           .select({ pattern: botGrants.pattern })
           .from(botGrants)
-          .where(and(eq(botGrants.accountId, actor.accountId), eq(botGrants.kind, 'paper')))
+          .where(and(eq(botGrants.accountId, actor.accountId), eq(botGrants.kind, page.kind)))
       ).map((row) => row.pattern)
     : [];
+  const verified = account.isBot || account.verifiedAt !== null;
+  const owns = await ownership(db, page, {
+    id: actor.accountId,
+    isBot: account.isBot,
+    verified: account.verifiedAt !== null,
+    handle: account.handle,
+  });
   return {
     system: false,
     admin: actor.isAdmin,
-    verified: account.isBot || account.verifiedAt !== null,
+    verified,
     established: isEstablished(account.verifiedAt),
-    owner: claim !== undefined,
-    claimed,
+    owner: owns.owner,
+    claimed: owns.claimed,
     bot: account.isBot,
     grants,
-    // On their own paper an author is always named, never their handle (DESIGN.md §5.3).
-    claimIdentity: claim?.identityId ?? null,
-    kind: 'paper',
+    claimIdentity: owns.claimIdentity,
+    kind: page.kind,
   };
 }
 

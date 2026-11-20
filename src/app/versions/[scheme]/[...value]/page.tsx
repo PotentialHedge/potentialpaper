@@ -1,13 +1,6 @@
 import type { Metadata } from 'next';
-import {
-  editHref,
-  first,
-  ToolHeader,
-  toolPaper,
-  toolPath,
-  type ToolParams,
-  type ToolSearchParams,
-} from '@/components/paper/page-tools';
+import { first, ToolHeader, toolPaper, type ToolParams, type ToolSearchParams } from '@/components/pages/page-tools';
+import { toolPath } from '@/lib/page-tools';
 import { ui } from '@/components/ui';
 import { evidenceLabel } from '@/lib/evidence';
 import type { DiffBlock, DiffPart } from '@/lib/text-diff';
@@ -19,8 +12,8 @@ export const dynamic = 'force-dynamic';
 type Props = { params: ToolParams; searchParams: ToolSearchParams };
 
 export async function generateMetadata({ params }: Props): Promise<Metadata> {
-  const { paper } = await toolPaper('versions', params);
-  return { title: `Versions of ${paper.title} · PotentialPaper`, robots: { index: false, follow: true } };
+  const { name } = await toolPaper('versions', params);
+  return { title: `Versions of ${name} · PotentialPaper`, robots: { index: false, follow: true } };
 }
 
 /** Words as they changed: removed struck through in red, added in green, the rest as it was. */
@@ -198,15 +191,19 @@ export default async function VersionsPage({ params, searchParams }: Props) {
   const a = first(query.a) ?? '';
   const b = first(query.b) ?? '';
   const found = await toolPaper('versions', params, new URLSearchParams({ a, b }).toString());
-  const versions = await currentVersions(found.paper.id);
+  const versions = await currentVersions(found.page.id);
   const comparison =
     a && b
-      ? await compareVersions(found.paper.id, { a, b }, { title: found.paper.title, abstract: found.paper.abstract })
+      ? await compareVersions(
+          found.page.id,
+          { a, b },
+          { title: found.paper.paper.title, abstract: found.paper.paper.abstract },
+        )
       : null;
-  const pagePath = toolPath('versions', found.id);
+  const pagePath = toolPath('versions', found.address);
   return (
     <main className={ui.page}>
-      <ToolHeader paper={found} tool="versions" title="Comparing versions" />
+      <ToolHeader page={found} tool="versions" title="Comparing versions" />
       {versions.length < 2 ? (
         <p className={ui.empty}>
           This paper has {versions.length === 0 ? 'no versions' : 'one version'} recorded, so there is nothing to
@@ -236,7 +233,7 @@ export default async function VersionsPage({ params, searchParams }: Props) {
                   <Marked parts={comparison.title} />
                 ) : (
                   <>
-                    {comparison.a.title ?? found.paper.title} <span className={ui.badge}>unchanged</span>
+                    {comparison.a.title ?? found.paper.paper.title} <span className={ui.badge}>unchanged</span>
                   </>
                 )}
               </p>
@@ -254,7 +251,7 @@ export default async function VersionsPage({ params, searchParams }: Props) {
               <TextSection
                 text={comparison.text}
                 labels={[comparison.a.label, comparison.b.label]}
-                editPath={editHref(found.id)}
+                editPath={toolPath('code', found.address)}
               />
             </>
           )}

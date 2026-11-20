@@ -327,7 +327,7 @@ the main text. \`pp.context.surface.size\` is the frame's \`{ width, height }\` 
 \`pp.ui.onResize(size => …)\` tells you when it changes (the column, the window, or your own height). Lay out by the
 width: the height is the one you ask for.
 
-**The author section.** A paper's confirmed authors may let panels into their section with \`author/plugins.json\`
+**The author section.** A paper's confirmed authors may let panels into their section with \`owners/plugins.json\`
 in the paper's repo: \`{ "panels": [{ "panel": "<plugin id>.<panel id>", "settings": { … } }] }\` (up to 8). A
 panel shows there only if its manifest offers \`"slot": { "paper": "author" }\`, the authors list it, and the reader
 has the plugin installed: listing it installs nothing. It may read what it may read anywhere; nothing a plugin does

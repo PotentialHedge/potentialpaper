@@ -1,18 +1,13 @@
-import type { ComponentType, ReactNode } from 'react';
-import { ArrangedPanels } from '@/components/ArrangedPanels';
-import { ArrangedTabs } from '@/components/ArrangedTabs';
+import type { ComponentType } from 'react';
 import { ui } from '@/components/ui';
-import { type KeyedKind, KINDS, pagePath } from '@/lib/kinds';
-import { slotPanels } from '@/lib/panels';
-import type { PageLink } from '@/server/page-links';
+import { type KeyedKind, pagePath } from '@/lib/kinds';
 import type { OrgOverview } from '@/server/org-pages';
 import type { ScopePaper } from '@/server/page-members';
 import type { UserPageView } from '@/server/user-pages';
-import { LinksBox } from './LinkLists';
+import { Backlinks, Links, type PageCommon, Sections } from './common';
 import { OrgAbout, OrgDepartments, OrgPeople, OrgTopics, OrgVenues } from './org-panels';
 import {
   TopicAbout,
-  TopicArticle,
   TopicIntroduced,
   TopicNeighbours,
   TopicOrgs,
@@ -22,28 +17,20 @@ import {
   type TopicView,
 } from './topic-panels';
 import { UserActivity, UserComments, UserIdentity, UserPapers } from './user-panels';
-import { VenueAbout, VenueEditions, VenueOrganizers, VenuePapers, VenueScores } from './venue-panels';
+import { VenueAbout, VenueEditions, VenuePapers, VenueScores } from './venue-panels';
 
 /**
- * The panels of the kinds of page other than a paper (`lib/kinds.ts`), by id in `lib/panels.ts`, rendered into a
- * kind's slots: `<kind>.main` beside `<kind>.aside`, then `<kind>.tabs`. A paper's are `components/paper/slots.tsx`.
- * What each kind shows beyond these generic panels comes with its phase of `handoffs/pages.md`: a venue's are in
- * `venue-panels.tsx`, an org's in `org-panels.tsx`. As on a paper, panels are the same HTML for every reader.
+ * The panels of the kinds of page other than a paper (`lib/kinds.ts`), by id in `lib/panels.ts`: every kind's
+ * (`common.tsx`) and each kind's own (`venue-panels.tsx`, `org-panels.tsx`, `topic-panels.tsx`, `user-panels.tsx`),
+ * laid out by the page every kind shares (`PageView.tsx`). A paper's are `components/paper/slots.tsx`.
  */
 
-export interface KindPanelProps {
+export interface KindPanelProps extends PageCommon {
   kind: KeyedKind;
   /** The page's key (`iclr/2027`); not `key`, which React keeps to itself. */
   pageKey: string;
-  pageId: string;
-  name: string;
   /** Its kind file as it parses, or `null`. */
   kindFile: Record<string, unknown> | null;
-  /** The owners' part and `community/`, as rendered at their last commit. */
-  ownersHtml: string | null;
-  communityHtml: string | null;
-  linksFrom: PageLink[];
-  linksTo: PageLink[];
   /** A scope's papers, rolled up from the pages under it, and how many there are; `null` on a page that isn't one. */
   papers: { count: number; list: ScopePaper[] } | null;
   /** A person's page: what its account shows (`server/user-pages.ts`); `null` on other kinds. */
@@ -54,48 +41,7 @@ export interface KindPanelProps {
   topic: TopicView | null;
 }
 
-function Html({ html, empty }: { html: string | null; empty: ReactNode }) {
-  return html ? <div className="md" dangerouslySetInnerHTML={{ __html: html }} /> : empty;
-}
-
-function OwnersSection({ kind, ownersHtml }: KindPanelProps) {
-  const owners = KINDS[kind].owners;
-  if (!owners) return null;
-  return (
-    <section id={owners.dir}>
-      {kind !== 'user' && <h2 className={ui.groupHeading}>{owners.title}</h2>}
-      <Html
-        html={ownersHtml}
-        empty={kind === 'user' ? null : <p className={ui.empty}>Nobody has written anything here yet.</p>}
-      />
-    </section>
-  );
-}
-
-function CommunitySection({ kind, communityHtml }: KindPanelProps) {
-  if (!KINDS[kind].community) return null;
-  return (
-    <section id="community">
-      <h2 className={ui.groupHeading}>{kind === 'topic' ? 'Article' : 'Community section'}</h2>
-      <Html html={communityHtml} empty={<p className={ui.empty}>Nobody has written anything here yet.</p>} />
-    </section>
-  );
-}
-
-/** What the kind file says, in a line: a venue's is `VenueAbout`, an org's `OrgAbout`, a topic's `TopicAbout`. */
-function About() {
-  return null;
-}
-
-function Links({ linksFrom }: KindPanelProps) {
-  return <LinksBox links={linksFrom} direction="from" />;
-}
-
-function Backlinks({ linksTo }: KindPanelProps) {
-  return <LinksBox links={linksTo} direction="to" />;
-}
-
-/** A scope's papers (`page_members`), rolled up: its editions', narrower topics', labs'. */
+/** A scope's papers (`page_members`), rolled up: its departments' and labs'. */
 function Papers({ papers }: KindPanelProps) {
   if (!papers) return null;
   if (papers.count === 0) return <p className={ui.empty}>No papers here yet.</p>;
@@ -117,99 +63,51 @@ function Papers({ papers }: KindPanelProps) {
   );
 }
 
-const PANELS: Record<string, ComponentType<KindPanelProps>> = {
-  about: About,
-  organizers: OwnersSection,
-  members: OwnersSection,
-  community: CommunitySection,
+const COMMON: Record<string, ComponentType<KindPanelProps>> = {
+  sections: Sections,
   links: Links,
   backlinks: Backlinks,
-  papers: Papers,
 };
 
-/**
- * A person's page (`user-panels.tsx`): `about` is its owners' part, the person's own words; the rest is what the
- * account chose to show.
- */
-const USER_PANELS: Record<string, ComponentType<KindPanelProps>> = {
-  ...PANELS,
-  identity: UserIdentity,
-  about: OwnersSection,
-  papers: UserPapers,
-  activity: UserActivity,
-  comments: UserComments,
+/** Each kind's panels by id: every kind's, and its own. */
+export const KIND_PANELS: Record<KeyedKind, Record<string, ComponentType<KindPanelProps>>> = {
+  // Its editions, its review scores, its submissions by status.
+  venue: { ...COMMON, about: VenueAbout, editions: VenueEditions, scores: VenueScores, papers: VenuePapers },
+  // Its names, the papers that introduced it, its neighbouring topics, venues and organisations, its papers
+  // (sortable) and what might belong here.
+  topic: {
+    ...COMMON,
+    about: TopicAbout,
+    introduced: TopicIntroduced,
+    topics: TopicNeighbours,
+    venues: TopicVenues,
+    orgs: TopicOrgs,
+    papers: TopicPapers,
+    suggestions: TopicSuggested,
+  },
+  // Where it sits, its departments and labs, the people who show it as their institution, its venues and topics, and
+  // its papers, rolled up from its departments.
+  org: {
+    ...COMMON,
+    about: OrgAbout,
+    departments: OrgDepartments,
+    people: OrgPeople,
+    venues: OrgVenues,
+    topics: OrgTopics,
+    papers: Papers,
+  },
+  // Only what the account chose to show (DESIGN.md §5.3), and its own words.
+  user: { ...COMMON, identity: UserIdentity, papers: UserPapers, activity: UserActivity, comments: UserComments },
 };
 
 /**
  * Panels that are there only when what they show is: a person's tabs for items the account doesn't show would be
  * empty tabs, so they are left out of the slot altogether.
  */
-const PRESENT: Partial<Record<KeyedKind, Record<string, (props: KindPanelProps) => boolean>>> = {
-  user: {
-    papers: ({ user }) => user?.claimedPapers != null,
-    activity: ({ user }) => user?.activity != null,
-    comments: ({ user }) => user?.comments != null,
-  },
-};
-
-/**
- * A venue's own panels (`venue-panels.tsx`): its editions, its organisers' claim, its review scores, its submissions by
- * status.
- */
-const VENUE_PANELS: Record<string, ComponentType<KindPanelProps>> = {
-  ...PANELS,
-  about: VenueAbout,
-  editions: VenueEditions,
-  organizers: VenueOrganizers,
-  scores: VenueScores,
-  papers: VenuePapers,
-};
-
-/**
- * An org's own panels (`org-panels.tsx`): where it sits, its departments and labs, the people who show it as their
- * institution, and its venues and topics by count. Its papers are the generic list, rolled up from its departments.
- */
-const ORG_PANELS: Record<string, ComponentType<KindPanelProps>> = {
-  ...PANELS,
-  about: OrgAbout,
-  departments: OrgDepartments,
-  people: OrgPeople,
-  venues: OrgVenues,
-  topics: OrgTopics,
-};
-
-/**
- * A topic's own panels (`topic-panels.tsx`): its names and where it is edited, the article, the papers that introduced
- * it, its neighbouring topics, venues and organisations, its papers (sortable) and what might belong here.
- */
-const TOPIC_PANELS: Record<string, ComponentType<KindPanelProps>> = {
-  ...PANELS,
-  about: TopicAbout,
-  community: TopicArticle,
-  introduced: TopicIntroduced,
-  topics: TopicNeighbours,
-  venues: TopicVenues,
-  orgs: TopicOrgs,
-  papers: TopicPapers,
-  suggestions: TopicSuggested,
-};
-
-const KIND_PANELS: Partial<Record<KeyedKind, Record<string, ComponentType<KindPanelProps>>>> = {
-  user: USER_PANELS,
-  venue: VENUE_PANELS,
-  org: ORG_PANELS,
-  topic: TOPIC_PANELS,
-};
-
-/** A slot's panels, which the reader's settings may hide or reorder (`ArrangedPanels`, `ArrangedTabs`). */
-export function KindSlot({ slot, ...props }: KindPanelProps & { slot: 'main' | 'aside' | 'tabs' }) {
-  const panels = slotPanels(props.kind, `${props.kind}.${slot}`)
-    .filter(({ id }) => PRESENT[props.kind]?.[id]?.(props) ?? true)
-    .map(({ id, title }) => {
-      const Panel = (KIND_PANELS[props.kind] ?? PANELS)[id];
-      return { id, title, node: <Panel {...props} /> };
-    });
-  const name = `${props.kind}.${slot}`;
-  if (slot === 'tabs') return <ArrangedTabs kind={props.kind} slot={name} panels={panels} />;
-  return <ArrangedPanels kind={props.kind} slot={name} panels={panels} />;
+export function presentPanel(props: KindPanelProps, id: string): boolean {
+  if (props.kind !== 'user') return true;
+  if (id === 'papers') return props.user?.claimedPapers != null;
+  if (id === 'activity') return props.user?.activity != null;
+  if (id === 'comments') return props.user?.comments != null;
+  return true;
 }

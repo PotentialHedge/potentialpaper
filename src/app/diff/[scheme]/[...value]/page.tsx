@@ -1,13 +1,7 @@
 import type { Metadata } from 'next';
 import { notFound } from 'next/navigation';
-import {
-  first,
-  ToolHeader,
-  toolPaper,
-  toolPath,
-  type ToolParams,
-  type ToolSearchParams,
-} from '@/components/paper/page-tools';
+import { first, ToolHeader, toolPage, type ToolParams, type ToolSearchParams } from '@/components/pages/page-tools';
+import { toolPath } from '@/lib/page-tools';
 import { RevertButton } from '@/components/paper/RevertButton';
 import { ui } from '@/components/ui';
 import { claimNames } from '@/server/claims';
@@ -21,8 +15,8 @@ export const dynamic = 'force-dynamic';
 type Props = { params: ToolParams; searchParams: ToolSearchParams };
 
 export async function generateMetadata({ params }: Props): Promise<Metadata> {
-  const { paper } = await toolPaper('diff', params);
-  return { title: `A change to ${paper.title} · PotentialPaper`, robots: { index: false, follow: true } };
+  const { name } = await toolPage('diff', params);
+  return { title: `A change to ${name} · PotentialPaper`, robots: { index: false, follow: true } };
 }
 
 /** A line's look by its first character: added, removed, a hunk's header, or context. */
@@ -60,11 +54,11 @@ function Patch({ diff }: { diff: FileDiff }) {
 
 export default async function DiffPage({ params, searchParams }: Props) {
   const oid = first((await searchParams).oid) ?? '';
-  const found = await toolPaper('diff', params, `oid=${encodeURIComponent(oid)}`);
-  const commit = await findCommit(getDb(), found.paper.id, oid);
+  const found = await toolPage('diff', params, `oid=${encodeURIComponent(oid)}`);
+  const commit = await findCommit(getDb(), found.page.id, oid);
   if (!commit) notFound();
   const [diffs, handles, names] = await Promise.all([
-    diffCommits(found.paper.id, commit.parent, oid),
+    diffCommits(found.page.id, commit.parent, oid),
     handlesOf([commit.authorId]),
     claimNames([commit.authorId]),
   ]);
@@ -73,7 +67,7 @@ export default async function DiffPage({ params, searchParams }: Props) {
   const authorName = names.get(commit.authorId);
   return (
     <main className={ui.page}>
-      <ToolHeader paper={found} tool="diff" title={commit.summary} />
+      <ToolHeader page={found} tool="diff" title={commit.summary} />
       <p className="mt-3 font-sans text-sm">
         {authorName ? (
           <>
@@ -91,13 +85,14 @@ export default async function DiffPage({ params, searchParams }: Props) {
         {commit.reverts && (
           <>
             {' '}
-            · reverts <a href={toolPath('diff', found.id, `oid=${commit.reverts}`)}>{commit.reverts.slice(0, 12)}</a>
+            · reverts{' '}
+            <a href={toolPath('diff', found.address, `oid=${commit.reverts}`)}>{commit.reverts.slice(0, 12)}</a>
           </>
         )}
         {commit.parent && (
           <>
             {' '}
-            · <RevertButton paper={found.canonical} oid={oid} historyPath={toolPath('history', found.id)} />
+            · <RevertButton page={found.ref} oid={oid} historyPath={toolPath('history', found.address)} />
           </>
         )}
       </p>

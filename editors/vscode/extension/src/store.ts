@@ -29,8 +29,8 @@ interface Saved {
   dirs?: string[];
 }
 
-/** Shown even while empty, so a new page shows where things go. */
-const FOLDERS = ['author', 'community', 'links', 'versions'];
+/** Folders the site lists as places to add to, but not these, which are added to by other means. */
+const UNLISTED = new Set(['.potentialpaper', 'demos']);
 
 const encoder = new TextEncoder();
 const decoder = new TextDecoder('utf-8', { fatal: true });
@@ -133,13 +133,21 @@ export class Store {
     return null;
   }
 
+  /** The page's folders, shown even while empty so a new page shows where things go: its kind's (`areas`). */
+  folders(): string[] {
+    return Object.keys(this.workspace?.areas ?? {})
+      .filter((area) => area.endsWith('/'))
+      .map((area) => area.slice(0, -1))
+      .filter((folder) => !UNLISTED.has(folder));
+  }
+
   exists(path: string): boolean {
     const p = this.pending.get(path);
     return p ? p.content !== null : this.remote.has(path);
   }
 
   isDir(path: string): boolean {
-    if (path === '' || FOLDERS.includes(path)) return true;
+    if (path === '' || this.folders().includes(path)) return true;
     if (this.dirs.has(path)) return true;
     const prefix = `${path}/`;
     for (const p of this.paths()) if (p.startsWith(prefix)) return true;
@@ -166,7 +174,7 @@ export class Store {
       if (slash === -1) found.set(rest, vscode.FileType.File);
       else found.set(rest.slice(0, slash), vscode.FileType.Directory);
     };
-    if (dir === '') for (const folder of FOLDERS) found.set(folder, vscode.FileType.Directory);
+    if (dir === '') for (const folder of this.folders()) found.set(folder, vscode.FileType.Directory);
     for (const path of this.paths()) add(path);
     for (const d of this.dirs)
       if (d !== dir && d.startsWith(prefix)) found.set(d.slice(prefix.length).split('/')[0], vscode.FileType.Directory);

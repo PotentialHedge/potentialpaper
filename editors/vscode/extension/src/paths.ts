@@ -1,7 +1,7 @@
 /** What the extension reads from paths and addresses, apart from VS Code so it can be tested on its own. */
 
-/** A section file, which the page shows as prose: `community/10-summary.md`, `author/20-results.html`. */
-const SECTION = /^(?:author|community)\/\d{2}-[a-z0-9-]+\.(md|html)$/;
+/** A section file, which the page shows as prose: `community/10-summary.md`, `owners/20-results.html`. */
+const SECTION = /^(?:owners|community)\/\d{2}-[a-z0-9-]+\.(md|html)$/;
 
 export type SectionFormat = 'markdown' | 'html';
 

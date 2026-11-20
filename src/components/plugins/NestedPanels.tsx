@@ -39,7 +39,7 @@ export function CommunityPanels() {
   return <NestedPanels slot="paper.community" />;
 }
 
-/** At the end of the author section: only the panels its authors list in `author/plugins.json`. */
+/** At the end of the author section: only the panels its authors list in `owners/plugins.json`. */
 export function AuthorPanels() {
   return <NestedPanels slot="paper.author" />;
 }

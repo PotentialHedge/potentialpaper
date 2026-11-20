@@ -1,5 +1,13 @@
 import { z } from 'zod';
-import { canonicalPaperId, PAPER_SCHEMES, paperPath, parsePaperId, type PaperId, type PaperScheme } from './paper-ids';
+import {
+  canonicalPaperId,
+  PAPER_SCHEMES,
+  PATH_PREFIX,
+  paperPath,
+  parsePaperId,
+  type PaperId,
+  type PaperScheme,
+} from './paper-ids';
 import { HANDLE_PATTERN } from './profile';
 import { USER_SHOW, USER_SHOW_ITEMS, type UserShowItem } from './user-pages';
 
@@ -15,9 +23,13 @@ import { USER_SHOW, USER_SHOW_ITEMS, type UserShowItem } from './user-pages';
  *   page's path on the site (`/v/iclr/2027`). A paper's are its `paper_identifiers` (`arxiv:…`, `doi:…`), as before;
  *   every other kind's are made from its `key`, the `pages.key` column;
  * - **its kind file** and that file's schema: what the page is (`venue.json`: name, dates, sources);
- * - **its parts**: the folders of sections people write, the owners' (`author/`, `organizers/`, `members/`,
- *   `about/`) and `community/`, each also holding that part's `links.jsonl`. Who may write which is in `rules.ts`;
- * - **its slots**: every kind has `<kind>.main`, `<kind>.aside` and `<kind>.tabs`, and a kind may add its own;
+ * - **its parts**: the folders of sections people write, `owners/` (where the kind has owners: a paper's authors, a
+ *   venue's organisers, an org's members, a person) and `community/`, each also holding that part's `links.jsonl`.
+ *   Who may write which is in `rules.ts`;
+ * - **how its owners are confirmed** (`claim`): by an author claim, an organiser claim, an address at its domains,
+ *   or being the account; a topic has none;
+ * - **its slots**: every kind has `<kind>.main`, `<kind>.aside`, `<kind>.body` and `<kind>.tabs`, and a kind may add
+ *   its own;
  * - **which file types it allows** (`server/pages/schemas.ts`);
  * - **the context keys** it offers plugins' `when` conditions (`handoffs/plugins.md` Phase 2);
  * - **whether it is a scope**: a page with members (papers), whose lists, counts and statistics read
@@ -119,7 +131,7 @@ export const profileFileSchema = z
         ) as Record<UserShowItem, z.ZodOptional<z.ZodBoolean>>,
       )
       .optional()
-      .meta({ description: 'What the page shows beyond the handle, about/ and links.' }),
+      .meta({ description: 'What the page shows beyond the handle, owners/ and links.' }),
   })
   .meta({
     title: 'Profile',
@@ -131,8 +143,18 @@ export type VenueFile = z.output<typeof venueFileSchema>;
 export type TopicFile = z.output<typeof topicFileSchema>;
 export type OrgFile = z.output<typeof orgFileSchema>;
 
-/** The generic slots every kind has; a kind may add more (a paper's title and body). */
-export const GENERIC_SLOTS = ['main', 'aside', 'tabs'] as const;
+/** The generic slots every kind has; a kind may add more (a paper's nested ones). */
+export const GENERIC_SLOTS = ['main', 'aside', 'body', 'tabs'] as const;
+
+/** The owners' part, the same folder on every kind that has owners. */
+export const OWNERS_DIR = 'owners';
+
+/**
+ * How a kind's owners are confirmed: `authors`, a claim on one of the paper's author names (`server/claims.ts`);
+ * `organisers`, a claim an admin decides, which holds for the pages under it too (`server/page-claims.ts`);
+ * `domain`, a confirmed address at one of its domains (`server/org-roles.ts`); `self`, being the account.
+ */
+export type ClaimPolicy = 'authors' | 'organisers' | 'domain' | 'self';
 export type GenericSlot = (typeof GENERIC_SLOTS)[number];
 
 export interface KindInfo {
@@ -145,8 +167,18 @@ export interface KindInfo {
   kindFile: string;
   /** Its schema; `null` for a paper's, which is the system's snapshot. */
   kindFileSchema: z.ZodType | null;
-  /** The owners' part, if the kind has owners, and what the page calls it. */
-  owners: { dir: string; title: string } | null;
+  /**
+   * Its owners, if it has any: what the page calls them ("the authors"), and how they are confirmed. Their part is
+   * `owners/` (`OWNERS_DIR`).
+   */
+  owners: {
+    dir: typeof OWNERS_DIR;
+    /** "the authors": "From the authors", "Only the authors…". */
+    title: string;
+    /** Who they are, as a refusal says it: "confirmed authors". */
+    noun: string;
+    claim: ClaimPolicy;
+  } | null;
   /** Whether it has a `community/` part. */
   community: boolean;
   /** Its slots, by full name: `venue.main`. */
@@ -175,9 +207,9 @@ export const KINDS: Record<PageKind, KindInfo> = {
     route: '/abs',
     kindFile: '.potentialpaper/metadata.json',
     kindFileSchema: null,
-    owners: { dir: 'author', title: 'Author section' },
+    owners: { dir: OWNERS_DIR, title: 'the authors', noun: 'confirmed authors', claim: 'authors' },
     community: true,
-    slots: slots('paper', ['title', 'body', 'submission', 'community', 'author']),
+    slots: slots('paper', ['title', 'submission', 'community', 'author']),
     fileTypes: [
       'section',
       'labeledLink',
@@ -200,7 +232,7 @@ export const KINDS: Record<PageKind, KindInfo> = {
     route: '/v',
     kindFile: 'venue.json',
     kindFileSchema: venueFileSchema,
-    owners: { dir: 'organizers', title: 'Organisers' },
+    owners: { dir: OWNERS_DIR, title: 'the organisers', noun: 'confirmed organisers', claim: 'organisers' },
     community: true,
     slots: slots('venue'),
     fileTypes: ['section', 'labeledLink', 'venue'],
@@ -228,7 +260,7 @@ export const KINDS: Record<PageKind, KindInfo> = {
     route: '/o',
     kindFile: 'org.json',
     kindFileSchema: orgFileSchema,
-    owners: { dir: 'members', title: 'Members' },
+    owners: { dir: OWNERS_DIR, title: 'the members', noun: 'verified members', claim: 'domain' },
     community: true,
     slots: slots('org'),
     fileTypes: ['section', 'labeledLink', 'org'],
@@ -242,7 +274,7 @@ export const KINDS: Record<PageKind, KindInfo> = {
     route: '/u',
     kindFile: 'profile.json',
     kindFileSchema: profileFileSchema,
-    owners: { dir: 'about', title: 'About' },
+    owners: { dir: OWNERS_DIR, title: 'the person', noun: 'account', claim: 'self' },
     community: false,
     slots: slots('user'),
     fileTypes: ['section', 'labeledLink', 'profile'],
@@ -256,7 +288,7 @@ export const KINDS: Record<PageKind, KindInfo> = {
 export const KEYED_KINDS = PAGE_KINDS.filter((kind) => kind !== 'paper') as Exclude<PageKind, 'paper'>[];
 export type KeyedKind = Exclude<PageKind, 'paper'>;
 
-/** The folders of a kind's sections, owners' first: `['author', 'community']` on a paper. */
+/** The folders of a kind's sections, owners' first: `['owners', 'community']` on a paper. */
 export function partsOf(kind: PageKind): string[] {
   const { owners, community } = KINDS[kind];
   return [...(owners ? [owners.dir] : []), ...(community ? ['community'] : [])];
@@ -312,6 +344,51 @@ export function keyedPagePath(kind: KeyedKind, key: string): string {
 /** Any page's address on the site. */
 export function pagePath(address: PageAddress): string {
   return address.kind === 'paper' ? paperPath(address.id) : keyedPagePath(address.kind, address.key);
+}
+
+/**
+ * A page as the API and the web editor name it, a scheme and a value: a paper by an identifier (`arxiv`,
+ * `1706.03762`), any other kind by its kind and key (`venue`, `iclr/2027`). Its identifier is `<scheme>:<value>`.
+ */
+export interface PageRef {
+  scheme: string;
+  value: string;
+}
+
+/** Every scheme a `PageRef` may have. */
+export const PAGE_SCHEMES = [...PAPER_SCHEMES, ...(PAGE_KINDS.filter((kind) => kind !== 'paper') as KeyedKind[])];
+
+export function pageRefOf(address: PageAddress): PageRef {
+  return address.kind === 'paper'
+    ? { scheme: address.id.scheme, value: address.id.value }
+    : { scheme: address.kind, value: address.key };
+}
+
+/** The address a `PageRef` names, or `null` if it names none. */
+export function addressOfRef({ scheme, value }: PageRef): PageAddress | null {
+  return parseIdentifier(`${scheme}:${value}`);
+}
+
+/**
+ * The address a path on the site names, by its first segment and the rest (`v`, `['iclr', '2027']`): what the page
+ * tools (`/history/v/iclr/2027`) put after their own name. `null` if it names none.
+ */
+export function addressOfPath(prefix: string, segments: readonly string[]): PageAddress | null {
+  let raw: string;
+  try {
+    raw = segments.map(decodeURIComponent).join('/');
+  } catch {
+    return null;
+  }
+  const scheme = PAPER_SCHEMES.find((s) => PATH_PREFIX[s] === `/${prefix}`);
+  if (scheme) {
+    const id = parsePaperId(scheme, raw);
+    return id ? { kind: 'paper', id } : null;
+  }
+  const kind = KEYED_KINDS.find((k) => KINDS[k].route === `/${prefix}`);
+  if (!kind) return null;
+  const key = kind === 'user' ? raw.toLowerCase() : raw;
+  return keyProblem(kind, key) ? null : { kind, key };
 }
 
 /** A paper page's address among its identifiers: the canonical one. */

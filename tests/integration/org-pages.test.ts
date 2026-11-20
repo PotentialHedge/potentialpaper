@@ -264,18 +264,12 @@ describe('an org', () => {
         eth.id,
         await head(),
         ada.actor,
-        [{ path: 'members/10-about.md', content: '# About\n\nUs.\n' }],
+        [{ path: 'owners/10-about.md', content: '# About\n\nUs.\n' }],
         'About',
       ),
     ).toMatchObject({ status: 'committed' });
     await expect(
-      commitPage(
-        eth.id,
-        await head(),
-        bob.actor,
-        [{ path: 'members/10-about.md', content: '# About\n\nThem.\n' }],
-        'x',
-      ),
+      commitPage(eth.id, await head(), bob.actor, [{ path: 'owners/10-about.md', content: '# About\n\nThem.\n' }], 'x'),
     ).rejects.toMatchObject({ status: 403 });
     // Anyone verified writes community/.
     expect(

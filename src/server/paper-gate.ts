@@ -31,6 +31,11 @@ export async function paperGate(pathname: string, options: LookupOptions = {}): 
   const found = await lookupPaper(id, options);
   if (found.status === 'missing') return { action: 'missing' };
   if (found.status === 'unavailable') return { action: 'unavailable' };
-  if (found.merged) return { action: 'redirect', to: paperPath(canonicalPaperId(found.identifiers) ?? id) };
+  // A duplicate's address, or another identifier of the paper (its DOI, its OpenReview forum): the page is at its
+  // canonical address only, so every other one leads there.
+  const canonical = canonicalPaperId(found.identifiers) ?? id;
+  if (found.merged || canonical.scheme !== id.scheme || canonical.value !== id.value) {
+    return { action: 'redirect', to: paperPath(canonical) };
+  }
   return { action: 'render' };
 }

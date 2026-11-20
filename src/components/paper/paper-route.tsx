@@ -2,24 +2,26 @@ import 'katex/dist/katex.min.css';
 import { eq, sql } from 'drizzle-orm';
 import type { Metadata } from 'next';
 import { cache } from 'react';
+import { buildPanels } from '@/components/pages/common';
+import { PageActions } from '@/components/pages/PageActions';
+import { PageHeader, PageView } from '@/components/pages/PageView';
+import type { PluginPageData } from '@/components/plugins/PluginPage';
 import { ui } from '@/components/ui';
 import { agentPaperPath, canonicalPaperId, paperPath, parsePaperId, type PaperScheme } from '@/lib/paper-ids';
 import { getDb } from '@/db';
 import { pageCurrent, pdfDocuments } from '@/db/schema';
-import { confirmedAuthors } from '@/server/claims';
 import { findPaper, type FoundPaper } from '@/server/papers';
 import { submissionsOf } from '@/server/submissions';
 import { bibtex, titleLinks } from '@/lib/paper-links';
 import { sortVersions } from '@/lib/versions';
 import { DemoFrames } from './DemoFrames';
-import { toolPath } from './page-tools';
-import { Slot } from './slots';
-import { TitleActions } from './TitleActions';
+import { PAPER_PANELS } from './slots';
 import { cloneAddresses } from '@/server/pages/clone';
 import { linksFrom as pageLinksFrom, linksTo as pageLinksTo } from '@/server/page-links';
-import { PluginPageProvider, type PluginPageData } from '@/components/plugins/PluginPage';
 import { pageHasSignals } from '@/server/signals';
 import { formatIdentifier, pagePath } from '@/lib/kinds';
+import { toolPath } from '@/lib/page-tools';
+import { ownersOf } from '@/server/owners';
 import { scopesOfPage, submissionsHaveScores } from '@/server/plugins/pages';
 import { siteUrl } from '@/server/site';
 import { badgeMarkdown, badgeUrl, previewMetadata, shortIdOf, shortUrl } from '@/server/share';
@@ -57,7 +59,10 @@ export async function paperMetadata(scheme: PaperScheme, segments: string[]): Pr
 
 export async function PaperRoute({ scheme, segments }: { scheme: PaperScheme; segments: string[] }) {
   const { paper, identifiers } = await load(scheme, segments);
-  const [[current], submissions, authors] = await Promise.all([
+  const canonical = canonicalPaperId(identifiers) ?? identifiers[0];
+  const address = { kind: 'paper' as const, id: canonical };
+  const pageRow = { id: paper.id, kind: 'paper' as const, key: paper.id };
+  const [[current], submissions, owners, linksFrom, linksTo, scopes, shortId, hasSignals] = await Promise.all([
     getDb()
       .select({
         pdf: pageCurrent.pdf,
@@ -73,13 +78,12 @@ export async function PaperRoute({ scheme, segments }: { scheme: PaperScheme; se
       .leftJoin(pdfDocuments, sql`${pdfDocuments.sha256} = ${pageCurrent.pdf} ->> 'sha256'`)
       .where(eq(pageCurrent.pageId, paper.id)),
     submissionsOf(paper.id),
-    confirmedAuthors(paper.id),
-  ]);
-  const [linksFrom, linksTo, scopes, shortId] = await Promise.all([
+    ownersOf(pageRow, address),
     pageLinksFrom(paper.id),
     pageLinksTo(paper.id),
-    scopesOfPage({ id: paper.id, kind: 'paper', key: paper.id }),
+    scopesOfPage(pageRow),
     shortIdOf(paper.id),
+    pageHasSignals({ id: paper.id, kind: 'paper' }),
   ]);
   // The authors' choice of picture wins over the PDF's first page.
   const picture = current?.thumbnail
@@ -91,7 +95,16 @@ export async function PaperRoute({ scheme, segments }: { scheme: PaperScheme; se
     : current?.cover
       ? { url: current.cover, alt: null, caption: "The paper's first page." }
       : null;
-  const panel = {
+  const props = {
+    kind: 'paper' as const,
+    address,
+    pageId: paper.id,
+    name: paper.title,
+    ownersHtml: current?.authorHtml ?? null,
+    communityHtml: current?.communityHtml ?? null,
+    linksFrom,
+    linksTo,
+    owners,
     paper,
     identifiers,
     pdf: current?.pdf ?? null,
@@ -99,15 +112,9 @@ export async function PaperRoute({ scheme, segments }: { scheme: PaperScheme; se
     cover: current?.cover ?? null,
     submissions,
     versions: sortVersions(current?.versions ?? []),
-    confirmedAuthors: authors,
-    canonical: canonicalPaperId(identifiers) ?? identifiers[0],
-    authorHtml: current?.authorHtml ?? null,
-    communityHtml: current?.communityHtml ?? null,
-    linksFrom,
-    linksTo,
+    canonical,
   };
   // What the page's plugins are told about it (`components/plugins/`).
-  const address = { kind: 'paper' as const, id: panel.canonical };
   const plugins: PluginPageData = {
     kind: 'paper',
     page: {
@@ -121,7 +128,7 @@ export async function PaperRoute({ scheme, segments }: { scheme: PaperScheme; se
     facts: {
       hasSubmissions: submissions.length > 0,
       hasScores: submissionsHaveScores(submissions),
-      hasSignals: await pageHasSignals({ id: paper.id, kind: 'paper' }),
+      hasSignals,
     },
     authorPanels: current?.authorPlugins ?? [],
   };
@@ -133,10 +140,12 @@ export async function PaperRoute({ scheme, segments }: { scheme: PaperScheme; se
     forums: submissions.map((s) => s.url),
   };
   return (
-    <main className={ui.page}>
-      <PluginPageProvider data={plugins}>
-        <article>
-          <h1 className="mt-6 text-center text-[26px] leading-tight font-normal">{paper.title}</h1>
+    <PageView
+      kind="paper"
+      plugins={plugins}
+      panels={buildPanels('paper', PAPER_PANELS, props)}
+      header={
+        <PageHeader title={paper.title}>
           <p className="mt-3 text-center">
             {paper.authors.length > 0 ? (
               paper.authors.join(', ')
@@ -155,48 +164,30 @@ export async function PaperRoute({ scheme, segments }: { scheme: PaperScheme; se
               </a>
             ))}
           </nav>
-          <TitleActions
-            paper={panel.canonical}
-            pageId={paper.id}
-            bibtex={bibtex({ paper, identifiers })}
-            historyPath={toolPath('history', panel.canonical)}
-            agentPath={agentPaperPath(panel.canonical)}
-            share={
-              shortId === null
-                ? null
-                : {
-                    url: shortUrl(shortId),
-                    title: paper.title,
-                    badge: { image: badgeUrl(shortId), markdown: badgeMarkdown(shortId) },
-                  }
-            }
-            edit={{
-              codePath: toolPath('code', panel.canonical),
-              clone: cloneAddresses(panel.canonical),
-              hasRepo: current !== undefined,
-            }}
-          />
-          {/* The paper itself is the first tab; plugins' panels in paper.tabs are tabs beside it. */}
-          <Slot
-            name="paper.tabs"
-            {...panel}
-            lead={
-              <>
-                <div className="grid grid-cols-[minmax(0,1fr)_300px] items-start gap-8 narrow:grid-cols-1">
-                  <div>
-                    <Slot name="paper.main" {...panel} />
-                  </div>
-                  <aside className="space-y-3">
-                    <Slot name="paper.aside" {...panel} />
-                  </aside>
-                </div>
-                <Slot name="paper.body" {...panel} />
-              </>
-            }
-          />
-        </article>
-      </PluginPageProvider>
-      <DemoFrames />
-    </main>
+        </PageHeader>
+      }
+      actions={
+        <PageActions
+          pageId={paper.id}
+          historyPath={toolPath('history', address)}
+          paper={{ id: canonical, bibtex: bibtex({ paper, identifiers }), agentPath: agentPaperPath(canonical) }}
+          share={
+            shortId === null
+              ? null
+              : {
+                  url: shortUrl(shortId),
+                  title: paper.title,
+                  badge: { image: badgeUrl(shortId), markdown: badgeMarkdown(shortId) },
+                }
+          }
+          edit={{
+            codePath: toolPath('code', address),
+            clone: cloneAddresses(canonical),
+            hasRepo: current !== undefined,
+          }}
+        />
+      }
+      after={<DemoFrames />}
+    />
   );
 }

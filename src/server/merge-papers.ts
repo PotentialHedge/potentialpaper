@@ -119,7 +119,7 @@ export function foldPages(
       versionIdOf(path) ||
       versionPdfIdOf(path) ||
       isLinkPath(path) ||
-      path.startsWith('author/');
+      path.startsWith('owners/');
     const picture = path === THUMBNAIL_PATH || thumbnailImageType(path) !== null;
     if (handled || (picture && survivorHasPicture) || path.startsWith('community/') || survivor.has(path)) continue;
     changes.push({ path, content: text });

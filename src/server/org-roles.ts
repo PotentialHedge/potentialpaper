@@ -6,7 +6,7 @@ import { keysAbove } from './page-claims';
 /**
  * Who an org page's members are (`handoffs/pages.md` Phase 4): the accounts with a confirmed address at one of its
  * `org.json` `domains`, or under one (`inf.ethz.ch` under `ethz.ch`), on the page itself or on an org above it by
- * address (a lab's members include its institution's). They own its `members/` and its `org.json` (`check.ts`'s
+ * address (a lab's members include its institution's). They own its `owners/` and its `org.json` (`check.ts`'s
  * `rolesOf`), and may make departments and labs under it (`server/org-pages.ts`).
  *
  * Read from `page_current.kind_file`, written in the commit's transaction, so a domain added counts at once.
@@ -47,4 +47,15 @@ export async function domainsAbove(db: Reader, page: PageRow): Promise<string[]>
        and jsonb_typeof(c.kind_file -> 'domains') = 'array'
   `);
   return rows.map((row) => row.domain);
+}
+
+/** The domains whose confirmed addresses make someone a member: its own and those of the orgs above it. */
+export async function orgDomains(db: Reader, page: PageRow): Promise<string[]> {
+  if (page.kind !== 'org') return [];
+  const { rows } = await db.execute<{ domain: string }>(sql`
+    select jsonb_array_elements_text(kind_file -> 'domains') as domain
+      from page_current
+     where page_id = ${page.id} and jsonb_typeof(kind_file -> 'domains') = 'array'
+  `);
+  return [...new Set([...rows.map((row) => row.domain), ...(await domainsAbove(db, page))])];
 }

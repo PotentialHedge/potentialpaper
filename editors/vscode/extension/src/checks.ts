@@ -7,7 +7,7 @@ import * as prettier from 'prettier/standalone';
  * Schemas (`check-jsonschema`) are VS Code's JSON support's, read from its diagnostics (`precommit.ts`).
  */
 
-const SECTION = /^(author|community)\/[^/]+\.md$/;
+const SECTION = /^(owners|community)\/[^/]+\.md$/;
 
 /** `check-added-large-files --maxkb=256`. */
 export const MAX_ADDED_KB = 256;

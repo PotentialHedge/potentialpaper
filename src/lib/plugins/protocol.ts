@@ -193,7 +193,7 @@ export interface FrameContext {
         size: FrameSize;
         /** In the `paper.submission` slot: the submission it is drawn under, by its venue (`openreview:ICLR.cc/2027/Conference`). */
         submission?: { venue: { id: string; name: string } };
-        /** In the `paper.author` slot: what the paper's authors set for it in `author/plugins.json`. */
+        /** In the `paper.author` slot: what the paper's authors set for it in `owners/plugins.json`. */
         config?: Record<string, unknown>;
       }
     | { type: 'page'; page: string; path: string[]; size: FrameSize };

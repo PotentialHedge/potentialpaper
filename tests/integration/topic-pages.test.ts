@@ -189,7 +189,7 @@ describe('papers in a topic', () => {
     ]);
   });
 
-  it("puts a confirmed author's topic links in author/", async () => {
+  it("puts a confirmed author's topic links in owners/", async () => {
     const author = await person('ada');
     const p = await paper('2401.00003');
     // The fixture's quickest way to an author: an admin's commit isn't one, so confirm a claim by hand.
@@ -202,7 +202,7 @@ describe('papers in a topic', () => {
       body: { name: 'Mixture of experts' },
     });
     expect(linked.status).toBe(201);
-    expect(await fileAt(p, 'author/links.jsonl')).toContain('topic:mixture-of-experts');
+    expect(await fileAt(p, 'owners/links.jsonl')).toContain('topic:mixture-of-experts');
     expect(await fileAt(p, 'community/links.jsonl')).toBeNull();
   });
 });

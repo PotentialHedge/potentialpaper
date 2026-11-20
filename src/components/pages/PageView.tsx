@@ -1,0 +1,76 @@
+import type { ReactNode } from 'react';
+import { ArrangedPanels } from '@/components/ArrangedPanels';
+import { ArrangedTabs } from '@/components/ArrangedTabs';
+import { type PluginPageData, PluginPageProvider } from '@/components/plugins/PluginPage';
+import { ui } from '@/components/ui';
+import { type GenericSlot, KINDS, type PageKind } from '@/lib/kinds';
+import type { BuiltPanel } from './common';
+
+/**
+ * Every kind of page, laid out the same way (`lib/kinds.ts`): its header and the actions under it, then the page
+ * itself, `<kind>.main` beside `<kind>.aside` with `<kind>.body` below both, as the first tab, and `<kind>.tabs`
+ * panels as tabs beside it. A kind brings only its header and its panels (`paper-route.tsx`, `page-route.tsx`).
+ * Rendered once and cached, so the same for every reader: which panels show, and in what order, is the reader's
+ * settings', decided in the browser (`ArrangedPanels`, `ArrangedTabs`).
+ */
+export function PageView({
+  kind,
+  plugins,
+  header,
+  actions,
+  panels,
+  after,
+}: {
+  kind: PageKind;
+  plugins: PluginPageData;
+  header: ReactNode;
+  actions: ReactNode;
+  panels: Record<GenericSlot, BuiltPanel[]>;
+  /** After the page, outside it: a paper's demo frames. */
+  after?: ReactNode;
+}) {
+  const slot = (name: GenericSlot) => `${kind}.${name}`;
+  return (
+    <main className={ui.page}>
+      <PluginPageProvider data={plugins}>
+        <article>
+          {header}
+          {actions}
+          <ArrangedTabs
+            kind={kind}
+            slot={slot('tabs')}
+            panels={panels.tabs}
+            lead={{
+              title: KINDS[kind].title,
+              node: (
+                <>
+                  <div className="grid grid-cols-[minmax(0,1fr)_300px] items-start gap-8 narrow:grid-cols-1">
+                    <div>
+                      <ArrangedPanels kind={kind} slot={slot('main')} panels={panels.main} />
+                    </div>
+                    <aside className="space-y-3">
+                      <ArrangedPanels kind={kind} slot={slot('aside')} panels={panels.aside} />
+                    </aside>
+                  </div>
+                  <ArrangedPanels kind={kind} slot={slot('body')} panels={panels.body} />
+                </>
+              ),
+            }}
+          />
+        </article>
+      </PluginPageProvider>
+      {after}
+    </main>
+  );
+}
+
+/** A page's title block: a small line saying what it is (not on a paper, whose title says it), its name, then lines. */
+export function PageHeader({ eyebrow, title, children }: { eyebrow?: string; title: string; children?: ReactNode }) {
+  return (
+    <>
+      {eyebrow && <p className={`${ui.fine} mt-6 text-center font-sans`}>{eyebrow}</p>}
+      <h1 className={`${eyebrow ? 'mt-1' : 'mt-6'} text-center text-[26px] leading-tight font-normal`}>{title}</h1>
+      {children}
+    </>
+  );
+}

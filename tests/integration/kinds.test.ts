@@ -75,7 +75,7 @@ describe('pages', () => {
     expect(await findPage('venue:iclr/2027')).toMatchObject({ id: venue.id, kind: 'venue', key: 'iclr/2027' });
     const tree = await files(venue.id);
     expect(Object.keys(tree).sort()).toEqual(['.gitattributes', '.potentialpaper/metadata.json', 'prek.toml']);
-    expect(JSON.parse(tree['.potentialpaper/metadata.json'])).toEqual({ layout: 3, kind: 'venue', key: 'iclr/2027' });
+    expect(JSON.parse(tree['.potentialpaper/metadata.json'])).toEqual({ layout: 4, kind: 'venue', key: 'iclr/2027' });
     await expect(createPage('venue', 'ICLR 2027')).rejects.toThrow(/slugs/);
     await expect(createPage('topic', 'a/b')).rejects.toThrow(/more than 1 part/);
     await expect(createPage('user', 'x')).rejects.toThrow(/handle/);
@@ -111,7 +111,7 @@ describe('path rules per kind', () => {
     ).rejects.toMatchObject({ status: 403 });
     // A topic has no owners' part, and no paper's files.
     await expect(
-      commitPage(topic.id, null, actor, [{ path: 'author/10-x.md', content: 'x\n' }], 'x'),
+      commitPage(topic.id, null, actor, [{ path: 'owners/10-x.md', content: 'x\n' }], 'x'),
     ).rejects.toMatchObject({ status: 403 });
     await expect(
       commitPage(topic.id, null, actor, [{ path: 'versions/v_k3x9q2ab.json', content: '{}' }], 'x'),
@@ -125,7 +125,7 @@ describe('path rules per kind', () => {
     const venue = await createPage('venue', 'neurips');
     const { actor } = await person();
     await expect(
-      commitPage(venue.id, null, actor, [{ path: 'organizers/10-welcome.md', content: 'Hi\n' }], 'x'),
+      commitPage(venue.id, null, actor, [{ path: 'owners/10-welcome.md', content: 'Hi\n' }], 'x'),
     ).rejects.toMatchObject({ status: 403 });
     await expect(
       commitPage(venue.id, null, actor, [{ path: 'venue.json', content: '{ "name": "NeurIPS" }\n' }], 'x'),
@@ -147,7 +147,7 @@ describe('path rules per kind', () => {
       commitPage(venue.id, null, bot, [{ path: 'community/20-x.md', content: 'x\n' }], 'x'),
     ).resolves.toMatchObject({ status: 'committed' });
     await expect(
-      commitPage(venue.id, null, { ...actor, isAdmin: true }, [{ path: 'organizers/10-a.md', content: 'A\n' }], 'x'),
+      commitPage(venue.id, null, { ...actor, isAdmin: true }, [{ path: 'owners/10-a.md', content: 'A\n' }], 'x'),
     ).resolves.toMatchObject({ status: 'committed' });
   });
 
@@ -156,7 +156,7 @@ describe('path rules per kind', () => {
     const page = await createPage('user', account.handle);
     const { actor: other } = await person();
     await expect(
-      commitPage(page.id, null, other, [{ path: 'about/10-me.md', content: 'Not me\n' }], 'x'),
+      commitPage(page.id, null, other, [{ path: 'owners/10-me.md', content: 'Not me\n' }], 'x'),
     ).rejects.toMatchObject({ status: 403 });
     await expect(
       commitPage(page.id, null, actor, [{ path: 'community/10-me.md', content: 'x\n' }], 'x'),
@@ -169,8 +169,8 @@ describe('path rules per kind', () => {
           null,
           actor,
           [
-            { path: 'about/10-me.md', content: 'Me\n' },
-            { path: 'about/links.jsonl', content: links },
+            { path: 'owners/10-me.md', content: 'Me\n' },
+            { path: 'owners/links.jsonl', content: links },
           ],
           'About me',
         )
@@ -211,7 +211,7 @@ describe('path rules per kind', () => {
     ).rejects.toMatchObject({ message: expect.stringContaining('used twice') });
     // The authors' links are the authors'.
     await expect(
-      commitPage(paperId, null, actor, [{ path: 'author/links.jsonl', content: '' }], 'x'),
+      commitPage(paperId, null, actor, [{ path: 'owners/links.jsonl', content: '' }], 'x'),
     ).rejects.toMatchObject({ status: 403 });
   });
 });
@@ -299,8 +299,8 @@ describe('clone and push', () => {
     expect(await readHead(getDb(), venue.id)).toBe(git(['rev-parse', 'HEAD'], clone));
 
     // The organisers' part isn't theirs: refused as a web edit would be.
-    execFileSync('mkdir', ['-p', join(clone, 'organizers')]);
-    writeFileSync(join(clone, 'organizers/10-welcome.md'), 'Welcome\n');
+    execFileSync('mkdir', ['-p', join(clone, 'owners')]);
+    writeFileSync(join(clone, 'owners/10-welcome.md'), 'Welcome\n');
     git(['add', '-A'], clone);
     git(['commit', '-q', '-m', 'Welcome'], clone);
     const refused = await gitAsync(['push', 'origin', 'HEAD:main'], clone);

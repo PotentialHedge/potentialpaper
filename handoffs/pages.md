@@ -1,6 +1,6 @@
 # Handoff: pages above the paper (venues, topics, organisations, people)
 
-Status: plan, 2026-11-16. Every phase is built: 1 (the page model), 2 (venue pages), 3 (user pages), 4 (organisation
+Status: plan, 2026-11-16; the kinds were unified on 2026-11-20 (see the Log). Every phase is built: 1 (the page model), 2 (venue pages), 3 (user pages), 4 (organisation
 pages) and 5 (topic pages); see the Log. Score standing's org view, which Phase 4 unblocked, is built too
 (`handoffs/plugins.md`, Phase 6's org view). What remains is "Later" and the open questions. Read with `handoffs/plugins.md`: plugins work on every kind of
 page this plan adds.
@@ -665,3 +665,28 @@ six in `pdf-ingest.test.ts` (no poppler) and one in `follows.test.ts`. 10 tests 
 - keywords through `submission.json` into the projection and suggestions, with papers sorted by their reviews' scores.
 
 These ran against this worktree's own database, `potentialpaper_test_pages5`, through an untracked `.env`.
+
+### Unifying the kinds (2026-11-20, on `main`)
+
+Decided with Benedict: the kinds should share as much as they can, with only slight adjustments each.
+
+- **One `owners/` folder on every kind with owners** (layout 4), not `author/`, `organizers/`, `members/` and
+  `about/`. `KINDS[kind].owners` says what the page calls them and how they are confirmed (`claim`: `authors`,
+  `organisers`, `domain`, `self`); a topic has none. `npm run pages:migrate-owners` moves an existing page
+  (`planOwners`), a system commit each; run it after deploying, then purge the edge cache. The web editor's extension
+  knows `owners/`; rebuild it (`scripts/build-web-editor.sh`).
+- **One table of path rules per kind** (`rules.ts`, `rulesOf`): each rule decides both the layout and who writes.
+- **One `rolesOf`** (`check.ts`), with ownership by the kind's claim policy; **`server/owners.ts`** is what a page
+  says about its owners.
+- **One page** (`components/pages/PageView.tsx`) for every kind: header, actions (`PageActions`: edit, share, history,
+  and on a paper cite, follow and for agents), the page as the first tab (`main`, `aside`, `body`) and `tabs` beside
+  it. `<kind>.body` is a slot on every kind now. The **sections are one panel** (`sections`, `components/pages/common.tsx`):
+  the owners' first, labelled, then the community's; unowned, one line asks the owners in. Panel ids `author`,
+  `community`, `organizers`, `members` and a person's `about` became `sections`, so readers' orders for those reset.
+- **The page tools work on every kind** (`lib/page-tools.ts`, `components/pages/page-tools.tsx`): `/code`, `/history`,
+  `/diff`, `/claim` in front of any page's address (`/history/v/iclr/2027`); `/versions` is a paper's. `/claim/venue/…`
+  is now `/claim/v/…`. The workspace API and revert take any page as `{ scheme, value }` (`venue`, `iclr/2027`).
+- **A paper's other identifiers redirect** to its canonical address (`paper-gate.ts`).
+
+Not done: `author_claims` and `page_claims` stay two tables (a paper's claims carry per-claim identities and author
+indexes); the admin queue is still two lists.

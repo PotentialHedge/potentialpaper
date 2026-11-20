@@ -9,6 +9,8 @@ import { gitObject, parseMessage } from './pages/git-objects';
 import { mergeWithMarkers } from './pages/merge';
 import { findCommit, readCommit, readFiles, readHead, readObject, readText } from './pages/repo';
 import { starterFiles } from './pages/starter';
+import { mustPage } from './pages/kinds';
+import { KINDS, type PageKind, partsOf } from '@/lib/kinds';
 import { encodeLfsPointer, lfsKindOf, parseLfsPointer, pathDenied } from './pages/rules';
 
 /**
@@ -34,18 +36,25 @@ export interface WorkspaceFile {
 }
 
 /**
- * Where a viewer may add files, by folder (or file, for the root's), and why not: so the editor can say so up
- * front. The commit decides in the end.
+ * Where a viewer may add files on a page of this kind, by folder (or file, for the root's), each with a sample path to
+ * ask the rules about, so the editor can say up front where they can't. The commit decides in the end.
  */
-const AREAS: Record<string, string> = {
-  'community/': 'community/10-new.md',
-  'author/': 'author/10-new.md',
-  'versions/': 'versions/v_aaaaaaaa.json',
-  'links/': 'links/10-new.json',
-  'thumbnail.json': 'thumbnail.json',
-  'demos/': 'demos/new/index.html',
-  '.potentialpaper/': '.potentialpaper/metadata.json',
-};
+function areasOf(kind: PageKind): Record<string, string> {
+  const areas: Record<string, string> = {};
+  for (const part of partsOf(kind)) areas[`${part}/`] = `${part}/10-new.md`;
+  if (kind === 'paper') {
+    Object.assign(areas, {
+      'versions/': 'versions/v_aaaaaaaa.json',
+      'links/': 'links/10-new.json',
+      'thumbnail.json': 'thumbnail.json',
+      'demos/': 'demos/new/index.html',
+    });
+  } else {
+    areas[KINDS[kind].kindFile] = KINDS[kind].kindFile;
+  }
+  areas['.potentialpaper/'] = '.potentialpaper/metadata.json';
+  return areas;
+}
 
 export interface Workspace {
   /** The commit the files are at: send it back as the commit's base. `null` for a page with no history yet. */
@@ -59,21 +68,22 @@ export interface Workspace {
 const NOT_SIGNED_IN = 'sign in to edit';
 
 export async function readWorkspace(
-  paperId: string,
+  pageId: string,
   actor: Actor | null,
   database: Database = getDb(),
 ): Promise<Workspace> {
-  const roles = actor ? await rolesOf(database, actor, paperId) : null;
-  const denied = (path: string) => (roles ? pathDenied(path, roles) : NOT_SIGNED_IN);
-  const head = await readHead(database, paperId);
-  const tree = head ? await readFiles(database, paperId, (await readCommit(database, paperId, head)).tree) : new Map();
+  const { kind } = await mustPage(database, pageId);
+  const roles = actor ? await rolesOf(database, actor, pageId) : null;
+  const denied = (path: string) => (roles ? pathDenied(path, roles, kind) : NOT_SIGNED_IN);
+  const head = await readHead(database, pageId);
+  const tree = head ? await readFiles(database, pageId, (await readCommit(database, pageId, head)).tree) : new Map();
 
   const files: WorkspaceFile[] = [];
   const pointers = new Map<string, { sha256: string; bytes: number }>();
   let inline = 0;
   for (const [path, oid] of [...tree].sort(([a], [b]) => a.localeCompare(b, 'en'))) {
     const file: WorkspaceFile = { path, oid, readonly: denied(path) };
-    const body = inline < INLINE_BYTES || lfsKindOf(path) ? (await readObject(database, paperId, oid))?.body : null;
+    const body = inline < INLINE_BYTES || lfsKindOf(path) ? (await readObject(database, pageId, oid))?.body : null;
     if (body) {
       const text = body.toString('utf8');
       const pointer = lfsKindOf(path) ? parseLfsPointer(text) : null;
@@ -91,7 +101,7 @@ export async function readWorkspace(
   // A page without a repo yet shows the files its first commit will start with (`starter.ts`), so the editor
   // opens on its empty sections; untouched, they are written by that commit as they are.
   if (!head) {
-    for (const [path, text] of starterFiles()) {
+    for (const [path, text] of starterFiles(kind)) {
       files.push({ path, oid: gitObject('blob', Buffer.from(text)).oid, text, readonly: denied(path) });
     }
     files.sort((a, b) => a.path.localeCompare(b.path, 'en'));
@@ -108,13 +118,13 @@ export async function readWorkspace(
     head,
     files,
     signedIn: actor !== null,
-    areas: Object.fromEntries(Object.entries(AREAS).map(([area, sample]) => [area, denied(sample)])),
+    areas: Object.fromEntries(Object.entries(areasOf(kind)).map(([area, sample]) => [area, denied(sample)])),
   };
 }
 
 /** One blob of the page's repo, by id: public, as a clone is, and never changing. */
-export async function readBlob(paperId: string, oid: string, database: Database = getDb()): Promise<Buffer> {
-  const found = /^[0-9a-f]{40}$/.test(oid) ? await readObject(database, paperId, oid) : null;
+export async function readBlob(pageId: string, oid: string, database: Database = getDb()): Promise<Buffer> {
+  const found = /^[0-9a-f]{40}$/.test(oid) ? await readObject(database, pageId, oid) : null;
   if (found?.type !== 'blob') throw new ApiError(404, 'not_found', 'no such file in this page');
   return found.body;
 }
@@ -143,17 +153,17 @@ export function readCommitMessage(message: string): { summary: string; evidence:
 }
 
 export async function commitWorkspace(
-  paperId: string,
+  pageId: string,
   actor: Actor,
   commit: WorkspaceCommit,
   database: Database = getDb(),
 ): Promise<CommitResult> {
-  if (commit.baseOid && !(await findCommit(database, paperId, commit.baseOid))) {
+  if (commit.baseOid && !(await findCommit(database, pageId, commit.baseOid))) {
     throw new ApiError(422, 'validation_error', 'the base is not a commit of this page');
   }
   const { summary, evidence } = readCommitMessage(commit.message);
   if (!summary) throw new ApiError(422, 'validation_error', 'say what the change is, in the first line');
-  return commitPage(paperId, commit.baseOid, actor, commit.changes, summary, { evidence, database });
+  return commitPage(pageId, commit.baseOid, actor, commit.changes, summary, { evidence, database });
 }
 
 /**
@@ -161,7 +171,7 @@ export async function commitWorkspace(
  * at that path. Nothing is committed: the pointer is, with the editor's next commit.
  */
 export async function storeWorkspaceFile(
-  paperId: string,
+  pageId: string,
   actor: Actor & { kind: 'account' },
   path: string,
   bytes: Buffer,
@@ -176,7 +186,7 @@ export async function storeWorkspaceFile(
     );
   }
   // Storing is slow and leaves a file behind, so only for someone the commit would take it from.
-  await checkMayWrite(database, paperId, actor, [path]);
+  await checkMayWrite(database, pageId, actor, [path]);
   await storeLfsUpload(actor.accountId, bytes, database);
   const sha256 = createHash('sha256').update(bytes).digest('hex');
   return { pointer: encodeLfsPointer({ sha256, bytes: bytes.length }), sha256, bytes: bytes.length };
@@ -197,22 +207,22 @@ export interface RebasedFile {
  * markers for the person to settle, and the editor then commits from the new head.
  */
 export async function rebaseWorkspace(
-  paperId: string,
+  pageId: string,
   baseOid: string | null,
   changes: readonly FileChange[],
   database: Database = getDb(),
 ): Promise<{ head: string | null; files: RebasedFile[] }> {
   const filesAt = async (oid: string | null) => {
-    const commit = oid ? await findCommit(database, paperId, oid) : null;
+    const commit = oid ? await findCommit(database, pageId, oid) : null;
     if (oid && !commit) throw new ApiError(422, 'validation_error', 'the base is not a commit of this page');
-    return commit ? readFiles(database, paperId, commit.tree) : new Map<string, string>();
+    return commit ? readFiles(database, pageId, commit.tree) : new Map<string, string>();
   };
-  const head = await readHead(database, paperId);
+  const head = await readHead(database, pageId);
   const [baseFiles, headFiles] = await Promise.all([filesAt(baseOid), filesAt(head)]);
   const files: RebasedFile[] = [];
   for (const { path, content } of changes) {
-    const base = await readText(database, paperId, baseFiles.get(path));
-    const theirs = await readText(database, paperId, headFiles.get(path));
+    const base = await readText(database, pageId, baseFiles.get(path));
+    const theirs = await readText(database, pageId, headFiles.get(path));
     const merged = mergeWithMarkers(base, content, theirs, { ours: 'your change', theirs: 'the page now' });
     files.push({ path, original: theirs, content: merged.content, conflict: merged.conflict });
   }

@@ -1,10 +1,13 @@
 import { describe, expect, it } from 'vitest';
 import {
+  addressOfPath,
+  addressOfRef,
   formatIdentifier,
   KINDS,
   keyProblem,
   PAGE_KINDS,
   pagePath,
+  pageRefOf,
   parentsOf,
   parseIdentifier,
   partsOf,
@@ -39,10 +42,10 @@ describe('the kind registry', () => {
       }
       expect(CORE_SETTINGS[`${kind}.panels.hidden`]).toBeTruthy();
     }
-    expect(partsOf('paper')).toEqual(['author', 'community']);
-    expect(partsOf('venue')).toEqual(['organizers', 'community']);
+    expect(partsOf('paper')).toEqual(['owners', 'community']);
+    expect(partsOf('venue')).toEqual(['owners', 'community']);
     expect(partsOf('topic')).toEqual(['community']);
-    expect(partsOf('user')).toEqual(['about']);
+    expect(partsOf('user')).toEqual(['owners']);
     expect(kindsOfFileType('labeledLink')).toEqual(PAGE_KINDS);
     expect(kindsOfFileType('venue')).toEqual(['venue']);
     expect(kindsOfFileType('submission')).toEqual(['paper']);
@@ -109,7 +112,7 @@ describe('labeled links', () => {
 
   it('is a file type searched by its words', () => {
     expect(fileTypeOf('community/links.jsonl')).toBe('labeledLink');
-    expect(fileTypeOf('organizers/links.jsonl')).toBe('labeledLink');
+    expect(fileTypeOf('owners/links.jsonl')).toBe('labeledLink');
     expect(indexFile('community/links.jsonl', '{"id":"a","to":"topic:x","label":"in-topic","note":"Why"}\n')).toEqual([
       { kind: 'labeled-link', text: 'is about\ntopic:x\nWhy', fields: { label: 'in-topic', to: 'topic:x' } },
     ]);
@@ -122,10 +125,10 @@ describe('labeled links', () => {
 describe('path rules per kind', () => {
   it("lays out each kind's pages", () => {
     expect(layoutProblem('venue.json', 'venue')).toBeNull();
-    expect(layoutProblem('organizers/10-welcome.md', 'venue')).toBeNull();
-    expect(layoutProblem('organizers/links.jsonl', 'venue')).toBeNull();
+    expect(layoutProblem('owners/10-welcome.md', 'venue')).toBeNull();
+    expect(layoutProblem('owners/links.jsonl', 'venue')).toBeNull();
     expect(layoutProblem('community/links.jsonl', 'paper')).toBeNull();
-    expect(layoutProblem('author/links.jsonl', 'paper')).toBeNull();
+    expect(layoutProblem('owners/links.jsonl', 'paper')).toBeNull();
     expect(layoutProblem('versions/v_k3x9q2ab.json', 'venue')).toMatch(/venue pages hold/);
     expect(layoutProblem('topic.json', 'venue')).toMatch(/venue pages hold/);
     expect(layoutProblem('community/10-x.md', 'user')).toMatch(/user pages hold/);
@@ -137,12 +140,12 @@ describe('path rules per kind', () => {
     expect(pathDenied('community/10-x.md', roles(), 'topic')).toBeNull();
     expect(pathDenied('topic.json', roles(), 'topic')).toBeNull();
     expect(pathDenied('topic.json', roles({ verified: false }), 'topic')).toMatch(/confirm/);
-    expect(pathDenied('organizers/10-x.md', roles(), 'venue')).toMatch(/organisers/);
-    expect(pathDenied('organizers/10-x.md', roles({ owner: true }), 'venue')).toBeNull();
+    expect(pathDenied('owners/10-x.md', roles(), 'venue')).toMatch(/organisers/);
+    expect(pathDenied('owners/10-x.md', roles({ owner: true }), 'venue')).toBeNull();
     expect(pathDenied('venue.json', roles(), 'venue')).toMatch(/organisers/);
     expect(pathDenied('venue.json', roles({ grants: ['venue.json'] }), 'venue')).toBeNull();
     expect(pathDenied('org.json', roles({ owner: true }), 'org')).toBeNull();
-    expect(pathDenied('about/10-me.md', roles(), 'user')).toMatch(/only this account/);
+    expect(pathDenied('owners/10-me.md', roles(), 'user')).toMatch(/only this account/);
     // A person's profile.json follows their user.show.* settings: only the site writes it.
     expect(pathDenied('profile.json', roles({ owner: true }), 'user')).toMatch(/user\.show/);
     expect(pathDenied('profile.json', roles({ admin: true }), 'user')).toMatch(/user\.show/);
@@ -150,7 +153,7 @@ describe('path rules per kind', () => {
     expect(pathDenied('.potentialpaper/metadata.json', roles({ owner: true }), 'user')).toMatch(/system/);
     expect(pathDenied('extensions/x/a.json', roles({ admin: true }), 'topic')).toMatch(/reserved/);
     expect(pathDenied('community/links.jsonl', roles(), 'paper')).toBeNull();
-    expect(pathDenied('author/links.jsonl', roles(), 'paper')).toMatch(/authors/);
+    expect(pathDenied('owners/links.jsonl', roles(), 'paper')).toMatch(/authors/);
   });
 
   it('checks kind files and grants per kind', () => {
@@ -170,5 +173,46 @@ describe('path rules per kind', () => {
     expect(grantProblem('topic.json', 'topic')).toMatch(/no bot/);
     expect(grantProblem('venue.json')).not.toBeNull();
     expect(grantProblem('reviews/openreview/**')).toBeNull();
+  });
+});
+
+describe('page addresses', () => {
+  it("read a tool's path for any kind, and give the API's scheme and value", () => {
+    expect(addressOfPath('abs', ['1706.03762'])).toEqual({
+      kind: 'paper',
+      id: { scheme: 'arxiv', value: '1706.03762' },
+    });
+    expect(addressOfPath('doi', ['10.1000', 'x'])).toEqual({
+      kind: 'paper',
+      id: { scheme: 'doi', value: '10.1000/x' },
+    });
+    expect(addressOfPath('v', ['iclr', '2027'])).toEqual({ kind: 'venue', key: 'iclr/2027' });
+    expect(addressOfPath('u', ['Ada'])).toEqual({ kind: 'user', key: 'ada' });
+    expect(addressOfPath('t', ['Not A Slug'])).toBeNull();
+    expect(addressOfPath('x', ['y'])).toBeNull();
+    expect(pageRefOf({ kind: 'venue', key: 'iclr/2027' })).toEqual({ scheme: 'venue', value: 'iclr/2027' });
+    expect(addressOfRef({ scheme: 'venue', value: 'iclr/2027' })).toEqual({ kind: 'venue', key: 'iclr/2027' });
+    expect(addressOfRef({ scheme: 'arxiv', value: '1706.03762' })).toEqual({
+      kind: 'paper',
+      id: { scheme: 'arxiv', value: '1706.03762' },
+    });
+  });
+
+  it("put every kind's owners in owners/, written only by them", () => {
+    const roles = (more: Partial<Roles> = {}): Roles => ({
+      system: false,
+      admin: false,
+      verified: true,
+      owner: false,
+      claimed: false,
+      ...more,
+    });
+    for (const kind of ['paper', 'venue', 'org', 'user'] as const) {
+      expect(layoutProblem('owners/10-a.md', kind)).toBeNull();
+      expect(pathDenied('owners/10-a.md', roles(), kind)).not.toBeNull();
+      expect(pathDenied('owners/10-a.md', roles({ owner: true }), kind)).toBeNull();
+    }
+    expect(layoutProblem('owners/10-a.md', 'topic')).not.toBeNull();
+    expect(layoutProblem('author/10-a.md', 'paper')).not.toBeNull();
   });
 });

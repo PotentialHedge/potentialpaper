@@ -40,7 +40,7 @@ export default async function Profile() {
       <h2 className={ui.groupHeading}>Public profile</h2>
       <p className="mb-3 font-sans text-sm">
         Your page is <a href={keyedPagePath('user', account.handle)}>{keyedPagePath('user', account.handle)}</a>. It
-        shows your handle, what you write in its <code className={ui.mono}>about/</code>, and your links; your
+        shows your handle, what you write in its <code className={ui.mono}>owners/</code>, and your links; your
         institution only as you choose below; your real name, papers, activity and comments only as you choose under{' '}
         <Link href="/settings/public-page">Settings, “Your public page”</Link>.
       </p>

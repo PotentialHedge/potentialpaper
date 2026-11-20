@@ -1,5 +1,5 @@
 /**
- * What a person's page (`/u/<handle>`, `handoffs/pages.md` Phase 3) may show beyond its handle, its `about/` and its
+ * What a person's page (`/u/<handle>`, `handoffs/pages.md` Phase 3) may show beyond its handle, its `owners/` and its
  * links: each item is a `user.show.<item>` setting in the account's settings.json, and defaults to what DESIGN.md
  * §5.3 allows without asking, so that nothing ties the handle to a real name or an author identity unless the account
  * turns it on. **The institution is the one exception** (`handoffs/pages.md` Phase 4): it is the account's

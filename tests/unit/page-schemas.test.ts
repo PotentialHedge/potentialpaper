@@ -59,7 +59,7 @@ describe('starter files', () => {
     const files = new Map(starterFiles());
     expect(files.get('prek.toml')).toBe(prekConfig());
     expect(files.get('community/10-summary.md')).toBe('');
-    expect(files.get('author/10-tl-dr.md')).toBe('');
+    expect(files.get('owners/10-tl-dr.md')).toBe('');
     for (const path of files.keys()) expect(layoutProblem(path)).toBeNull();
   });
 
@@ -81,12 +81,12 @@ describe('starter files', () => {
     const changes = missingStarterFiles(paths, undefined);
     expect(changes.map((c) => c.path)).toEqual([
       'prek.toml',
-      'author/10-tl-dr.md',
-      'author/20-overview.md',
-      'author/30-results.md',
-      'author/40-demos.md',
-      'author/50-code-and-data.md',
-      'author/60-talks.md',
+      'owners/10-tl-dr.md',
+      'owners/20-overview.md',
+      'owners/30-results.md',
+      'owners/40-demos.md',
+      'owners/50-code-and-data.md',
+      'owners/60-talks.md',
     ]);
     const all = new Set([...paths, ...changes.map((c) => c.path)]);
     expect(missingStarterFiles(all, prekConfig())).toEqual([]);

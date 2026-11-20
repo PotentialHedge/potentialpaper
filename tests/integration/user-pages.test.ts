@@ -240,7 +240,7 @@ describe('user pages', () => {
           ada.cookie,
           PAPER,
           await base(PAPER),
-          { 'author/10-summary.md': '# Summary\n\nOurs.\n' },
+          { 'owners/10-summary.md': '# Summary\n\nOurs.\n' },
           'Summary',
         )
       ).status,
@@ -281,8 +281,8 @@ describe('user pages', () => {
           await readHead(getDb(), page.id),
           ada.actor,
           [
-            { path: 'about/10-me.md', content: '# About\n\nI work on engines.\n' },
-            { path: 'about/links.jsonl', content: `${links}\n` },
+            { path: 'owners/10-me.md', content: '# About\n\nI work on engines.\n' },
+            { path: 'owners/links.jsonl', content: `${links}\n` },
           ],
           'About me',
         )

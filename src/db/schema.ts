@@ -373,7 +373,7 @@ export const pageCurrent = pgTable('page_current', {
   head: bytea('head').notNull(),
   /**
    * Each part's section files joined, as an agent reads them (`pages/sections.ts`). `author_*` holds the owners'
-   * part of any kind (a paper's `author/`, a venue's `organizers/`, a user's `about/`; `lib/kinds.ts`).
+   * part of any kind (`owners/`, `lib/kinds.ts`).
    */
   authorMarkdown: text('author_markdown'),
   communityMarkdown: text('community_markdown'),
@@ -388,7 +388,7 @@ export const pageCurrent = pgTable('page_current', {
   links: jsonb('links').$type<TitleLink[]>(),
   /** The page's `versions/`, oldest first (`lib/versions.ts`). */
   versions: jsonb('versions').$type<PaperVersion[]>(),
-  /** A paper's `author/plugins.json`: the plugins' panels its authors let into the author section, if it parses. */
+  /** A paper's `owners/plugins.json`: the plugins' panels its authors let into the author section, if it parses. */
   authorPlugins: jsonb('author_plugins').$type<AuthorPanel[]>(),
   /**
    * A page of another kind: its kind file as it parses (`venue.json`, …, `lib/kinds.ts`), or `null` if it has none
@@ -432,7 +432,7 @@ export const pageEvents = pgTable(
  * `links` consumer (`server/page-links.ts`) and rebuildable from the repos. It answers "what links here" on a page
  * of any kind: `target` is the identifier as the line names it, in normal form, and `target_page_id` the page it
  * named when the line was indexed, if there was one then. `origin` is the part the line is in: the owners'
- * (`author/` on a paper) or `community`.
+ * (`owners/`) or `community`.
  */
 export const pageLinks = pgTable(
   'page_links',
@@ -864,7 +864,7 @@ export type PageClaimStatus = (typeof PAGE_CLAIM_STATUSES)[number];
 
 /**
  * An account's claim to be one of the owners of a page above the paper (`handoffs/pages.md`): for now a venue's
- * organisers, who write its `organizers/` and its `venue.json`. Built on the author claim flow (`server/claims.ts`),
+ * organisers, who write its `owners/` and its `venue.json`. Built on the author claim flow (`server/claims.ts`),
  * with the page as what is claimed, and confirmed by an admin (`npm run claims:decide`). An organiser of a series
  * also organises its editions (`server/page-claims.ts`). Organising is a public role, so an organiser's commits carry
  * their own `u_` identity, not a per-claim one.

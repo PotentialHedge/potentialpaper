@@ -61,7 +61,7 @@ describe('page protection', () => {
     expect(protectionHolds('admins', 'topic.json', { ...someone, admin: true }, 'topic')).toBe(false);
     expect(protectionHolds('admins', 'topic.json', { ...someone, system: true }, 'topic')).toBe(false);
     // A paper's authors keep their section; their community edits are held like anyone's.
-    expect(protectionHolds('admins', 'author/10-a.md', { ...someone, owner: true }, 'paper')).toBe(false);
+    expect(protectionHolds('admins', 'owners/10-a.md', { ...someone, owner: true }, 'paper')).toBe(false);
     expect(protectionHolds('admins', 'community/10-a.md', { ...someone, owner: true }, 'paper')).toBe(true);
     expect(
       protectionHolds('admins', 'reviews/openreview/x/submission.json', {

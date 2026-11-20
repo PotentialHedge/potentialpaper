@@ -172,6 +172,21 @@ describe('the gate in front of paper pages', () => {
     expect(await paperGate('/abs/1706.03762', { sources: { arxiv } })).toEqual({ action: 'unavailable' });
   });
 
+  it("sends a paper's other identifiers to its canonical address", async () => {
+    await savePaper({
+      ...ATTENTION,
+      identifiers: [
+        { scheme: 'arxiv', value: '1706.03762' },
+        { scheme: 'doi', value: '10.1000/attention' },
+        { scheme: 'openreview', value: 'attn123' },
+      ],
+    });
+    for (const path of ['/doi/10.1000/attention', '/openreview/attn123']) {
+      expect(await paperGate(path, noSource)).toEqual({ action: 'redirect', to: '/abs/1706.03762' });
+    }
+    expect(await paperGate('/abs/1706.03762', noSource)).toEqual({ action: 'render' });
+  });
+
   it("sends a merged duplicate's address to the survivor", async () => {
     const survivor = await savePaper(ATTENTION);
     const duplicate = await savePaper({ ...ATTENTION, identifiers: [{ scheme: 'doi', value: '10.1000/dup' }] });

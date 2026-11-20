@@ -76,6 +76,12 @@ export const Ok = z.object({ status: z.literal('ok') });
 export const IdParam = z.uuid();
 
 export const PaperIdentifier = z.object({ scheme: z.enum(['arxiv', 'doi', 'openreview']), value: z.string() });
+/**
+ * A page of any kind (`lib/kinds.ts`'s `PageRef`): a paper by an identifier, any other kind by its kind and key,
+ * `{ "scheme": "venue", "value": "iclr/2027" }`.
+ */
+export const PageSchemeParam = z.enum(['arxiv', 'doi', 'openreview', 'venue', 'topic', 'org', 'user']);
+export const PageIdentifier = z.object({ scheme: PageSchemeParam, value: z.string().min(1).max(300) });
 export const PaperResponse = z.object({
   title: z.string(),
   authors: z.array(z.string()),
@@ -141,7 +147,7 @@ const Oid = z.string().regex(/^[0-9a-f]{40}$/);
  */
 const Evidence = z.array(z.string().max(MAX_EVIDENCE_URL)).max(MAX_EVIDENCE).default([]);
 
-export const PagePartParam = z.enum(['author', 'community']);
+export const PagePartParam = z.enum(['owners', 'community']);
 
 export const SectionEditBody = z.object({
   paper: PaperIdentifier,
@@ -171,7 +177,7 @@ export const RenderBody = z.object({
 export const Rendered = z.object({ html: z.string() });
 
 export const RevertBody = z.object({
-  paper: PaperIdentifier,
+  paper: PageIdentifier,
   oid: Oid,
   summary: z.string().max(1000).optional(),
   evidence: Evidence,
@@ -284,16 +290,17 @@ export const ThumbnailFields = z.object({
 });
 
 export const PaperQuery = z.object({ scheme: PaperSchemeParam, value: z.string().min(1).max(300) });
+export const PageQuery = PageIdentifier;
 
 /** What the page's editor opens with: one section's Markdown, or the picture and links. */
 export const EditorQuery = PaperQuery.extend({
-  part: z.enum(['author', 'community', 'card', 'versions']).default('community'),
+  part: z.enum(['owners', 'community', 'card', 'versions']).default('community'),
   section: z.coerce.number().int().min(0).max(1000).default(0),
 });
 
 export const EditorOpened = z.discriminatedUnion('part', [
   z.object({
-    part: z.enum(['author', 'community']),
+    part: z.enum(['owners', 'community']),
     baseOid: z.string().nullable(),
     section: z.number().int(),
     title: z.string().nullable(),
@@ -520,7 +527,7 @@ export const AgentPostList = z.object({ posts: z.array(AgentPost) });
  * editor the site embeds speaks only this.
  */
 export const WorkspaceResponse = z.object({
-  paper: z.object({ scheme: PaperSchemeParam, value: z.string(), title: z.string(), path: z.string() }),
+  paper: z.object({ scheme: PageSchemeParam, value: z.string(), title: z.string(), path: z.string() }),
   head: z.string().nullable(),
   files: z.array(
     z.object({
@@ -537,10 +544,10 @@ export const WorkspaceResponse = z.object({
   clone: z.object({ https: z.string(), ssh: z.string().nullable() }),
 });
 
-export const WorkspaceBlobQuery = PaperQuery.extend({ oid: Oid });
+export const WorkspaceBlobQuery = PageQuery.extend({ oid: Oid });
 
 export const WorkspaceCommitBody = z.object({
-  paper: PaperIdentifier,
+  paper: PageIdentifier,
   baseOid: Oid.nullable(),
   changes: z
     .array(

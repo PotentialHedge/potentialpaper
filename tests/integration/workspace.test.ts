@@ -5,6 +5,7 @@ import { eq } from 'drizzle-orm';
 import { afterAll, beforeAll, beforeEach, describe, expect, it } from 'vitest';
 import { getDb } from '@/db';
 import { accounts, pageCurrent } from '@/db/schema';
+import { createPage } from '@/server/pages/commit';
 import { historyWithHandles } from '@/server/pages/edit';
 import { rebuildAllPages } from '@/server/pages/projections';
 import { readCommit, readFiles, readHead } from '@/server/pages/repo';
@@ -73,7 +74,7 @@ describe('the web editor workspace', () => {
     // A page without a repo shows the files its first commit starts with: empty sections, prek.toml.
     expect(before.body).toMatchObject({ head: null, signedIn: false });
     expect(before.body.files.map((f: { path: string }) => f.path)).toEqual(
-      expect.arrayContaining(['prek.toml', 'community/10-summary.md', 'author/10-tl-dr.md']),
+      expect.arrayContaining(['prek.toml', 'community/10-summary.md', 'owners/10-tl-dr.md']),
     );
     expect(before.body.files.find((f: { path: string }) => f.path === 'community/10-summary.md')).toMatchObject({
       text: '',
@@ -95,7 +96,7 @@ describe('the web editor workspace', () => {
     expect(files['community/10-summary.md'].readonly).toBeNull();
     expect(files['.potentialpaper/metadata.json'].readonly).toMatch(/only the system and admins/);
     expect(ada.body.areas['community/']).toBeNull();
-    expect(ada.body.areas['author/']).toMatch(/confirmed authors/);
+    expect(ada.body.areas['owners/']).toMatch(/confirmed authors/);
 
     const blob = await api('GET', `/workspace/blob?${new URLSearchParams({ ...PAPER, oid: summary.oid })}`);
     expect(blob.status).toBe(200);
@@ -195,7 +196,7 @@ describe('the web editor workspace', () => {
 
   it('holds commits to the rules: who may write what, and a confirmed address', async () => {
     const { ada, head } = await started();
-    const author = await commitFiles(ada, PAPER, head, { 'author/10-overview.md': '# Overview\nMine.\n' });
+    const author = await commitFiles(ada, PAPER, head, { 'owners/10-overview.md': '# Overview\nMine.\n' });
     expect(author.status).toBe(403);
     expect(author.body.error.message).toMatch(/confirmed authors/);
     const nowhere = await commitFiles(ada, PAPER, head, { 'notes.txt': 'hello' });
@@ -244,6 +245,31 @@ describe('the web editor workspace', () => {
     expect(res.body.html).not.toContain('href=');
     expect(res.body.html).toContain('katex');
     expect((await api('POST', '/pages/render', { body: { content: 'x' } })).status).toBe(401);
+  });
+});
+
+describe('the workspace on other kinds of page', () => {
+  it("opens a venue's repo, lets anyone verified write community/ but only organisers owners/, and reverts", async () => {
+    const venue = await createPage('venue', 'iclr/2027');
+    const ref = { scheme: 'venue', value: 'iclr/2027' };
+    const ada = await signUp('ada@ethz.ch');
+    const opened = await api('GET', `/workspace?${new URLSearchParams(ref)}`, { cookie: ada });
+    expect(opened.status).toBe(200);
+    expect(opened.body.paper).toMatchObject({ ...ref, path: '/v/iclr/2027' });
+    expect(opened.body.areas['community/']).toBeNull();
+    expect(opened.body.areas['owners/']).toMatch(/organisers/);
+    expect(opened.body.areas['venue.json']).toMatch(/organisers/);
+    expect(opened.body.areas).not.toHaveProperty('versions/');
+
+    const refused = await commitFiles(ada, ref, opened.body.head, { 'owners/10-welcome.md': '# Welcome\n' });
+    expect(refused.status).toBe(403);
+    const written = await commitFiles(ada, ref, opened.body.head, { 'community/10-about.md': '# About\nA venue.\n' });
+    expect(written.status).toBe(200);
+    expect((await current(venue.id)).communityHtml).toContain('A venue.');
+
+    const reverted = await api('POST', '/pages/revert', { cookie: ada, body: { paper: ref, oid: written.body.head } });
+    expect(reverted.status).toBe(200);
+    expect((await current(venue.id)).communityHtml).toBeNull();
   });
 });
 

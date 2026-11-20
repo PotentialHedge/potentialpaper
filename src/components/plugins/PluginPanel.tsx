@@ -29,7 +29,7 @@ import { usePluginPage } from './PluginPage';
  * the reader's `<kind>.panels.hidden` and `.order` arrange them by `<plugin id>.<panel id>`, and `.placement` moves
  * them to another place. A plugin the reader hasn't approved shows its consent prompt in place of each panel, rather
  * than running. In the author section (`paper.author`) only the panels the paper's authors list show
- * (`author/plugins.json`), each told what they set for it (`surface.config`).
+ * (`owners/plugins.json`), each told what they set for it (`surface.config`).
  */
 
 /**

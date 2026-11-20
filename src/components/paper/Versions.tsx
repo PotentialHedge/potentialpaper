@@ -8,7 +8,7 @@ import {
   type PaperVersion,
   type VersionStatus,
 } from '@/lib/versions';
-import { toolPath } from './page-tools';
+import { toolPath } from '@/lib/page-tools';
 import { Fold } from '@/components/paper/Fold';
 
 /**
@@ -69,7 +69,7 @@ export function VersionsSection({
             <a href="#edit" rel="nofollow">
               {versions.length > 0 ? 'edit' : 'add'}
             </a>{' '}
-            · <a href={toolPath('history', canonical)}>history</a>
+            · <a href={toolPath('history', { kind: 'paper', id: canonical })}>history</a>
           </span>
         </>
       }
@@ -84,7 +84,7 @@ export function VersionsSection({
           <code>versions/</code>.
         </p>
       ) : (
-        <form action={toolPath('versions', canonical)} method="get">
+        <form action={toolPath('versions', { kind: 'paper', id: canonical })} method="get">
           <div className={ui.tableScroll}>
             <table className={`${ui.table} font-sans text-sm`}>
               <thead>

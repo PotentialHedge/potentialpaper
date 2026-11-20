@@ -14,7 +14,7 @@ import { refreshPages } from './pages/refresh';
  * (`npm run claims:decide`). There is no automatic route yet, since nothing on a venue's page says who organised it.
  *
  * A confirmed organiser of a venue is an owner (`check.ts`'s `rolesOf`) of it **and of every venue under it**: the
- * organisers of a series (`iclr`) organise its editions (`iclr/2027`). They write its `organizers/` and its
+ * organisers of a series (`iclr`) organise its editions (`iclr/2027`). They write its `owners/` and its
  * `venue.json`. Organising is a public role, so their commits carry their own `u_` identity; still, nothing here
  * lists who the organisers are: what they write is the page.
  *

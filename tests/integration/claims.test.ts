@@ -31,7 +31,7 @@ async function accountOf(email: string) {
 }
 
 const authorEdit = (cookie: string, content: string, baseOid: string | null = null) =>
-  commitFiles(cookie, PAPER, baseOid, { 'author/10-tldr.md': content });
+  commitFiles(cookie, PAPER, baseOid, { 'owners/10-tldr.md': content });
 
 afterAll(closePool);
 beforeEach(resetDatabase);
@@ -91,10 +91,10 @@ describe('claiming a paper', () => {
     const [row] = await getDb().select().from(authorClaims).where(eq(authorClaims.paperId, paperId));
     await decideClaim(row.id, 'confirmed', null);
 
-    const file = { 'author/plugins.json': '{ "panels": [{ "panel": "o/map.minimap", "settings": { "zoom": 2 } }] }\n' };
+    const file = { 'owners/plugins.json': '{ "panels": [{ "panel": "o/map.minimap", "settings": { "zoom": 2 } }] }\n' };
     expect((await commitFiles(other.cookie, PAPER, null, file)).status).toBe(403);
     expect(
-      (await commitFiles(ashish.cookie, PAPER, null, { 'author/plugins.json': '{ "panels": [{ "panel": "x" }] }' }))
+      (await commitFiles(ashish.cookie, PAPER, null, { 'owners/plugins.json': '{ "panels": [{ "panel": "x" }] }' }))
         .status,
     ).toBe(422);
     const written = await commitFiles(ashish.cookie, PAPER, null, file);
@@ -224,13 +224,13 @@ describe('what the web editor says each viewer may change', () => {
 
     expect((await areas(''))['community/']).toBe('sign in to edit');
     expect(await areas(ada.cookie)).toMatchObject({ 'community/': null, 'thumbnail.json': null, 'links/': null });
-    expect((await areas(ada.cookie))['author/']).toMatch(/confirmed authors/);
+    expect((await areas(ada.cookie))['owners/']).toMatch(/confirmed authors/);
 
     await api('POST', '/claims', { cookie: ashish.cookie, body: { paper: PAPER, authorIndex: 0 } });
     const [claim] = await getDb().select().from(authorClaims);
     await decideClaim(claim.id, 'confirmed', null);
     expect((await areas(ada.cookie))['links/']).toMatch(/confirmed authors/);
-    expect(await areas(ashish.cookie)).toMatchObject({ 'author/': null, 'links/': null, 'thumbnail.json': null });
+    expect(await areas(ashish.cookie)).toMatchObject({ 'owners/': null, 'links/': null, 'thumbnail.json': null });
 
     await getDb().update(accounts).set({ verifiedAt: null }).where(eq(accounts.id, ada.account.id));
     expect((await areas(ada.cookie))['community/']).toMatch(/institutional email/);

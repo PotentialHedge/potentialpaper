@@ -28,7 +28,7 @@ import { userSettingsRow } from './settings';
  * account. Every account has one, made and moved with the account by triggers (migration `0037`): keyed by the
  * handle, so a new handle moves the key and leaves a redirect (`page_redirects`).
  *
- * **The §5.3 rule lives here** (DESIGN.md §5.3): the page shows its handle, its `about/` and its links, and of the
+ * **The §5.3 rule lives here** (DESIGN.md §5.3): the page shows its handle, its `owners/` and its links, and of the
  * rest only what the account turned on in its `user.show.*` settings (`lib/user-pages.ts`), which default to nothing
  * that ties the handle to a real name or an author identity. The page (`components/pages/user-panels.tsx`), the
  * plugins' `page.read` and the public routes all read `userPageView`, so a plugin sees exactly what the public does.

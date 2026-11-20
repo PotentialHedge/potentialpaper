@@ -4,8 +4,8 @@ import { PAGE_KINDS } from './kinds';
  * The built-in panels of each kind of page (`lib/kinds.ts`), by id, in their default order within their slot. Shared
  * by the pages (`components/paper/slots.tsx` and `components/pages/slots.tsx` render them) and by settings
  * (`lib/settings/core.ts`), where a reader hides (`<kind>.panels.hidden`) or reorders (`<kind>.panels.order`) them
- * (DESIGN.md §4.8). Every slot is one of its kind's (`KINDS[kind].slots`): `<kind>.main`, `<kind>.aside` and
- * `<kind>.tabs` on every kind, which plugins' panels join too (`handoffs/plugins.md` Phase 2).
+ * (DESIGN.md §4.8). Every slot is one of its kind's (`KINDS[kind].slots`): `<kind>.main`, `<kind>.aside`,
+ * `<kind>.body` and `<kind>.tabs` on every kind, which plugins' panels join too (`handoffs/plugins.md` Phase 2).
  *
  * **Ids are stable.** They are what people's settings name, so renaming one drops it from their files.
  */
@@ -19,14 +19,13 @@ export interface PanelInfo {
 export const PAGE_PANELS = {
   paper: [
     { id: 'abstract', slot: 'paper.main', title: 'Abstract' },
-    { id: 'author', slot: 'paper.main', title: 'Author section' },
+    { id: 'sections', slot: 'paper.main', title: 'Sections' },
     { id: 'read', slot: 'paper.aside', title: 'Picture, PDF and links' },
     { id: 'versions-box', slot: 'paper.aside', title: 'Versions (side box)' },
     { id: 'submissions-box', slot: 'paper.aside', title: 'Submissions (side box)' },
     { id: 'topics', slot: 'paper.aside', title: 'Topics' },
     { id: 'links', slot: 'paper.aside', title: 'Labeled links' },
     { id: 'backlinks', slot: 'paper.aside', title: 'What links here' },
-    { id: 'community', slot: 'paper.body', title: 'Community section' },
     { id: 'versions', slot: 'paper.body', title: 'Versions' },
     { id: 'submissions', slot: 'paper.body', title: 'Submissions and reviews' },
     { id: 'discussion', slot: 'paper.body', title: 'Discussion' },
@@ -35,15 +34,14 @@ export const PAGE_PANELS = {
     { id: 'about', slot: 'venue.main', title: 'About the venue' },
     { id: 'editions', slot: 'venue.main', title: 'Editions' },
     { id: 'scores', slot: 'venue.main', title: 'Review scores' },
-    { id: 'organizers', slot: 'venue.main', title: 'Organisers' },
-    { id: 'community', slot: 'venue.main', title: 'Community section' },
+    { id: 'sections', slot: 'venue.main', title: 'Sections' },
     { id: 'links', slot: 'venue.aside', title: 'Labeled links' },
     { id: 'backlinks', slot: 'venue.aside', title: 'What links here' },
     { id: 'papers', slot: 'venue.tabs', title: 'Papers' },
   ],
   topic: [
     { id: 'about', slot: 'topic.main', title: 'About the topic' },
-    { id: 'community', slot: 'topic.main', title: 'Article' },
+    { id: 'sections', slot: 'topic.main', title: 'Article' },
     { id: 'introduced', slot: 'topic.main', title: 'Papers that introduced it' },
     { id: 'topics', slot: 'topic.aside', title: 'Broader, narrower and related topics' },
     { id: 'venues', slot: 'topic.aside', title: 'Venues' },
@@ -56,8 +54,7 @@ export const PAGE_PANELS = {
   org: [
     { id: 'about', slot: 'org.main', title: 'About the organisation' },
     { id: 'departments', slot: 'org.main', title: 'Departments and labs' },
-    { id: 'members', slot: 'org.main', title: 'Members section' },
-    { id: 'community', slot: 'org.main', title: 'Community section' },
+    { id: 'sections', slot: 'org.main', title: 'Sections' },
     { id: 'people', slot: 'org.aside', title: 'People' },
     { id: 'venues', slot: 'org.aside', title: 'Venues' },
     { id: 'topics', slot: 'org.aside', title: 'Topics' },
@@ -67,7 +64,7 @@ export const PAGE_PANELS = {
   ],
   user: [
     { id: 'identity', slot: 'user.main', title: 'Name and institution' },
-    { id: 'about', slot: 'user.main', title: 'About' },
+    { id: 'sections', slot: 'user.main', title: 'About' },
     { id: 'papers', slot: 'user.main', title: 'Papers they authored' },
     { id: 'links', slot: 'user.aside', title: 'Labeled links' },
     { id: 'backlinks', slot: 'user.aside', title: 'What links here' },
@@ -81,12 +78,12 @@ export const SLOT_TITLES: Record<string, string> = Object.fromEntries([
   ...PAGE_KINDS.flatMap((kind) => [
     [`${kind}.main`, 'Main column'],
     [`${kind}.aside`, 'Side column'],
+    [`${kind}.body`, 'Below both'],
     [`${kind}.tabs`, 'Tabs'],
   ]),
-  ['paper.body', 'Below both'],
   ['paper.submission', 'Under each submission'],
-  ['paper.community', 'In the community section'],
-  ['paper.author', 'In the author section'],
+  ['paper.community', "In the community's sections"],
+  ['paper.author', "In the authors' sections"],
 ]);
 
 /**
@@ -95,8 +92,8 @@ export const SLOT_TITLES: Record<string, string> = Object.fromEntries([
  */
 export const SLOT_PARENTS: Record<string, { panel: string; slot: string }> = {
   'paper.submission': { panel: 'submissions', slot: 'paper.body' },
-  'paper.community': { panel: 'community', slot: 'paper.body' },
-  'paper.author': { panel: 'author', slot: 'paper.main' },
+  'paper.community': { panel: 'sections', slot: 'paper.main' },
+  'paper.author': { panel: 'sections', slot: 'paper.main' },
 };
 
 export type PanelKind = keyof typeof PAGE_PANELS;

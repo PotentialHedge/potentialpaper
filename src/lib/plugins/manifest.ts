@@ -36,11 +36,11 @@ export type PluginPermission = keyof typeof PERMISSIONS;
 export const PERMISSION_NAMES = Object.keys(PERMISSIONS) as PluginPermission[];
 
 /**
- * Where on a page of a kind a panel goes (its place): its kind's `<kind>.main`, `<kind>.aside` or `<kind>.tabs`; on a
- * paper also `body` (below both columns), `submission` (`paper.submission`: once under each of its submissions that
- * has scores, in the Submissions section, the frame told which as `pp.context.surface.submission`), `community` (at
- * the end of the Community section) and `author` (at the end of the author section, only where the paper's authors
- * list the panel in `author/plugins.json`, `lib/plugins/author-plugins.ts`).
+ * Where on a page of a kind a panel goes (its place): its kind's `<kind>.main`, `<kind>.aside`, `<kind>.body` (below
+ * both columns) or `<kind>.tabs`; on a paper also `submission` (`paper.submission`: once under each of its submissions
+ * that has scores, in the Submissions section, the frame told which as `pp.context.surface.submission`), `community`
+ * (after the community's sections) and `author` (after the authors' sections, only where the paper's authors list the
+ * panel in `owners/plugins.json`, `lib/plugins/author-plugins.ts`).
  *
  * A panel's `slot` is the place it prefers. A reader may move a `movable` one to any other place its kind has
  * (`<kind>.panels.placement`), but `author`: only the authors put a panel there, and one made for it stays there.
@@ -58,8 +58,8 @@ export const PLACE_TITLES: Record<PanelSlot, string> = {
   tab: 'Tabs',
   body: 'Below both',
   submission: 'Under each submission',
-  community: 'In the community section',
-  author: 'In the author section',
+  community: "In the community's sections",
+  author: "In the authors' sections",
 };
 
 /** The places of a kind's pages a reader may move a panel to. */
@@ -168,7 +168,7 @@ const slotSchema = z
   .union([z.enum(PANEL_SLOTS), z.partialRecord(z.enum([...PAGE_KINDS, '*']), z.enum(PANEL_SLOTS))])
   .meta({
     description:
-      'Where it prefers to go on each kind of page: "main", "aside" or "tab", and on a paper "body" (below both columns), "submission" (under each of its submissions with scores), "community" (at the end of the Community section) or "author" (at the end of the author section, only on papers whose authors list it in author/plugins.json). One for every kind, or by kind with "*" for the rest: { "paper": "submission", "*": "main" }. Readers may move a movable panel to another place, but not into the author section.',
+      'Where it prefers to go on each kind of page: "main", "aside", "tab" or "body" (below both columns), and on a paper "submission" (under each of its submissions with scores), "community" (after the community’s sections) or "author" (after the authors’ sections, only on papers whose authors list it in owners/plugins.json). One for every kind, or by kind with "*" for the rest: { "paper": "submission", "*": "main" }. Readers may move a movable panel to another place, but not into the authors’ sections.',
   });
 
 const panelSchema = z.looseObject({

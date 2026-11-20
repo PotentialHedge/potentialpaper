@@ -3,7 +3,7 @@
 import { useEffect, useState } from 'react';
 import { ui } from '@/components/ui';
 import { editorChannelName, type EditorMessage, type HostMessage } from '@/editors/channel';
-import type { PaperId } from '@/lib/paper-ids';
+import type { PageRef } from '@/lib/kinds';
 
 /**
  * The page around a web editor (`src/editors`): the editor in a frame, which previews sections itself. Knows
@@ -12,12 +12,12 @@ import type { PaperId } from '@/lib/paper-ids';
  */
 
 export function EditorHost({
-  paper,
+  page,
   frameSrc,
   editorName,
   pagePath,
 }: {
-  paper: PaperId;
+  page: PageRef;
   frameSrc: string;
   editorName: string;
   pagePath: string;
@@ -29,7 +29,7 @@ export function EditorHost({
   const [slow, setSlow] = useState(false);
 
   useEffect(() => {
-    const channel = new BroadcastChannel(editorChannelName(paper));
+    const channel = new BroadcastChannel(editorChannelName({ scheme: page.scheme, value: page.value }));
     channel.onmessage = (event: MessageEvent<EditorMessage>) => {
       const message = event.data;
       if (message?.type === 'ready') setReady(true);
@@ -41,7 +41,7 @@ export function EditorHost({
       channel.close();
       clearTimeout(timer);
     };
-  }, [paper]);
+  }, [page.scheme, page.value]);
 
   return (
     <div className="flex min-h-0 flex-1 flex-col">

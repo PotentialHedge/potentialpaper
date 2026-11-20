@@ -236,10 +236,10 @@ export async function checkDemos(tx: Reader, check: DemoCheck): Promise<string[]
   }
 
   if (touchesDemos) {
-    // Either section can show a folder, and the community can add one; once the author section shows it,
+    // Either part can show a folder, and the community can add one; once the owners' sections show it,
     // what runs there is the authors' to say.
     const authorFolders = new Set(
-      [...(await refsIn(headFiles, 'author')), ...after.filter(({ path }) => partOf(path) === 'author')].flatMap(
+      [...(await refsIn(headFiles, 'owners')), ...after.filter(({ path }) => partOf(path) === 'owners')].flatMap(
         ({ refs }) => refs.flatMap((ref) => (ref.kind === 'repo' ? [ref.name] : [])),
       ),
     );

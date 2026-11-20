@@ -379,7 +379,7 @@ describe("a demo in the page's own repo", () => {
       paperId,
       null,
       author,
-      [...FOLDER, { path: 'author/10-demos.md', content: SHOWN }],
+      [...FOLDER, { path: 'owners/10-demos.md', content: SHOWN }],
       'Our demo',
       { rateLimit: NO_LIMIT },
     );

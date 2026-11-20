@@ -3,8 +3,6 @@ import { eq } from 'drizzle-orm';
 import type { Metadata } from 'next';
 import { notFound, redirect } from 'next/navigation';
 import { cache } from 'react';
-import { ui } from '@/components/ui';
-import { ViewCount } from '@/components/ViewCount';
 import { getDb } from '@/db';
 import { pageCurrent } from '@/db/schema';
 import { type KeyedKind, keyedPagePath, keyProblem, KINDS, pageName } from '@/lib/kinds';
@@ -14,14 +12,17 @@ import { cloneAddresses } from '@/server/pages/clone';
 import { findKeyedPage, type PageRow, redirectedPage, survivorOf } from '@/server/pages/kinds';
 import { orgOverview } from '@/server/org-pages';
 import { userPageView } from '@/server/user-pages';
-import { PluginPageProvider } from '@/components/plugins/PluginPage';
 import { pageFacts, pageSummaries, scopesOfPage } from '@/server/plugins/pages';
-import { KindSlot } from './slots';
+import { toolPath } from '@/lib/page-tools';
+import { ownersOf } from '@/server/owners';
+import { buildPanels } from './common';
+import { PageActions } from './PageActions';
+import { PageHeader, PageView } from './PageView';
+import { KIND_PANELS, type KindPanelProps, presentPanel } from './slots';
 import type { TopicView } from './topic-panels';
 import { topicOverview } from '@/server/topic-pages';
 import { presentTopicPapers } from '@/server/topic-papers';
 import { previewMetadata, shortIdOf, shortUrl } from '@/server/share';
-import { SharePopover } from '@/components/SharePopover';
 
 /**
  * What the routes of the kinds other than a paper share (`/v/…`, `/t/…`, `/o/…`, `/u/…`, `lib/kinds.ts`): the page
@@ -90,8 +91,9 @@ export async function KeyedPageRoute({ kind, segments }: { kind: KeyedKind; segm
   if (!found) notFound();
   if ('redirect' in found) redirect(found.redirect);
   const { page, key, current } = found;
+  const address = { kind, key };
   const scope = KINDS[kind].scope;
-  const [from, to, count, list, summaries, scopes, facts, user, org, topic, shortId] = await Promise.all([
+  const [from, to, count, list, summaries, scopes, facts, user, org, topic, shortId, owners] = await Promise.all([
     linksFrom(page.id),
     linksTo(page.id),
     scope ? scopeMemberCount(page.id) : Promise.resolve(0),
@@ -107,10 +109,12 @@ export async function KeyedPageRoute({ kind, segments }: { kind: KeyedKind; segm
     // Its neighbours, papers and suggestions (`server/topic-pages.ts`).
     kind === 'topic' ? topicView(page) : Promise.resolve(null),
     shortIdOf(page.id),
+    ownersOf(page, address),
   ]);
   const summary = summaries.get(page.id)!;
-  const props = {
+  const props: KindPanelProps = {
     kind,
+    address,
     pageKey: key,
     pageId: page.id,
     name: current?.name ?? pageName(kind, key, null),
@@ -119,45 +123,33 @@ export async function KeyedPageRoute({ kind, segments }: { kind: KeyedKind; segm
     communityHtml: current?.communityHtml ?? null,
     linksFrom: from,
     linksTo: to,
+    owners,
     papers: scope ? { count, list } : null,
     user,
     org,
     topic,
   };
-  const clone = cloneAddresses({ kind, key });
   return (
-    <main className={ui.page}>
-      <PluginPageProvider data={{ kind, page: summary, scopes, facts }}>
-        <article>
-          <p className={`${ui.fine} mt-6 text-center font-sans`}>{KINDS[kind].title}</p>
-          <h1 className="mt-1 text-center text-[26px] leading-tight font-normal">{props.name}</h1>
-          <p className={`${ui.fine} text-center font-sans`}>
-            <span className={ui.mono}>
-              {kind}:{key}
-            </span>{' '}
-            · clone with <span className={ui.mono}>git clone {clone.https}</span>
-          </p>
-          <p className={`${ui.fine} flex justify-center gap-x-4 font-sans`}>
-            {shortId !== null && (
-              <SharePopover
-                url={shortUrl(shortId)}
-                title={props.name}
-                className="cursor-pointer text-muted hover:text-ink hover:underline"
-              />
-            )}
-            <ViewCount pageId={page.id} />
-          </p>
-          <div className="mt-5 grid grid-cols-[minmax(0,1fr)_300px] items-start gap-8 narrow:grid-cols-1">
-            <div>
-              <KindSlot slot="main" {...props} />
-            </div>
-            <aside className="space-y-3">
-              <KindSlot slot="aside" {...props} />
-            </aside>
-          </div>
-          <KindSlot slot="tabs" {...props} />
-        </article>
-      </PluginPageProvider>
-    </main>
+    <PageView
+      kind={kind}
+      plugins={{ kind, page: summary, scopes, facts }}
+      panels={buildPanels(kind, KIND_PANELS[kind], props, (id) => presentPanel(props, id))}
+      header={<PageHeader eyebrow={KINDS[kind].title} title={props.name} />}
+      actions={
+        <PageActions
+          pageId={page.id}
+          historyPath={toolPath('history', address)}
+          share={shortId === null ? null : { url: shortUrl(shortId), title: props.name }}
+          edit={{
+            codePath: toolPath('code', address),
+            clone: cloneAddresses(address),
+            hasRepo: current !== null,
+            // A topic's names, broader topics and article have a form of their own.
+            form:
+              kind === 'topic' ? { href: `${keyedPagePath('topic', key)}/edit`, label: 'Edit the topic' } : undefined,
+          }}
+        />
+      }
+    />
   );
 }

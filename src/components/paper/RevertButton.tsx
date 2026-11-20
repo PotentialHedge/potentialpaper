@@ -2,10 +2,10 @@
 
 import { useState } from 'react';
 import { ui } from '@/components/ui';
-import type { PaperId } from '@/lib/paper-ids';
+import type { PageRef } from '@/lib/kinds';
 
 /** Undoes one commit, as a new commit, then shows the history past every cache. */
-export function RevertButton({ paper, oid, historyPath }: { paper: PaperId; oid: string; historyPath: string }) {
+export function RevertButton({ page, oid, historyPath }: { page: PageRef; oid: string; historyPath: string }) {
   const [state, setState] = useState<'idle' | 'confirm' | 'busy'>('idle');
   const [problem, setProblem] = useState<string | null>(null);
 
@@ -16,7 +16,7 @@ export function RevertButton({ paper, oid, historyPath }: { paper: PaperId; oid:
       const res = await fetch('/api/v1/pages/revert', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ paper, oid }),
+        body: JSON.stringify({ paper: page, oid }),
       });
       const body = await res.json().catch(() => null);
       if (!res.ok) {

@@ -65,6 +65,11 @@ describe('navbar', () => {
     expect(choice.places!.map((p) => p.value)).toEqual(['submission', 'main', 'aside', 'tab', 'body', 'community']);
     expect(choice.places![1]).toEqual({ value: 'main', label: 'Main column', group: 'Main column' });
     expect(pluginPanelChoices(plugins, 'venue')[0].parent).toBeUndefined();
-    expect(pluginPanelChoices(plugins, 'venue')[0].places!.map((p) => p.value)).toEqual(['main', 'aside', 'tab']);
+    expect(pluginPanelChoices(plugins, 'venue')[0].places!.map((p) => p.value)).toEqual([
+      'main',
+      'aside',
+      'tab',
+      'body',
+    ]);
   });
 });

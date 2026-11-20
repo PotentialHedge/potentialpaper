@@ -22,7 +22,7 @@ describe('the VS Code extension on a clone', () => {
 
   it('knows a section by its path', () => {
     expect(sectionFormat('community/10-summary.md')).toBe('markdown');
-    expect(sectionFormat('author/20-results.html')).toBe('html');
+    expect(sectionFormat('owners/20-results.html')).toBe('html');
     expect(sectionFormat('links/10-code.json')).toBeNull();
     expect(sectionFormat('community/notes/10-x.md')).toBeNull();
     expect(sectionFormat(null)).toBeNull();

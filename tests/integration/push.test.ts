@@ -243,7 +243,7 @@ describe('git push over HTTPS', () => {
     const { name } = await gitIdentity(paperId, actor);
     const clone = await cloneAs(id, token, name);
     const head = await readHead(getDb(), paperId);
-    commit(clone, { 'author/10-tl-dr.md': '# TL;DR\n' });
+    commit(clone, { 'owners/10-tl-dr.md': '# TL;DR\n' });
     const author = await push(clone);
     expect(author.ok).toBe(false);
     expect(author.output).toMatch(/remote: commit [0-9a-f]{7}: .*author/);
@@ -316,7 +316,7 @@ describe('git push over HTTPS', () => {
     const identity = await gitIdentity(paperId, actor);
     expect(identity.name).toBe('a_noether1');
     const clone = await cloneAs(id, token, identity.name);
-    const tip = commit(clone, { 'author/10-tl-dr.md': '# TL;DR\n\nRings, *abstractly*.\n' }, 'Write the TL;DR');
+    const tip = commit(clone, { 'owners/10-tl-dr.md': '# TL;DR\n\nRings, *abstractly*.\n' }, 'Write the TL;DR');
     expect(await push(clone)).toMatchObject({ ok: true });
     expect(await readHead(getDb(), paperId)).toBe(tip);
     expect(git(['log', '-1', '--format=%an <%ae> %cn', tip], clone)).toBe(
@@ -324,13 +324,13 @@ describe('git push over HTTPS', () => {
     );
     const [current] = await getDb().select().from(pageCurrent).where(eq(pageCurrent.pageId, paperId));
     expect(current.authorHtml).toContain('<em>abstractly</em>');
-    expect(readFileSync(join(clone, 'author/10-tl-dr.md'), 'utf8')).toContain('Rings');
+    expect(readFileSync(join(clone, 'owners/10-tl-dr.md'), 'utf8')).toContain('Rings');
 
     // Their handle's identity is refused on this paper.
     const handleId = (await gitIdentity((await newPaper()).paperId, actor)).name;
     git(['config', 'user.name', handleId], clone);
     git(['config', 'user.email', `${handleId}@users.invalid`], clone);
-    commit(clone, { 'author/10-tl-dr.md': '# TL;DR\n\nAgain.\n' });
+    commit(clone, { 'owners/10-tl-dr.md': '# TL;DR\n\nAgain.\n' });
     const refused = await push(clone);
     expect(refused.output).toContain('git config user.name a_noether1');
     expect(await readHead(getDb(), paperId)).toBe(tip);

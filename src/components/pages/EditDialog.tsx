@@ -5,7 +5,7 @@ import { PencilIcon, WITH_ICON } from '@/components/icons';
 import { ui } from '@/components/ui';
 
 /**
- * How to edit a paper's page: in the web editor (`/code/…`), or with git. Every page is a git repository, so both
+ * How to edit a page of any kind: in the web editor (`/code/…`), with git, or a kind's own form (a topic's). Every page is a git repository, so both
  * edit the same files, held to the same rules. Opens from the "edit" button under the title, and from any link to
  * `#edit` (and the old `#edit-…` links) on the page.
  *
@@ -19,6 +19,8 @@ export interface EditOptions {
   clone: { https: string; ssh: string | null };
   /** The page has a repository yet: it starts with its first edit, so until then only the web editor works. */
   hasRepo: boolean;
+  /** A form of the kind's own for the common edits, offered first (a topic's names and article). */
+  form?: { href: string; label: string };
 }
 
 const OPENS = /^#edit(?:-[a-z0-9-]+)?$/;
@@ -35,7 +37,7 @@ const VSIX = '/editor/potentialpaper.vsix';
 /** Remembers, in this browser, that the reader declined the extension, so copying doesn't ask again. */
 const DECLINED = 'pp:edit:no-extension';
 
-export function EditDialog({ codePath, clone, hasRepo }: EditOptions) {
+export function EditDialog({ codePath, clone, hasRepo, form }: EditOptions) {
   const dialog = useRef<HTMLDialogElement>(null);
   const [via, setVia] = useState<'https' | 'ssh'>('https');
   const [offer, setOffer] = useState(false);
@@ -103,7 +105,12 @@ export function EditDialog({ codePath, clone, hasRepo }: EditOptions) {
             </button>
           </div>
 
-          <a href={codePath} rel="nofollow" className={ui.btn({ inline: true, flush: true })}>
+          {form && (
+            <a href={form.href} rel="nofollow" className={`${ui.btn({ inline: true, flush: true })} mr-3`}>
+              {form.label}
+            </a>
+          )}
+          <a href={codePath} rel="nofollow" className={form ? 'text-accent' : ui.btn({ inline: true, flush: true })}>
             Edit in web editor
           </a>
 

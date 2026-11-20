@@ -241,7 +241,7 @@ describe("a venue's pages", () => {
 });
 
 describe('organiser claims', () => {
-  it('wait for an admin, then let the organiser write organizers/ and venue.json, on the editions too', async () => {
+  it('wait for an admin, then let the organiser write owners/ and venue.json, on the editions too', async () => {
     const series = await createPage('venue', 'iclr');
     const edition = await createPage('venue', 'iclr/2027');
     const ada = await verifiedAccount();
@@ -270,7 +270,7 @@ describe('organiser claims', () => {
         pageId,
         head,
         actor,
-        [{ path: 'organizers/10-welcome.md', content: '# Welcome\nCall for papers is out.\n' }],
+        [{ path: 'owners/10-welcome.md', content: '# Welcome\nCall for papers is out.\n' }],
         'Welcome',
       );
     await expect(write(series.id, series.head)).rejects.toMatchObject({ status: 403 });
@@ -297,7 +297,7 @@ describe('organiser claims', () => {
         'Dates',
       ),
     ).toMatchObject({ status: 'committed' });
-    // Anyone else verified writes community/, not organizers/.
+    // Anyone else verified writes community/, not owners/.
     await expect(write(edition.id, await readHead(getDb(), edition.id), bob.actor)).rejects.toMatchObject({
       status: 403,
     });

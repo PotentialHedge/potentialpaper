@@ -35,7 +35,7 @@ import { pageSummaries } from './plugins/pages';
  *   which links the paper and makes the topic if no topic of that name or alias exists yet. Names and aliases are
  *   checked first (`topicsNamed`, `similarTopics`), to keep duplicates down.
  * - **A paper in a topic** is a labeled link from the paper (`in-topic`, `introduces-topic`), in its `community/` or,
- *   from one of its confirmed authors, its `author/` links; membership (`page-members.ts`) follows from it, rolled up
+ *   from one of its confirmed authors, its `owners/` links; membership (`page-members.ts`) follows from it, rolled up
  *   from narrower topics through `broader`.
  * - **Editing** (`editTopic`: name, aliases, broader topics, the article's sections, related topics), **renaming**
  *   (`renameTopic`, a new address with a redirect from the old) and **merging** (`mergeTopic`, the duplicate folded
@@ -314,7 +314,7 @@ function appendLine(text: string, line: string): string {
 
 /**
  * Puts a paper in a topic: a labeled link from the paper (`in-topic` unless `introduces-topic` is asked) in its
- * `community/links.jsonl`, or its `author/links.jsonl` when one of its confirmed authors adds it, so the authors
+ * `community/links.jsonl`, or its `owners/links.jsonl` when one of its confirmed authors adds it, so the authors
  * assert it as authors (DESIGN.md §8). By name, the topic is made if no topic has that name or alias. A suggestion
  * of the paper for the topic becomes confirmed.
  */
@@ -337,11 +337,11 @@ export async function linkPaperToTopic(
   }
   const target = formatIdentifier({ kind: 'topic', key: topic.key });
   const roles = await rolesOf(database, actor, paper.id);
-  const part = roles.owner ? 'author' : 'community';
+  const part = roles.owner ? 'owners' : 'community';
   const path = `${part}/${LINKS_FILE}`;
   const head = await readHead(database, paper.id);
   // In either part already, by this label: nothing to add.
-  for (const each of ['author', 'community']) {
+  for (const each of ['owners', 'community']) {
     const parsed = parseLabeledLinks(await textAt(database, paper.id, head, `${each}/${LINKS_FILE}`), 'paper');
     const links = 'links' in parsed ? parsed.links : [];
     if (links.some((link) => link.label === label && (link.target === target || sameTopic(link.target, topic!)))) {

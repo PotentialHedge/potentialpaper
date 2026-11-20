@@ -1,7 +1,7 @@
 import sanitizeHtml from 'sanitize-html';
 
 /**
- * A section written in HTML (`author/20-results.html`). People write these, so what they may use is an
+ * A section written in HTML (`owners/20-results.html`). People write these, so what they may use is an
  * allowlist: text structure, tables, links and images, and no scripts, styles, forms, frames, event handlers,
  * ids or classes (an id could shadow the page's own). A file with anything else is refused at commit
  * (`htmlProblem`), rather than quietly cleaned, because a pushed commit is stored as it was sent, so what is

@@ -149,28 +149,6 @@ export async function VenueEditions({ pageKey: key, pageId, name }: KindPanelPro
   );
 }
 
-/** The organisers' section, or the way to claim the venue while nobody has. */
-export function VenueOrganizers({ pageKey: key, ownersHtml }: KindPanelProps) {
-  const claim = `/claim/venue/${key.split('/').map(encodeURIComponent).join('/')}`;
-  return (
-    <section id="organizers">
-      <h2 className={ui.groupHeading}>Organisers</h2>
-      {ownersHtml ? (
-        <>
-          <div className="md" dangerouslySetInnerHTML={{ __html: ownersHtml }} />
-          <p className={ui.fine}>
-            Written by the venue&apos;s confirmed organisers. <a href={claim}>Are you one?</a>
-          </p>
-        </>
-      ) : (
-        <p className={ui.empty}>
-          Nothing from the organisers yet. Organise this venue? <a href={claim}>Claim it</a>.
-        </p>
-      )}
-    </section>
-  );
-}
-
 /** The venue's submissions by status, rolled up from its editions, with filters. */
 export async function VenuePapers({ kind, pageKey: key, pageId }: KindPanelProps) {
   const identifier = formatIdentifier({ kind, key });

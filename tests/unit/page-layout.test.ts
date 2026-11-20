@@ -1,11 +1,10 @@
 import { describe, expect, it } from 'vitest';
 import { linkChanges, versionChanges } from '@/server/pages/content';
 import { htmlProblem, renderHtmlSection } from '@/server/pages/html';
-import { planLayout, planLfs } from '@/server/pages/layout-migration';
+import { planLayout, planLfs, planOwners } from '@/server/pages/layout-migration';
 import {
   contentProblem,
   GITATTRIBUTES,
-  LAYOUT_VERSION,
   layoutProblem,
   layoutVersionOf,
   parseLfsPointer,
@@ -40,7 +39,7 @@ describe('the layout', () => {
     for (const path of [
       '.potentialpaper/metadata.json',
       'community/10-summary.md',
-      'author/05-results.html',
+      'owners/05-results.html',
       'versions/v_k3x9q2ab.json',
       'versions/arxiv-v2.json',
       'links/10-code.json',
@@ -166,11 +165,11 @@ describe('section files', () => {
   });
 
   it('start an empty part in tens', () => {
-    const changes = planSections([], 'author', 0, 0, [
+    const changes = planSections([], 'owners', 0, 0, [
       { title: 'TL;DR', text: '# TL;DR\n' },
       { title: 'Code and data', text: '# Code and data\n' },
     ]);
-    expect(changes.map((c) => c.path)).toEqual(['author/10-tl-dr.md', 'author/20-code-and-data.md']);
+    expect(changes.map((c) => c.path)).toEqual(['owners/10-tl-dr.md', 'owners/20-code-and-data.md']);
   });
 });
 
@@ -295,7 +294,7 @@ describe('the move to Git LFS', () => {
     }
     expect(after.get('.gitattributes')).toBe(GITATTRIBUTES);
     expect(after.get('.potentialpaper/metadata.json')).toBe('{\n  "layout": 3\n}\n');
-    expect(layoutVersionOf(after.get('.potentialpaper/metadata.json'))).toBe(LAYOUT_VERSION);
+    expect(layoutVersionOf(after.get('.potentialpaper/metadata.json'))).toBe(3);
     expect(parseLfsPointer(after.get('.potentialpaper/paper.pdf')!)).toEqual({ sha256: sha('a'), bytes: 1000 });
     expect(JSON.parse(after.get('.potentialpaper/pdf.json')!)).toEqual({
       source: 'https://openreview.net/forum?id=x',
@@ -318,5 +317,38 @@ describe('the move to Git LFS', () => {
       ['c', 'application/pdf', 'https://pdfs.example.org/pdf/c.pdf'],
     ]);
     expect(planLfs(after)).toEqual({ changes: [], stored: [] });
+  });
+});
+
+describe('the move to owners/', () => {
+  it("moves each kind's owners' part to owners/, and says layout 4", () => {
+    const paper = new Map([
+      ['.potentialpaper/metadata.json', '{\n  "layout": 3\n}\n'],
+      ['author/10-tl-dr.md', '# TL;DR\n'],
+      ['author/plugins.json', '{"panels":[]}\n'],
+      ['community/10-summary.md', '# Summary\n'],
+    ]);
+    const changes = planOwners('paper', paper);
+    expect(changes).toEqual([
+      { path: 'author/10-tl-dr.md', content: null },
+      { path: 'owners/10-tl-dr.md', content: '# TL;DR\n' },
+      { path: 'author/plugins.json', content: null },
+      { path: 'owners/plugins.json', content: '{"panels":[]}\n' },
+      { path: '.potentialpaper/metadata.json', content: '{\n  "layout": 4\n}\n' },
+    ]);
+    const venue = new Map([
+      ['.potentialpaper/metadata.json', '{"layout":3,"kind":"venue","key":"iclr"}\n'],
+      ['organizers/links.jsonl', '\n'],
+    ]);
+    expect(planOwners('venue', venue).map((c) => c.path)).toEqual([
+      'organizers/links.jsonl',
+      'owners/links.jsonl',
+      '.potentialpaper/metadata.json',
+    ]);
+    // A topic has no owners' part, but still says its layout; a page that says 4 is left alone.
+    expect(
+      planOwners('topic', new Map([['.potentialpaper/metadata.json', '{"layout":3}']])).map((c) => c.path),
+    ).toEqual(['.potentialpaper/metadata.json']);
+    expect(planOwners('paper', new Map([['.potentialpaper/metadata.json', '{"layout":4}']]))).toEqual([]);
   });
 });

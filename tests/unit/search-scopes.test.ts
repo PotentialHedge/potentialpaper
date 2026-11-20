@@ -46,7 +46,7 @@ describe('in: scopes', () => {
 
 describe('sections in the registry', () => {
   it('are a text type, searched in the page, with no JSON Schema', () => {
-    expect(fileTypeOf('author/10-tl-dr.md')).toBe('section');
+    expect(fileTypeOf('owners/10-tl-dr.md')).toBe('section');
     expect(fileTypeOf('community/20-results.html')).toBe('section');
     expect(fileTypeOf('community/x.md')).toBeNull();
     expect(searchScopeOf('community/10-summary.md')).toBe('page');
@@ -57,9 +57,9 @@ describe('sections in the registry', () => {
 
   it('index their words with their title and part, and skip blank ones', () => {
     expect(
-      indexFile('author/10-tl-dr.md', '# In short\n\nSee [the code](https://x.org) and ![a plot](p.png).\n'),
+      indexFile('owners/10-tl-dr.md', '# In short\n\nSee [the code](https://x.org) and ![a plot](p.png).\n'),
     ).toEqual([
-      { kind: 'section', text: 'In short\n\nSee the code and a plot.', fields: { part: 'author', title: 'In short' } },
+      { kind: 'section', text: 'In short\n\nSee the code and a plot.', fields: { part: 'owners', title: 'In short' } },
     ]);
     expect(indexFile('community/10-a.html', '<h1>Results</h1><p>Fast &amp; <em>small</em>.</p>')).toEqual([
       { kind: 'section', text: 'Results Fast & small .', fields: { part: 'community', title: 'Results' } },

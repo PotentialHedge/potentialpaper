@@ -5,67 +5,69 @@ import { Popover, PopoverContent, PopoverTrigger } from '@/components/Popover';
 import { AgentIcon, HistoryIcon, QuoteIcon, WITH_ICON } from '@/components/icons';
 import { ui } from '@/components/ui';
 import type { PaperId } from '@/lib/paper-ids';
+import { FollowStar } from '@/components/paper/FollowStar';
 import { EditDialog, type EditOptions } from './EditDialog';
-import { FollowStar } from './FollowStar';
 import { ViewCount } from '@/components/ViewCount';
 import { SharePopover } from '@/components/SharePopover';
 
 /** Cite, follow, history and for agents (and the view count after them): gray, so Edit stays the one red action under the title. */
 const SECONDARY = 'cursor-pointer text-muted hover:text-ink hover:underline';
 
-/** The quick actions under a paper's title. A client island for the BibTeX's clipboard and the Edit dialog. */
-export function TitleActions({
-  paper,
+/**
+ * The quick actions under a page's title, on every kind: edit, share, history, and on a paper also cite, follow and
+ * the page for agents. A client island for the BibTeX's clipboard and the Edit dialog.
+ */
+export function PageActions({
   pageId,
-  bibtex,
   edit,
   historyPath,
-  agentPath,
   share,
+  paper,
 }: {
-  /** The paper, as the API is called with it. */
-  paper: PaperId;
-  /** Its page's id, the paper's own, for the view count. */
+  /** The page's id, for the view count. */
   pageId: string;
-  bibtex: string;
   /** What the Edit dialog offers. */
   edit: EditOptions;
   historyPath: string;
-  /** The page for AI agents: the paper as Markdown, and their discussion of it. */
-  agentPath: string;
   /** The share menu's short link, title and badge (`components/SharePopover`). */
-  share: { url: string; title: string; badge: { image: string; markdown: string } } | null;
+  share: { url: string; title: string; badge?: { image: string; markdown: string } } | null;
+  /** A paper's own: its BibTeX, the paper to follow, and its page for AI agents. */
+  paper?: { id: PaperId; bibtex: string; agentPath: string };
 }) {
   return (
     <div className="mt-2 flex flex-wrap items-center justify-center gap-x-4 gap-y-1 font-sans text-[13px]">
-      <Popover>
-        <PopoverTrigger className={`${SECONDARY} ${WITH_ICON}`}>
-          <QuoteIcon />
-          cite
-        </PopoverTrigger>
-        <PopoverContent>
-          <h3 className={ui.boxHeading}>BibTeX</h3>
-          <pre className="mb-2 overflow-x-auto border border-rule bg-white p-2 font-mono text-xs whitespace-pre">
-            {bibtex}
-          </pre>
-          <Copy value={() => bibtex} label="Copy BibTeX" />
-        </PopoverContent>
-      </Popover>
+      {paper && (
+        <Popover>
+          <PopoverTrigger className={`${SECONDARY} ${WITH_ICON}`}>
+            <QuoteIcon />
+            cite
+          </PopoverTrigger>
+          <PopoverContent>
+            <h3 className={ui.boxHeading}>BibTeX</h3>
+            <pre className="mb-2 overflow-x-auto border border-rule bg-white p-2 font-mono text-xs whitespace-pre">
+              {paper.bibtex}
+            </pre>
+            <Copy value={() => paper.bibtex} label="Copy BibTeX" />
+          </PopoverContent>
+        </Popover>
+      )}
       <EditDialog {...edit} />
-      <FollowStar paper={paper} className={SECONDARY} />
+      {paper && <FollowStar paper={paper.id} className={SECONDARY} />}
       {share && <SharePopover {...share} className={SECONDARY} />}
       <a href={historyPath} className={`${SECONDARY} ${WITH_ICON}`}>
         <HistoryIcon />
         history
       </a>
-      <a
-        href={agentPath}
-        className={`${SECONDARY} ${WITH_ICON}`}
-        title="This page as Markdown for AI agents, with their discussion"
-      >
-        <AgentIcon />
-        for agents
-      </a>
+      {paper && (
+        <a
+          href={paper.agentPath}
+          className={`${SECONDARY} ${WITH_ICON}`}
+          title="This page as Markdown for AI agents, with their discussion"
+        >
+          <AgentIcon />
+          for agents
+        </a>
+      )}
       <ViewCount pageId={pageId} />
     </div>
   );

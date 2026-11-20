@@ -12,8 +12,8 @@ import { PAGE_SCHEMA_NAMES, PAGE_SCHEMAS } from './schemas';
  */
 
 /** The sections each part starts with, empty. Renamed, reordered or deleted like any other. */
-export const STARTER_SECTIONS: Record<'author' | 'community', readonly string[]> = {
-  author: ['10-tl-dr.md', '20-overview.md', '30-results.md', '40-demos.md', '50-code-and-data.md', '60-talks.md'],
+export const STARTER_SECTIONS: Record<'owners' | 'community', readonly string[]> = {
+  owners: ['10-tl-dr.md', '20-overview.md', '30-results.md', '40-demos.md', '50-code-and-data.md', '60-talks.md'],
   community: [
     '10-summary.md',
     '20-why-it-matters.md',
@@ -87,7 +87,7 @@ export function starterFiles(kind: PageKind = 'paper'): [path: string, content: 
   if (kind !== 'paper') return [[PREK_PATH, prekConfig()]];
   return [
     [PREK_PATH, prekConfig()],
-    ...(['author', 'community'] as const).flatMap((part) =>
+    ...(['owners', 'community'] as const).flatMap((part) =>
       STARTER_SECTIONS[part].map((name): [string, string] => [`${part}/${name}`, '']),
     ),
   ];
@@ -100,7 +100,7 @@ export function starterFiles(kind: PageKind = 'paper'): [path: string, content: 
 export function missingStarterFiles(paths: ReadonlySet<string>, prek: string | undefined): FileChange[] {
   const changes: FileChange[] = [];
   if (prek !== prekConfig()) changes.push({ path: PREK_PATH, content: prekConfig() });
-  for (const part of ['author', 'community'] as const) {
+  for (const part of ['owners', 'community'] as const) {
     if ([...paths].some((path) => sectionName(path, part))) continue;
     for (const name of STARTER_SECTIONS[part]) changes.push({ path: `${part}/${name}`, content: '' });
   }

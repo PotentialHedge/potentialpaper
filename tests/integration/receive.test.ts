@@ -171,7 +171,7 @@ describe('a bad tree is refused, whoever made it', () => {
   const SHA = 'c'.repeat(64);
   const cases: [string, Record<string, Content>, number, RegExp][] = [
     ['the system files', { '.potentialpaper/metadata.json': '{}\n' }, 403, /only the system and admins/],
-    ['the author section, by someone else', { 'author/10-mine.md': '# Mine\n' }, 403, /confirmed authors/],
+    ['the author section, by someone else', { 'owners/10-mine.md': '# Mine\n' }, 403, /confirmed authors/],
     ['a path with no place', { 'page.md': 'hello\n' }, 403, /pages hold \.gitattributes, prek\.toml, \.potentialpaper/],
     ['a section not named NN-slug', { 'community/summary.md': 'x\n' }, 422, /one file per section/],
     ['a dot file', { 'community/.hidden': 'x\n' }, 422, /starting with a dot/],
@@ -338,7 +338,7 @@ describe('a bad tree is refused, whoever made it', () => {
         newBlobBytes: new Map(),
       });
     await expect(check({ 'community/10-ok.md': '# Fine\n' })).resolves.toEqual([]);
-    await expect(check({ 'author/10-x.md': '# X\n' })).rejects.toMatchObject({ status: 403 });
+    await expect(check({ 'owners/10-x.md': '# X\n' })).rejects.toMatchObject({ status: 403 });
     await expect(check({ 'community/10-x.html': '<img src="x" onerror="y">' })).rejects.toMatchObject({
       status: 422,
       message: expect.stringMatching(/^community\/10-x\.html /),
@@ -418,13 +418,13 @@ describe('a pushed commit', () => {
       'git config user.email a_claimed1@users.invalid',
     ]);
     const head = (await readHead(getDb(), paperId))!;
-    const ok = await make(paperId, head, { 'author/10-tl-dr.md': '# TL;DR\n' }, { identity: 'a_claimed1' });
+    const ok = await make(paperId, head, { 'owners/10-tl-dr.md': '# TL;DR\n' }, { identity: 'a_claimed1' });
     expect(
       (await receiveCommits(paperId, actor, { old: head, new: ok.oid }, ok.objects, { rateLimit: NO_LIMIT })).status,
     ).toBe('committed');
     // Their handle's identity is not theirs on this paper.
     const { id: handleId } = await gitIdentity(await newPaper(), actor);
-    const wrong = await make(paperId, ok.oid, { 'author/10-tl-dr.md': '# TL;DR!\n' }, { identity: handleId });
+    const wrong = await make(paperId, ok.oid, { 'owners/10-tl-dr.md': '# TL;DR!\n' }, { identity: handleId });
     const err = await refusal(
       receiveCommits(paperId, actor, { old: ok.oid, new: wrong.oid }, wrong.objects, { rateLimit: NO_LIMIT }),
     );
@@ -588,7 +588,7 @@ describe('the commit path, for web edits too', () => {
     vi.stubGlobal('fetch', fetch);
     const block = '```demo https://github.com/someone/demo\nA demo\n```\n';
     await expect(
-      commitPage(paperId, null, someone, [{ path: 'author/10-demo.md', content: block }], 'Demo', {
+      commitPage(paperId, null, someone, [{ path: 'owners/10-demo.md', content: block }], 'Demo', {
         rateLimit: NO_LIMIT,
       }),
     ).rejects.toMatchObject({ status: 403 });
@@ -608,7 +608,7 @@ describe('the commit path, for web edits too', () => {
     ).rejects.toMatchObject({ status: 422 });
     const { id } = await gitIdentity(paperId, someone);
     const head = (await readHead(getDb(), paperId))!;
-    const pushed = await make(paperId, head, { 'author/10-demo.md': block }, { identity: id });
+    const pushed = await make(paperId, head, { 'owners/10-demo.md': block }, { identity: id });
     await expect(
       receiveCommits(paperId, someone, { old: head, new: pushed.oid }, pushed.objects, { rateLimit: NO_LIMIT }),
     ).rejects.toMatchObject({ status: 403 });

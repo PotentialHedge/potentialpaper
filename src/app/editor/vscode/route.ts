@@ -1,23 +1,21 @@
 import { editorCsp } from '@/editors/vscode/csp';
 import { workbenchHtml } from '@/editors/vscode/workbench';
-import { canonicalPaperId, PAPER_SCHEMES, parsePaperId, type PaperScheme } from '@/lib/paper-ids';
-import { findPaper } from '@/server/papers';
+import { addressOfRef, pageRefOf } from '@/lib/kinds';
+import { namedPage } from '@/server/pages/named';
 
 export const dynamic = 'force-dynamic';
 
 /**
- * VS Code for the Web, for one paper (`src/editors/vscode`), framed by the paper's `/code/…` page. Its own
+ * VS Code for the Web, for one page of any kind (`src/editors/vscode`), framed by its `/code/…` page. Its own
  * CSP (`next.config.ts` leaves `/editor/` out of the site's): VS Code runs workers from `blob:`, frames its
  * extension host from this origin and webviews from their own, and is framed by this origin only.
  */
 export async function GET(req: Request) {
   const query = new URL(req.url).searchParams;
-  const scheme = PAPER_SCHEMES.find((s) => s === query.get('scheme')) as PaperScheme | undefined;
-  const id = scheme && parsePaperId(scheme, query.get('value') ?? '');
-  const found = id && (await findPaper(id));
-  if (!found) return new Response('no such paper', { status: 404, headers: { 'Content-Type': 'text/plain' } });
-  const canonical = canonicalPaperId(found.identifiers) ?? id;
-  return new Response(workbenchHtml({ ...canonical, title: found.paper.title }), {
+  const asked = addressOfRef({ scheme: query.get('scheme') ?? '', value: query.get('value') ?? '' });
+  const found = asked && (await namedPage(asked));
+  if (!found) return new Response('no such page', { status: 404, headers: { 'Content-Type': 'text/plain' } });
+  return new Response(workbenchHtml({ ...pageRefOf(found.address), title: found.name }), {
     headers: {
       'Content-Type': 'text/html; charset=utf-8',
       'Cache-Control': 'private, no-store',

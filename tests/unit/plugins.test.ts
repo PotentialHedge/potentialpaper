@@ -204,7 +204,7 @@ describe('plugin manifests', () => {
     expect(placeOfSlot('paper.community')).toBe('community');
   });
 
-  it("reads a paper's author/plugins.json", () => {
+  it("reads a paper's owners/plugins.json", () => {
     expect(parseAuthorPlugins('{ "panels": [{ "panel": "o/map.minimap", "settings": { "set": "o/s" } }] }')).toEqual({
       panels: [{ panel: 'o/map.minimap', settings: { set: 'o/s' } }],
     });

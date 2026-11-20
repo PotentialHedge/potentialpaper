@@ -183,8 +183,8 @@ export const PAGE_SCHEMAS = {
   authorPlugins: fileType({
     title: 'Author section plugins',
     schema: authorPluginsFileSchema,
-    glob: 'author/plugins.json',
-    filesRegex: '^author/plugins\\.json$',
+    glob: 'owners/plugins.json',
+    filesRegex: '^owners/plugins\\.json$',
     writable: true,
     render: { panel: 'AuthorSection', slots: ['paper.author'] },
   }),

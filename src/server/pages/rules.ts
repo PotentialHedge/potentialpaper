@@ -1,6 +1,6 @@
 import { z } from 'zod';
 import { DEMO_NAME, DEMOS_DIR, MAX_DEMO_NAME } from '@/lib/demos';
-import { KINDS, type PageKind, partsOf } from '@/lib/kinds';
+import { KINDS, OWNERS_DIR, PAGE_KINDS, type PageKind, partsOf } from '@/lib/kinds';
 import { LINKS_FILE, parseLabeledLinks } from '@/lib/labeled-links';
 import { parseLinkFile } from '@/lib/paper-links';
 import { parseReviewPath, parseReviewFile, REVIEWS_DIR, reviewSourceOf } from '@/lib/review-files';
@@ -18,8 +18,9 @@ import { htmlProblem } from './html';
  *   .potentialpaper/metadata.json   the system's: the layout's version, identifiers, title, authors, abstract
  *   .potentialpaper/paper.pdf       the system's: the paper's PDF (Git LFS)
  *   .potentialpaper/pdf.json        the system's: where that PDF came from, and its license
- *   author/10-overview.md           the author section, a file per section (Markdown or HTML)
- *   author/plugins.json             the plugins' panels the authors let into it (`lib/plugins/author-plugins.ts`)
+ *   owners/10-overview.md           the owners' sections (on a paper, its confirmed authors'), a file per section
+ *                                   (Markdown or HTML)
+ *   owners/plugins.json             the plugins' panels the authors let into them (`lib/plugins/author-plugins.ts`)
  *   community/10-summary.md         the community section, the same way
  *   versions/v_k3x9q2ab.json        a version of the paper, named by its id
  *   versions/v_k3x9q2ab.pdf         that version's PDF (Git LFS)
@@ -36,7 +37,7 @@ import { htmlProblem } from './html';
  *
  *   .potentialpaper/metadata.json   the system's: the layout's version, the kind and the key
  *   venue.json, topic.json, org.json or profile.json   the kind file (`lib/kinds.ts`)
- *   organizers/, members/ or about/ the owners' sections, where the kind has owners; community/ on all but a user's
+ *   owners/                         the owners' sections, where the kind has owners; community/ on all but a user's
  *   <part>/links.jsonl              that part's labeled links
  *
  * PDFs and pictures are Git LFS pointers (`parseLfsPointer`): the repo holds their hash and size, the bytes
@@ -62,8 +63,9 @@ const SYSTEM_PATHS = new Set([METADATA_PATH, PAPER_PDF_PATH, PDF_PATH]);
  *   2  files and folders: a file per section, link and version, the system's files in `.potentialpaper/`
  *      (`planLayout`)
  *   3  PDFs and pictures as Git LFS pointers, with `.gitattributes` (`planLfs`)
+ *   4  the owners' part is `owners/` on every kind, not `author/`, `organizers/`, `members/` or `about/` (`planOwners`)
  */
-export const LAYOUT_VERSION = 3;
+export const LAYOUT_VERSION = 4;
 
 /** The layout a page's `metadata.json` says it has; `null` if it says none, as the first layout's doesn't. */
 export function layoutVersionOf(metadata: string | undefined): number | null {
@@ -155,8 +157,8 @@ export function isDemoPath(path: string): boolean {
 }
 
 /**
- * A part of a page written as prose, a directory of section files: the owners' (`author/` on a paper) and
- * `community/`. Each kind has its own (`partsOf`); these are a paper's.
+ * A part of a page written as prose, a directory of section files: `owners/` and `community/`. Each kind has its
+ * own (`partsOf`); these are a paper's.
  */
 export type PagePart = string;
 export const PAGE_PARTS: readonly PagePart[] = partsOf('paper');
@@ -294,62 +296,176 @@ export function encodeLfsPointer({ sha256, bytes }: LfsPointer): string {
   return `${LFS_VERSION}\noid sha256:${sha256}\nsize ${bytes}\n`;
 }
 
-/** What a page holds, said when a path isn't one of them. */
-const LAYOUT =
-  'pages hold .gitattributes, prek.toml, .potentialpaper/ (metadata.json, paper.pdf, pdf.json), author/ and community/ ' +
-  '(sections named like 10-summary.md or 20-results.html, and links.jsonl; author/ also plugins.json), versions/<id>.json and <id>.pdf, links/ (named like ' +
-  '10-code.json), thumbnail.png (or .jpg, .gif, .webp, .avif) and thumbnail.json, demos/<name>/, ' +
-  'reviews/<source>/<submission>/ and extensions/';
+/** What a page of a kind holds, said when a path isn't one of them. */
+function kindLayout(kind: PageKind): string {
+  const parts = partsOf(kind).map((part) => `${part}/`);
+  const sections = `${parts.join(' and ')} (sections named like 10-summary.md or 20-results.html, and links.jsonl${kind === 'paper' ? `; ${OWNERS_DIR}/ also plugins.json` : ''})`;
+  if (kind !== 'paper') {
+    return `${kind} pages hold .gitattributes, prek.toml, ${METADATA_PATH}, ${KINDS[kind].kindFile}, ${sections} and extensions/`;
+  }
+  return (
+    `pages hold .gitattributes, prek.toml, .potentialpaper/ (metadata.json, paper.pdf, pdf.json), ${sections}, ` +
+    'versions/<id>.json and <id>.pdf, links/ (named like 10-code.json), thumbnail.png (or .jpg, .gif, .webp, .avif) ' +
+    'and thumbnail.json, demos/<name>/, reviews/<source>/<submission>/ and extensions/'
+  );
+}
 
 const REVIEWS_LAYOUT =
   'reviews/<source>/<submission>/ holds submission.json, forms.json and notes/<id>.json, each name a lower-case ' +
   'slug (letters, digits, - and _)';
 
-/** What a page of a kind other than a paper holds, said when a path isn't one of them. */
-function kindLayout(kind: PageKind): string {
-  const parts = partsOf(kind).map((part) => `${part}/`);
-  return (
-    `${kind} pages hold .gitattributes, prek.toml, ${METADATA_PATH}, ${KINDS[kind].kindFile}, ` +
-    `${parts.join(' and ')} (sections named like 10-summary.md, and links.jsonl) and extensions/`
-  );
+const CONFIRM = 'confirm an institutional email address first';
+const METADATA_ONLY = 'the system only writes the metadata';
+
+/**
+ * One kind of path on a page, and who writes it: the whole of the rules of DESIGN.md §4.3, as `rulesOf` lists them for
+ * each kind. The first rule that covers a path decides both whether it is laid out right and who may write it.
+ */
+interface PathRule {
+  covers(path: string): boolean;
+  /** Why the path, which this rule covers, is no file this page can hold; `null` if it is one. */
+  layout(path: string): string | null;
+  /** Why these roles can't write it, or `null`. */
+  denied(roles: Roles, path: string): string | null;
+}
+
+const fine = () => null;
+
+/** Who may write: each is why these roles can't, or `null`. */
+const may = {
+  system: (roles: Roles) =>
+    roles.system || roles.admin ? null : `only the system and admins can change ${SYSTEM_DIR}/`,
+  /** Anyone verified, but not the system, which writes only the metadata. */
+  verified: (roles: Roles) => (roles.system ? METADATA_ONLY : roles.verified || roles.admin ? null : CONFIRM),
+  owners: (refusal: string) => (roles: Roles) => (roles.owner || roles.admin ? null : refusal),
+  granted: (roles: Roles, path: string) => roles.grants?.some((pattern) => grantCovers(pattern, path)) ?? false,
+};
+
+/** A part's files: its sections, its labeled links, and on a paper's owners' part the plugins they let in. */
+function partRule(kind: PageKind, part: string, denied: PathRule['denied']): PathRule {
+  return {
+    covers: (path) => path.startsWith(`${part}/`),
+    layout: (path) =>
+      sectionName(path, part) || isLabeledLinksPath(path, kind) || (kind === 'paper' && path === AUTHOR_PLUGINS_PATH)
+        ? null
+        : `${part}/ holds one file per section, named like 10-summary.md or 20-results.html (two digits, a lower-case slug), and ${LINKS_FILE}`,
+    denied,
+  };
+}
+
+/** Who writes a keyed kind's kind file (`venue.json`): see `kindFileWriters`. */
+function kindFileRule(kind: Exclude<PageKind, 'paper'>): PathRule {
+  const { kindFile, owners } = KINDS[kind];
+  return {
+    covers: (path) => path === kindFile,
+    layout: fine,
+    denied: (roles, path) => {
+      // A person's profile.json is written by the site from their `user.show.*` settings (`server/user-pages.ts`),
+      // which are what count, so the file and the settings never disagree.
+      if (kind === 'user')
+        return roles.system ? null : `${kindFile} follows your user.show.* settings: change them at /settings`;
+      if (kind === 'topic') return may.verified(roles);
+      if (roles.system) return METADATA_ONLY;
+      return roles.owner || roles.admin || may.granted(roles, path)
+        ? null
+        : `only this ${kind}'s ${owners?.noun} and admins can change ${kindFile}`;
+    },
+  };
+}
+
+/** The rules of a paper's own files, beyond every kind's. */
+const PAPER_RULES: PathRule[] = [
+  {
+    covers: (path) => path.startsWith(`${VERSIONS_DIR}/`),
+    layout: (path) =>
+      versionIdOf(path) || versionPdfIdOf(path)
+        ? null
+        : 'versions/ holds a file per version, named like v_k3x9q2ab.json, and its PDF beside it as v_k3x9q2ab.pdf',
+    // Facts about the paper that anyone verified can add to with evidence; the system writes them on import.
+    denied: (roles) => (roles.system || roles.admin || roles.verified ? null : CONFIRM),
+  },
+  {
+    // The paper's card: its confirmed authors' once it is claimed, and anyone verified's until then.
+    covers: (path) => path === THUMBNAIL_PATH || thumbnailImageType(path) !== null || path.startsWith(`${LINKS_DIR}/`),
+    layout: (path) =>
+      !path.startsWith(`${LINKS_DIR}/`) || isLinkPath(path)
+        ? null
+        : 'links/ holds one file per link, named like 10-code.json',
+    denied: (roles) => {
+      if (roles.system) return METADATA_ONLY;
+      if (roles.admin) return null;
+      if (roles.claimed)
+        return roles.owner ? null : "only this paper's confirmed authors can change its picture and links";
+      return roles.verified ? null : CONFIRM;
+    },
+  },
+  {
+    // As the community section, since either section may show a demo. A folder the owners' section shows is its
+    // owners' alone, which `commit.ts` checks, as it needs the sections' text.
+    covers: isDemoPath,
+    layout: (path) => {
+      const demo = demoPath(path);
+      if (!demo || !DEMO_NAME.test(demo.name) || demo.name.length > MAX_DEMO_NAME) {
+        return 'demos/ holds one folder per demo, named like demos/my-demo/ (lower-case letters, digits and dashes)';
+      }
+      const dot = demo.inside.lastIndexOf('.');
+      const extension = dot === -1 ? '' : demo.inside.slice(dot + 1);
+      return DEMO_EXTENSIONS.has(extension)
+        ? null
+        : `a demo's files are text: ${[...DEMO_EXTENSIONS].map((e) => `.${e}`).join(' ')} (binary files come from GitHub)`;
+    },
+    denied: may.verified,
+  },
+  {
+    // A source's imported submissions and reviews: only the bot granted the source writes them (DESIGN.md §4.3), so
+    // what a page shows as a venue's reviews is what the venue published.
+    covers: (path) => path.startsWith(`${REVIEWS_DIR}/`),
+    layout: (path) => (parseReviewPath(path) ? null : REVIEWS_LAYOUT),
+    denied: (roles, path) => {
+      if (roles.admin || may.granted(roles, path)) return null;
+      const source = reviewSourceOf(path);
+      return `only the bot granted ${source ? `reviews/${source}/` : 'a source'} can change it, and admins`;
+    },
+  },
+];
+
+/** Every rule of a kind's pages, in the order they are tried. */
+function rulesOf(kind: PageKind): PathRule[] {
+  const { owners, community } = KINDS[kind];
+  const ownersRefusal =
+    kind === 'user'
+      ? 'only this account can change its page'
+      : `only this ${kind}'s ${owners?.noun} can edit ${OWNERS_DIR}/`;
+  const systemPaths = kind === 'paper' ? SYSTEM_PATHS : new Set([METADATA_PATH]);
+  return [
+    {
+      covers: (path) => path.startsWith(`${SYSTEM_DIR}/`) || path === GITATTRIBUTES_PATH || path === PREK_PATH,
+      layout: (path) =>
+        systemPaths.has(path) || path === GITATTRIBUTES_PATH || path === PREK_PATH ? null : kindLayout(kind),
+      denied: may.system,
+    },
+    ...(owners ? [partRule(kind, OWNERS_DIR, may.owners(ownersRefusal))] : []),
+    ...(community ? [partRule(kind, 'community', may.verified)] : []),
+    ...(kind === 'paper' ? PAPER_RULES : [kindFileRule(kind)]),
+    // Data owned by one extension (DESIGN.md §10). Nobody can act as one until extensions exist.
+    {
+      covers: (path) => path.startsWith('extensions/'),
+      layout: fine,
+      denied: () => 'this path is reserved for extensions',
+    },
+  ];
+}
+
+const RULES = Object.fromEntries(PAGE_KINDS.map((kind) => [kind, rulesOf(kind)])) as Record<PageKind, PathRule[]>;
+
+function ruleFor(path: string, kind: PageKind): PathRule | undefined {
+  return RULES[kind].find((rule) => rule.covers(path));
 }
 
 /** Why nothing can be written at this path on a page of this kind, or `null`. Deleting a file needs no such check. */
 export function layoutProblem(path: string, kind: PageKind = 'paper'): string | null {
-  if (path === METADATA_PATH || path === GITATTRIBUTES_PATH || path === PREK_PATH) return null;
-  if (path.startsWith('extensions/')) return null;
-  if (kind === 'paper' && path === AUTHOR_PLUGINS_PATH) return null;
-  const part = partOf(path, kind);
-  if (part) {
-    return sectionName(path, part) || isLabeledLinksPath(path, kind)
-      ? null
-      : `${part}/ holds one file per section, named like 10-summary.md or 20-results.html (two digits, a lower-case slug), and ${LINKS_FILE}`;
-  }
-  if (kind !== 'paper') return path === KINDS[kind].kindFile ? null : kindLayout(kind);
-  if (SYSTEM_PATHS.has(path) || path === THUMBNAIL_PATH) return null;
-  if (thumbnailImageType(path)) return null;
-  if (path.startsWith(`${REVIEWS_DIR}/`)) return parseReviewPath(path) ? null : REVIEWS_LAYOUT;
-  if (path.startsWith(`${LINKS_DIR}/`)) {
-    return isLinkPath(path) ? null : 'links/ holds one file per link, named like 10-code.json';
-  }
-  if (path.startsWith(`${VERSIONS_DIR}/`)) {
-    return versionIdOf(path) || versionPdfIdOf(path)
-      ? null
-      : 'versions/ holds a file per version, named like v_k3x9q2ab.json, and its PDF beside it as v_k3x9q2ab.pdf';
-  }
-  if (isDemoPath(path)) {
-    const demo = demoPath(path);
-    if (!demo || !DEMO_NAME.test(demo.name) || demo.name.length > MAX_DEMO_NAME) {
-      return 'demos/ holds one folder per demo, named like demos/my-demo/ (lower-case letters, digits and dashes)';
-    }
-    const dot = demo.inside.lastIndexOf('.');
-    const extension = dot === -1 ? '' : demo.inside.slice(dot + 1);
-    if (!DEMO_EXTENSIONS.has(extension)) {
-      return `a demo's files are text: ${[...DEMO_EXTENSIONS].map((e) => `.${e}`).join(' ')} (binary files come from GitHub)`;
-    }
-    return null;
-  }
-  return LAYOUT;
+  const rule = ruleFor(path, kind);
+  return rule ? rule.layout(path) : kindLayout(kind);
 }
 
 export const MAX_FILE_BYTES = 256 * 1024;
@@ -449,84 +565,13 @@ export function grantProblem(pattern: string, kind: PageKind = 'paper'): string 
   return null;
 }
 
-const CONFIRM = 'confirm an institutional email address first';
-
 /**
- * Who may write a page of a kind other than a paper (`handoffs/pages.md`): the owners' part is its owners' (a
- * venue's confirmed organisers, an org's verified members, the account a user page is); `community/` anyone
- * verified; the kind file its owners and the bot granted it on a venue or an org, anyone verified on a topic.
- * Admins may write anything but the system's files' fixed content.
+ * Why these roles cannot write this path on a page of this kind, or `null`. Checked for each path of a commit. Admins
+ * may write anything but the system's files' fixed content and a person's profile.
  */
-function kindPathDenied(path: string, roles: Roles, kind: Exclude<PageKind, 'paper'>): string | null {
-  const { owners, kindFile } = KINDS[kind];
-  const owner = roles.owner || roles.admin;
-  const granted = roles.grants?.some((pattern) => grantCovers(pattern, path)) ?? false;
-  if (path === kindFile) {
-    // A person's profile.json is written by the site from their `user.show.*` settings (`server/user-pages.ts`),
-    // which are what count, so the file and the settings never disagree.
-    if (kind === 'user') {
-      return roles.system ? null : `${kindFile} follows your user.show.* settings: change them at /settings`;
-    }
-    if (roles.system) return 'the system only writes the metadata';
-    if (kind === 'topic') return roles.verified || roles.admin ? null : CONFIRM;
-    return owner || granted
-      ? null
-      : `only this ${kind}'s ${owners?.title.toLowerCase()} and admins can change ${kindFile}`;
-  }
-  const part = partOf(path, kind);
-  if (part && part === owners?.dir) {
-    if (kind === 'user') return owner ? null : 'only this account can change its page';
-    return owner ? null : `only this ${kind}'s ${owners.title.toLowerCase()} can edit ${part}/`;
-  }
-  if (part === 'community') {
-    if (roles.system) return 'the system only writes the metadata';
-    return roles.verified || roles.admin ? null : CONFIRM;
-  }
-  if (path.startsWith('extensions/')) return 'this path is reserved for extensions';
-  return kindLayout(kind);
-}
-
-/** Why these roles cannot write this path on a page of this kind, or `null`. Checked for each path of a commit. */
 export function pathDenied(path: string, roles: Roles, kind: PageKind = 'paper'): string | null {
-  if (path.startsWith(`${SYSTEM_DIR}/`) || path === GITATTRIBUTES_PATH || path === PREK_PATH) {
-    return roles.system || roles.admin ? null : `only the system and admins can change ${SYSTEM_DIR}/`;
-  }
-  if (kind !== 'paper') return kindPathDenied(path, roles, kind);
-  if (path.startsWith(`${VERSIONS_DIR}/`)) {
-    return roles.system || roles.admin || roles.verified ? null : 'confirm an institutional email address first';
-  }
-  if (path === THUMBNAIL_PATH || thumbnailImageType(path) || path.startsWith(`${LINKS_DIR}/`)) {
-    if (roles.system) return 'the system only writes the metadata';
-    if (roles.admin) return null;
-    if (roles.claimed)
-      return roles.owner ? null : "only this paper's confirmed authors can change its picture and links";
-    return roles.verified ? null : 'confirm an institutional email address first';
-  }
-  if (path.startsWith('author/')) {
-    // The authors' labeled links are theirs as their sections are, and say so (`origin`, DESIGN.md §8).
-    return roles.owner || roles.admin ? null : "only this paper's confirmed authors can edit its author section";
-  }
-  if (path.startsWith('community/')) {
-    if (roles.system) return 'the system only writes the metadata';
-    return roles.verified || roles.admin ? null : 'confirm an institutional email address first';
-  }
-  // As the community section, since either section may show a demo. A folder the author section shows is
-  // its authors' alone, which `commit.ts` checks, as it needs the sections' text.
-  if (isDemoPath(path)) {
-    if (roles.system) return 'the system only writes the metadata';
-    return roles.verified || roles.admin ? null : 'confirm an institutional email address first';
-  }
-  // A source's imported submissions and reviews: only the bot granted the source writes them (DESIGN.md §4.3),
-  // so what a page shows as a venue's reviews is what the venue published.
-  if (path.startsWith(`${REVIEWS_DIR}/`)) {
-    if (roles.admin) return null;
-    if (roles.grants?.some((pattern) => grantCovers(pattern, path))) return null;
-    const source = reviewSourceOf(path);
-    return `only the bot granted ${source ? `reviews/${source}/` : 'a source'} can change it, and admins`;
-  }
-  // Data owned by one extension (DESIGN.md §10). Nobody can act as one until extensions exist.
-  if (path.startsWith('extensions/')) return 'this path is reserved for extensions';
-  return LAYOUT;
+  const rule = ruleFor(path, kind);
+  return rule ? rule.denied(roles, path) : kindLayout(kind);
 }
 
 function jsonValueProblem(value: unknown, depth = 0): string | null {

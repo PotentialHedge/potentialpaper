@@ -101,7 +101,7 @@ async function readKindFile(
   return { kindFile, name: pageName(page.kind, page.key, kindFile) };
 }
 
-/** A paper's `author/plugins.json`, if it has one that parses. */
+/** A paper's `owners/plugins.json`, if it has one that parses. */
 async function readAuthorPlugins(
   db: Reader,
   page: PageRow,
@@ -119,7 +119,7 @@ export async function writeCurrent(tx: Writer, pageId: string, head: string, com
   const thumbnail = await readThumbnail(tx, pageId, files);
   const links = await readLinks(tx, pageId, files);
   const versions = await readVersions(tx, pageId, files);
-  // The owners' part (a paper's `author/`, a venue's `organizers/`, …) goes in the `author_*` columns.
+  // The owners' part, `owners/`, goes in the `author_*` columns.
   const page = await mustPage(tx, pageId);
   const { owners, community: hasCommunity } = KINDS[page.kind];
   const ownersPart = owners?.dir ?? null;
@@ -137,7 +137,7 @@ export async function writeCurrent(tx: Writer, pageId: string, head: string, com
     head: toBytes(head),
     authorMarkdown: partSource(author),
     communityMarkdown: partSource(community),
-    authorHtml: renderPart(author, ownersPart ?? 'author', demos),
+    authorHtml: renderPart(author, ownersPart ?? 'owners', demos),
     communityHtml: renderPart(community, 'community', demos),
     pdf,
     thumbnail,

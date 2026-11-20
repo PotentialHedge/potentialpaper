@@ -16,8 +16,7 @@ import { grantCovers, partOf } from './pages/rules';
  *   fresh account can't take part in an edit war;
  * - `admins`: admins only.
  *
- * It holds the paths the community writes. The owners' part (a paper's `author/`, a venue's `organizers/`, an org's
- * `members/`, a person's `about/`) stays its owners', a bot's granted paths stay the bot's, and the system is never
+ * It holds the paths the community writes. The owners' part (`owners/`) stays its owners', a bot's granted paths stay the bot's, and the system is never
  * held: protection is against edit wars among people, not a way to take a page from those it belongs to. Checked for
  * every commit, a web edit or a push alike (`check.ts`'s `checkTree`).
  */

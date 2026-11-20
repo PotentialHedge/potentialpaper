@@ -191,8 +191,8 @@ big files. `src/server/pages/rules.ts` is the authority.
 .potentialpaper/metadata.json   system: layout version, identifiers, title, authors, abstract snapshot
 .potentialpaper/paper.pdf       system: the paper's PDF (Git LFS)
 .potentialpaper/pdf.json        system: its source page, license and when it was fetched
-author/10-tl-dr.md              the author section, one file per section
-author/20-results.html          … in Markdown or HTML
+owners/10-tl-dr.md              the owners' sections (a paper's confirmed authors'), one file per section
+owners/20-results.html          … in Markdown or HTML
 community/10-summary.md         the community section, the same way
 versions/v_k3x9q2ab.json        a version of the paper; the file's name is its id
 versions/v_k3x9q2ab.pdf         that version's PDF (Git LFS)
@@ -210,12 +210,21 @@ extensions/<id>/...             reserved: data owned by one extension (section 1
 **Pages of every kind** (decided 2026-11-16, built in `handoffs/pages.md` Phase 1). A paper is the first kind of
 page; venues (`/v/iclr/2027`), topics (`/t/<slug>`), organisations (`/o/<slug>`) and people (`/u/<handle>`) are
 pages built the same way, each a repo with the same shape: `.gitattributes`, `prek.toml` and
-`.potentialpaper/metadata.json` (`{ layout, kind, key }`) for the system; its parts' sections, the owners'
-(`author/` on a paper, `organizers/`, `members/`, `about/`) and `community/` (all but a user's); each part's
-`links.jsonl` (§8); its kind file (`venue.json`, `topic.json`, `org.json`, `profile.json`); and `extensions/`. The
-kind registry, `src/lib/kinds.ts`, declares each kind's address, kind file and schema, parts, slots
-(`<kind>.main`, `<kind>.aside`, `<kind>.tabs`), file types and plugin context keys, and `rules.ts` takes the
-page's kind. Every table of the page store is keyed by `page_id` (`pages(id, kind, key)`); a paper's page id is its
+`.potentialpaper/metadata.json` (`{ layout, kind, key }`) for the system; its parts' sections, `owners/` (on every
+kind with owners) and `community/` (all but a user's); each part's `links.jsonl` (§8); its kind file (`venue.json`,
+`topic.json`, `org.json`, `profile.json`); and `extensions/`. The kind registry, `src/lib/kinds.ts`, declares each
+kind's address, kind file and schema, parts, **how its owners are confirmed** (a paper's authors by claim, a venue's
+organisers by a claim an admin decides, an org's members by address, a person's page by being the account; a topic
+has none), slots (`<kind>.main`, `<kind>.aside`, `<kind>.body`, `<kind>.tabs`), file types and plugin context keys;
+`rules.ts` holds one table of path rules per kind, which decides both what a page may hold and who writes it.
+
+**One page, every kind** (decided 2026-11-20). Every kind is shown by the same page (`components/pages/PageView.tsx`):
+a header with the same actions (edit, share, history; on a paper also cite, follow and the page for agents), the page
+itself as the first tab (`main` beside `aside`, `body` below both) and `tabs` panels beside it. Its sections read as
+one document: the owners' first, labelled as theirs, then the community's; while nobody owns the page their part is
+one line asking them in. The page tools (`/code`, `/history`, `/diff`, `/claim`, and a paper's `/versions`) work on
+every kind, in front of its address (`/history/v/iclr/2027`). A paper is at its canonical address only
+(`/abs/<arXiv id>` when it has one): its other identifiers' addresses redirect there. Every table of the page store is keyed by `page_id` (`pages(id, kind, key)`); a paper's page id is its
 paper id. Other kinds' pages are made by `createPage` (`npm run pages:create`), which starts their repo with the
 system's commit, and are cloned and pushed at `/git/<kind>/<key>.git` (or over SSH at their own address).
 
@@ -225,7 +234,7 @@ and its submissions by status with filters (status, decision, words in the title
 editions. The `venues` bot, granted `venue.json` on venue pages, makes both pages for every venue an import knows
 (`venues` rows → the edition's `sources`), and only ever adds a missing source to a `venue.json` someone wrote. A
 venue's owners are its confirmed organisers (`page_claims`, the author claim flow with the venue as what is claimed,
-decided by an admin); a series' organisers also own its editions. They write `organizers/` and `venue.json` under
+decided by an admin); a series' organisers also own its editions. They write `owners/` and `venue.json` under
 their own handle's identity, since organising is a public role.
 A venue's page also shows its review scores (`scores`, from `scope_stats`, §10): the first score field as a
 histogram stacked by outcome, and every field's median, middle half and medians by decision, per venue on a series.
@@ -234,7 +243,7 @@ histogram stacked by outcome, and every field's median, middle half and medians 
 handle and made with the account by a trigger on `accounts` (migration `0037`, which also made one for every existing
 account); its repo starts at sign-up (`npm run users:pages` starts the rest). A handle change moves the page's key in
 the same transaction and leaves a redirect (`page_redirects`): `/u/<old>` and `user:<old>` lead to the page until
-another account takes the old handle. The page shows its handle, its `about/` and its links, and of the rest only what
+another account takes the old handle. The page shows its handle, its `owners/` and its links, and of the rest only what
 the account turned on (§5.3): its real name, institutions, the papers it is a confirmed author of, its activity
 (commits under its handle, from the outbox) and its comments under its handle, each a `user.show.*` setting
 (`lib/user-pages.ts`). Its `profile.json` repeats the choices, never the values, and is written only by the site
@@ -251,7 +260,7 @@ when their address is confirmed. It only ever adds missing domains and a missing
 wrote. Departments and labs are made by the institution's verified members (`/new/org/<key>`,
 `POST /api/v1/pages/{identifier}/children`). **Members** are the accounts with a confirmed address at one of the
 org's domains or under one (`inf.ethz.ch` under `ethz.ch`), on the page or an org above it by address; they own
-`members/` and `org.json`. A top-level org's domains are changed only by admins and the bot, and a department's must
+`owners/` and `org.json`. A top-level org's domains are changed only by admins and the bot, and a department's must
 be its organisation's or under them, so nobody widens an org to take in another institution's people or papers.
 **Its papers** (`page_members`, `via` `affiliation`, §4.9) are those with a confirmed author claim by a verified
 member who shows their institution (weight 1), and those whose page 1 prints an address at one of its domains or
@@ -267,7 +276,7 @@ is refused (`topic_exists`); the forms list similar topics as one types. Its `to
 optional `broader` topics (a loose DAG, by slug, each a topic that exists); its article is `community/` ("What it
 is", "Key ideas", "History", "Open problems" as the editor's starting headings); `related` links (§8) name related
 topics. **A paper is in a topic** through its own labeled link, `in-topic` or `introduces-topic`, in its
-`community/links.jsonl`, or its `author/links.jsonl` when one of its confirmed authors adds it; a topic's papers roll
+`community/links.jsonl`, or its `owners/links.jsonl` when one of its confirmed authors adds it; a topic's papers roll
 up from the topics it is broader than. The page reads as an article: its names and where to edit it, the article,
 where it started (the papers that introduced it); beside them its broader, narrower and related topics, the venues
 and organisations its papers are at by count, and its links; below, its papers, sortable by date, venue and review
@@ -307,7 +316,7 @@ attribute can name a filter and filters run programs on a clone.
 | `.gitattributes`          | System, admins, and only its fixed content                                                  |
 | `versions/**`             | Any verified account, system ingest, admins                                                 |
 | `thumbnail.*`, `links/**` | Confirmed authors once claimed, any verified account before, admins                         |
-| `author/**`               | Confirmed authors of this paper, admins                                                     |
+| `owners/**`               | The page's owners (on a paper its confirmed authors), admins                                |
 | `community/**`            | Any verified account, subject to page protection                                            |
 | `demos/<name>/**`         | Any verified account; a folder the author section shows, only its confirmed authors; admins |
 | `reviews/<source>/**`     | Only the bot granted `<source>` (`openreview` is our importer), admins                      |
@@ -798,7 +807,7 @@ below it.
 ### Format
 
 A link is a statement made **on the source page about the target**. It lives as one line in that
-page's `<part>/links.jsonl` (`community/links.jsonl`, `author/links.jsonl`), so it gets history, revert and blame with no extra machinery:
+page's `<part>/links.jsonl` (`community/links.jsonl`, `owners/links.jsonl`), so it gets history, revert and blame with no extra machinery:
 
 ```json
 {
@@ -816,7 +825,7 @@ page's `<part>/links.jsonl` (`community/links.jsonl`, `author/links.jsonl`), so 
   (`arxiv:…`, `doi:…`) or any other kind's (`venue:iclr/2027`, `topic:linear-attention`, `org:eth`, `user:alice`).
 - `page_links` is the query index, derived from git and rebuildable. It answers "what links here",
   which is shown on the target page as well as the source.
-- `origin` comes from the path: `author/` links show as author-asserted and `community/` links as
+- `origin` comes from the path: `owners/` links show as owner-asserted and `community/` links as
   community-asserted. Links where the editor is a confirmed author of either paper use their author
   identity and carry a COI badge, whichever repo the link is stored in.
 
@@ -950,7 +959,7 @@ Built 2026-11-16 (`handoffs/plugins.md` Phase 2). A plugin is a public repo (or 
   `tab`, or on a paper `submission` (under each of its submissions with scores, in the Submissions section, the frame
   told which as `pp.context.surface.submission`), `community` (at the end of the Community section), `body` (below
   both columns) or `author` (at the end of the author section, only where the paper's authors list the panel in
-  `author/plugins.json`, `lib/plugins/author-plugins.ts`), one for every kind or one per kind; the place it
+  `owners/plugins.json`, `lib/plugins/author-plugins.ts`), one for every kind or one per kind; the place it
   prefers, and a reader moves a `movable` panel (the default) to another in `<kind>.panels.placement`, never into
   or out of the author section, as `{ "paper": "submission", "*": "main" }`; the frame is told its `surface.place`
   and `surface.size`, and `surface.resize` when that changes), `pages` (whole pages at
@@ -1020,7 +1029,7 @@ Arbitrary JavaScript on the main origin could act as any signed-in user. So:
   `https://ppusercontent.com/sdk/v1/pp.js`, with `pp.d.ts` beside it; `examples/plugins/hello/` uses it.
 - The reads go through public routes anyone can call, `GET /api/v1/pages/<identifier>` and its `/files`, `/members`
   and `/submissions`, so a plugin's own backend reads the same data; they give only what the page shows the public
-  (a user page's `about/` and links, and only the items its account shows, `userPageView`, §5.3).
+  (a user page's `owners/` and links, and only the items its account shows, `userPageView`, §5.3).
 - **Consent is not in settings.json.** The document lists installed plugins (the `plugins` key), and a hand-edited
   file can add one, but a grant row (`user_plugin_grants`: plugin id, SHA, permissions, network origins) records
   what was approved. A plugin whose manifest asks for anything its grant lacks shows an approval prompt instead of

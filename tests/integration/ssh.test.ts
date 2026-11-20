@@ -228,7 +228,7 @@ describe('git over SSH', () => {
     const clone = await cloneAs(key, sshUrl(`abs/${id.value}.git`), name);
     const head = await readHead(getDb(), paperId);
 
-    commit(clone, { 'author/10-tl-dr.md': '# TL;DR\n' });
+    commit(clone, { 'owners/10-tl-dr.md': '# TL;DR\n' });
     const author = await gitWith(key, ['push', 'origin', 'main'], clone);
     expect(author.ok).toBe(false);
     expect(author.output).toMatch(/remote: commit [0-9a-f]{7}: .*author/);

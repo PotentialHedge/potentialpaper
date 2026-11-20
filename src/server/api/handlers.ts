@@ -24,7 +24,7 @@ import { addSshKey, listSshKeys, removeSshKey } from '../ssh-keys';
 import { previewDemoSources } from '../demos/attach';
 import { snapshotDemo } from '../demos/snapshot';
 import { demoUrl } from '@/lib/demos';
-import { formatIdentifier, keyedPagePath } from '@/lib/kinds';
+import { addressOfRef, formatIdentifier, keyedPagePath, pagePath, pageRefOf } from '@/lib/kinds';
 import { addCoAuthor, ownClaim, requestClaim, withdrawClaim } from '../claims';
 import { authoredPapers } from '../my-papers';
 import {
@@ -42,7 +42,7 @@ import { renderMarkdown } from '../pages/markdown';
 import { getDb } from '@/db';
 import { pageCurrent } from '@/db/schema';
 import { eq } from 'drizzle-orm';
-import { refreshPageIds, refreshPaperPages } from '../pages/refresh';
+import { refreshPageIds, refreshPages, refreshPaperPages } from '../pages/refresh';
 import { fetchPdf, storeFile } from '../files';
 import { mergeFoundVersions, setVersions, versionsAt } from '../versions';
 import { lookUpVersions } from '../version-sources';
@@ -77,6 +77,7 @@ import { identityTokenFor } from '../plugins/identity';
 import { DISCOVER_CACHE_MS, discoverPlugins } from '../plugins/discover';
 import { pluginUpdates, updatePlugin } from '../plugins/updates';
 import { findPage } from '../pages/kinds';
+import { namedPage } from '../pages/named';
 import { isClaimable, ownPageClaim, requestPageClaim, withdrawPageClaim } from '../page-claims';
 import { presentVenuePapers } from '../venue-pages';
 import { createOrgChild, orgOverview, presentOrgOverview } from '../org-pages';
@@ -321,6 +322,18 @@ async function knownPaper(scheme: z.infer<typeof S.PaperSchemeParam>, value: str
 }
 
 /**
+ * A page of any kind, as `{ scheme, value }` names it (`S.PageIdentifier`), at its canonical address: what the web
+ * editor and revert work on. Refreshing it after a commit refreshes each of a paper's addresses.
+ */
+async function knownPage(ref: { scheme: string; value: string }) {
+  const asked = addressOfRef(ref);
+  const found = asked && (await namedPage(asked));
+  if (!found) throw new ApiError(404, 'not_found', 'no page with that identifier');
+  const identifiers = found.paper?.identifiers ?? [];
+  return { ...found, title: found.name, refresh: () => refreshPages(found.address, identifiers) };
+}
+
+/**
  * Copies a demo from a public GitHub repo or gist, for the editor to insert into a section as a block.
  * Slow: it downloads the repo. Commits nothing: the block does, with the edit.
  */
@@ -369,11 +382,11 @@ export const postRender = route(async (req) => {
 /** Undoes one commit, keeping everything since, as `git revert` does. */
 export const postRevert = route(async (req) => {
   const principal = await requireVerified(req);
-  const { paper: id, oid, summary, evidence } = await parseBody(req, S.RevertBody);
-  const { paper, identifiers } = await knownPaper(id.scheme, id.value);
-  const result = await revertCommit(paper.id, oid, actorOf(principal), summary?.trim() || undefined, { evidence });
-  if (result.status === 'committed') await refreshPaperPages(identifiers);
-  notifyEdit(paper.id, principal, result);
+  const { paper: ref, oid, summary, evidence } = await parseBody(req, S.RevertBody);
+  const { page, refresh } = await knownPage(ref);
+  const result = await revertCommit(page.id, oid, actorOf(principal), summary?.trim() || undefined, { evidence });
+  if (result.status === 'committed') await refresh();
+  notifyEdit(page.id, principal, result);
   return respond(S.PageCommitted, committed(result), { principal });
 });
 
@@ -812,16 +825,14 @@ export const getMyMentions = route(async (req) => {
  */
 export const getWorkspace = route(async (req) => {
   const principal = await authenticate(req);
-  const { scheme, value } = parseQuery(req, S.PaperQuery);
-  const { paper, identifiers } = await knownPaper(scheme, value);
-  const id = canonicalPaperId(identifiers) ?? { scheme, value };
-  const workspace = await readWorkspace(paper.id, principal ? actorOf(principal) : null);
+  const { page, address, title } = await knownPage(parseQuery(req, S.PageQuery));
+  const workspace = await readWorkspace(page.id, principal ? actorOf(principal) : null);
   return respond(
     S.WorkspaceResponse,
     {
       ...workspace,
-      paper: { ...id, title: paper.title, path: paperPath(id) },
-      clone: cloneAddresses(id),
+      paper: { ...(pageRefOf(address) as z.infer<typeof S.PageIdentifier>), title, path: pagePath(address) },
+      clone: cloneAddresses(address),
     },
     { principal, headers: { 'Cache-Control': 'private, no-store' } },
   );
@@ -829,8 +840,8 @@ export const getWorkspace = route(async (req) => {
 
 export const getWorkspaceBlob = route(async (req) => {
   const { scheme, value, oid } = parseQuery(req, S.WorkspaceBlobQuery);
-  const { paper } = await knownPaper(scheme, value);
-  const body = await readBlob(paper.id, oid);
+  const { page } = await knownPage({ scheme, value });
+  const body = await readBlob(page.id, oid);
   return new Response(new Uint8Array(body), {
     headers: {
       'Content-Type': 'application/octet-stream',
@@ -843,11 +854,11 @@ export const getWorkspaceBlob = route(async (req) => {
 
 export const postWorkspaceCommit = route(async (req) => {
   const principal = await requireVerified(req);
-  const { paper: id, ...commit } = await parseBody(req, S.WorkspaceCommitBody);
-  const { paper, identifiers } = await knownPaper(id.scheme, id.value);
-  const result = await commitWorkspace(paper.id, actorOf(principal), commit);
-  if (result.status === 'committed') await refreshPaperPages(identifiers);
-  notifyEdit(paper.id, principal, result);
+  const { paper: ref, ...commit } = await parseBody(req, S.WorkspaceCommitBody);
+  const { page, refresh } = await knownPage(ref);
+  const result = await commitWorkspace(page.id, actorOf(principal), commit);
+  if (result.status === 'committed') await refresh();
+  notifyEdit(page.id, principal, result);
   return respond(S.WorkspaceCommitted, committed(result), { principal });
 });
 
@@ -864,12 +875,12 @@ export const postWorkspaceFile = route(async (req) => {
     const v = form.get(name);
     return typeof v === 'string' ? v : '';
   };
-  const { scheme, value } = parseParam({ scheme: field('scheme'), value: field('value') }, S.PaperQuery, 'paper');
-  const { paper } = await knownPaper(scheme, value);
+  const ref = parseParam({ scheme: field('scheme'), value: field('value') }, S.PageQuery, 'paper');
+  const { page } = await knownPage(ref);
   const file = form.get('file');
   if (!(file instanceof File) || file.size === 0) throw new ApiError(400, 'validation_error', 'send a file');
   const stored = await storeWorkspaceFile(
-    paper.id,
+    page.id,
     { kind: 'account', accountId: principal.account.id, isAdmin: principal.isAdmin },
     field('path'),
     Buffer.from(await file.arrayBuffer()),
@@ -880,9 +891,9 @@ export const postWorkspaceFile = route(async (req) => {
 /** Changes made from an older head, merged onto the current one with conflict markers; nothing is committed. */
 export const postWorkspaceRebase = route(async (req) => {
   const principal = await requireAuth(req);
-  const { paper: id, baseOid, changes } = await parseBody(req, S.WorkspaceRebaseBody);
-  const { paper } = await knownPaper(id.scheme, id.value);
-  return respond(S.WorkspaceRebased, await rebaseWorkspace(paper.id, baseOid, changes), { principal });
+  const { paper: ref, baseOid, changes } = await parseBody(req, S.WorkspaceRebaseBody);
+  const { page } = await knownPage(ref);
+  return respond(S.WorkspaceRebased, await rebaseWorkspace(page.id, baseOid, changes), { principal });
 });
 
 // Plugins (`handoffs/plugins.md` Phase 2, `server/plugins/`).
