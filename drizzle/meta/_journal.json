@@ -330,6 +330,13 @@
       "when": 1795162762700,
       "tag": "0046_author_plugins",
       "breakpoints": true
+    },
+    {
+      "idx": 47,
+      "version": "7",
+      "when": 1795213433672,
+      "tag": "0047_page_analytics",
+      "breakpoints": true
     }
   ]
 }

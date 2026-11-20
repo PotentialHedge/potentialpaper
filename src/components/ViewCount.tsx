@@ -35,6 +35,39 @@ function previousPage(pageId: string): string | null {
 }
 
 /**
+ * Measure how long the page is in view, and report it once as the reader leaves it (`POST /api/v1/views/time`):
+ * closing the tab, putting it in the background, or going to another page in the app. Only time it was visible
+ * counts. Returns the cleanup that reports on a client-side navigation.
+ */
+function reportTimeOnPage(pageId: string): () => void {
+  let visibleMs = 0;
+  let since: number | null = document.visibilityState === 'visible' ? performance.now() : null;
+  let sent = false;
+  const report = () => {
+    if (since !== null) visibleMs += performance.now() - since;
+    since = null;
+    if (sent || visibleMs < 1000) return;
+    sent = true;
+    try {
+      navigator.sendBeacon('/api/v1/views/time', JSON.stringify({ page: pageId, seconds: Math.round(visibleMs / 1000) }));
+    } catch {
+      // No beacon: the time is simply not counted.
+    }
+  };
+  const onVisibility = () => {
+    if (document.visibilityState === 'visible') since ??= performance.now();
+    else report();
+  };
+  document.addEventListener('visibilitychange', onVisibility);
+  window.addEventListener('pagehide', report);
+  return () => {
+    document.removeEventListener('visibilitychange', onVisibility);
+    window.removeEventListener('pagehide', report);
+    report();
+  };
+}
+
+/**
  * A page's unique viewers, as acceptodds shows a listing's: counted from the browser (`POST /api/v1/views`), so a
  * page served from the cache still counts and a crawler that runs no script does not. Sent with the session cookie,
  * so a signed-in reader counts as their account rather than as their network. The page is the same cached HTML for
@@ -61,6 +94,8 @@ export function ViewCount({ pageId, className = 'text-muted' }: { pageId: string
       .catch(() => {});
     return () => abort.abort();
   }, [pageId]);
+
+  useEffect(() => reportTimeOnPage(pageId), [pageId]);
 
   if (views === null || views < MIN_SHOWN_VIEWS) return null;
   return (

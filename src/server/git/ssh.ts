@@ -4,6 +4,7 @@ import { Server, utils, type AuthContext, type Connection, type ServerChannel } 
 import type { Database } from '@/db';
 import type { Account } from '@/db/schema';
 import { findRepo, type GitAddress, parseGitAddress } from '../pages/clone';
+import { countQuietly } from '../page-analytics';
 import { consume, rateLimitConfig } from '../ratelimit';
 import { findSshKey, fingerprintOf, touchSshKey } from '../ssh-keys';
 import { pageReceiveTarget } from './page-push';
@@ -328,6 +329,7 @@ async function serve(
   // exit status, so the client's ssh exits 255 and git reports the fetch as failed.
   const reader = new PktReader(channel.iterator({ destroyOnReturn: false }));
   if (service === 'git-upload-pack') {
+    countQuietly(repo.pageId, 'git', { accountId: account.id, ip: null });
     output = uploadPackSession(pageRepo(ctx.database, repo.pageId), reader, protocolVersion(gitProtocol));
   } else {
     // As `authenticateGitPush`: a person needs a confirmed address; a bot account is let through.

@@ -362,6 +362,20 @@ export const FollowBody = z.object({ paper: PaperIdentifier });
 /** A page's beacon: its id (a paper's is the paper's id), and the page this tab read just before, if any. */
 export const ViewBody = z.object({ page: z.uuid(), from: z.string().max(100).optional() });
 export const ViewState = z.object({ views: z.number().int() });
+export const ViewTimeBody = z.object({ page: z.uuid(), seconds: z.number().min(0).max(86_400) });
+export const AnalyticsQuery = z.object({ page: z.uuid() });
+const RelatedPage = z.object({ name: z.string(), address: z.string(), count: z.number().int() });
+/** A page's analytics, for its owners (`server/page-analytics.ts`). Totals only, never who. */
+export const Analytics = z.object({
+  days: z.array(
+    z.object({ day: z.string(), views: z.number().int(), git: z.number().int(), agent: z.number().int() }),
+  ),
+  totalViews: z.number().int(),
+  time: z.array(z.number().int()),
+  institutions: z.array(z.object({ name: z.string(), visitors: z.number().int() })),
+  next: z.array(RelatedPage),
+  previous: z.array(RelatedPage),
+});
 export const TransitionsQuery = z.object({ min: z.coerce.number().int().min(1).default(1) });
 /** How many visitors read one page and then another, per ordered pair, most first. Totals only. */
 export const Transitions = z.object({

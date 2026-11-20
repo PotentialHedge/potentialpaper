@@ -1222,6 +1222,52 @@ export const pageTransitionVisits = pgTable(
 );
 
 /**
+ * A page's analytics, per UTC day (`server/page-analytics.ts`), for its owners only: `metric` is `views` (unique
+ * visitors, as `pages.view_count`), `git` (clones and pulls, unique per visitor), `agent` (reads of its agent page,
+ * unique per visitor), or `time:<bucket>` (how long a visitor kept it open, `TIME_BUCKETS`). Totals only, never who.
+ * No foreign keys, like `page_views`.
+ */
+export const pageDailyCounts = pgTable(
+  'page_daily_counts',
+  {
+    pageId: uuid('page_id').notNull(),
+    day: date('day', { mode: 'string' }).notNull(),
+    metric: text('metric').notNull(),
+    count: integer('count').notNull().default(0),
+  },
+  (t) => [primaryKey({ columns: [t.pageId, t.day, t.metric] })],
+);
+
+/**
+ * How many signed-in visitors of each institution read a page in a UTC month (the month's first day), each counted
+ * once a month (`page_month_visitors`). Shown to the page's owners only for institutions with enough visitors that
+ * none of them can be told apart (`MIN_INSTITUTION_VISITORS`).
+ */
+export const pageInstitutionCounts = pgTable(
+  'page_institution_counts',
+  {
+    pageId: uuid('page_id').notNull(),
+    month: date('month', { mode: 'string' }).notNull(),
+    institution: text('institution').notNull(),
+    visitors: integer('visitors').notNull().default(0),
+  },
+  (t) => [primaryKey({ columns: [t.pageId, t.month, t.institution] })],
+);
+
+/**
+ * Who has been counted for `page_institution_counts` this month: an HMAC of the month, the account and the page, as
+ * `page_views`'s. Only this and last month's rows are kept.
+ */
+export const pageMonthVisitors = pgTable(
+  'page_month_visitors',
+  {
+    month: date('month', { mode: 'string' }).notNull(),
+    visitor: text('visitor').notNull(),
+  },
+  (t) => [primaryKey({ columns: [t.month, t.visitor] })],
+);
+
+/**
  * Who follows (stars) which paper (`server/follows.ts`): followers are mailed when the paper's page is edited or
  * someone comments on it. A confirmed author follows their paper from the moment their claim is confirmed, and can
  * unfollow it like anyone else. **Private:** only the count is public, never who.

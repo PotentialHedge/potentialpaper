@@ -15,6 +15,7 @@ import type { BuiltPanel } from './common';
  */
 export function PageView({
   kind,
+  pageId,
   plugins,
   header,
   actions,
@@ -22,6 +23,8 @@ export function PageView({
   after,
 }: {
   kind: PageKind;
+  /** For the Analytics tab its owners see (`Analytics.tsx`). */
+  pageId: string;
   plugins: PluginPageData;
   header: ReactNode;
   actions: ReactNode;
@@ -40,6 +43,7 @@ export function PageView({
             kind={kind}
             slot={slot('tabs')}
             panels={panels.tabs}
+            pageId={pageId}
             lead={{
               title: KINDS[kind].title,
               node: (

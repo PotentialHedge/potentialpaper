@@ -29,23 +29,23 @@ export interface Viewer {
   ip: string | null;
 }
 
-function who(viewer: Viewer): string {
+export function who(viewer: Viewer): string {
   return viewer.accountId ? `account:${viewer.accountId}` : `net:${ipNetwork(viewer.ip) ?? ''}`;
 }
 
-function hmac(message: string): string {
+export function hmacOf(message: string): string {
   return createHmac('sha256', process.env.BETTER_AUTH_SECRET ?? '')
     .update(message)
     .digest('hex');
 }
 
 export function visitorHash(day: string, viewer: Viewer): string {
-  return hmac(`view\0${day}\0${who(viewer)}`);
+  return hmacOf(`view\0${day}\0${who(viewer)}`);
 }
 
 /** The pair is inside the hash, so a row joins neither to a view nor to the visitor's other pairs. */
 export function transitionHash(day: string, viewer: Viewer, fromPageId: string, toPageId: string): string {
-  return hmac(`transition\0${day}\0${who(viewer)}\0${fromPageId}\0${toPageId}`);
+  return hmacOf(`transition\0${day}\0${who(viewer)}\0${fromPageId}\0${toPageId}`);
 }
 
 /** A date in UTC, as `YYYY-MM-DD`. */
@@ -81,6 +81,12 @@ export async function countView(
       update pages set view_count = view_count + 1
       where id = ${pageId}::uuid and exists (select 1 from ins)
       returning view_count
+    ),
+    -- The same visitor, by day, for its owners analytics (page-analytics.ts).
+    daily as (
+      insert into page_daily_counts (page_id, day, metric, count)
+      select ${pageId}::uuid, ${day}::date, 'views', 1 from ins
+      on conflict (page_id, day, metric) do update set count = page_daily_counts.count + 1
     )
     select coalesce((select view_count from bump), (select view_count from found)) as view_count
       from found

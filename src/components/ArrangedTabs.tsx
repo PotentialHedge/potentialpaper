@@ -1,6 +1,7 @@
 'use client';
 
 import { type ReactNode, useState } from 'react';
+import { AnalyticsPanel, usePageAnalytics } from '@/components/pages/Analytics';
 import { usePluginPanels } from '@/components/plugins/PluginPanel';
 import { ui } from '@/components/ui';
 import { arrangePanels, type PanelKind } from '@/lib/panels';
@@ -19,13 +20,16 @@ export function ArrangedTabs({
   slot,
   panels: builtIn,
   lead,
+  pageId,
 }: {
   kind: PanelKind;
   /** The slot's full name (`venue.tabs`), for plugins' panels, which join as tabs of their own. */
   slot?: string;
   panels: { id: string; title: string; node: ReactNode }[];
   lead?: { title: string; node: ReactNode };
+  pageId?: string;
 }) {
+  const analytics = usePageAnalytics(pageId);
   const hidden = useSetting<string[]>(`${kind}.panels.hidden`);
   const order = useSetting<string[]>(`${kind}.panels.order`);
   const panels = [...builtIn, ...usePluginPanels(slot)];
@@ -34,6 +38,11 @@ export function ArrangedTabs({
     hidden,
     order,
   );
+  const ANALYTICS = '\0analytics';
+  if (analytics) {
+    panels.push({ id: ANALYTICS, title: 'Analytics', node: <AnalyticsPanel data={analytics} kind={kind} /> });
+    ids.push(ANALYTICS);
+  }
   const [chosen, setChosen] = useState<string | null>(null);
   const LEAD = '';
   const tabs = lead ? [LEAD, ...ids] : ids;

@@ -141,6 +141,7 @@ export async function PaperRoute({ scheme, segments }: { scheme: PaperScheme; se
   };
   return (
     <PageView
+      pageId={paper.id}
       kind="paper"
       plugins={plugins}
       panels={buildPanels('paper', PAPER_PANELS, props)}

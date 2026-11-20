@@ -99,6 +99,7 @@ import {
   topicSuggestionList,
 } from '../topic-pages';
 import { countTransition, countView, transitionCounts } from '../view-counter';
+import { countInstitution, countTime, pageAnalytics } from '../page-analytics';
 import { ApiError } from './errors';
 import {
   clientIp,
@@ -595,7 +596,41 @@ export const postView = route(async (req) => {
   if (views === null) throw new ApiError(404, 'not_found', 'no page with that id');
   const fromId = S.IdParam.safeParse(from);
   if (fromId.success) await countTransition(fromId.data, page, viewer);
+  if (principal) await countInstitution(page, principal.account.id);
   return respond(S.ViewState, { views }, { principal });
+});
+
+/**
+ * How long the caller kept the page open, sent as they leave it (`navigator.sendBeacon`, so the body may come as
+ * text): their first report of the day counts, in a bucket (`page-analytics.ts`).
+ */
+export const postViewTime = route(async (req) => {
+  const principal = await authenticate(req);
+  let raw: unknown = null;
+  try {
+    raw = JSON.parse(await req.text());
+  } catch {
+    // Not JSON: refused below.
+  }
+  const body = S.ViewTimeBody.safeParse(raw);
+  if (!body.success) throw new ApiError(400, 'validation_error', 'expected { page, seconds }');
+  const { page, seconds } = body.data;
+  await countTime(page, seconds, { accountId: principal?.account.id, ip: clientIp(req) });
+  return new Response(null, { status: 204, headers: { 'Cache-Control': 'no-store' } });
+});
+
+/** A page's analytics (`page-analytics.ts`): its owners' and admins' only. */
+export const getPageAnalytics = route(async (req) => {
+  const principal = await requireAuth(req);
+  const { page } = parseQuery(req, S.AnalyticsQuery);
+  if (!principal.isAdmin) {
+    const roles = await rolesOf(getDb(), actorOf(principal), page);
+    if (!roles.owner) throw new ApiError(403, 'forbidden', "only the page's owners see its analytics");
+  }
+  return respond(S.Analytics, await pageAnalytics(page), {
+    principal,
+    headers: { 'Cache-Control': 'private, no-store' },
+  });
 });
 
 /** Totals of visitors who read one page and then another, for related papers. Admins only. */

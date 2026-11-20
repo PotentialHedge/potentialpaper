@@ -46,6 +46,8 @@ import * as myPapers from '@/app/api/v1/me/papers/route';
 import * as myCoAuthors from '@/app/api/v1/me/papers/co-authors/route';
 import * as follows from '@/app/api/v1/follows/route';
 import * as views from '@/app/api/v1/views/route';
+import * as viewTime from '@/app/api/v1/views/time/route';
+import * as analytics from '@/app/api/v1/analytics/route';
 import * as transitions from '@/app/api/v1/transitions/route';
 import * as mySettings from '@/app/api/v1/me/settings/route';
 import * as siteSettings from '@/app/api/v1/settings/route';
@@ -85,7 +87,7 @@ export const ORIGIN = 'http://test.local';
 
 export async function resetDatabase(): Promise<void> {
   await getDb().execute(sql`
-    truncate table signal_values, signal_labels, signals, signal_sets, page_views, page_transitions, page_transition_visits, identity_keys, topic_suggestions, page_protection, org_members_due, page_redirects, scope_stats, scope_state, page_claims, plugin_refs, plugin_snapshots, user_plugin_grants, user_plugin_storage, site_settings, user_settings, page_links, page_members, page_member_sources, page_scope_names, page_parents, page_ancestors, pages, paper_follows, search_docs, bot_grants, comment_mentions, comment_aliases, comments, lfs_objects, ssh_keys, evidence_files, agent_posts, agent_files, api_tokens, agent_codes, author_claims, demo_pins, demo_snapshots, submission_notes, submissions, venues, pdf_documents, consumer_cursors, page_events, page_current, page_revisions, page_refs, page_objects, commit_identities, paper_lookup_misses, paper_identifiers, papers, institution_domains, affiliations, accounts, rate_limit_buckets, announcements,
+    truncate table page_daily_counts, page_institution_counts, page_month_visitors, signal_values, signal_labels, signals, signal_sets, page_views, page_transitions, page_transition_visits, identity_keys, topic_suggestions, page_protection, org_members_due, page_redirects, scope_stats, scope_state, page_claims, plugin_refs, plugin_snapshots, user_plugin_grants, user_plugin_storage, site_settings, user_settings, page_links, page_members, page_member_sources, page_scope_names, page_parents, page_ancestors, pages, paper_follows, search_docs, bot_grants, comment_mentions, comment_aliases, comments, lfs_objects, ssh_keys, evidence_files, agent_posts, agent_files, api_tokens, agent_codes, author_claims, demo_pins, demo_snapshots, submission_notes, submissions, venues, pdf_documents, consumer_cursors, page_events, page_current, page_revisions, page_refs, page_objects, commit_identities, paper_lookup_misses, paper_identifiers, papers, institution_domains, affiliations, accounts, rate_limit_buckets, announcements,
       session, account, verification, "user"
     restart identity cascade
   `);
@@ -132,6 +134,8 @@ const ROUTES: [RegExp, any][] = [
   [/^\/me\/papers\/co-authors$/, myCoAuthors],
   [/^\/follows(\?.*)?$/, follows],
   [/^\/views$/, views],
+  [/^\/views\/time$/, viewTime],
+  [/^\/analytics(\?.*)?$/, analytics],
   [/^\/transitions$/, transitions],
   [/^\/me\/settings$/, mySettings],
   [/^\/plugins\/installed(\?.*)?$/, installedPlugins],

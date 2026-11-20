@@ -2,6 +2,8 @@ import { gunzipSync } from 'node:zlib';
 import { getDb, type Database } from '@/db';
 import { isContentHost } from '@/lib/demos';
 import { ApiError } from '../api/errors';
+import { clientIp } from '../api/http';
+import { countQuietly } from '../page-analytics';
 import { authenticateGitPush, GIT_REALM } from '../auth';
 import { answerGitRequest, findRepo, type GitAddress, parseGitAddress } from '../pages/clone';
 import { lfsBatch, lfsLocks, lfsUpload } from './lfs';
@@ -56,6 +58,8 @@ export async function gitGet(req: Request, database: Database = getDb()): Promis
     const repo = await findRepo(address, database);
     if (repo.kind === 'missing') return notFound();
     if (repo.kind === 'redirect') return redirect(repo.to, url.search);
+    // A clone or pull starts here, once per command: count it for the page's owners (`page-analytics.ts`).
+    countQuietly(repo.pageId, 'git', { ip: clientIp(req) });
     const version = protocolVersion(req.headers.get('git-protocol'));
     const body = await advertisement(pageRepo(database, repo.pageId), version);
     // Version 2 starts with its own `version 2` line; the older ones with the service, as http-backend does.
