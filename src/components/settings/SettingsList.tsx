@@ -181,6 +181,7 @@ function SettingRow({
       onChange={(v) => save({ [item.key]: v })}
       values={Object.fromEntries(Object.entries(keys).map(([k, s]) => [k, s.value]))}
       onChangeKey={(k, v) => save({ [k]: v })}
+      onChangeWith={(v, others) => save({ [item.key]: v, ...others })}
       label={item.title}
       disabled={busy}
     />

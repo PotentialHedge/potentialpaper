@@ -6,6 +6,7 @@ import {
   DndContext,
   type DragEndEvent,
   KeyboardSensor,
+  useDroppable,
   PointerSensor,
   useSensor,
   useSensors,
@@ -28,6 +29,10 @@ import { iconButtonClass } from './fields';
  * `actions` adds buttons of the caller's to each row (remove, edit), shown on hover; `trailing` adds a control of the
  * caller's at the end of each row, always shown (a switch); `below` adds content under a row that moves with it (its
  * sub-items).
+ *
+ * With `container`, it is one of several lists in a `DndContext` of the caller's, which handles drops (moving items
+ * between lists, `RankedOptions`); the list itself is a drop target by that id, and `target` marks it as one the
+ * dragged item may go to (`'can'`) or is over (`'over'`). The up and down buttons still call `onReorder`.
  */
 export function SortableList<T>({
   items,
@@ -43,6 +48,9 @@ export function SortableList<T>({
   nested = false,
   disabled,
   empty = 'Nothing yet',
+  container,
+  target,
+  overlay = false,
 }: {
   items: T[];
   /** A stable, unique id per item. */
@@ -62,6 +70,10 @@ export function SortableList<T>({
   nested?: boolean;
   disabled?: boolean;
   empty?: ReactNode;
+  container?: string;
+  target?: 'can' | 'over';
+  /** The dragged row is drawn by the caller's `DragOverlay`, so its own stays put, faded. */
+  overlay?: boolean;
 }) {
   const id = useId();
   const sensors = useSensors(
@@ -85,8 +97,42 @@ export function SortableList<T>({
     onDragCancel: ({ active }) => `Put ${name(active.id)} back where it was.`,
   };
 
+  const rows = items.map((item, i) => (
+    <SortableRow
+      key={getId(item)}
+      id={getId(item)}
+      label={getLabel(item)}
+      index={i}
+      count={items.length}
+      numbered={numbered}
+      disabled={disabled}
+      onMove={(by) => onReorder(arrayMove(items, i, i + by))}
+      actions={actions?.(item, i)}
+      trailing={trailing?.(item, i)}
+      below={below?.(item, i)}
+      ghost={overlay}
+    >
+      {renderItem ? renderItem(item, i) : getLabel(item)}
+    </SortableRow>
+  ));
+
+  if (container)
+    return (
+      <ListBody
+        container={container}
+        target={target}
+        ids={ids}
+        label={label}
+        nested={nested}
+        disabled={disabled}
+        empty={empty}
+      >
+        {rows}
+      </ListBody>
+    );
+
   function onDragEnd({ active, over }: DragEndEvent) {
-    if (!over || active.id === over.id) return;
+    if (!over || active.id === over.id || !ids.includes(String(over.id))) return;
     onReorder(arrayMove(items, ids.indexOf(String(active.id)), ids.indexOf(String(over.id))));
   }
 
@@ -105,32 +151,46 @@ export function SortableList<T>({
       }}
       onDragEnd={onDragEnd}
     >
-      <SortableContext items={ids} strategy={verticalListSortingStrategy} disabled={disabled}>
-        <ol
-          aria-label={label}
-          className={`relative max-w-[520px] divide-y divide-rule-soft ${nested ? 'border-l border-rule-soft' : 'border border-rule bg-card'}`}
-        >
-          {items.length === 0 && <li className="px-2 py-1.5 text-faint italic">{empty}</li>}
-          {items.map((item, i) => (
-            <SortableRow
-              key={getId(item)}
-              id={getId(item)}
-              label={getLabel(item)}
-              index={i}
-              count={items.length}
-              numbered={numbered}
-              disabled={disabled}
-              onMove={(by) => onReorder(arrayMove(items, i, i + by))}
-              actions={actions?.(item, i)}
-              trailing={trailing?.(item, i)}
-              below={below?.(item, i)}
-            >
-              {renderItem ? renderItem(item, i) : getLabel(item)}
-            </SortableRow>
-          ))}
-        </ol>
-      </SortableContext>
+      <ListBody container={`${id}-list`} ids={ids} label={label} nested={nested} disabled={disabled} empty={empty}>
+        {rows}
+      </ListBody>
     </DndContext>
+  );
+}
+
+/** A list's rows in their sortable context, and the list as a drop target (for a drop into another list, or an empty one). */
+function ListBody({
+  container,
+  target,
+  ids,
+  label,
+  nested,
+  disabled,
+  empty,
+  children,
+}: {
+  container: string;
+  target?: 'can' | 'over';
+  ids: string[];
+  label: string;
+  nested: boolean;
+  disabled?: boolean;
+  empty: ReactNode;
+  children: ReactNode[];
+}) {
+  const { setNodeRef } = useDroppable({ id: container, disabled });
+  const ring = target === 'over' ? 'ring-2 ring-accent' : target === 'can' ? 'ring-1 ring-accent/40' : '';
+  return (
+    <SortableContext items={ids} strategy={verticalListSortingStrategy} disabled={disabled}>
+      <ol
+        ref={setNodeRef}
+        aria-label={label}
+        className={`relative max-w-[520px] divide-y divide-rule-soft ${nested ? 'min-h-8 border-l border-rule-soft' : 'border border-rule bg-card'} ${ring}`}
+      >
+        {children.length === 0 && <li className="px-2 py-1.5 text-faint italic">{empty}</li>}
+        {children}
+      </ol>
+    </SortableContext>
   );
 }
 
@@ -156,6 +216,7 @@ function SortableRow({
   actions,
   trailing,
   below,
+  ghost,
   children,
 }: {
   id: string;
@@ -168,6 +229,8 @@ function SortableRow({
   actions?: ReactNode;
   trailing?: ReactNode;
   below?: ReactNode;
+  /** While dragged, stay put, faded: the caller's `DragOverlay` follows the pointer instead. */
+  ghost?: boolean;
   children: ReactNode;
 }) {
   const { attributes, listeners, setNodeRef, setActivatorNodeRef, transform, transition, isDragging } = useSortable({
@@ -178,7 +241,7 @@ function SortableRow({
     <li
       ref={setNodeRef}
       style={{ transform: CSS.Translate.toString(transform), transition }}
-      className={`bg-card ${isDragging ? 'relative z-10 shadow-md ring-1 ring-frame' : ''}`}
+      className={`bg-card ${isDragging ? (ghost ? 'opacity-40' : 'relative z-10 shadow-md ring-1 ring-frame') : ''}`}
     >
       <div className="group flex min-h-8 items-center gap-1.5 py-0.5 pr-2 pl-0.5">
         <button

@@ -33,6 +33,7 @@ export function SettingControl({
   onChange,
   values,
   onChangeKey,
+  onChangeWith,
   label,
   disabled,
 }: {
@@ -41,6 +42,8 @@ export function SettingControl({
   onChange: (value: unknown) => void;
   values?: Record<string, unknown>;
   onChangeKey?: (key: string, value: unknown) => void;
+  /** Change its own value and others at once, saved as one change. */
+  onChangeWith?: (value: unknown, others: Record<string, unknown>) => void;
   label: string;
   disabled?: boolean;
 }) {
@@ -120,8 +123,10 @@ export function SettingControl({
           onChange={onChange}
           hidden={control.toggleKey ? asList(values?.[control.toggleKey]) : undefined}
           placement={control.placeKey ? asRecord(values?.[control.placeKey]) : undefined}
-          onPlacementChange={
-            control.placeKey && onChangeKey ? (placement) => onChangeKey(control.placeKey!, placement) : undefined
+          onMove={
+            control.placeKey && onChangeWith
+              ? (order, placement) => onChangeWith(order, { [control.placeKey!]: placement })
+              : undefined
           }
           onHiddenChange={
             control.toggleKey && onChangeKey ? (hidden) => onChangeKey(control.toggleKey!, hidden) : undefined
