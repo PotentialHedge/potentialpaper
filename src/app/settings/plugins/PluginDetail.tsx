@@ -39,6 +39,31 @@ export const STATUS_COLOR: Record<InstalledPlugin['status'], string> = {
   error: 'text-down',
 };
 
+/** A plugin's status: a green check when it runs, otherwise in words. */
+export function PluginStatus({ status }: { status: InstalledPlugin['status'] }) {
+  if (status === 'ready')
+    return (
+      <span
+        className={`${STATUS_COLOR.ready} inline-flex self-center`}
+        title={STATUS.ready}
+        role="img"
+        aria-label={STATUS.ready}
+      >
+        <svg
+          viewBox="0 0 16 16"
+          fill="none"
+          stroke="currentColor"
+          strokeWidth="2"
+          aria-hidden="true"
+          className="size-4"
+        >
+          <path d="M3 8.5 6.5 12 13 4.5" strokeLinecap="round" strokeLinejoin="round" />
+        </svg>
+      </span>
+    );
+  return <span className={STATUS_COLOR[status]}>{STATUS[status]}</span>;
+}
+
 const FROM: Record<InstalledPlugin['from'], string> = {
   site: 'Installed by the site for everyone',
   user: '',
@@ -138,7 +163,7 @@ export function PluginDetail({ id }: { id: string }) {
         <span className="flex-1" />
         {canToggle && (
           <label className="flex cursor-pointer items-center gap-2">
-            <span className={STATUS_COLOR[p.status]}>{STATUS[p.status]}</span>
+            <PluginStatus status={p.status} />
             <Switch
               checked={p.enabled}
               disabled={busy}
@@ -147,7 +172,7 @@ export function PluginDetail({ id }: { id: string }) {
             />
           </label>
         )}
-        {!canToggle && <span className={STATUS_COLOR[p.status]}>{STATUS[p.status]}</span>}
+        {!canToggle && <PluginStatus status={p.status} />}
       </div>
       <p className={`${ui.fine} mt-0.5`}>
         {[plugin.id, manifest.author && `by ${manifest.author}`, FROM[p.from]].filter(Boolean).join(' · ')}

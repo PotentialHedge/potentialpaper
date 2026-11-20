@@ -21,7 +21,7 @@ import { parsePluginSource, sourceKey } from '@/lib/plugins/sources';
 import { pluginSettingsPath } from '@/lib/settings/form';
 import { useSettings } from '@/lib/settings/client';
 import { ApproveDialog } from './ApproveDialog';
-import { STATUS, STATUS_COLOR } from './PluginDetail';
+import { PluginStatus } from './PluginDetail';
 
 type Note = { ok: boolean; text: string } | null;
 
@@ -132,7 +132,7 @@ export function PluginsSettings() {
                     {manifest && <span className="text-muted">{manifest.version}</span>}
                     {update && <span className="text-xs text-accent">{update.latest.version} is out</span>}
                     <span className="flex-1" />
-                    <span className={STATUS_COLOR[p.status]}>{STATUS[p.status]}</span>
+                    <PluginStatus status={p.status} />
                     {(p.from === 'dev' || (signedIn && p.from === 'user')) && (
                       <button
                         type="button"
