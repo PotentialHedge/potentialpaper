@@ -1,5 +1,5 @@
 import { LinkedComments, LinkedDetails, Permalink } from '@/components/paper/ReviewLinks';
-import { SubmissionPanels } from '@/components/plugins/SubmissionPanels';
+import { SubmissionPanels } from '@/components/plugins/NestedPanels';
 import { ui } from '@/components/ui';
 import { sourceName } from '@/lib/paper-ids';
 import { reviewMath } from '@/lib/review-math';

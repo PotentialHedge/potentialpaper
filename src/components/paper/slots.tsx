@@ -18,6 +18,7 @@ import { SubmissionsBox, SubmissionsSection } from './Submissions';
 import { VersionsBox, VersionsSection } from './Versions';
 import type { PaperVersion } from '@/lib/versions';
 import { Fold } from '@/components/paper/Fold';
+import { CommunityPanels } from '@/components/plugins/NestedPanels';
 
 /**
  * A paper page is assembled from named slots, so that built-in panels can later become the first
@@ -160,6 +161,8 @@ function CommunitySection({ communityHtml, canonical }: PanelProps) {
           </p>
         }
       />
+      {/* Plugins' panels in the community section (`paper.community`): the paper map's minimap. */}
+      <CommunityPanels />
     </Fold>
   );
 }

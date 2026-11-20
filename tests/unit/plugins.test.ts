@@ -156,6 +156,16 @@ describe('plugin manifests', () => {
     ]);
   });
 
+  it('puts a panel in the community section on a paper only', () => {
+    const panel = (slot: unknown) => ({ id: 'minimap', title: 'A', kinds: ['paper', 'venue'], slot });
+    const ok = validateManifest({ ...HELLO, contributes: { panels: [panel({ paper: 'community', '*': 'main' })] } });
+    expect(ok.errors).toEqual([]);
+    expect(kindSlot('paper', 'community')).toBe('paper.community');
+    expect(validateManifest({ ...HELLO, contributes: { panels: [panel('community')] } }).errors).toEqual([
+      'contributes.panels[0].slot: venue pages have no "community" slot',
+    ]);
+  });
+
   it('refuses a manifest for a newer API, saying so', () => {
     expect(validateManifest({ ...HELLO, apiVersion: 2 }).errors).toEqual([
       'apiVersion: the plugin is for API version 2, and this site runs 1',

@@ -177,7 +177,7 @@ export const KINDS: Record<PageKind, KindInfo> = {
     kindFileSchema: null,
     owners: { dir: 'author', title: 'Author section' },
     community: true,
-    slots: slots('paper', ['title', 'body', 'submission']),
+    slots: slots('paper', ['title', 'body', 'submission', 'community']),
     fileTypes: ['section', 'labeledLink', 'link', 'version', 'thumbnail', 'pdf', 'submission', 'forms', 'note'],
     contextKeys: [...COMMON_CONTEXT, 'page.hasScores', 'page.hasSubmissions', 'page.hasSignals'],
     scope: false,

@@ -254,7 +254,8 @@ Every field of the manifest:
   prompt says the plugin shows that bot's data, and what this site lets the bot write; naming a bot grants nothing.
 - \`contributes.panels\` (up to 8): \`id\`, \`title\`, \`kinds\` (${PAGE_KINDS.map((k) => `\`${k}\``).join(', ')}), \`slot\`
   (\`main\`, \`aside\` or \`tab\`, and on a paper \`submission\`: once under each of its submissions with scores, in the
-  Submissions section, with \`pp.context.surface.submission.venue\` saying which; or one per kind,
+  Submissions section, with \`pp.context.surface.submission.venue\` saying which, or \`community\`: at the end of the
+  Community section, in the page's main text; or one per kind,
   \`{ "paper": "submission", "*": "main" }\`), and \`when\`.
 - \`contributes.pages\` (up to 8): whole pages of its own at \`${origin}/x/<owner>/<name>/<page id>/…\`, each
   \`{ "id", "title", "layout", "nav" }\`. \`layout\` \`"article"\` (the default) puts the frame under a heading in the site's

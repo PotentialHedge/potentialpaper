@@ -202,7 +202,7 @@ function PluginPanel({
   );
   const aside = slot.endsWith('.aside');
   return (
-    <section data-plugin={plugin.plugin.id} className={aside ? ui.box : submission ? 'mt-4' : 'mt-6'}>
+    <section data-plugin={plugin.plugin.id} className={aside ? ui.box : submission || slot === 'paper.community' ? 'mt-4' : 'mt-6'}>
       {header}
       {body}
     </section>
