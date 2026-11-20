@@ -19,8 +19,8 @@ import {
 } from '@/lib/plugins/client';
 import { type InstalledPlugin, PERSONAL_PERMISSIONS, type PluginBot } from '@/lib/plugins/installed';
 import { PERMISSIONS, type PluginPermission } from '@/lib/plugins/manifest';
-import { kindCategory, panelsSettingsPath, pluginCategory } from '@/lib/settings/form';
-import { PANEL_KINDS, type PanelKind } from '@/lib/panels';
+import { pluginCategory } from '@/lib/settings/form';
+import { PluginLayout } from './PluginLayout';
 
 type Note = { ok: boolean; text: string } | null;
 
@@ -244,7 +244,7 @@ export function PluginDetail({ id }: { id: string }) {
         </div>
       )}
 
-      <Layout plugin={p} />
+      <PluginLayout plugin={p} />
 
       <h3 className="mt-8 mb-1 font-serif text-lg font-normal">Settings</h3>
       {settings.length === 0 ? (
@@ -332,50 +332,5 @@ export function Asks({
       ))}
       <BotNote bot={bot} />
     </ul>
-  );
-}
-
-/**
- * Layout: each of a plugin's panels, with a link per kind of page it is on to that kind's Panels control (where it is
- * moved, hidden or reordered), and its own pages.
- */
-function Layout({ plugin }: { plugin: InstalledPlugin }) {
-  const manifest = plugin.plugin!.manifest;
-  const { panels, pages } = manifest.contributes;
-  if (panels.length === 0 && pages.length === 0) return null;
-  // Panels of one name (one per kind of page) are one line.
-  const byTitle = new Map<string, PanelKind[]>();
-  for (const panel of panels) {
-    const kinds = panel.kinds.filter((k): k is PanelKind => (PANEL_KINDS as string[]).includes(k));
-    byTitle.set(panel.title, [...new Set([...(byTitle.get(panel.title) ?? []), ...kinds])]);
-  }
-  return (
-    <>
-      <h3 className="mt-8 mb-1 font-serif text-lg font-normal">Layout</h3>
-      {panels.length > 0 && <p className={`${ui.fine} mt-0 mb-1`}>Choose a page to move or hide a panel there.</p>}
-      <ul className="space-y-0.5">
-        {[...byTitle].map(([title, kinds]) => (
-          <li key={title}>
-            {title}:{' '}
-            {kinds.map((kind, i) => (
-              <span key={kind}>
-                {i > 0 && <span className="text-faint"> · </span>}
-                <Link href={panelsSettingsPath(kind)} className="text-accent">
-                  {kindCategory(kind).title}
-                </Link>
-              </span>
-            ))}
-          </li>
-        ))}
-        {pages.map((page) => (
-          <li key={page.id}>
-            Page:{' '}
-            <Link href={`/x/${plugin.plugin!.id}/${page.id}`} className="text-accent">
-              {page.title}
-            </Link>
-          </li>
-        ))}
-      </ul>
-    </>
   );
 }
