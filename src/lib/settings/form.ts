@@ -255,6 +255,16 @@ export function pluginCategory(pluginId: string): string {
   return `plugin:${pluginId}`;
 }
 
+/** The settings page for a kind of page ("Paper pages"). */
+export function kindCategory(kind: PanelKind): Category {
+  return findCategory(KIND_CATEGORY[kind])!;
+}
+
+/** Where a kind's Panels control is: its category's page, at the control (`SettingRow` scrolls to it). */
+export function panelsSettingsPath(kind: PanelKind): string {
+  return `/settings/${KIND_CATEGORY[kind]}#${kind}.panels.order`;
+}
+
 /** A plugin's settings page. */
 export function pluginSettingsPath(pluginId: string): string {
   return `/settings/plugins/${pluginId}`;

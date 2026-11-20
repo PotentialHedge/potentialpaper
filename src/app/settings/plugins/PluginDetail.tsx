@@ -18,8 +18,9 @@ import {
   updatePluginTo,
 } from '@/lib/plugins/client';
 import { type InstalledPlugin, PERSONAL_PERMISSIONS, type PluginBot } from '@/lib/plugins/installed';
-import { PERMISSIONS, type PluginPermission } from '@/lib/plugins/manifest';
-import { pluginCategory } from '@/lib/settings/form';
+import { PERMISSIONS, type PanelContribution, type PluginPermission } from '@/lib/plugins/manifest';
+import { kindCategory, panelsSettingsPath, pluginCategory } from '@/lib/settings/form';
+import { PANEL_KINDS, type PanelKind } from '@/lib/panels';
 
 type Note = { ok: boolean; text: string } | null;
 
@@ -334,6 +335,26 @@ export function Asks({
   );
 }
 
+/** Links to where a panel is arranged in settings, one per kind of page it is on: moved, if it may be, or hidden. */
+function PanelSettingsLinks({ panel }: { panel: PanelContribution }) {
+  const kinds = panel.kinds.filter((k): k is PanelKind => (PANEL_KINDS as string[]).includes(k));
+  if (kinds.length === 0) return null;
+  return (
+    <span className="block text-subtle">
+      {panel.movable ? 'Move or hide it' : 'Hide it or change its order'} in{' '}
+      {kinds.map((kind, i) => (
+        <span key={kind}>
+          {i > 0 && (i === kinds.length - 1 ? ' and ' : ', ')}
+          <Link href={panelsSettingsPath(kind)} className="text-accent underline underline-offset-2">
+            {kindCategory(kind).title.toLowerCase()}
+          </Link>
+        </span>
+      ))}
+      .
+    </span>
+  );
+}
+
 /** Where a plugin shows: its panels by kind and slot, and its own pages. */
 function Contributes({ plugin }: { plugin: InstalledPlugin }) {
   const manifest = plugin.plugin!.manifest;
@@ -351,6 +372,7 @@ function Contributes({ plugin }: { plugin: InstalledPlugin }) {
                 , when <code className="text-xs">{panel.when}</code>
               </>
             )}
+            <PanelSettingsLinks panel={panel} />
           </li>
         ))}
         {pages.map((page) => (

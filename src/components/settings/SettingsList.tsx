@@ -1,7 +1,7 @@
 'use client';
 
 import Link from 'next/link';
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { ui } from '@/components/ui';
 import { pluginNavItems } from '@/lib/nav';
 import type { PanelKind } from '@/lib/panels';
@@ -149,6 +149,12 @@ function SettingRow({
 }) {
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const row = useRef<HTMLDivElement>(null);
+  // A link to this setting (`/settings/paper#paper.panels.order`): the list renders after the settings load, too late
+  // for the browser to scroll to it, so it scrolls here.
+  useEffect(() => {
+    if (decodeURIComponent(window.location.hash.slice(1)) === item.key) row.current?.scrollIntoView({ block: 'start' });
+  }, [item.key]);
   const modified = Object.values(keys).some((k) => k.set);
 
   /** Save new values for some of the item's keys at once, each taken out of the file when it equals the layer below. */
@@ -183,7 +189,9 @@ function SettingRow({
 
   return (
     <div
-      className={`group/row relative -ml-4 border-l-2 py-3 pl-[14px] hover:bg-highlight/40 ${modified ? 'border-accent' : 'border-transparent'}`}
+      ref={row}
+      id={item.key}
+      className={`group/row relative -ml-4 scroll-mt-4 border-l-2 py-3 pl-[14px] hover:bg-highlight/40 ${modified ? 'border-accent' : 'border-transparent'}`}
     >
       <div className="flex flex-wrap items-baseline gap-x-2">
         <h4 className="font-semibold text-ink">
