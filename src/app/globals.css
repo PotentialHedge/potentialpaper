@@ -69,6 +69,12 @@
   a:hover {
     text-decoration: underline;
   }
+  /* A plain link inside running text is underlined, so it reads as one; styled links (with a class) set their own. */
+  p a:not([class]) {
+    text-decoration: underline;
+    text-underline-offset: 2px;
+    text-decoration-thickness: 1px;
+  }
 }
 
 /* Section numbers for ui.section / ui.subsection, counted in page order. */
