@@ -9,7 +9,16 @@ import {
   missingConsent,
   runningPermissions,
 } from '@/lib/plugins/installed';
-import { kindSlot, manifestJsonSchema, panelSlot, PLUGIN_PANEL_ID_RE, validateManifest } from '@/lib/plugins/manifest';
+import { parseAuthorPlugins } from '@/lib/plugins/author-plugins';
+import {
+  kindSlot,
+  manifestJsonSchema,
+  panelPlace,
+  panelSlot,
+  placeOfSlot,
+  PLUGIN_PANEL_ID_RE,
+  validateManifest,
+} from '@/lib/plugins/manifest';
 import { BOOT_MESSAGE, type FrameContext, HELLO_MESSAGE } from '@/lib/plugins/protocol';
 import { parsePluginSource, sourceKey } from '@/lib/plugins/sources';
 import { evalWhen, pageWhenContext, parseWhen, whenHolds, whenProblem } from '@/lib/plugins/when';
@@ -166,6 +175,44 @@ describe('plugin manifests', () => {
     ]);
   });
 
+  it("moves a movable panel where the reader's placement says, but never into or out of the author section", () => {
+    const panel = (slot: unknown, movable?: boolean) => {
+      const { manifest, errors } = validateManifest({
+        ...HELLO,
+        contributes: {
+          panels: [{ id: 'p', title: 'P', kinds: ['paper', 'venue'], slot, ...(movable === false && { movable }) }],
+        },
+      });
+      expect(errors).toEqual([]);
+      return manifest!.contributes.panels[0];
+    };
+    const map = panel({ paper: 'community', '*': 'tab' });
+    expect(map.movable).toBe(true);
+    expect(panelPlace(map, 'paper', undefined)).toBe('community');
+    expect(panelPlace(map, 'paper', 'main')).toBe('main');
+    expect(panelPlace(map, 'paper', 'body')).toBe('body');
+    expect(panelPlace(map, 'paper', 'author')).toBe('community');
+    expect(panelPlace(map, 'venue', 'community')).toBe('tab');
+    expect(panelPlace(panel({ paper: 'community', '*': 'tab' }, false), 'paper', 'main')).toBe('community');
+    const own = { ...HELLO, contributes: { panels: [{ id: 'p', title: 'P', kinds: ['paper'], slot: 'author' }] } };
+    expect(panelPlace(validateManifest(own).manifest!.contributes.panels[0], 'paper', 'main')).toBe('author');
+    expect(
+      validateManifest({ ...own, contributes: { panels: [{ ...own.contributes.panels[0], kinds: ['venue'] }] } })
+        .errors,
+    ).toEqual(['contributes.panels[0].slot: venue pages have no "author" slot']);
+    expect(placeOfSlot('paper.tabs')).toBe('tab');
+    expect(placeOfSlot('paper.community')).toBe('community');
+  });
+
+  it("reads a paper's author/plugins.json", () => {
+    expect(parseAuthorPlugins('{ "panels": [{ "panel": "o/map.minimap", "settings": { "set": "o/s" } }] }')).toEqual({
+      panels: [{ panel: 'o/map.minimap', settings: { set: 'o/s' } }],
+    });
+    expect('problem' in parseAuthorPlugins('{ "panels": [{ "panel": "minimap" }] }')).toBe(true);
+    expect('problem' in parseAuthorPlugins('{ "panels": [{ "panel": "o/m.a" }, { "panel": "o/m.a" }] }')).toBe(true);
+    expect('problem' in parseAuthorPlugins('not json')).toBe(true);
+  });
+
   it('refuses a manifest for a newer API, saying so', () => {
     expect(validateManifest({ ...HELLO, apiVersion: 2 }).errors).toEqual([
       'apiVersion: the plugin is for API version 2, and this site runs 1',
@@ -306,7 +353,7 @@ function services(
 
 const CONTEXT: FrameContext = {
   plugin: { id: 'potentialhedge/hello', name: 'Hello', version: '1.0.0', sha: 'a'.repeat(40), dev: false },
-  surface: { type: 'panel', panel: 'hello', slot: 'venue.main' },
+  surface: { type: 'panel', panel: 'hello', slot: 'venue.main', place: 'main', size: { width: 600, height: 120 } },
   page: {
     kind: 'venue',
     identifier: 'venue:iclr/2027',

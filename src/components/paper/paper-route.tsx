@@ -66,6 +66,7 @@ export async function PaperRoute({ scheme, segments }: { scheme: PaperScheme; se
         versions: pageCurrent.versions,
         authorHtml: pageCurrent.authorHtml,
         communityHtml: pageCurrent.communityHtml,
+        authorPlugins: pageCurrent.authorPlugins,
         cover: pdfDocuments.coverUrl,
       })
       .from(pageCurrent)
@@ -122,6 +123,7 @@ export async function PaperRoute({ scheme, segments }: { scheme: PaperScheme; se
       hasScores: submissionsHaveScores(submissions),
       hasSignals: await pageHasSignals({ id: paper.id, kind: 'paper' }),
     },
+    authorPanels: current?.authorPlugins ?? [],
   };
   const about = [paper.venue, paper.year].filter(Boolean).join(', ');
   const linkSources = {

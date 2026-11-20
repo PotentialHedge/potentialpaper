@@ -11,6 +11,7 @@ import {
 } from '@/lib/kinds';
 import { labeledLinkSchema, LINK_LABELS } from '@/lib/labeled-links';
 import { linkFileSchema } from '@/lib/paper-links';
+import { authorPluginsFileSchema } from '@/lib/plugins/author-plugins';
 import { formsFileSchema, noteFileSchema, submissionFileSchema } from '@/lib/review-files';
 import { scoreOf } from '@/lib/submissions';
 import { versionFileSchema } from '@/lib/versions';
@@ -178,6 +179,14 @@ export const PAGE_SCHEMAS = {
       },
     ],
     render: { panel: 'Links', slots: PAGE_KINDS.map((kind) => `${kind}.aside`) },
+  }),
+  authorPlugins: fileType({
+    title: 'Author section plugins',
+    schema: authorPluginsFileSchema,
+    glob: 'author/plugins.json',
+    filesRegex: '^author/plugins\\.json$',
+    writable: true,
+    render: { panel: 'AuthorSection', slots: ['paper.author'] },
   }),
   venue: fileType(kindFileType('venue', venueFileSchema)),
   topic: fileType(kindFileType('topic', topicFileSchema)),

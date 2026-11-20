@@ -18,7 +18,7 @@ import { SubmissionsBox, SubmissionsSection } from './Submissions';
 import { VersionsBox, VersionsSection } from './Versions';
 import type { PaperVersion } from '@/lib/versions';
 import { Fold } from '@/components/paper/Fold';
-import { CommunityPanels } from '@/components/plugins/NestedPanels';
+import { AuthorPanels, CommunityPanels } from '@/components/plugins/NestedPanels';
 
 /**
  * A paper page is assembled from named slots, so that built-in panels can later become the first
@@ -128,6 +128,8 @@ function AuthorSection({ authorHtml, canonical, confirmedAuthors }: PanelProps) 
           ) : null
         }
       />
+      {/* The plugins' panels its authors let in (`paper.author`, `author/plugins.json`). */}
+      <AuthorPanels />
     </Fold>
   );
 }
@@ -315,6 +317,5 @@ export function Slot({ name, ...props }: PanelProps & { name: PaperSlot }) {
     return { id, title, node: <Panel {...props} /> };
   });
   if (name === 'paper.tabs') return <ArrangedTabs kind="paper" slot={name} panels={panels} />;
-  // `paper.body` is the paper's own slot, not one plugins name (`main`, `aside`, `tab`), so none join it.
-  return <ArrangedPanels kind="paper" slot={name === 'paper.body' ? undefined : name} panels={panels} />;
+  return <ArrangedPanels kind="paper" slot={name} panels={panels} />;
 }

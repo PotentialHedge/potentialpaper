@@ -252,11 +252,14 @@ Every field of the manifest:
   ([Your own backend](#your-own-backend)).
 - \`bot\`: the handle of the bot account whose files on pages the plugin shows (\`"bot": "openreview"\`). The approval
   prompt says the plugin shows that bot's data, and what this site lets the bot write; naming a bot grants nothing.
-- \`contributes.panels\` (up to 8): \`id\`, \`title\`, \`kinds\` (${PAGE_KINDS.map((k) => `\`${k}\``).join(', ')}), \`slot\`
-  (\`main\`, \`aside\` or \`tab\`, and on a paper \`submission\`: once under each of its submissions with scores, in the
-  Submissions section, with \`pp.context.surface.submission.venue\` saying which, or \`community\`: at the end of the
-  Community section, in the page's main text; or one per kind,
-  \`{ "paper": "submission", "*": "main" }\`), and \`when\`.
+- \`contributes.panels\` (up to 8): \`id\`, \`title\`, \`kinds\` (${PAGE_KINDS.map((k) => `\`${k}\``).join(', ')}), \`slot\`,
+  \`movable\` and \`when\`. \`slot\` is the place it prefers: \`main\`, \`aside\` or \`tab\`, and on a paper \`body\` (below
+  both columns), \`submission\` (once under each of its submissions with scores, in the Submissions section, with
+  \`pp.context.surface.submission.venue\` saying which), \`community\` (at the end of the Community section) or
+  \`author\` (see [The author section](#the-author-section)); one for every kind, or one per kind,
+  \`{ "paper": "submission", "*": "main" }\`. Readers may move a panel to any other place in their settings
+  (\`<kind>.panels.placement\`) unless it says \`"movable": false\`; none can be moved into or out of the author
+  section. \`pp.context.surface.place\` says where it is.
 - \`contributes.pages\` (up to 8): whole pages of its own at \`${origin}/x/<owner>/<name>/<page id>/…\`, each
   \`{ "id", "title", "layout", "nav" }\`. \`layout\` \`"article"\` (the default) puts the frame under a heading in the site's
   column, as tall as it asks; \`"full"\` gives it the whole window under the site's bar, with no heading, for a map
@@ -315,8 +318,21 @@ Load \`https://ppusercontent.com/sdk/v1/pp.js\` (here: ${sdk}); it installs \`wi
 | ---- | ----- | ---- |
 ${methodRows}
 
-Events: \`pp.on('settings.change' | 'theme.change' | 'context.change', listener)\`, or \`pp.settings.onChange\` and
-\`pp.theme.onChange\`. \`pp.supports(method)\` says whether this site answers a method, and \`pp.call(method, params)\`
+Events: \`pp.on('settings.change' | 'theme.change' | 'context.change' | 'surface.resize', listener)\`, or
+\`pp.settings.onChange\`, \`pp.theme.onChange\` and \`pp.ui.onResize\`.
+
+**Where you are, and how big.** \`pp.context.surface.place\` is where a panel sits (\`main\`, \`aside\`, \`tab\`, \`body\`,
+\`submission\`, \`community\`, \`author\`), so one panel can draw a small view in the side column and a large one in
+the main text. \`pp.context.surface.size\` is the frame's \`{ width, height }\` in CSS pixels, kept current;
+\`pp.ui.onResize(size => …)\` tells you when it changes (the column, the window, or your own height). Lay out by the
+width: the height is the one you ask for.
+
+**The author section.** A paper's confirmed authors may let panels into their section with \`author/plugins.json\`
+in the paper's repo: \`{ "panels": [{ "panel": "<plugin id>.<panel id>", "settings": { … } }] }\` (up to 8). A
+panel shows there only if its manifest offers \`"slot": { "paper": "author" }\`, the authors list it, and the reader
+has the plugin installed: listing it installs nothing. It may read what it may read anywhere; nothing a plugin does
+changes the page. The authors' \`settings\` reach it as \`pp.context.surface.config\`, so say in your README what
+they can set. \`pp.supports(method)\` says whether this site answers a method, and \`pp.call(method, params)\`
 calls one newer than your copy of the types.
 
 **Theme.** The SDK sets the page's design tokens on your \`:root\` as CSS variables, on load and whenever the reader

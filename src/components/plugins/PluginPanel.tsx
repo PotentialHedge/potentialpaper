@@ -5,11 +5,14 @@ import { Popover, PopoverClose, PopoverContent, PopoverTrigger } from '@/compone
 import { ui } from '@/components/ui';
 import { grantPlugin, usePlugins } from '@/lib/plugins/client';
 import type { Connection } from '@/lib/plugins/host';
+import { useSetting } from '@/lib/settings/client';
 import {
   kindSlot,
+  OWNERS_PLACES,
   type PanelContribution,
-  panelSlot,
+  panelPlace,
   PERMISSIONS,
+  placeOfSlot,
   pluginPanelId,
   type PluginPermission,
 } from '@/lib/plugins/manifest';
@@ -21,8 +24,10 @@ import { usePluginPage } from './PluginPage';
 /**
  * Plugin panels in a page's slots (DESIGN.md §10): each installed plugin's panels for the page's kind and the slot,
  * whose `when` holds for this page and reader, beside the built-in ones (`ArrangedPanels`, `ArrangedTabs`), where
- * the reader's `<kind>.panels.hidden` and `.order` arrange them by `<plugin id>.<panel id>`. A plugin the reader
- * hasn't approved shows its consent prompt in place of each panel, rather than running.
+ * the reader's `<kind>.panels.hidden` and `.order` arrange them by `<plugin id>.<panel id>`, and `.placement` moves
+ * them to another place. A plugin the reader hasn't approved shows its consent prompt in place of each panel, rather
+ * than running. In the author section (`paper.author`) only the panels the paper's authors list show
+ * (`author/plugins.json`), each told what they set for it (`surface.config`).
  */
 
 /**
@@ -153,6 +158,7 @@ function PluginPanel({
   viewer,
   inTabs,
   submission,
+  config,
 }: {
   plugin: ReadyPlugin;
   panel: PanelContribution;
@@ -160,6 +166,8 @@ function PluginPanel({
   viewer: { signedIn: boolean; isOwner: boolean };
   inTabs: boolean;
   submission?: PanelSubmission;
+  /** In the author section: what the authors set for it. */
+  config?: Record<string, unknown>;
 }) {
   const page = usePluginPage();
   const connection = useRef<Connection | null>(null);
@@ -178,6 +186,7 @@ function PluginPanel({
             id: panel.id,
             slot,
             ...(submission && { submission: { venue: submission.venue } }),
+            ...(config && { config }),
           }}
           page={page}
           viewer={viewer}
@@ -201,8 +210,10 @@ function PluginPanel({
     </div>
   );
   const aside = slot.endsWith('.aside');
+  // Inside a built-in panel (under a submission, in the community or author section): closer to what is above it.
+  const nested = ['submission', 'community', 'author'].includes(placeOfSlot(slot) ?? '');
   return (
-    <section data-plugin={plugin.plugin.id} className={aside ? ui.box : submission || slot === 'paper.community' ? 'mt-4' : 'mt-6'}>
+    <section data-plugin={plugin.plugin.id} className={aside ? ui.box : nested ? 'mt-4' : 'mt-6'}>
       {header}
       {body}
     </section>
@@ -230,19 +241,25 @@ export interface SlotPanel {
 export function usePluginPanels(slot: string | undefined, submission?: PanelSubmission): SlotPanel[] {
   const page = usePluginPage();
   const { plugins, viewer } = usePlugins(page && slot ? page.page.identifier : null);
+  const placement = useSetting<Record<string, string>>(`${page?.kind ?? 'paper'}.panels.placement`);
   return useMemo(() => {
     if (!page || !slot) return [];
     const facts = submission ? { ...page.facts, hasScores: submission.hasScores } : page.facts;
     const context = pageWhenContext(page.kind, { ...facts, ...viewer });
+    const listed = new Map((page.authorPanels ?? []).map((p) => [p.panel, p]));
     const out: SlotPanel[] = [];
     for (const p of plugins) {
       if ((p.status !== 'ready' && p.status !== 'consent') || !p.plugin) continue;
       const ready = p as ReadyPlugin;
       for (const panel of ready.plugin.manifest.contributes.panels) {
-        const at = panelSlot(panel, page.kind);
+        const id = pluginPanelId(ready.plugin.id, panel.id);
+        const at = panelPlace(panel, page.kind, placement?.[id]);
         if (!at || kindSlot(page.kind, at) !== slot || !whenHolds(panel.when, context)) continue;
+        // Only the page's owners let a panel into their section.
+        const owners = OWNERS_PLACES.includes(at) ? listed.get(id) : undefined;
+        if (OWNERS_PLACES.includes(at) && !owners) continue;
         out.push({
-          id: pluginPanelId(ready.plugin.id, panel.id),
+          id,
           title: panel.title,
           node: (
             <PluginPanel
@@ -253,11 +270,12 @@ export function usePluginPanels(slot: string | undefined, submission?: PanelSubm
               viewer={viewer}
               inTabs={slot.endsWith('.tabs')}
               submission={submission}
+              config={owners ? (owners.settings ?? {}) : undefined}
             />
           ),
         });
       }
     }
     return out;
-  }, [page, slot, plugins, viewer, submission]);
+  }, [page, slot, plugins, viewer, submission, placement]);
 }

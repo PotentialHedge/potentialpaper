@@ -17,6 +17,11 @@ function asList(value: unknown): string[] {
   return Array.isArray(value) ? value.filter((v): v is string => typeof v === 'string') : [];
 }
 
+function asRecord(value: unknown): Record<string, string> {
+  if (typeof value !== 'object' || value === null || Array.isArray(value)) return {};
+  return Object.fromEntries(Object.entries(value).filter((e): e is [string, string] => typeof e[1] === 'string'));
+}
+
 /**
  * One setting's control (`lib/settings/form.ts` `Control`), drawn with the site's standard controls
  * (`components/controls`). `value` is the setting's own; a control that edits a second setting too (a `rank` with a
@@ -114,6 +119,10 @@ export function SettingControl({
           value={asList(value)}
           onChange={onChange}
           hidden={control.toggleKey ? asList(values?.[control.toggleKey]) : undefined}
+          placement={control.placeKey ? asRecord(values?.[control.placeKey]) : undefined}
+          onPlacementChange={
+            control.placeKey && onChangeKey ? (placement) => onChangeKey(control.placeKey!, placement) : undefined
+          }
           onHiddenChange={
             control.toggleKey && onChangeKey ? (hidden) => onChangeKey(control.toggleKey!, hidden) : undefined
           }

@@ -5,6 +5,7 @@ import { LINKS_FILE, parseLabeledLinks } from '@/lib/labeled-links';
 import { parseLinkFile } from '@/lib/paper-links';
 import { parseReviewPath, parseReviewFile, REVIEWS_DIR, reviewSourceOf } from '@/lib/review-files';
 import { parseVersionFile, VERSION_ID } from '@/lib/versions';
+import { AUTHOR_PLUGINS_PATH, parseAuthorPlugins } from '@/lib/plugins/author-plugins';
 import { htmlProblem } from './html';
 
 /**
@@ -18,6 +19,7 @@ import { htmlProblem } from './html';
  *   .potentialpaper/paper.pdf       the system's: the paper's PDF (Git LFS)
  *   .potentialpaper/pdf.json        the system's: where that PDF came from, and its license
  *   author/10-overview.md           the author section, a file per section (Markdown or HTML)
+ *   author/plugins.json             the plugins' panels the authors let into it (`lib/plugins/author-plugins.ts`)
  *   community/10-summary.md         the community section, the same way
  *   versions/v_k3x9q2ab.json        a version of the paper, named by its id
  *   versions/v_k3x9q2ab.pdf         that version's PDF (Git LFS)
@@ -295,7 +297,7 @@ export function encodeLfsPointer({ sha256, bytes }: LfsPointer): string {
 /** What a page holds, said when a path isn't one of them. */
 const LAYOUT =
   'pages hold .gitattributes, prek.toml, .potentialpaper/ (metadata.json, paper.pdf, pdf.json), author/ and community/ ' +
-  '(sections named like 10-summary.md or 20-results.html, and links.jsonl), versions/<id>.json and <id>.pdf, links/ (named like ' +
+  '(sections named like 10-summary.md or 20-results.html, and links.jsonl; author/ also plugins.json), versions/<id>.json and <id>.pdf, links/ (named like ' +
   '10-code.json), thumbnail.png (or .jpg, .gif, .webp, .avif) and thumbnail.json, demos/<name>/, ' +
   'reviews/<source>/<submission>/ and extensions/';
 
@@ -316,6 +318,7 @@ function kindLayout(kind: PageKind): string {
 export function layoutProblem(path: string, kind: PageKind = 'paper'): string | null {
   if (path === METADATA_PATH || path === GITATTRIBUTES_PATH || path === PREK_PATH) return null;
   if (path.startsWith('extensions/')) return null;
+  if (kind === 'paper' && path === AUTHOR_PLUGINS_PATH) return null;
   const part = partOf(path, kind);
   if (part) {
     return sectionName(path, part) || isLabeledLinksPath(path, kind)
@@ -704,6 +707,10 @@ export function contentProblem(path: string, content: string, kind: PageKind = '
   if (path === GITATTRIBUTES_PATH) return content === GITATTRIBUTES ? null : 'is the same on every page, and fixed';
   if (isLabeledLinksPath(path, kind)) {
     const parsed = parseLabeledLinks(content, kind);
+    return 'problem' in parsed ? parsed.problem : null;
+  }
+  if (kind === 'paper' && path === AUTHOR_PLUGINS_PATH) {
+    const parsed = parseAuthorPlugins(content);
     return 'problem' in parsed ? parsed.problem : null;
   }
   const part = partOf(path, kind);

@@ -7,7 +7,8 @@ import { type PanelSubmission, usePluginPanels } from './PluginPanel';
 
 /**
  * The reader's plugins' panels in a slot drawn inside a built-in panel (`SLOT_PARENTS`): `paper.submission`, under
- * one submission, or `paper.community`, at the end of the Community section. Hidden and ordered by
+ * one submission, `paper.community`, at the end of the Community section, or `paper.author`, at the end of the
+ * author section. Hidden and ordered by
  * `paper.panels.hidden` and `.order` like any panel; nothing until the plugin list arrives, so the cached page is
  * unchanged.
  */
@@ -36,4 +37,9 @@ export function SubmissionPanels({ venue, hasScores }: { venue: { id: string; na
 /** At the end of the Community section, in the page's main text: the paper's place on a map, say. */
 export function CommunityPanels() {
   return <NestedPanels slot="paper.community" />;
+}
+
+/** At the end of the author section: only the panels its authors list in `author/plugins.json`. */
+export function AuthorPanels() {
+  return <NestedPanels slot="paper.author" />;
 }

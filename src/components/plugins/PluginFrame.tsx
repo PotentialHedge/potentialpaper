@@ -3,10 +3,11 @@
 import { useEffect, useRef, useState } from 'react';
 import { type Connection, connect, HostError, type HostServices } from '@/lib/plugins/host';
 import { type InstalledPlugin, runningPermissions } from '@/lib/plugins/installed';
-import { API_VERSION } from '@/lib/plugins/manifest';
+import { API_VERSION, placeOfSlot } from '@/lib/plugins/manifest';
 import {
   BOOT_MESSAGE,
   type FrameContext,
+  type FrameSize,
   HELLO_MESSAGE,
   HOST_METHODS,
   type IdentityToken,
@@ -26,7 +27,8 @@ import type { PluginPageData } from './PluginPage';
  * costs nothing until scrolled to. Its only way to the page is the RPC (`lib/plugins/host.ts`): the frame says hello,
  * the page answers with a port and the context, and from then on the page answers its calls, checked against the
  * permissions the reader granted, and tells it when the theme or its settings change. It takes the height it asks
- * for (`ui.setHeight`, which the SDK sends as its body grows).
+ * for (`ui.setHeight`, which the SDK sends as its body grows), and is told where it sits (`surface.place`) and how
+ * big it is (`surface.size`, and `surface.resize` when that changes).
  */
 
 export type ReadyPlugin = InstalledPlugin & { plugin: NonNullable<InstalledPlugin['plugin']> };
@@ -140,8 +142,13 @@ interface Latest {
   surface: PluginSurface;
 }
 
+function frameSize(frame: HTMLIFrameElement | null): FrameSize {
+  const box = frame?.getBoundingClientRect();
+  return { width: Math.round(box?.width ?? 0), height: Math.round(box?.height ?? 0) };
+}
+
 /** What a frame knows: `pp.context` at boot, and `context.get`. */
-function frameContext({ plugin: p, page: pg, viewer: v, surface: s }: Latest): FrameContext {
+function frameContext({ plugin: p, page: pg, viewer: v, surface: s }: Latest, size: FrameSize): FrameContext {
   return {
     plugin: {
       id: p.plugin.id,
@@ -152,8 +159,16 @@ function frameContext({ plugin: p, page: pg, viewer: v, surface: s }: Latest): F
     },
     surface:
       s.type === 'panel'
-        ? { type: 'panel', panel: s.id, slot: s.slot ?? '', ...(s.submission && { submission: s.submission }) }
-        : { type: 'page', page: s.id, path: s.path ?? [] },
+        ? {
+            type: 'panel',
+            panel: s.id,
+            slot: s.slot ?? '',
+            place: placeOfSlot(s.slot ?? '') ?? '',
+            size,
+            ...(s.submission && { submission: s.submission }),
+            ...(s.config && { config: s.config }),
+          }
+        : { type: 'page', page: s.id, path: s.path ?? [], size },
     page: pg?.page ?? null,
     scopes: pg?.scopes ?? [],
     viewer: v,
@@ -173,6 +188,8 @@ export interface PluginSurface {
   path?: string[];
   /** A `paper.submission` panel's submission, by its venue. */
   submission?: { venue: { id: string; name: string } };
+  /** A `paper.author` panel's settings, as the paper's authors set them. */
+  config?: Record<string, unknown>;
 }
 
 export function PluginFrame({
@@ -229,7 +246,7 @@ export function PluginFrame({
     if (!frame) return;
     let connection: Connection | null = null;
 
-    const context = () => frameContext(latest.current);
+    const context = () => frameContext(latest.current, frameSize(frame));
     const services: HostServices = {
       context,
       // A dev plugin runs with what it asks for; a site default with what it asks for less what only the reader can
@@ -333,9 +350,21 @@ export function PluginFrame({
     const observer = new MutationObserver(themeChanged);
     observer.observe(document.documentElement, { attributes: true, attributeFilter: ['class', 'style', 'data-theme'] });
 
+    // Tell the frame its new size when it changes: the window, the column, or its own height.
+    let lastSize = JSON.stringify(frameSize(frame));
+    const resized = new ResizeObserver(() => {
+      const size = frameSize(frame);
+      const text = JSON.stringify(size);
+      if (text === lastSize) return;
+      lastSize = text;
+      connection?.emit('surface.resize', size);
+    });
+    resized.observe(frame);
+
     frame.src = src;
     return () => {
       window.removeEventListener('message', onMessage);
+      resized.disconnect();
       stopSettings();
       media.removeEventListener('change', themeChanged);
       observer.disconnect();
@@ -351,7 +380,7 @@ export function PluginFrame({
   useEffect(() => {
     if (lastViewer.current === viewerKey) return;
     lastViewer.current = viewerKey;
-    connectionRef.current?.emit('context.change', frameContext(latest.current));
+    connectionRef.current?.emit('context.change', frameContext(latest.current, frameSize(frameRef.current)));
   }, [viewerKey]);
 
   return (

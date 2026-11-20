@@ -17,6 +17,7 @@ import { diffFile, mergeFile } from '@/server/pages/merge';
 import {
   cleanSummary,
   contentProblem,
+  layoutProblem,
   MAX_FILE_BYTES,
   MAX_SUMMARY_LENGTH,
   METADATA_PATH,
@@ -194,6 +195,8 @@ describe('who may write where', () => {
     ['.potentialpaper/metadata.json', ['system', 'admin']],
     ['.potentialpaper/pdf.json', ['system', 'admin']],
     ['author/10-overview.md', ['admin', 'author']],
+    // The plugins the authors let into their section: theirs alone.
+    ['author/plugins.json', ['admin', 'author']],
     // The card: the authors' once the paper is claimed, anyone verified's until then.
     ['thumbnail.json', ['admin', 'verified', 'author']],
     ['links/10-code.json', ['admin', 'verified', 'author']],
@@ -218,6 +221,13 @@ describe('file contents', () => {
   it('takes any text, including nothing', () => {
     expect(contentProblem('community/10-summary.md', '')).toBeNull();
     expect(contentProblem('community/10-summary.md', '# 日本語 \u{1F600}\r\n')).toBeNull();
+  });
+
+  it("checks the authors' plugins file, which only a paper has", () => {
+    expect(layoutProblem('author/plugins.json')).toBeNull();
+    expect(layoutProblem('community/plugins.json')).not.toBeNull();
+    expect(contentProblem('author/plugins.json', '{ "panels": [{ "panel": "o/map.minimap" }] }')).toBeNull();
+    expect(contentProblem('author/plugins.json', '{ "panels": [{ "panel": "minimap" }] }')).toMatch(/plugin id/);
   });
 
   it('refuses what is not text, or too big', () => {

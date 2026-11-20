@@ -3,7 +3,7 @@ import { HIDE_UNTIL, type HideUntil } from '../scope-stats';
 import { KINDS } from '../kinds';
 import { HIDEABLE_NAV_IDS, NAV_IDS, NAV_ITEMS } from '../nav';
 import { PAGE_PANELS, PANEL_KINDS, panelIds, SLOT_TITLES, type PanelKind } from '../panels';
-import { PLUGIN_PANEL_ID_RE } from '../plugins/manifest';
+import { movablePlaces, PLUGIN_PANEL_ID_RE } from '../plugins/manifest';
 import { parsePluginSource, sourceKey } from '../plugins/sources';
 import { PLUGIN_ID_RE } from './spec';
 import { USER_SHOW, USER_SHOW_SETTINGS, userShowKey } from '../user-pages';
@@ -88,6 +88,32 @@ function panelList(
   };
 }
 
+/**
+ * Where a reader moves plugins' panels on a kind's pages: `{ "<plugin id>.<panel id>": "<place>" }`, each place one
+ * a reader may choose there (`movablePlaces`). A panel its plugin made not movable stays where it is. Read leniently:
+ * entries that don't fit are dropped.
+ */
+function panelPlacement(kind: PanelKind): CoreSetting<Record<string, string>> {
+  const places = movablePlaces(kind);
+  const panel = z.string().regex(PLUGIN_PANEL_ID_RE, "a plugin's panel, as <plugin id>.<panel id>");
+  return {
+    schema: z.record(panel, z.enum(places as [string, ...string[]])),
+    default: {},
+    title: 'Plugin panel places',
+    description: `Where plugins' panels go on ${kind} pages, by panel: ${places.map((p) => `"${p}"`).join(', ')}. Without one, a panel goes where its plugin prefers.`,
+    group: `${KINDS[kind].title} pages`,
+    sanitize: (raw) => {
+      if (typeof raw !== 'object' || raw === null || Array.isArray(raw)) return undefined;
+      return Object.fromEntries(
+        Object.entries(raw).filter(
+          (e): e is [string, string] =>
+            PLUGIN_PANEL_ID_RE.test(e[0]) && typeof e[1] === 'string' && (places as string[]).includes(e[1]),
+        ),
+      );
+    },
+  };
+}
+
 function kindSettings(kind: PanelKind): Record<string, CoreSetting> {
   const noun = `${kind} pages`;
   return {
@@ -103,6 +129,7 @@ function kindSettings(kind: PanelKind): Record<string, CoreSetting> {
       'Panel order',
       `Panels to show first on ${noun}, in this order, each within its own part of the page; the rest follow in their usual order.`,
     ) as CoreSetting,
+    [`${kind}.panels.placement`]: panelPlacement(kind) as CoreSetting,
   };
 }
 

@@ -88,6 +88,8 @@
         applyTheme(m.params);
       } else if (m.method === 'settings.change') {
         context.settings = m.params;
+      } else if (m.method === 'surface.resize') {
+        if (context.surface) context.surface.size = m.params;
       } else if (m.method === 'context.change') {
         var settings = context.settings;
         context = m.params;
@@ -333,6 +335,9 @@
       },
       openUrl: function (url) {
         return call('ui.openUrl', { url: String(url) });
+      },
+      onResize: function (listener) {
+        return on('surface.resize', listener);
       },
     },
     theme: {

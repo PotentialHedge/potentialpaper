@@ -51,8 +51,13 @@ describe('the settings form', () => {
     // A kind's panels are one control: the order, with a switch per panel for the hidden list.
     expect(items.some((i) => i.key === 'paper.panels.hidden')).toBe(false);
     const panels = items.find((i) => i.key === 'paper.panels.order')!;
-    expect(panels.control).toMatchObject({ kind: 'rank', toggleKey: 'paper.panels.hidden' });
-    expect(itemKeys(panels)).toEqual(['paper.panels.order', 'paper.panels.hidden']);
+    expect(panels.control).toMatchObject({
+      kind: 'rank',
+      toggleKey: 'paper.panels.hidden',
+      placeKey: 'paper.panels.placement',
+    });
+    expect(itemKeys(panels)).toEqual(['paper.panels.order', 'paper.panels.hidden', 'paper.panels.placement']);
+    expect(items.some((i) => i.key === 'paper.panels.placement')).toBe(false);
     expect(matchesSearch(panels, 'Paper pages', 'hidden')).toBe(true);
   });
 

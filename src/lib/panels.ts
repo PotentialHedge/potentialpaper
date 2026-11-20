@@ -86,6 +86,7 @@ export const SLOT_TITLES: Record<string, string> = Object.fromEntries([
   ['paper.body', 'Below both'],
   ['paper.submission', 'Under each submission'],
   ['paper.community', 'In the community section'],
+  ['paper.author', 'In the author section'],
 ]);
 
 /**
@@ -95,6 +96,7 @@ export const SLOT_TITLES: Record<string, string> = Object.fromEntries([
 export const SLOT_PARENTS: Record<string, { panel: string; slot: string }> = {
   'paper.submission': { panel: 'submissions', slot: 'paper.body' },
   'paper.community': { panel: 'community', slot: 'paper.body' },
+  'paper.author': { panel: 'author', slot: 'paper.main' },
 };
 
 export type PanelKind = keyof typeof PAGE_PANELS;

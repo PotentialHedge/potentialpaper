@@ -3,7 +3,17 @@ import type { ResolvedSettings } from '../settings/document';
 import { parsePluginSource, sourceKey } from './sources';
 import type { PageKind } from '../kinds';
 import { SLOT_PARENTS, SLOT_TITLES } from '../panels';
-import { kindSlot, panelSlot, pluginPanelId, type PluginManifest, type PluginPermission } from './manifest';
+import {
+  kindSlot,
+  movablePlaces,
+  OWNERS_PLACES,
+  panelSlot,
+  PLACE_TITLES,
+  pluginPanelId,
+  type PanelSlot,
+  type PluginManifest,
+  type PluginPermission,
+} from './manifest';
 
 /**
  * Which plugins a reader has installed, from their resolved settings (DESIGN.md §10): the site's `plugins.default`
@@ -135,16 +145,39 @@ export interface InstalledPlugin {
   missing: { permissions: PluginPermission[]; network: string[] };
 }
 
+export interface PanelPlaceChoice {
+  value: string;
+  label: string;
+  group: string;
+  parent?: string;
+}
+
+export interface PanelChoice {
+  value: string;
+  label: string;
+  group: string;
+  parent?: string;
+  places?: PanelPlaceChoice[];
+}
+
 /**
  * Installed plugins' panels on a kind's pages, as choices for that kind's `<kind>.panels.hidden` and `.order` in the
  * settings form: each by `<plugin id>.<panel id>`, named with its plugin, grouped by the slot it takes there; one in a
- * slot drawn inside a built-in panel (`SLOT_PARENTS`) is set under that panel, as a sub-item.
+ * slot drawn inside a built-in panel (`SLOT_PARENTS`) is set under that panel, as a sub-item. A movable one lists the
+ * places a reader may move it to (`places`, its preferred first), each with the group and parent it takes there.
  */
-export function pluginPanelChoices(
-  plugins: readonly Pick<InstalledPlugin, 'plugin'>[],
-  kind: PageKind,
-): { value: string; label: string; group: string; parent?: string }[] {
-  const out: { value: string; label: string; group: string; parent?: string }[] = [];
+export function pluginPanelChoices(plugins: readonly Pick<InstalledPlugin, 'plugin'>[], kind: PageKind): PanelChoice[] {
+  const out: PanelChoice[] = [];
+  const at = (place: PanelSlot): PanelPlaceChoice => {
+    const slot = kindSlot(kind, place);
+    const parent = SLOT_PARENTS[slot];
+    return {
+      value: place,
+      label: PLACE_TITLES[place],
+      group: SLOT_TITLES[parent?.slot ?? slot] ?? slot,
+      ...(parent ? { parent: parent.panel } : {}),
+    };
+  };
   const seen = new Set<string>();
   for (const { plugin } of plugins) {
     if (!plugin) continue;
@@ -153,14 +186,16 @@ export function pluginPanelChoices(
       const value = pluginPanelId(plugin.id, panel.id);
       if (!slot || seen.has(value)) continue;
       seen.add(value);
-      const at = kindSlot(kind, slot);
-      const parent = SLOT_PARENTS[at];
+      const { value: _place, label: _title, ...where } = at(slot);
+      void _place;
+      void _title;
+      const movable = panel.movable !== false && !OWNERS_PLACES.includes(slot);
       out.push({
         value,
         // Named with its plugin, unless its title already is the plugin's name.
         label: panel.title === plugin.manifest.name ? panel.title : `${panel.title} (${plugin.manifest.name})`,
-        group: SLOT_TITLES[parent?.slot ?? at] ?? at,
-        ...(parent ? { parent: parent.panel } : {}),
+        ...where,
+        ...(movable ? { places: [slot, ...movablePlaces(kind).filter((p) => p !== slot)].map(at) } : {}),
       });
     }
   }

@@ -1,0 +1,1 @@
+ALTER TABLE "page_current" ADD COLUMN "author_plugins" jsonb;

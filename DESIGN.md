@@ -946,11 +946,14 @@ Built 2026-11-16 (`handoffs/plugins.md` Phase 2). A plugin is a public repo (or 
 - **The manifest** (`lib/plugins/manifest.ts`, zod; JSON Schema at `/schemas/plugin-manifest.json`) names an `id`
   (`<GitHub owner>/<name>`, and the owner must be the repo's), `name`, `version` (semver), `apiVersion` (1), `main`
   (an HTML file), `permissions` (`page.read`, `scope.read`, `reviews.read`, `identity`), `network` (https origins
-  its own backend lives at), an optional `bot` (the bot whose files on pages it shows) and what it `contributes`: `panels` (`{ id, title, kinds, slot, when? }`; `slot` is `main`, `aside` or
+  its own backend lives at), an optional `bot` (the bot whose files on pages it shows) and what it `contributes`: `panels` (`{ id, title, kinds, slot, movable?, when? }`; `slot` is `main`, `aside` or
   `tab`, or on a paper `submission` (under each of its submissions with scores, in the Submissions section, the frame
-  told which as `pp.context.surface.submission`) or `community` (at the end of the Community section), one for every
-  kind or one per kind,
-  `{ "paper": "submission", "*": "main" }`), `pages` (whole pages at
+  told which as `pp.context.surface.submission`), `community` (at the end of the Community section), `body` (below
+  both columns) or `author` (at the end of the author section, only where the paper's authors list the panel in
+  `author/plugins.json`, `lib/plugins/author-plugins.ts`), one for every kind or one per kind; the place it
+  prefers, and a reader moves a `movable` panel (the default) to another in `<kind>.panels.placement`, never into
+  or out of the author section, as `{ "paper": "submission", "*": "main" }`; the frame is told its `surface.place`
+  and `surface.size`, and `surface.resize` when that changes), `pages` (whole pages at
   `/x/<owner>/<name>/<page>`), `settings` (`SettingSpec`s, keyed `<plugin id>.<name>` in settings.json) and
   `commands` (in each of its panels' menus). The validator reports every problem in one pass, each on a line naming
   its field; unknown fields are warnings, so a newer manifest still loads on an older host.

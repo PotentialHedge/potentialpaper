@@ -80,6 +80,29 @@ describe('claiming a paper', () => {
     expect(repo).toContain(row.identityId);
   });
 
+  it("lets only a confirmed author list plugins' panels for the author section", async () => {
+    const paperId = await paper();
+    const ashish = await accountOf('ashish@ethz.ch');
+    const other = await accountOf('noam@ethz.ch');
+    await api('POST', '/claims', {
+      cookie: ashish.cookie,
+      body: { paper: PAPER, authorIndex: 0, evidence: 'My address is on the first page.' },
+    });
+    const [row] = await getDb().select().from(authorClaims).where(eq(authorClaims.paperId, paperId));
+    await decideClaim(row.id, 'confirmed', null);
+
+    const file = { 'author/plugins.json': '{ "panels": [{ "panel": "o/map.minimap", "settings": { "zoom": 2 } }] }\n' };
+    expect((await commitFiles(other.cookie, PAPER, null, file)).status).toBe(403);
+    expect(
+      (await commitFiles(ashish.cookie, PAPER, null, { 'author/plugins.json': '{ "panels": [{ "panel": "x" }] }' }))
+        .status,
+    ).toBe(422);
+    const written = await commitFiles(ashish.cookie, PAPER, null, file);
+    expect(written.status).toBe(200);
+    const [current] = await getDb().select().from(pageCurrent).where(eq(pageCurrent.pageId, paperId));
+    expect(current.authorPlugins).toEqual([{ panel: 'o/map.minimap', settings: { zoom: 2 } }]);
+  });
+
   it('can be changed or withdrawn while pending, and not taken from a confirmed author', async () => {
     const paperId = await paper();
     const ashish = await accountOf('ashish@ethz.ch');

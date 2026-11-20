@@ -18,6 +18,8 @@ export interface Choice {
   locked?: boolean;
   /** The choice it is drawn under, as a sub-item (a plugin's panel under each submission). */
   parent?: string;
+  /** Where it may be moved to, the default first, each with its group and parent there (a plugin's panel). */
+  places?: { value: string; label: string; group?: string; parent?: string }[];
 }
 
 /** How a setting is drawn. */
@@ -46,6 +48,8 @@ export type Control =
        * setting's own key keeps the order; this one keeps what is hidden.
        */
       toggleKey?: string;
+      /** A third: where each choice that has `places` is moved to, `{ "<choice>": "<place>" }`. */
+      placeKey?: string;
     }
   /** No control: set it in the file. */
   | { kind: 'file' };
@@ -168,6 +172,8 @@ export function coreItems(pluginChoices: (list: string) => Choice[] = () => []):
     // An arranged list is one control: its order, with a switch per item for `<list>.hidden`. The two stay separate
     // keys in the file, flat lists anyone can edit by hand.
     if (list && setting.widget === 'toggles') continue;
+    // A kind's plugin panel places are edited in its Panels control too.
+    if (key.endsWith('.panels.placement')) continue;
     const control = coreControl(setting, list ? pluginChoices(list) : []);
     const pageTitle = findCategory(category)?.title.toLowerCase() ?? 'these pages';
     const arranged = list && control.kind === 'rank';
@@ -178,9 +184,11 @@ export function coreItems(pluginChoices: (list: string) => Choice[] = () => []):
         ? setting.description
         : list === 'navbar'
           ? 'Drag to reorder the links, and switch one off to leave it out.'
-          : `Drag to reorder the panels within each part of ${pageTitle}, and switch one off to leave it out.`,
+          : `Drag to reorder the panels within each part of ${pageTitle}, and switch one off to leave it out. A plugin's panel can also be moved to another part.`,
       category,
-      control: arranged ? { ...control, toggleKey: `${list}.hidden` } : control,
+      control: arranged
+        ? { ...control, toggleKey: `${list}.hidden`, ...(list !== 'navbar' && { placeKey: `${list}.placement` }) }
+        : control,
       fallback: setting.default,
     });
   }
@@ -189,7 +197,8 @@ export function coreItems(pluginChoices: (list: string) => Choice[] = () => []):
 
 /** Every key an item edits: its own, and its control's second one. */
 export function itemKeys(item: SettingItem): string[] {
-  return item.control.kind === 'rank' && item.control.toggleKey ? [item.key, item.control.toggleKey] : [item.key];
+  if (item.control.kind !== 'rank') return [item.key];
+  return [item.key, item.control.toggleKey, item.control.placeKey].filter((k): k is string => k !== undefined);
 }
 
 function specChoices(spec: { values: string[]; labels?: string[] }): Choice[] {

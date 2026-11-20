@@ -3,6 +3,13 @@
 import type { ReactNode } from 'react';
 import { CheckboxField } from './Checkbox';
 
+export interface OptionPlace {
+  value: string;
+  label: string;
+  group?: string;
+  parent?: string;
+}
+
 export interface GroupedOption {
   value: string;
   label: ReactNode;
@@ -12,6 +19,11 @@ export interface GroupedOption {
   locked?: boolean;
   /** In a ranked list, the option it is drawn under, as a sub-item. */
   parent?: string;
+  /**
+   * In a ranked list, the places it may be moved to, each with the group and parent it then takes; the first is
+   * where it goes by default (a plugin's movable panel).
+   */
+  places?: OptionPlace[];
 }
 
 /** Options by their `group`, in the order each group first appears. */

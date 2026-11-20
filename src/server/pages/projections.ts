@@ -2,6 +2,7 @@ import { eq, notInArray, sql } from 'drizzle-orm';
 import { getDb, type Database } from '@/db';
 import { authorClaims, commitIdentities, pageCurrent, pageRefs, pageRevisions } from '@/db/schema';
 import { KINDS, pageName } from '@/lib/kinds';
+import { AUTHOR_PLUGINS_PATH, type AuthorPanel, parseAuthorPlugins } from '@/lib/plugins/author-plugins';
 import { pageDemoSources } from '../demos/attach';
 import { readLinks, readPagePdf, readThumbnail, readVersions } from './content';
 import { type Commit, SYSTEM_AUTHOR_ID } from './git-objects';
@@ -100,6 +101,17 @@ async function readKindFile(
   return { kindFile, name: pageName(page.kind, page.key, kindFile) };
 }
 
+/** A paper's `author/plugins.json`, if it has one that parses. */
+async function readAuthorPlugins(
+  db: Reader,
+  page: PageRow,
+  files: ReadonlyMap<string, string>,
+): Promise<AuthorPanel[] | null> {
+  if (page.kind !== 'paper' || !files.has(AUTHOR_PLUGINS_PATH)) return null;
+  const parsed = parseAuthorPlugins((await readText(db, page.id, files.get(AUTHOR_PLUGINS_PATH))) ?? '');
+  return 'panels' in parsed && parsed.panels.length > 0 ? parsed.panels : null;
+}
+
 /** Makes `page_current` say what the commit at the head says. */
 export async function writeCurrent(tx: Writer, pageId: string, head: string, commit: Commit): Promise<void> {
   const files = await readFiles(tx, pageId, commit.tree);
@@ -131,6 +143,7 @@ export async function writeCurrent(tx: Writer, pageId: string, head: string, com
     thumbnail,
     links: links.length > 0 ? links : null,
     versions: versions.length > 0 ? versions : null,
+    authorPlugins: await readAuthorPlugins(tx, page, files),
     ...(await readKindFile(tx, page, files)),
     updatedAt: commit.at,
   };

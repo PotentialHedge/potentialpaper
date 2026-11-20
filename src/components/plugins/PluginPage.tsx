@@ -2,6 +2,7 @@
 
 import { createContext, type ReactNode, useContext } from 'react';
 import type { PageKind } from '@/lib/kinds';
+import type { AuthorPanel } from '@/lib/plugins/author-plugins';
 import type { PageSummary } from '@/lib/plugins/protocol';
 
 /**
@@ -14,6 +15,8 @@ export interface PluginPageData {
   page: PageSummary;
   scopes: PageSummary[];
   facts: { hasScores: boolean; hasSubmissions: boolean; hasSignals: boolean };
+  /** A paper's `author/plugins.json`: the panels its authors let into the author section. */
+  authorPanels?: AuthorPanel[];
 }
 
 const PluginPageContext = createContext<PluginPageData | null>(null);

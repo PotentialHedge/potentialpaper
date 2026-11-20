@@ -99,7 +99,7 @@ export const HOST_METHODS = {
 export type HostMethod = keyof typeof HOST_METHODS;
 
 /** Events the host sends a frame. */
-export type FrameEvent = 'settings.change' | 'theme.change' | 'context.change';
+export type FrameEvent = 'settings.change' | 'theme.change' | 'context.change' | 'surface.resize';
 
 /** Calls the host makes to a frame: `commands.run` `{ command }`, when the reader picks one from a panel's menu. */
 export type FrameMethod = 'commands.run';
@@ -169,19 +169,34 @@ export interface PageSummary {
   name: string;
 }
 
+/** A frame's size, in CSS pixels. */
+export interface FrameSize {
+  width: number;
+  height: number;
+}
+
 /** What a frame knows when it starts (`pp.context`), and gets again from `context.get`. */
 export interface FrameContext {
   plugin: { id: string; name: string; version: string; sha: string | null; dev: boolean };
-  /** The panel the frame draws, or the plugin page it is. */
+  /**
+   * The panel the frame draws, or the plugin page it is, and its size in CSS pixels when the context was made. The
+   * `surface.resize` event (`pp.ui.onResize`) gives the size again whenever it changes.
+   */
   surface:
     | {
         type: 'panel';
         panel: string;
+        /** Its slot's full name: `paper.community`. */
         slot: string;
+        /** Where it sits, as a manifest's `slot` names places: `main`, `aside`, `tab`, `body`, `submission`, `community`, `author`. */
+        place: string;
+        size: FrameSize;
         /** In the `paper.submission` slot: the submission it is drawn under, by its venue (`openreview:ICLR.cc/2027/Conference`). */
         submission?: { venue: { id: string; name: string } };
+        /** In the `paper.author` slot: what the paper's authors set for it in `author/plugins.json`. */
+        config?: Record<string, unknown>;
       }
-    | { type: 'page'; page: string; path: string[] };
+    | { type: 'page'; page: string; path: string[]; size: FrameSize };
   /** The page the panel is on; `null` on a plugin's own page. */
   page: PageSummary | null;
   /**

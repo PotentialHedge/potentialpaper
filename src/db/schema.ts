@@ -26,6 +26,7 @@ import { NOTE_KINDS, SUBMISSION_STATUSES, type FieldValue, type VenueForms } fro
 import type { Bins, ScoreGroup, StatOutcome } from '../lib/scope-stats';
 import type { TitleLink } from '../lib/paper-links';
 import type { PaperVersion } from '../lib/versions';
+import type { AuthorPanel } from '../lib/plugins/author-plugins';
 import type { PdfPointer, ThumbnailPointer } from '@/server/pages/rules';
 import { PAPER_ORIGINS } from '../server/paper-sources/types';
 import { user } from './auth-schema';
@@ -387,6 +388,8 @@ export const pageCurrent = pgTable('page_current', {
   links: jsonb('links').$type<TitleLink[]>(),
   /** The page's `versions/`, oldest first (`lib/versions.ts`). */
   versions: jsonb('versions').$type<PaperVersion[]>(),
+  /** A paper's `author/plugins.json`: the plugins' panels its authors let into the author section, if it parses. */
+  authorPlugins: jsonb('author_plugins').$type<AuthorPanel[]>(),
   /**
    * A page of another kind: its kind file as it parses (`venue.json`, …, `lib/kinds.ts`), or `null` if it has none
    * or it doesn't parse, and the name it shows (`pageName`). A paper's are `null`: its title is `papers.title`.

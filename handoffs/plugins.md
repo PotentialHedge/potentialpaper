@@ -968,3 +968,24 @@ Integration: 306 of 314 pass, 1 skipped (the network test). The 7 failures are t
 
 These ran against this worktree's own database, `potentialpaper_test_plugins6org`, through an untracked `.env`. The
 plugin repo: 38 tests, typecheck and build pass, and CI is green on `main` and on `v0.2.0`.
+
+### Places: where panels sit, and the author section (2026-11-20)
+
+- **Decided with Benedict:** plugins go anywhere on a page but the owners' section. A panel's `slot` is the place it
+  prefers; readers move a `movable` one (the default) in `<kind>.panels.placement`. A paper's confirmed authors let
+  panels into the author section with `author/plugins.json` (a file in the repo, not a table: the path rules already
+  make `author/` theirs, and it has history). Listing a panel installs nothing; a reader sees it only with the plugin
+  installed. Read-only, as everywhere. Papers only: other kinds' owners' sections wait for the shared page layout.
+- **Places** (`lib/plugins/manifest.ts`): `main`, `aside`, `tab`, and on a paper `body`, `submission`, `community`
+  (end of the Community section) and `author`. `panelPlace` says where a panel goes for a reader; `movablePlaces` the
+  ones a reader may choose (never `author`). `paper.community` and `paper.author` are drawn inside their sections
+  (`components/plugins/NestedPanels.tsx`); `paper.body` now takes plugins too.
+- **`author/plugins.json`** (`lib/plugins/author-plugins.ts`): `{ "panels": [{ "panel": "<plugin>.<panel>",
+"settings": {…} }] }`, up to 8, a file type (`authorPlugins`), projected to `page_current.author_plugins`
+  (migration `0046`). The page passes it to the plugin context; each entry's `settings` reach the frame as
+  `surface.config`.
+- **Settings form:** a movable plugin panel's row in a kind's Panels list has a dropdown of places; the row moves to
+  that part of the list.
+- **Frames** know `surface.place` and `surface.size` (`{ width, height }`), and get `surface.resize` when it changes
+  (`pp.ui.onResize` in the SDK).
+- **Paper map v0.6.0:** the minimap prefers `community`, and draws taller in the main text than in the side column.
