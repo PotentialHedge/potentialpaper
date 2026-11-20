@@ -1,4 +1,4 @@
-import type { ComponentType } from 'react';
+import type { ComponentType, ReactNode } from 'react';
 import { ArrangedPanels } from '@/components/ArrangedPanels';
 import { ArrangedTabs } from '@/components/ArrangedTabs';
 import { LinksBox } from '@/components/pages/LinkLists';
@@ -51,7 +51,10 @@ export interface PanelProps {
   linksTo: PageLink[];
 }
 
-/** `paper.main` sits beside `paper.aside`; `paper.body` follows both, across the page, then `paper.tabs`. */
+/**
+ * `paper.main` sits beside `paper.aside`; `paper.body` follows both, across the page. Together they are the "Paper" tab,
+ * which `paper.tabs` panels are tabs beside, each shown in its place.
+ */
 export type PaperSlot = 'paper.main' | 'paper.aside' | 'paper.body' | 'paper.tabs';
 
 function Abstract({ paper }: PanelProps) {
@@ -311,11 +314,14 @@ const PANELS: Record<PanelId<'paper'>, ComponentType<PanelProps>> = {
 };
 
 /** A slot's panels, which the reader's settings may hide or reorder (`ArrangedPanels`). */
-export function Slot({ name, ...props }: PanelProps & { name: PaperSlot }) {
+export function Slot({ name, lead, ...props }: PanelProps & { name: PaperSlot; lead?: ReactNode }) {
   const panels = slotPanels('paper', name).map(({ id, title }) => {
     const Panel = PANELS[id];
     return { id, title, node: <Panel {...props} /> };
   });
-  if (name === 'paper.tabs') return <ArrangedTabs kind="paper" slot={name} panels={panels} />;
+  if (name === 'paper.tabs')
+    return (
+      <ArrangedTabs kind="paper" slot={name} panels={panels} lead={lead ? { title: 'Paper', node: lead } : undefined} />
+    );
   return <ArrangedPanels kind="paper" slot={name} panels={panels} />;
 }

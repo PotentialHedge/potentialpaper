@@ -78,39 +78,40 @@ export function RankedOptions({
       getId={(o) => o.value}
       getLabel={text}
       renderItem={(o) => (
-        <span
-          className={toggles && (inHidden || isHidden(o.value)) ? 'text-faint line-through decoration-rule-strong' : ''}
-        >
-          {o.label}
-        </span>
+        <>
+          <span
+            className={toggles && (inHidden || isHidden(o.value)) ? 'text-faint line-through decoration-rule-strong' : ''}
+          >
+            {o.label}
+          </span>
+          {/* On a line of its own, so a long label isn't squeezed beside it. */}
+          {movable && o.places && o.places.length > 1 && (
+            <span className="block py-0.5">
+              <Select
+                options={o.places.map((p) => ({ value: p.value, label: p.label }))}
+                value={placeOf(o)?.value ?? ''}
+                onValueChange={(place) => move(o, place)}
+                label={`Where ${text(o)} goes`}
+                disabled={disabled}
+                className="w-full max-w-56 min-w-0! py-0.5 text-xs"
+              />
+            </span>
+          )}
+        </>
       )}
       trailing={
-        toggles || movable
-          ? (o) => (
-              <>
-                {movable && o.places && o.places.length > 1 && (
-                  <Select
-                    options={o.places.map((p) => ({ value: p.value, label: p.label }))}
-                    value={placeOf(o)?.value ?? ''}
-                    onValueChange={(place) => move(o, place)}
-                    label={`Where ${text(o)} goes`}
-                    disabled={disabled}
-                    className="mr-2 min-w-0 py-0.5 text-xs"
-                  />
-                )}
-                {toggles &&
-                  (o.locked ? (
-                    <span className="w-8 shrink-0" aria-hidden />
-                  ) : (
-                    <Switch
-                      checked={!isHidden(o.value)}
-                      onCheckedChange={(on) => setShown(o.value, on)}
-                      aria-label={`Show ${text(o)}`}
-                      disabled={disabled}
-                    />
-                  ))}
-              </>
-            )
+        toggles
+          ? (o) =>
+              o.locked ? (
+                <span className="w-8 shrink-0" aria-hidden />
+              ) : (
+                <Switch
+                  checked={!isHidden(o.value)}
+                  onCheckedChange={(on) => setShown(o.value, on)}
+                  aria-label={`Show ${text(o)}`}
+                  disabled={disabled}
+                />
+              )
           : undefined
       }
       below={(o) => {

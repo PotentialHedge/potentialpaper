@@ -176,16 +176,24 @@ export async function PaperRoute({ scheme, segments }: { scheme: PaperScheme; se
               hasRepo: current !== undefined,
             }}
           />
-          <div className="mt-5 grid grid-cols-[minmax(0,1fr)_300px] items-start gap-8 narrow:grid-cols-1">
-            <div>
-              <Slot name="paper.main" {...panel} />
-            </div>
-            <aside className="space-y-3">
-              <Slot name="paper.aside" {...panel} />
-            </aside>
-          </div>
-          <Slot name="paper.body" {...panel} />
-          <Slot name="paper.tabs" {...panel} />
+          {/* The paper itself is the first tab; plugins' panels in paper.tabs are tabs beside it. */}
+          <Slot
+            name="paper.tabs"
+            {...panel}
+            lead={
+              <>
+                <div className="grid grid-cols-[minmax(0,1fr)_300px] items-start gap-8 narrow:grid-cols-1">
+                  <div>
+                    <Slot name="paper.main" {...panel} />
+                  </div>
+                  <aside className="space-y-3">
+                    <Slot name="paper.aside" {...panel} />
+                  </aside>
+                </div>
+                <Slot name="paper.body" {...panel} />
+              </>
+            }
+          />
         </article>
       </PluginPageProvider>
       <DemoFrames />
