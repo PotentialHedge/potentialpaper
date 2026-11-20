@@ -58,7 +58,7 @@ describe('starter files', () => {
   it('starts a page with prek.toml and empty sections', () => {
     const files = new Map(starterFiles());
     expect(files.get('prek.toml')).toBe(prekConfig());
-    expect(files.get('community/10-summary.md')).toBe('');
+    expect(files.get('community/10-tl-dr.md')).toBe('');
     expect(files.get('owners/10-tl-dr.md')).toBe('');
     for (const path of files.keys()) expect(layoutProblem(path)).toBeNull();
   });

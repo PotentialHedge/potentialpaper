@@ -193,7 +193,7 @@ big files. `src/server/pages/rules.ts` is the authority.
 .potentialpaper/pdf.json        system: its source page, license and when it was fetched
 owners/10-tl-dr.md              the owners' sections (a paper's confirmed authors'), one file per section
 owners/20-results.html          … in Markdown or HTML
-community/10-summary.md         the community section, the same way
+community/10-tl-dr.md           the community section, the same way
 versions/v_k3x9q2ab.json        a version of the paper; the file's name is its id
 versions/v_k3x9q2ab.pdf         that version's PDF (Git LFS)
 links/10-code.json              a link under the title: { "label", "url" }
@@ -780,7 +780,8 @@ below it.
 ## 7. The community section
 
 - **Open to any verified account**, section by section like Wikipedia, with preview and an edit
-  summary. Starter headings: Summary, Why it matters, Critique, Errata, Reproductions, Follow-ups.
+  summary. Starter headings: TL;DR, Summary, Why it matters, Critique, Errata, Reproductions, Follow-ups. The
+  TL;DR is the community's; a paper's authors keep their own in `owners/`. The abstract stays the paper's.
 - **Conflicts of interest are visible, not banned.** Edits by a paper's confirmed authors appear under
   their author identity with a badge (section 5.3). Authors have no special power here.
 - **Anti-vandalism is the real product.** Wikipedia works because patrolling is cheap, so these are

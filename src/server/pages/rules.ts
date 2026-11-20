@@ -21,7 +21,7 @@ import { htmlProblem } from './html';
  *   owners/10-overview.md           the owners' sections (on a paper, its confirmed authors'), a file per section
  *                                   (Markdown or HTML)
  *   owners/plugins.json             the plugins' panels the authors let into them (`lib/plugins/author-plugins.ts`)
- *   community/10-summary.md         the community section, the same way
+ *   community/10-tl-dr.md           the community section, the same way
  *   versions/v_k3x9q2ab.json        a version of the paper, named by its id
  *   versions/v_k3x9q2ab.pdf         that version's PDF (Git LFS)
  *   links/10-code.json              a link under the title

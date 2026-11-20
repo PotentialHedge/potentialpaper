@@ -15,12 +15,13 @@ import { PAGE_SCHEMA_NAMES, PAGE_SCHEMAS } from './schemas';
 export const STARTER_SECTIONS: Record<'owners' | 'community', readonly string[]> = {
   owners: ['10-tl-dr.md', '20-overview.md', '30-results.md', '40-demos.md', '50-code-and-data.md', '60-talks.md'],
   community: [
-    '10-summary.md',
-    '20-why-it-matters.md',
-    '30-critique.md',
-    '40-errata.md',
-    '50-reproductions.md',
-    '60-follow-ups.md',
+    '10-tl-dr.md',
+    '20-summary.md',
+    '30-why-it-matters.md',
+    '40-critique.md',
+    '50-errata.md',
+    '60-reproductions.md',
+    '70-follow-ups.md',
   ],
 };
 

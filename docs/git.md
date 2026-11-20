@@ -47,7 +47,7 @@ git clone ssh://git@git.papers.potentialhedge.com:2222/abs/1706.03762.git
 Sections can also be `.html` files, from a small allowlist of tags (no scripts, styles or classes). They show
 in the order of their file names, so `10-summary.md` comes before `20-results.md`; a section's title is the
 `#` heading its file starts with, or else its file name. Every page starts with an empty file for each section
-it might have (`community/10-summary.md`, `author/10-tl-dr.md`, …): an empty file isn't shown, so write in one to
+it might have (`community/10-tl-dr.md`, `owners/10-tl-dr.md`, …): an empty file isn't shown, so write in one to
 add that section, and rename or delete the rest as you like. Files are plain text (UTF-8), at most 256 KB each (1 MB in `demos/`), except
 the PDFs and the picture.
 
