@@ -12,6 +12,8 @@ import {
   fetchUpdates,
   installPlugin,
   type PluginUpdate,
+  removeDevPlugin,
+  uninstallPlugin,
   usePlugins,
 } from '@/lib/plugins/client';
 import type { InstalledPlugin } from '@/lib/plugins/installed';
@@ -46,6 +48,7 @@ export function PluginsSettings() {
   const [updates, setUpdates] = useState<PluginUpdate[]>([]);
   const [note, setNote] = useState<Note>(null);
   const [approving, setApproving] = useState<InstalledPlugin | null>(null);
+  const [removing, setRemoving] = useState<string | null>(null);
   const origin = useOrigin();
   const signedIn = settings.loaded && settings.signedIn;
 
@@ -64,6 +67,26 @@ export function PluginsSettings() {
   }, [signedIn, installedKey]);
 
   const installed = useMemo(() => new Set(plugins.map((p) => p.source)), [plugins]);
+
+  /** Uninstall one, or stop loading it from the dev server. The site's own are turned off on their page instead. */
+  async function remove(p: InstalledPlugin) {
+    const name = p.plugin?.manifest.name ?? p.source;
+    setNote(null);
+    if (p.from === 'dev') {
+      removeDevPlugin(p.source);
+      setNote({ ok: true, text: `Removed ${name}.` });
+      return;
+    }
+    setRemoving(p.source);
+    try {
+      await uninstallPlugin(p.source);
+      setNote({ ok: true, text: `Removed ${name}.` });
+    } catch (err) {
+      setNote({ ok: false, text: (err as Error).message });
+    } finally {
+      setRemoving(null);
+    }
+  }
 
   const onInstalled: OnInstalled = (p) => {
     if (p.status === 'consent' && p.plugin?.commit) setApproving(p);
@@ -110,6 +133,17 @@ export function PluginsSettings() {
                     {update && <span className="text-xs text-accent">{update.latest.version} is out</span>}
                     <span className="flex-1" />
                     <span className={STATUS_COLOR[p.status]}>{STATUS[p.status]}</span>
+                    {(p.from === 'dev' || (signedIn && p.from === 'user')) && (
+                      <button
+                        type="button"
+                        className={`${ui.linkBtn} text-sm`}
+                        disabled={removing === p.source}
+                        onClick={() => remove(p)}
+                        aria-label={`Remove ${manifest?.name ?? p.source}`}
+                      >
+                        {removing === p.source ? 'Removing…' : 'remove'}
+                      </button>
+                    )}
                   </div>
                   {manifest?.description && <p className="mt-0.5 text-subtle">{manifest.description}</p>}
                   {p.error && <p className="mt-1 text-xs whitespace-pre-line text-down">{p.error}</p>}
