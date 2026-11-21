@@ -44,7 +44,7 @@ declare namespace PP {
 
   interface Context {
     plugin: { id: string; name: string; version: string; sha: string | null; dev: boolean };
-    /** The panel this frame draws, or the plugin page it is. */
+    /** The panel this frame draws, the plugin page it is, or the popover your action opens. */
     surface:
     | {
         type: 'panel';
@@ -60,7 +60,9 @@ declare namespace PP {
         /** In the `paper.author` slot: what the paper's authors set for it in `author/plugins.json`. */
         config?: Record<string, unknown>;
       }
-    | { type: 'page'; page: string; path: string[]; size: Size };
+    | { type: 'page'; page: string; path: string[]; size: Size }
+    /** The popover your action under the page's title opens (`contributes.actions`). */
+    | { type: 'action'; action: string; size: Size };
     /** The page the panel is on; `null` on the plugin's own page. */
     page: PageSummary | null;
     /** The pages above it: a paper's venues, topics and orgs; a topic's broader topics; an org's parents. */

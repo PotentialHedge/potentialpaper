@@ -46,6 +46,9 @@ const innermost: CollisionDetection = (args) => {
  * An option with a `parent` among the options is drawn under it, in a list of its own to drag within, and greyed
  * while its parent is hidden (a plugin's panel under each submission, under "Submissions and reviews").
  *
+ * With `menuAfter`, every shown option past that many, in order, is marked as in the menu (the page actions' bar shows
+ * that many, and the rest in its "⋯" menu).
+ *
  * With `placement` and `onMove`, an option with `places` is drawn in the list (group, and parent) of the place
  * `placement` names, or else of its first, and is dragged into any other of its places' lists to move it there; the
  * lists it may go to are outlined while it is dragged, and empty ones shown. `onMove` gets the new order and placement
@@ -59,6 +62,7 @@ export function RankedOptions({
   onHiddenChange,
   placement,
   onMove,
+  menuAfter,
   label,
   disabled,
 }: {
@@ -69,6 +73,7 @@ export function RankedOptions({
   onHiddenChange?: (hidden: string[]) => void;
   placement?: Record<string, string>;
   onMove?: (value: string[], placement: Record<string, string>) => void;
+  menuAfter?: number;
   label: string;
   disabled?: boolean;
 }) {
@@ -106,6 +111,15 @@ export function RankedOptions({
     const mine = options.map((o) => o.value).filter((x) => (x === v ? !shown : hidden.includes(x)));
     onHiddenChange([...others, ...mine]);
   };
+  /** The shown options past `menuAfter`, in order: those in the menu. */
+  const inMenu = new Set(
+    menuAfter === undefined
+      ? []
+      : ranked(options)
+          .filter((o) => !isHidden(o.value))
+          .slice(menuAfter)
+          .map((o) => o.value),
+  );
   /** A list's whole new order, over what the value says of the others. */
   const withOrder = (order: string[]) => [...value.filter((v) => !order.includes(v)), ...order];
 
@@ -166,6 +180,7 @@ export function RankedOptions({
           className={toggles && (inHidden || isHidden(o.value)) ? 'text-faint line-through decoration-rule-strong' : ''}
         >
           {o.label}
+          {inMenu.has(o.value) && <span className="ml-2 font-sans text-xs text-faint">in ⋯ menu</span>}
         </span>
       )}
       trailing={

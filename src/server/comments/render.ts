@@ -1,5 +1,6 @@
 import MarkdownIt, { type MarkdownIt as Md, type Token } from 'markdown-it';
 import { splitMentions } from '@/lib/aliases';
+import { reviewMath } from '@/lib/review-math';
 import { mathPlugin } from '../pages/markdown';
 
 /**
@@ -99,6 +100,14 @@ function newRenderer(): Md {
 }
 
 const md = newRenderer();
+
+/**
+ * Text from a paper's source (an abstract, a review) as HTML: Markdown with TeX written every way there is
+ * (`\\(x\\)`, `$x$`), set as `$…$` first (`lib/review-math.ts`), then rendered as a comment is.
+ */
+export function renderSourceText(text: string): string {
+  return renderComment(reviewMath(text));
+}
 
 export function renderComment(
   body: string,

@@ -9,6 +9,10 @@ export const dynamic = 'force-dynamic';
  */
 const UPDATES: { date: string; text: string }[] = [
   {
+    date: '2026-11-21',
+    text: "The actions under a page's title are arranged in settings: `actions.order` and `actions.hidden` (`cite`, `edit`, `follow`, `share`, `history`, `agents`, and plugins' actions as `<plugin id>.<action id>`). The first four shown are in the bar, the rest in its ⋯ menu. A plugin offers an action with `contributes.actions` in its manifest (see `/plugins.md`). A paper's abstract is now rendered as Markdown with TeX.",
+  },
+  {
     date: '2026-11-18',
     text: 'Settings are easier to change for a person: `PATCH /api/v1/me/settings` with `{ "<key>": <value> | null }` changes only those keys (`null` puts one back to its default) and keeps the rest of their settings.json, comments included. `/schemas/settings.json`, fetched with their token, lists every key they have, their plugins\' too. New keys: `navbar.order` and `navbar.hidden` arrange the links in the site\'s navbar (`papers`, `changes`, `settings`, and plugin pages as `<plugin id>.<page id>`; `settings` can\'t be hidden). A plugin page offers a navbar link with `"nav"` in its manifest (see `/plugins.md`).',
   },

@@ -123,6 +123,7 @@ export function SettingControl({
           onChange={onChange}
           hidden={control.toggleKey ? asList(values?.[control.toggleKey]) : undefined}
           placement={control.placeKey ? asRecord(values?.[control.placeKey]) : undefined}
+          menuAfter={control.menuAfter}
           onMove={
             control.placeKey && onChangeWith
               ? (order, placement) => onChangeWith(order, { [control.placeKey!]: placement })

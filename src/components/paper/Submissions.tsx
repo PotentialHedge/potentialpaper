@@ -2,7 +2,6 @@ import { LinkedComments, LinkedDetails, Permalink } from '@/components/paper/Rev
 import { SubmissionPanels } from '@/components/plugins/NestedPanels';
 import { ui } from '@/components/ui';
 import { sourceName } from '@/lib/paper-ids';
-import { reviewMath } from '@/lib/review-math';
 import {
   formatScore,
   formOf,
@@ -16,7 +15,7 @@ import {
   type Submission,
   type SubmissionNote,
 } from '@/lib/submissions';
-import { renderComment } from '@/server/comments/render';
+import { renderSourceText } from '@/server/comments/render';
 import { Fold } from '@/components/paper/Fold';
 
 /**
@@ -106,14 +105,6 @@ function Scores({ fields }: { fields: ShownField[] }) {
   );
 }
 
-/**
- * A passage as HTML: OpenReview's notes are Markdown with TeX, written every way there is (`\\(x\\)`, `$x$`), set
- * as `$…$` first. Rendered as comments are, so a tag is text, links are `nofollow` and only GIFs embed.
- */
-function markdown(text: string): string {
-  return renderComment(reviewMath(text));
-}
-
 /** The passages, each under its label. */
 function Sections({ fields }: { fields: ShownField[] }) {
   return fields
@@ -122,7 +113,7 @@ function Sections({ fields }: { fields: ShownField[] }) {
       <div key={field.key} className="mt-2 text-[15px]">
         {/* A comment's one passage needs no label. */}
         {field.key !== 'comment' && <h5 className="font-sans text-[13px] font-semibold text-subtle">{field.label}</h5>}
-        <div className="md comment-md break-words" dangerouslySetInnerHTML={{ __html: markdown(field.text) }} />
+        <div className="md comment-md break-words" dangerouslySetInnerHTML={{ __html: renderSourceText(field.text) }} />
       </div>
     ));
 }

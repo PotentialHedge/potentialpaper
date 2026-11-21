@@ -283,6 +283,11 @@ Every field of the manifest:
 
   They appear in the reader's settings.json as \`"<plugin id>.<name>"\`, and on your plugin's own page of the
   settings, ${origin}/settings/plugins/<owner>/<name>, which also lists them in the settings' search.
+- \`contributes.actions\` (up to 4): \`id\`, \`title\` (its text in the bar, up to 30 characters), \`kinds\` and
+  \`when\` (as a panel's). Each is a button under the page's title, beside cite and share, that opens a popover with
+  a frame of your plugin in it, where \`pp.context.surface\` is \`{ "type": "action", "action": "<id>" }\`. Readers
+  move or hide it in settings, as \`<owner>/<name>.<action id>\` in \`actions.order\` and \`actions.hidden\`; the
+  first four shown are in the bar and the rest in its ⋯ menu.
 - \`contributes.commands\` (up to 16): \`id\` and \`title\`, listed in each of its panels' menus; handle them with
   \`pp.commands.register(id, handler)\`.
 

@@ -2,6 +2,7 @@ import { z } from 'zod';
 import { HIDE_UNTIL, type HideUntil } from '../scope-stats';
 import { KINDS } from '../kinds';
 import { HIDEABLE_NAV_IDS, NAV_IDS, NAV_ITEMS } from '../nav';
+import { ACTION_IDS, BAR_SIZE, PAGE_ACTIONS } from '../page-actions';
 import { PAGE_PANELS, PANEL_KINDS, panelIds, SLOT_TITLES, type PanelKind } from '../panels';
 import { movablePlaces, PLUGIN_PANEL_ID_RE } from '../plugins/manifest';
 import { parsePluginSource, sourceKey } from '../plugins/sources';
@@ -135,13 +136,19 @@ function kindSettings(kind: PanelKind): Record<string, CoreSetting> {
 
 /**
  * A list of navbar link ids, unique: the site's own (`lib/nav.ts`) and plugins' (`<plugin id>.<page id>`). Read
- * leniently, as a panel list.
+ * leniently, as a panel list. The page actions' lists (`lib/page-actions.ts`) are made the same way.
  */
 function navList(
   ids: string[],
   widget: 'toggles' | 'order',
   title: string,
   description: string,
+  {
+    group = 'Navbar',
+    what = 'link',
+    of = 'page',
+    items = NAV_ITEMS as { id: string; title: string; locked?: boolean }[],
+  } = {},
 ): CoreSetting<string[]> {
   const known = (id: unknown): id is string =>
     typeof id === 'string' && (ids.includes(id) || PLUGIN_PANEL_ID_RE.test(id));
@@ -150,16 +157,16 @@ function navList(
       .array(
         z.union([
           z.enum(ids as [string, ...string[]]),
-          z.string().regex(PLUGIN_PANEL_ID_RE, "a built-in link's id, or a plugin's as <plugin id>.<page id>"),
+          z.string().regex(PLUGIN_PANEL_ID_RE, `a built-in ${what}'s id, or a plugin's as <plugin id>.<${of} id>`),
         ]),
       )
-      .refine((list) => new Set(list).size === list.length, 'must not name a link twice'),
+      .refine((list) => new Set(list).size === list.length, `must not name a ${what} twice`),
     default: [],
     title,
     description,
-    group: 'Navbar',
+    group,
     widget,
-    choices: NAV_ITEMS.map((i) => ({ value: i.id, label: i.title, ...(i.locked ? { locked: true } : {}) })),
+    choices: items.map((i) => ({ value: i.id, label: i.title, ...(i.locked ? { locked: true } : {}) })),
     sanitize: (raw) => (Array.isArray(raw) ? [...new Set(raw.filter(known))] : undefined),
   };
 }
@@ -176,6 +183,24 @@ const NAV_SETTINGS: Record<string, CoreSetting> = {
     'toggles',
     'Hidden navbar links',
     `Links to leave out of the navbar, by id (${HIDEABLE_NAV_IDS.join(', ')}, or a plugin's page as <plugin id>.<page id>). Settings always shows.`,
+  ) as CoreSetting,
+};
+
+const ACTIONS = { group: 'Page actions', what: 'action', of: 'action', items: PAGE_ACTIONS };
+const ACTION_SETTINGS: Record<string, CoreSetting> = {
+  'actions.order': navList(
+    ACTION_IDS,
+    'order',
+    'Action order',
+    `Actions under a page's title to show first, in this order (${ACTION_IDS.join(', ')}, or a plugin's as <plugin id>.<action id>); the rest follow in their usual order. The first ${BAR_SIZE} shown are in the bar, the rest in its "⋯" menu.`,
+    ACTIONS,
+  ) as CoreSetting,
+  'actions.hidden': navList(
+    ACTION_IDS,
+    'toggles',
+    'Hidden actions',
+    `Actions to leave out from under a page's title, by id (${ACTION_IDS.join(', ')}, or a plugin's as <plugin id>.<action id>).`,
+    ACTIONS,
   ) as CoreSetting,
 };
 
@@ -294,6 +319,7 @@ const USER_SETTINGS: Record<string, CoreSetting> = Object.fromEntries(
 
 export const CORE_SETTINGS: Record<string, CoreSetting> = {
   ...NAV_SETTINGS,
+  ...ACTION_SETTINGS,
   ...Object.fromEntries(PANEL_KINDS.flatMap((kind) => Object.entries(kindSettings(kind)))),
   ...USER_SETTINGS,
   ...PLUGIN_SETTINGS,

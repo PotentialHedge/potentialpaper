@@ -202,6 +202,15 @@ const pageSchema = z.looseObject({
     }),
 });
 
+const actionSchema = z.looseObject({
+  id: contributionId('action'),
+  title: text(30, 'Its text in the bar under the title, and its name in settings: "translate".'),
+  kinds: kindsSchema,
+  when: z.string().max(MAX_WHEN_LENGTH).optional().meta({
+    description: 'Whether it shows on a page at all, as a panel\'s "when": "page.hasScores", "signedIn".',
+  }),
+});
+
 const commandSchema = z.looseObject({
   id: contributionId('command'),
   title: text(60, 'What it does, as its menu entry says it: "Copy as CSV".'),
@@ -322,6 +331,10 @@ export const manifestSchema = z
           .record(z.string().regex(SETTING_NAME_RE, 'a setting name starts with a letter; no dots'), settingSpecSchema)
           .default({})
           .meta({ description: 'Its settings, in settings.json as "<plugin id>.<name>".' }),
+        actions: z.array(actionSchema).max(4).default([]).meta({
+          description:
+            "Actions under a page's title, beside cite and share, each opening a popover with a frame of its own. Readers arrange and hide them in settings (actions.order, actions.hidden).",
+        }),
         commands: z
           .array(commandSchema)
           .max(16)
@@ -331,7 +344,7 @@ export const manifestSchema = z
           description: 'Values it publishes about papers, for any plugin and search to use. Needs a publisher.',
         }),
       })
-      .default({ panels: [], pages: [], settings: {}, commands: [], signals: [] }),
+      .default({ panels: [], pages: [], actions: [], settings: {}, commands: [], signals: [] }),
   })
   .meta({
     title: MANIFEST_FILE,
@@ -346,6 +359,13 @@ export interface PanelContribution {
   slot: PanelSlot | Partial<Record<PageKind | '*', PanelSlot>>;
   /** Whether a reader may move it (`<kind>.panels.placement`); true unless the manifest says false. */
   movable: boolean;
+  when?: string;
+}
+
+export interface ActionContribution {
+  id: string;
+  title: string;
+  kinds: PageKind[];
   when?: string;
 }
 
@@ -367,6 +387,7 @@ export interface PluginManifest {
   contributes: {
     panels: PanelContribution[];
     pages: { id: string; title: string; layout: 'article' | 'full'; nav?: boolean | string }[];
+    actions: ActionContribution[];
     settings: Record<string, PluginSettingSpec>;
     commands: { id: string; title: string }[];
     signals: SignalSpec[];
@@ -402,12 +423,13 @@ function unknownFields(raw: Record<string, unknown>, warn: (path: string, messag
   };
   check(raw, Object.keys(manifestSchema.shape), '');
   const contributes = raw.contributes;
-  check(contributes, ['panels', 'pages', 'settings', 'commands', 'signals'], 'contributes');
+  check(contributes, ['panels', 'pages', 'actions', 'settings', 'commands', 'signals'], 'contributes');
   if (!isObject(contributes)) return;
   const each = (list: unknown, known: string[], at: string) =>
     Array.isArray(list) && list.forEach((item, i) => check(item, known, `${at}[${i}]`));
   each(contributes.panels, Object.keys(panelSchema.shape), 'contributes.panels');
   each(contributes.pages, Object.keys(pageSchema.shape), 'contributes.pages');
+  each(contributes.actions, Object.keys(actionSchema.shape), 'contributes.actions');
   each(contributes.commands, Object.keys(commandSchema.shape), 'contributes.commands');
   if (Array.isArray(contributes.signals)) {
     const common = ['kind', ...Object.keys(signalCommon)];
@@ -468,7 +490,7 @@ function crossChecks(
   error: (path: string, message: string) => void,
   warn: (path: string, message: string) => void,
 ) {
-  const { panels, pages, settings, commands, signals } = manifest.contributes;
+  const { panels, pages, actions, settings, commands, signals } = manifest.contributes;
   const unique = (list: { id: string }[], at: string, what: string) => {
     const seen = new Set<string>();
     list.forEach((item, i) => {
@@ -476,8 +498,25 @@ function crossChecks(
       seen.add(item.id);
     });
   };
+  /** A `when` that parses, over keys its kinds offer. */
+  function checkWhen({ when, kinds }: { when?: string; kinds: PageKind[] }, at: string) {
+    if (when === undefined) return;
+    const problem = whenProblem(when);
+    if (problem) {
+      error(`${at}.when`, problem);
+      return;
+    }
+    const keys = whenKeys(parseWhen(when));
+    for (const kind of kinds) {
+      const missing = keys.filter((key) => !KINDS[kind].contextKeys.includes(key));
+      if (missing.length) {
+        warn(`${at}.when`, `${kind} pages don't offer ${missing.join(', ')}, which read as false there`);
+      }
+    }
+  }
   unique(panels, 'contributes.panels', 'panel');
   unique(pages, 'contributes.pages', 'page');
+  unique(actions, 'contributes.actions', 'action');
   unique(commands, 'contributes.commands', 'command');
   unique(signals, 'contributes.signals', 'signal');
   signals.forEach((signal, i) => {
@@ -507,20 +546,12 @@ function crossChecks(
         }
       }
     }
-    if (panel.when !== undefined) {
-      const problem = whenProblem(panel.when);
-      if (problem) {
-        error(`${at}.when`, problem);
-      } else {
-        const keys = whenKeys(parseWhen(panel.when));
-        for (const kind of panel.kinds) {
-          const missing = keys.filter((key) => !KINDS[kind].contextKeys.includes(key));
-          if (missing.length) {
-            warn(`${at}.when`, `${kind} pages don't offer ${missing.join(', ')}, which read as false there`);
-          }
-        }
-      }
-    }
+    checkWhen(panel, at);
+  });
+  actions.forEach((action, i) => {
+    const at = `contributes.actions[${i}]`;
+    if (new Set(action.kinds).size !== action.kinds.length) warn(`${at}.kinds`, 'names a kind twice');
+    checkWhen(action, at);
   });
 
   for (const [name, spec] of Object.entries(settings)) {
@@ -548,8 +579,8 @@ function crossChecks(
   if (manifest.permissions.includes('identity') && manifest.network.length === 0) {
     warn('permissions', '"identity" gives a token for your own backend, and "network" names none to send it to');
   }
-  if (panels.length === 0 && pages.length === 0 && signals.length === 0) {
-    warn('contributes', 'adds no panels, pages or signals, so it never runs');
+  if (panels.length === 0 && pages.length === 0 && actions.length === 0 && signals.length === 0) {
+    warn('contributes', 'adds no panels, pages, actions or signals, so it never runs');
   }
 }
 

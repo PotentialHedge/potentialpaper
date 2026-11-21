@@ -168,7 +168,9 @@ function frameContext({ plugin: p, page: pg, viewer: v, surface: s }: Latest, si
             ...(s.submission && { submission: s.submission }),
             ...(s.config && { config: s.config }),
           }
-        : { type: 'page', page: s.id, path: s.path ?? [], size },
+        : s.type === 'action'
+          ? { type: 'action', action: s.id, size }
+          : { type: 'page', page: s.id, path: s.path ?? [], size },
     page: pg?.page ?? null,
     scopes: pg?.scopes ?? [],
     viewer: v,
@@ -180,8 +182,8 @@ function frameContext({ plugin: p, page: pg, viewer: v, surface: s }: Latest, si
 }
 
 export interface PluginSurface {
-  type: 'panel' | 'page';
-  /** The panel's or page's id. */
+  type: 'panel' | 'page' | 'action';
+  /** The panel's, page's or action's id. */
   id: string;
   /** A panel's slot (`venue.main`); a page's path after its id. */
   slot?: string;

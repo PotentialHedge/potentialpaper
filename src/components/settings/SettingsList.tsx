@@ -4,6 +4,7 @@ import Link from 'next/link';
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { ui } from '@/components/ui';
 import { pluginNavItems } from '@/lib/nav';
+import { pluginActions } from '@/lib/page-actions';
 import type { PanelKind } from '@/lib/panels';
 import { usePlugins } from '@/lib/plugins/client';
 import { type InstalledPlugin, pluginPanelChoices } from '@/lib/plugins/installed';
@@ -67,7 +68,9 @@ export function useSettingItems() {
       ...coreItems((list) =>
         list === 'navbar'
           ? pluginNavItems(plugins).map((i) => ({ value: i.id, label: `${i.title} (${i.plugin})` }))
-          : pluginPanelChoices(plugins, list.split('.')[0] as PanelKind),
+          : list === 'actions'
+            ? pluginActions(plugins).map((a) => ({ value: a.id, label: `${a.title} (${a.plugin})` }))
+            : pluginPanelChoices(plugins, list.split('.')[0] as PanelKind),
       ),
       ...withPages.flatMap((p) => pluginItems(p.plugin!.id, p.plugin!.manifest.contributes.settings)),
     ].filter((item) => shown.has(item.category));

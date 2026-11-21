@@ -179,7 +179,7 @@ export interface FrameSize {
 export interface FrameContext {
   plugin: { id: string; name: string; version: string; sha: string | null; dev: boolean };
   /**
-   * The panel the frame draws, or the plugin page it is, and its size in CSS pixels when the context was made. The
+   * The panel the frame draws, the plugin page it is, or the action popover it fills, and its size in CSS pixels when the context was made. The
    * `surface.resize` event (`pp.ui.onResize`) gives the size again whenever it changes.
    */
   surface:
@@ -196,7 +196,9 @@ export interface FrameContext {
         /** In the `paper.author` slot: what the paper's authors set for it in `owners/plugins.json`. */
         config?: Record<string, unknown>;
       }
-    | { type: 'page'; page: string; path: string[]; size: FrameSize };
+    | { type: 'page'; page: string; path: string[]; size: FrameSize }
+    /** The popover an action under the page's title opens (`contributes.actions`). */
+    | { type: 'action'; action: string; size: FrameSize };
   /** The page the panel is on; `null` on a plugin's own page. */
   page: PageSummary | null;
   /**
