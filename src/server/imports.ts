@@ -1,16 +1,18 @@
 import { and, eq, gt, isNull, sql } from 'drizzle-orm';
 import { getDb, type Database } from '@/db';
 import { botGrants, pageCurrent, paperIdentifiers, papers } from '@/db/schema';
+import { MAX_LINKS, type TitleLink } from '@/lib/paper-links';
 import type { PaperId, PaperScheme } from '@/lib/paper-ids';
 import type { PaperVersion, VersionPdf } from '@/lib/versions';
 import { ApiError } from './api/errors';
 import type { Principal } from './auth';
 import { versionPdfAt } from './files';
-import type { Actor } from './pages/check';
+import { rolesOf, type Actor } from './pages/check';
 import { commitPage, type CommitResult } from './pages/commit';
 import { grantCovers } from './pages/rules';
 import { findPaper } from './papers';
-import { versionChanges } from './pages/content';
+import { linkChanges, readLinks, versionChanges } from './pages/content';
+import { readCommit, readFiles, readHead } from './pages/repo';
 import { attachPdf, mergeFoundVersions, setVersions, versionsAt } from './versions';
 
 /**
@@ -146,5 +148,57 @@ export async function importPdf(
     database,
     evidence: [input.at.url],
   });
+  return { result, identifiers };
+}
+
+/** An address as two links to one place compare: no scheme, no `www.`, no trailing slash, the host in lower case. */
+function sameAddress(url: string): string {
+  const parsed = URL.parse(url);
+  if (!parsed) return url;
+  const host = parsed.hostname.toLowerCase().replace(/^www\./, '');
+  return `${host}${parsed.pathname.replace(/\/+$/, '')}${parsed.search}`;
+}
+
+/**
+ * Links to the paper elsewhere a source names, such as the code an abstract points to, added under its title
+ * (`links/`) after the ones it has. One whose address is there already is left out, a label taken already gets a
+ * number ("Code 2"), and the page keeps at most `MAX_LINKS`. A claimed paper's links are its authors', so
+ * nothing is added to one.
+ */
+export async function importLinks(
+  actor: Actor,
+  input: { paper: PaperId; links: TitleLink[]; summary?: string },
+  database: Database = getDb(),
+): Promise<{ result: CommitResult; identifiers: PaperId[] }> {
+  const { paper, identifiers } = await paperOf(input.paper, database);
+  const head = await readHead(database, paper.id);
+  const unchanged: CommitResult = { status: 'unchanged', oid: head };
+  if ((await rolesOf(database, actor, paper.id)).claimed) return { result: unchanged, identifiers };
+  const files: ReadonlyMap<string, string> = head
+    ? await readFiles(database, paper.id, (await readCommit(database, paper.id, head)).tree)
+    : new Map();
+  const links = await readLinks(database, paper.id, files);
+  const addresses = new Set(links.map((link) => sameAddress(link.url)));
+  const labels = new Set(links.map((link) => link.label.toLowerCase()));
+  const before = links.length;
+  for (const link of input.links) {
+    if (links.length >= MAX_LINKS) break;
+    const address = sameAddress(link.url);
+    if (addresses.has(address)) continue;
+    let label = link.label.trim();
+    for (let n = 2; labels.has(label.toLowerCase()); n += 1) label = `${link.label.trim()} ${n}`;
+    links.push({ label, url: link.url });
+    addresses.add(address);
+    labels.add(label.toLowerCase());
+  }
+  if (links.length === before) return { result: unchanged, identifiers };
+  const result = await commitPage(
+    paper.id,
+    head,
+    actor,
+    linkChanges(files.keys(), links),
+    input.summary ?? 'Add links from the abstract',
+    { database },
+  );
   return { result, identifiers };
 }

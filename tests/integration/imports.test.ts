@@ -4,7 +4,7 @@ import { join } from 'node:path';
 import { eq } from 'drizzle-orm';
 import { afterAll, beforeEach, describe, expect, it } from 'vitest';
 import { getDb } from '@/db';
-import { accounts } from '@/db/schema';
+import { accounts, pageCurrent } from '@/db/schema';
 import { ensureBot, grantBot, OPENREVIEW_BOT } from '@/server/bots';
 import { VENUES_BOT } from '@/server/venue-pages';
 import { findPaper } from '@/server/papers';
@@ -162,5 +162,30 @@ describe('the import API', () => {
     expect(first.pdf).toMatchObject({ sha256: stored.body.sha256, source: pdf.source, license: 'CC-BY-4.0' });
     expect(first.submissions?.[0]).toMatchObject({ reviews: 'openreview/forum1' });
     expect(versions.find((v) => v.url === later)).toMatchObject({ label: 'NeurIPS 2027', date: '2027-05-01' });
+  });
+
+  it('adds the links an abstract names under the title, once, numbering a label it has', async () => {
+    const token = await botToken();
+    await grantBot(OPENREVIEW_BOT, 'reviews/openreview/**', { grantedBy: 'system' });
+    await api('POST', '/imports/papers', { token, body: PAPERS });
+    const paper = { scheme: 'openreview', value: 'forum1' };
+    const links = [
+      { label: 'Code', url: 'https://github.com/ada/sparse' },
+      { label: 'Code', url: 'https://github.com/ada/sparse-data' },
+    ];
+    const first = await api('POST', '/imports/links', { token, body: { paper, links } });
+    expect(first).toMatchObject({ status: 200, body: { changed: true } });
+    // The same address, written another way, is there already.
+    const again = await api('POST', '/imports/links', {
+      token,
+      body: { paper, links: [{ label: 'Code', url: 'http://www.github.com/ada/sparse/' }] },
+    });
+    expect(again.body.changed).toBe(false);
+    const found = await findPaper(paper as never);
+    const [row] = await getDb().select().from(pageCurrent).where(eq(pageCurrent.pageId, found!.paper.id));
+    expect(row.links).toEqual([
+      { label: 'Code', url: 'https://github.com/ada/sparse' },
+      { label: 'Code 2', url: 'https://github.com/ada/sparse-data' },
+    ]);
   });
 });

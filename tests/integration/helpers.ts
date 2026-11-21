@@ -42,6 +42,7 @@ import * as importSubmissions from '@/app/api/v1/imports/submissions/route';
 import * as importVenues from '@/app/api/v1/imports/venues/route';
 import * as importVersions from '@/app/api/v1/imports/versions/route';
 import * as importPdfs from '@/app/api/v1/imports/pdfs/route';
+import * as importLinks from '@/app/api/v1/imports/links/route';
 import * as commentsRoute from '@/app/api/v1/comments/route';
 import * as commentRoute from '@/app/api/v1/comments/[id]/route';
 import * as commentReplies from '@/app/api/v1/comments/[id]/replies/route';
@@ -138,6 +139,7 @@ const ROUTES: [RegExp, any][] = [
   [/^\/imports\/venues$/, importVenues],
   [/^\/imports\/versions$/, importVersions],
   [/^\/imports\/pdfs$/, importPdfs],
+  [/^\/imports\/links$/, importLinks],
   [/^\/comments(\?.*)?$/, commentsRoute],
   [/^\/comments\/preview$/, commentPreview],
   [/^\/comments\/(?<id>[^/?]+)\/replies(\?.*)?$/, commentReplies],

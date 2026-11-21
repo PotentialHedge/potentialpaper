@@ -1,12 +1,13 @@
 import { z } from 'zod';
 import { getDb } from '@/db';
 import { MAX_EVIDENCE_URL } from '@/lib/evidence';
+import { linkFileSchema, MAX_LINKS } from '@/lib/paper-links';
 import { PAPER_SCHEMES } from '@/lib/paper-ids';
 import { NOTE_KINDS, SUBMISSION_STATUSES, type VenueForms } from '@/lib/submissions';
 import { requireAuth } from '../auth';
 import { IMPORT_RATE_LIMIT, importReviews } from '../import-reviews';
 import { importSubmissions } from '../import-submissions';
-import { importPapers, importPdf, importsFrom, importVersions, requireImporter } from '../imports';
+import { importLinks, importPapers, importPdf, importsFrom, importVersions, requireImporter } from '../imports';
 import type { CommitResult } from '../pages/commit';
 import { refreshPageIds, refreshPaperPages } from '../pages/refresh';
 import { syncVenuePages } from '../venue-pages';
@@ -134,6 +135,13 @@ export const ImportPdfBody = z.object({
   at: z.object({ url: Url, label: z.string().min(1).max(200) }),
 });
 
+/** Links to the paper elsewhere, such as the code its abstract names, added under its title if not there. */
+export const ImportLinksBody = z.object({
+  paper: PaperIdentifier,
+  links: z.array(linkFileSchema).max(MAX_LINKS),
+  summary: z.string().max(1000).optional(),
+});
+
 export const ImportCommitted = z.object({ head: z.string().nullable(), changed: z.boolean() });
 
 const committed = (result: CommitResult) => ({ head: result.oid, changed: result.status === 'committed' });
@@ -218,6 +226,13 @@ export const postImportVersions = route(async (req) => {
 export const postImportPdf = route(async (req) => {
   const { principal, actor } = await importer(req);
   const { result, identifiers } = await importPdf(actor, await parseBody(req, ImportPdfBody));
+  if (result.status === 'committed') await refreshPaperPages(identifiers);
+  return respond(ImportCommitted, committed(result), { principal });
+});
+
+export const postImportLinks = route(async (req) => {
+  const { principal, actor } = await importer(req);
+  const { result, identifiers } = await importLinks(actor, await parseBody(req, ImportLinksBody));
   if (result.status === 'committed') await refreshPaperPages(identifiers);
   return respond(ImportCommitted, committed(result), { principal });
 });

@@ -35,6 +35,10 @@ Send the token as \`Authorization: Bearer pp_live_…\`. Only a bot's token reac
 - \`POST ${api}/files\`, multipart with the PDF as \`file\`: stores it, and answers its \`url\`.
 - \`POST ${api}/imports/pdfs\` \`{ paper, pdf: { url, license, source }, at: { url, label } }\`: makes the stored PDF the PDF of the version at \`at.url\` (its address, or a forum one of its submissions names), or of a new version there.
 
+## Links
+
+\`POST ${api}/imports/links\` \`{ paper, links: [{ label, url }] }\`, at most 12: links to the paper elsewhere, such as the code or project page its abstract names, shown under its title. One whose address the page has already is left out, a label it has already gets a number (\`Code 2\`), and a claimed paper's links are its authors', so nothing is added to one.
+
 Writes answer \`{ head, changed }\`. Errors are \`{ error: { code, message, details? } }\`; a 429 says when to try again.
 `;
   return markdown(body);
