@@ -29,10 +29,12 @@ export function addPrompt(origin: string, what: 'version' | 'submission', paperU
 
 /**
  * The prompt the Edit dialog's "Agent" option gives, in `addPrompt`'s style: a pointer to `/agent/setup`, which says
- * everything (check and set up sign-in, git, credentials, an SSH key), the page's clone address, and the sign-in
+ * everything (check and set up sign-in, git, credentials, an SSH key), the page's clone address as a path on the site, and the sign-in
  * code when there is one.
  */
 export function setupPrompt(origin: string, cloneUrl: string, code?: string): string {
-  const follow = `Follow ${origin}${AGENT_SETUP_PATH} for ${cloneUrl}`;
+  // The origin once: the clone address goes as its path (`/git/….git`), which `/agent/setup` reads against it.
+  const path = cloneUrl.startsWith(origin) ? cloneUrl.slice(origin.length) : cloneUrl;
+  const follow = `Follow ${origin}${AGENT_SETUP_PATH} for ${path}`;
   return code ? `${follow}. My sign-in code: ${code}` : `${follow}.`;
 }
