@@ -6,7 +6,7 @@
 declare namespace PP {
   type PageKind = 'paper' | 'venue' | 'topic' | 'org' | 'user';
 
-  type Permission = 'page.read' | 'scope.read' | 'reviews.read' | 'identity';
+  type Permission = 'page.read' | 'scope.read' | 'reviews.read' | 'lists.read' | 'identity';
   type Outcome = 'accepted' | 'rejected' | 'withdrawn' | 'pending';
 
   type ErrorCode = 'MethodNotFound' | 'PermissionDenied' | 'InvalidParams' | 'Unavailable' | 'Internal';
@@ -62,8 +62,12 @@ declare namespace PP {
       }
     | { type: 'page'; page: string; path: string[]; size: Size }
     /** The popover your action under the page's title opens (`contributes.actions`). */
-    | { type: 'action'; action: string; size: Size };
-    /** The page the panel is on; `null` on the plugin's own page. */
+    | { type: 'action'; action: string; size: Size }
+    /** Your hidden frame on a list (`contributes.rows`): the papers it shows, by identifier, top to bottom. */
+    | { type: 'rows'; list: 'home'; papers: string[] }
+    /** A row command's frame (`"popover": true`), beside the row of `paper`. */
+    | { type: 'popover'; list: 'home'; command: string; paper: string; size: Size };
+    /** The page the panel is on; `null` on the plugin's own page and on a list. */
     page: PageSummary | null;
     /** The pages above it: a paper's venues, topics and orgs; a topic's broader topics; an org's parents. */
     scopes: PageSummary[];
@@ -75,6 +79,16 @@ declare namespace PP {
     site: string;
     /** The methods this host answers. */
     methods: string[];
+  }
+
+  /** A note on a row of a list: a few words shown where the row shows its venue. Plain text. */
+  interface RowNote {
+    /** At most 40 characters. */
+    text: string;
+    /** Its tooltip, at most 300. */
+    title?: string;
+    /** Its colour: `muted` (the default), `up`, `down` or `accent`. */
+    tone?: 'muted' | 'up' | 'down' | 'accent';
   }
 
   interface Section {
@@ -275,7 +289,7 @@ declare namespace PP {
     supports(method: string): boolean;
     /** Any method by name, for one newer than these types. */
     call<T = unknown>(method: string, params?: Record<string, unknown>): Promise<T>;
-    /** `settings.change`, `theme.change`, `context.change`, `surface.resize`. Returns a function that stops listening. */
+    /** `settings.change`, `theme.change`, `context.change`, `surface.resize`, `rows.change`. Returns a function that stops listening. */
     on(event: string, listener: (params: unknown) => void): () => void;
     getContext(): Promise<Context>;
     settings: {
@@ -393,9 +407,23 @@ declare namespace PP {
       setPath(path: string[]): Promise<void>;
       /** When the frame's size changes (the column, the window, or its own height); `context.surface.size` is kept current. */
       onResize(listener: (size: Size) => void): () => void;
+      /** A row command's popover: close it. */
+      close(): Promise<void>;
+    };
+    /** On a list (`contributes.rows`): the papers it shows, and your notes on their rows. */
+    rows: {
+      /** The papers listed, by identifier, top to bottom; empty off a list's frame. */
+      readonly papers: string[];
+      /** Needs `lists.read`: set notes by paper identifier (at most 500 a call); `null` removes one. */
+      set(notes: Record<string, RowNote | null>): Promise<void>;
+      /** When the papers listed change. Returns a function that stops listening. */
+      onChange(listener: (papers: string[]) => void): () => void;
     };
     theme: { onChange(listener: (theme: Theme) => void): () => void };
-    /** Handle a command your manifest declares; the reader runs it from your panel's menu. */
+    /**
+     * Handle a command your manifest declares; the reader runs it from your panel's menu, or a row command from a
+     * row's ⋯ menu, when `args` is `{ paper }`.
+     */
     commands: { register(id: string, handler: (args: unknown) => unknown): () => void };
   }
 }

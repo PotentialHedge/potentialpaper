@@ -1,7 +1,15 @@
 import { KINDS, PAGE_KINDS } from '@/lib/kinds';
 import { API_VERSION, PERMISSIONS, PERMISSION_NAMES } from '@/lib/plugins/manifest';
 import { SDK_BASE } from '@/lib/plugins/origin';
-import { HOST_METHODS, MAX_FRAME_HEIGHT, MAX_STORAGE_BYTES, THEME_TOKENS } from '@/lib/plugins/protocol';
+import {
+  HOST_METHODS,
+  MAX_FRAME_HEIGHT,
+  MAX_ROW_NOTE_TEXT,
+  MAX_ROW_NOTE_TITLE,
+  MAX_ROW_NOTES,
+  MAX_STORAGE_BYTES,
+  THEME_TOKENS,
+} from '@/lib/plugins/protocol';
 import { MANIFEST_FILE } from '@/lib/plugins/sources';
 import { PLUGIN_TOPIC } from '../plugins/discover';
 import { IDENTITY_TOKEN_SECONDS, JWKS_PATH } from '../plugins/identity';
@@ -74,6 +82,10 @@ export const METHOD_DOCS: Record<keyof typeof HOST_METHODS, { call: string; does
     call: 'pp.signals.forPaper([paper], [set])',
     does: "One paper's values, by set: the current paper by default.",
   },
+  'rows.set': {
+    call: 'pp.rows.set({ [paper]: { text, title, tone } | null })',
+    does: "On the home page's list ([Notes on rows](#notes-on-rows)): set a note on papers' rows, by identifier; `null` removes one.",
+  },
   'ui.setHeight': {
     call: 'pp.ui.setHeight(px)',
     does: `Size your frame yourself (at most ${MAX_FRAME_HEIGHT}px). By default the SDK sizes it to your body.`,
@@ -83,6 +95,7 @@ export const METHOD_DOCS: Record<keyof typeof HOST_METHODS, { call: string; does
     does: "On your own page, the rest of its address after the page's id (`surface.path`), replaced in the address bar without a reload, so a view can be shared.",
   },
   'ui.openUrl': { call: 'pp.ui.openUrl(url)', does: 'Open an http(s) address in a new tab.' },
+  'ui.close': { call: 'pp.ui.close()', does: "A row command's popover: close it, as when you're done with its form." },
 };
 
 export function pluginsGuide(origin: string): string {
@@ -290,6 +303,9 @@ Every field of the manifest:
   first four shown are in the bar and the rest in its ⋯ menu.
 - \`contributes.commands\` (up to 16): \`id\` and \`title\`, listed in each of its panels' menus; handle them with
   \`pp.commands.register(id, handler)\`.
+- \`contributes.rows\`: notes on the rows of the home page's list, and entries in each row's ⋯ menu, as
+  \`{ "title", "commands": [{ "id", "title", "popover" }] }\` (up to 8 commands). Needs \`lists.read\`:
+  [Notes on rows](#notes-on-rows).
 
 Fields the site doesn't know are warnings, not errors, so a newer manifest still loads. Every problem is listed at once
 when the plugin is installed or loaded from localhost.
@@ -303,6 +319,47 @@ plugin: \`page.hasScores\`, \`page.kind == venue && signedIn\`, \`!viewer.isOwne
 | Kind | \`when\` keys |
 | ---- | ----------- |
 ${kindRows}
+
+### Notes on rows
+
+The home page lists papers: the reader's own, those they follow, and all papers or a search's results. A plugin with
+\`contributes.rows\` adds to each row:
+
+- **A note**, a few words (at most ${MAX_ROW_NOTE_TEXT} characters, and a tooltip of ${MAX_ROW_NOTE_TITLE}), shown where the row
+  shows its venue: a score (\`6.2 · top 15%\`), a status (\`to read\`), the start of the reader's own note. The venue
+  moves to its tooltip. If several plugins note one paper, the first installed is shown and the rest are in the
+  tooltip. Plain text only, coloured by \`tone\`: \`muted\` (the default), \`up\`, \`down\` or \`accent\`.
+- **Commands** in the row's ⋯ menu. One without \`popover\` runs in the list's frame, its handler given
+  \`{ paper }\`. One with \`"popover": true\` opens a frame of yours beside the row, for a form: \`pp.context.surface\`
+  is \`{ type: "popover", command, paper }\`, it may set notes too, and \`pp.ui.close()\` closes it.
+
+For the notes, the page starts **one hidden frame** of your \`main\` for the whole list, with \`pp.context.surface\`
+\`{ type: "rows", list: "home", papers: [...] }\`: every paper listed, by identifier, top to bottom. It is told again
+when they change (\`pp.rows.onChange\`). Set notes with \`pp.rows.set\` (at most ${MAX_ROW_NOTES} a call), whenever you
+like: at once from your cache, again when your backend answers.
+
+\`\`\`js
+pp.ready.then(async (ctx) => {
+  if (ctx.surface.type === 'rows') {
+    const show = async (papers) => {
+      const notes = {};
+      for (const paper of papers) {
+        const note = await pp.storage.get(\`note:\${paper}\`);
+        notes[paper] = note ? { text: note.slice(0, 40), title: note } : null;
+      }
+      await pp.rows.set(notes);
+    };
+    await show(pp.rows.papers);
+    pp.rows.onChange(show);
+    pp.commands.register('clear', ({ paper }) => pp.storage.set(\`note:\${paper}\`, null).then(() => pp.rows.set({ [paper]: null })));
+  } else if (ctx.surface.type === 'popover') {
+    // draw a form for ctx.surface.paper; on save: pp.storage.set(…), pp.rows.set(…), pp.ui.close()
+  }
+});
+\`\`\`
+
+The list is what the reader is looking at, their searches included, so \`lists.read\` says so in the approval prompt,
+and a plugin with \`network\` origins can send it there. Ask only for what you use.
 
 ## Permissions
 

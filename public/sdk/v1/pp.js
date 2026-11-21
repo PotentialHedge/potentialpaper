@@ -90,6 +90,8 @@
         context.settings = m.params;
       } else if (m.method === 'surface.resize') {
         if (context.surface) context.surface.size = m.params;
+      } else if (m.method === 'rows.change') {
+        if (context.surface && context.surface.type === 'rows') context.surface.papers = (m.params && m.params.papers) || [];
       } else if (m.method === 'context.change') {
         var settings = context.settings;
         context = m.params;
@@ -338,6 +340,26 @@
       },
       onResize: function (listener) {
         return on('surface.resize', listener);
+      },
+      /** A row command's popover: close it. */
+      close: function () {
+        return call('ui.close');
+      },
+    },
+    rows: {
+      /** The papers the list shows, by identifier, top to bottom (a list's frame only). */
+      get papers() {
+        return context && context.surface && context.surface.type === 'rows' ? context.surface.papers : [];
+      },
+      /** Needs `lists.read`: notes on rows, by paper identifier; `null` removes one. */
+      set: function (notes) {
+        return call('rows.set', { notes: notes });
+      },
+      /** When the papers listed change: the listener gets them. */
+      onChange: function (listener) {
+        return on('rows.change', function (params) {
+          listener((params && params.papers) || []);
+        });
       },
     },
     theme: {

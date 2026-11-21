@@ -1,11 +1,16 @@
 import Link from 'next/link';
+import { RowActions, RowNote } from '@/components/plugins/RowPlugins';
 
 /**
  * One paper in a list: its PDF link, title and authors, venue and year. The whole row is one target: the
  * title's link is stretched over the row (`after:inset-0`), since a row that is itself a link could not hold
  * the PDF link, which sits above the stretched one, in a column of its own at the left so titles align.
+ *
+ * Under `RowPlugins` (`paper` given), a plugin's note on the paper takes the venue's place, and the year's column
+ * widens by `--row-actions` for the ⋯ of the plugins' row commands, when there are any.
  */
 export function PaperRow({
+  paper,
   title,
   authors,
   venue,
@@ -13,6 +18,8 @@ export function PaperRow({
   pdf,
   href,
 }: {
+  /** Its identifier (`arxiv:1706.03762`), which plugins' notes name it by. */
+  paper?: string;
   title: string;
   authors: string[];
   venue: string | null;
@@ -21,7 +28,7 @@ export function PaperRow({
   href: string;
 }) {
   return (
-    <div className="relative grid grid-cols-[34px_1fr_150px_40px] items-center gap-x-3.5 border-b border-dotted border-rule-strong py-2 hover:bg-highlight narrow:grid-cols-[34px_1fr_40px]">
+    <div className="relative grid grid-cols-[34px_1fr_150px_calc(40px_+_var(--row-actions,0px))] items-center gap-x-3.5 border-b border-dotted border-rule-strong py-2 hover:bg-highlight narrow:grid-cols-[34px_1fr_calc(40px_+_var(--row-actions,0px))]">
       <span className="font-sans text-xs">
         {pdf && (
           <a href={pdf} className="relative z-10 text-accent" rel="noopener noreferrer" target="_blank">
@@ -37,9 +44,18 @@ export function PaperRow({
         <span className="block font-sans text-xs text-muted">{authorLine(authors)}</span>
       </span>
       <span className="truncate text-right font-sans text-xs text-muted narrow:hidden" title={venue ?? undefined}>
-        {venue}
+        {paper ? (
+          <RowNote paper={paper} venue={venue}>
+            {venue}
+          </RowNote>
+        ) : (
+          venue
+        )}
       </span>
-      <span className="text-right font-mono text-xs text-muted">{year}</span>
+      <span className="flex items-center justify-end gap-1 font-mono text-xs text-muted">
+        {year}
+        {paper && <RowActions paper={paper} />}
+      </span>
     </div>
   );
 }
@@ -56,6 +72,7 @@ function authorLine(names: string[]): string {
  * page. A paper with no cover gets a blank title page instead, so the column stays even. The frame is A4.
  */
 export function PaperCard({
+  paper,
   title,
   authors,
   abstract,
@@ -65,6 +82,8 @@ export function PaperCard({
   cover,
   href,
 }: {
+  /** As `PaperRow`'s: a plugin's note takes the venue's place, and the plugins' ⋯ follows the PDF link. */
+  paper?: string;
   title: string;
   authors: string[];
   abstract: string | null;
@@ -105,12 +124,23 @@ export function PaperCard({
           <p className="mt-1.5 line-clamp-3 text-[13px] leading-snug text-subtle narrow:line-clamp-2">{abstract}</p>
         )}
         <div className="mt-1.5 flex flex-wrap items-baseline gap-x-2 font-sans text-xs text-muted">
-          {[venue, year].filter(Boolean).join(' · ')}
+          {paper ? (
+            <span>
+              <RowNote paper={paper} venue={venue}>
+                {venue}
+              </RowNote>
+              {venue && year && ' · '}
+              {year}
+            </span>
+          ) : (
+            [venue, year].filter(Boolean).join(' · ')
+          )}
           {pdf && (
             <a href={pdf} className="relative z-10 text-accent" rel="noopener noreferrer" target="_blank">
               [pdf]
             </a>
           )}
+          {paper && <RowActions paper={paper} />}
         </div>
       </div>
     </div>

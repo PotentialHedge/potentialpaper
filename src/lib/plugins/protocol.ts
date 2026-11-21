@@ -92,16 +92,21 @@ export const HOST_METHODS = {
   'signals.columns': null,
   'signals.nearest': null,
   'signals.forPaper': null,
+  'rows.set': 'lists.read',
   'ui.setHeight': null,
   'ui.openUrl': null,
   'ui.setPath': null,
+  'ui.close': null,
 } as const satisfies Record<string, PluginPermission | null>;
 export type HostMethod = keyof typeof HOST_METHODS;
 
 /** Events the host sends a frame. */
-export type FrameEvent = 'settings.change' | 'theme.change' | 'context.change' | 'surface.resize';
+export type FrameEvent = 'settings.change' | 'theme.change' | 'context.change' | 'surface.resize' | 'rows.change';
 
-/** Calls the host makes to a frame: `commands.run` `{ command }`, when the reader picks one from a panel's menu. */
+/**
+ * Calls the host makes to a frame: `commands.run` `{ command }`, when the reader picks one from a panel's menu, or
+ * `{ command, args: { paper } }` from a row's ⋯ menu.
+ */
 export type FrameMethod = 'commands.run';
 
 /** One plugin's storage, as JSON: what `storage.set` may keep per account and plugin. */
@@ -128,6 +133,26 @@ export interface IdentityToken {
   handle: string;
   jwksUrl: string;
 }
+
+/**
+ * A plugin's note on a row of a list (`rows.set`): a few words shown where the row shows its venue, with a tooltip.
+ * Plain text: the host draws it.
+ */
+export interface RowNote {
+  text: string;
+  /** Its tooltip. */
+  title?: string;
+  /** Its colour, from the page's tokens: `muted` (the default), `up`, `down` or `accent`. */
+  tone?: (typeof ROW_NOTE_TONES)[number];
+}
+export const ROW_NOTE_TONES = ['muted', 'up', 'down', 'accent'] as const;
+export const MAX_ROW_NOTE_TEXT = 40;
+export const MAX_ROW_NOTE_TITLE = 300;
+/** The most notes one `rows.set` call may set. */
+export const MAX_ROW_NOTES = 500;
+
+/** The lists a plugin's rows frame can be on. */
+export type RowList = 'home';
 
 /** The tallest a frame may make itself. */
 export const MAX_FRAME_HEIGHT = 4000;
@@ -198,8 +223,12 @@ export interface FrameContext {
       }
     | { type: 'page'; page: string; path: string[]; size: FrameSize }
     /** The popover an action under the page's title opens (`contributes.actions`). */
-    | { type: 'action'; action: string; size: FrameSize };
-  /** The page the panel is on; `null` on a plugin's own page. */
+    | { type: 'action'; action: string; size: FrameSize }
+    /** The hidden frame of a list's rows: the papers listed, by identifier, top to bottom (and `rows.change`). */
+    | { type: 'rows'; list: RowList; papers: string[] }
+    /** A row command's frame (`popover`), beside the row of `paper`. */
+    | { type: 'popover'; list: RowList; command: string; paper: string; size: FrameSize };
+  /** The page the panel is on; `null` on a plugin's own page and on a list. */
   page: PageSummary | null;
   /**
    * The pages above it: a paper's venues, topics and orgs; a topic's broader topics; an org's parents; an edition's

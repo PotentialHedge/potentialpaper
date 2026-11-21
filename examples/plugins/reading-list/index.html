@@ -1,0 +1,20 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <title>Reading list</title>
+    <link rel="stylesheet" href="style.css" />
+    <script src="https://ppusercontent.com/sdk/v1/pp.js"></script>
+  </head>
+  <body>
+    <!-- Drawn only in a row's popover; the list's frame is hidden and draws nothing. -->
+    <form id="form" hidden>
+      <textarea id="text" rows="4" maxlength="500" placeholder="A line on this paper"></textarea>
+      <div class="actions">
+        <button type="submit">Save</button>
+        <button type="button" id="clear">Clear</button>
+      </div>
+    </form>
+    <script src="main.js"></script>
+  </body>
+</html>
