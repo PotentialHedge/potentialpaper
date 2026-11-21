@@ -3,14 +3,13 @@ import { eq, sql } from 'drizzle-orm';
 import { getDb, type Database } from '@/db';
 import { isUniqueViolation } from '@/db/errors';
 import { accounts, affiliations, type Account } from '@/db/schema';
-import { handleProblem } from '@/lib/profile';
+import { cleanProfileLink, handleProblem, PROFILE_LINKS, type ProfileLinks } from '@/lib/profile';
 import { normalizeEmail, syncAccount } from './affiliations';
 import { ApiError } from './api/errors';
 import { claimByEmail } from './claims';
 import { institutionForEmail } from './institution-domains';
-import { refreshPages } from './pages/refresh';
 import { ensureOrgPageFor } from './org-pages';
-import { afterHandleChange, startUserPage, syncProfileFile } from './user-pages';
+import { afterHandleChange, afterProfileChange } from './user-pages';
 
 function placeholderHandle(): string {
   return `user-${randomBytes(6)
@@ -71,8 +70,6 @@ export async function ensureAccountForUser(
       } catch (err) {
         console.error('claim by email', err);
       }
-      // Its page at /u/<handle> exists already (a trigger made it with the account); its repo starts here.
-      await startUserPage(created, database);
       // Its institution's page, if nobody from there has come before.
       if (institution) await ensureOrgPageFor(user.email, database);
       return created;
@@ -92,6 +89,9 @@ export interface ProfileChange {
   realName?: string | null;
   /** `null` or blank clears it. */
   bio?: string | null;
+  homepage?: string | null;
+  orcid?: string | null;
+  scholar?: string | null;
   showInstitution?: boolean;
   mentionMail?: boolean;
   followMail?: boolean;
@@ -118,6 +118,13 @@ export async function updateProfile(
   }
   const realName = change.realName === undefined ? undefined : change.realName?.trim() || null;
   const bio = change.bio === undefined ? undefined : change.bio?.trim() || null;
+  const links: Partial<ProfileLinks> = {};
+  for (const link of PROFILE_LINKS) {
+    if (change[link] === undefined) continue;
+    const cleaned = cleanProfileLink(link, change[link]);
+    if ('problem' in cleaned) throw new ApiError(422, 'invalid_link', cleaned.problem);
+    links[link] = cleaned.value;
+  }
   try {
     const [updated] = await database
       .update(accounts)
@@ -125,6 +132,7 @@ export async function updateProfile(
         ...(change.handle !== undefined ? { handle: change.handle } : {}),
         ...(realName !== undefined ? { realName } : {}),
         ...(bio !== undefined ? { bio } : {}),
+        ...links,
         ...(change.showInstitution !== undefined ? { showInstitution: change.showInstitution } : {}),
         ...(change.mentionMail !== undefined ? { mentionMail: change.mentionMail } : {}),
         ...(change.followMail !== undefined ? { followMail: change.followMail } : {}),
@@ -132,14 +140,10 @@ export async function updateProfile(
       })
       .where(eq(accounts.id, account.id))
       .returning();
-    // The page's profile.json says whether it shows the institution (`user-pages.ts`).
-    if (updated.showInstitution !== account.showInstitution) {
-      await syncProfileFile(updated, database).catch((err) => console.error('profile.json', err));
-    }
     // The trigger moved the page to the new handle and left a redirect from the old one.
     if (updated.handle !== account.handle) await afterHandleChange(account.handle, updated.handle, database);
-    // What the page shows may have changed (a real name, the bio), whether or not it shows it.
-    else await refreshPages({ kind: 'user', key: updated.handle }).catch(() => {});
+    // What the page shows may have changed (a real name, the bio, links, the institution), shown or not.
+    else await afterProfileChange(updated, database);
     return updated;
   } catch (err) {
     if (isUniqueViolation(err)) throw new ApiError(409, 'handle_taken', 'that handle is taken');

@@ -1,5 +1,6 @@
 import { ui } from '@/components/ui';
 import { AbstractText } from '@/components/AbstractText';
+import { ProfileLinksLine } from '@/components/ProfileLinksLine';
 import type { UserPageView } from '@/server/user-pages';
 import { OwnProfileLink } from './OwnProfileLink';
 import type { KindPanelProps } from './slots';
@@ -24,6 +25,7 @@ export function UserByline({ user }: { user: UserPageView }) {
   return (
     <>
       {parts.length > 0 && <p className="mt-2.5 text-center font-sans text-[15px] text-muted">{parts.join(' · ')}</p>}
+      <ProfileLinksLine links={user.links} className="mt-2" />
       <OwnProfileLink handle={user.handle} />
     </>
   );

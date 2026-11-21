@@ -36,9 +36,9 @@ export function PageActions({
 }: {
   /** The page's id, for the view count. */
   pageId: string;
-  /** What the Edit dialog offers. */
-  edit: EditOptions;
-  historyPath: string;
+  /** What the Edit dialog offers; none on a page without files (a person's). */
+  edit?: EditOptions;
+  historyPath?: string;
   /** The share menu's short link, title and badge (`components/SharePopover`). */
   share: { url: string; title: string; badge?: { image: string; markdown: string } } | null;
   /** A paper's own: its BibTeX, the paper to follow, and its page for AI agents. */
@@ -69,16 +69,18 @@ export function PageActions({
       </Popover>,
     );
   }
-  actions.set('edit', <EditDialog {...edit} />);
+  if (edit) actions.set('edit', <EditDialog {...edit} />);
   if (paper) actions.set('follow', <FollowStar paper={paper.id} className={SECONDARY} />);
   if (share) actions.set('share', <SharePopover {...share} className={SECONDARY} />);
-  actions.set(
-    'history',
-    <a href={historyPath} className={`${SECONDARY} ${WITH_ICON}`}>
-      <HistoryIcon />
-      history
-    </a>,
-  );
+  if (historyPath) {
+    actions.set(
+      'history',
+      <a href={historyPath} className={`${SECONDARY} ${WITH_ICON}`}>
+        <HistoryIcon />
+        history
+      </a>,
+    );
+  }
   if (paper) {
     actions.set(
       'agents',

@@ -16,11 +16,11 @@ export const MAX_LINKS_PER_FILE = 500;
 const MAX_NOTE = 2000;
 const MAX_ANCHOR = 200;
 
-export type LinkGroup = 'lineage' | 'support' | 'contest' | 'discourse' | 'topic' | 'person';
+export type LinkGroup = 'lineage' | 'support' | 'contest' | 'discourse' | 'topic';
 
 /**
- * What a link's `to` names: a page of a kind, or `web`, an https address elsewhere (a person's homepage, ORCID
- * record or Scholar profile), which only the labels that say so take.
+ * What a link's `to` names: a page of a kind, or `web`, an https address elsewhere, which only the labels that say so
+ * take. No label does now: a person's homepage, ORCID and Scholar profile are on their account (`lib/profile.ts`).
  */
 export type LinkTargetKind = PageKind | 'web';
 
@@ -106,18 +106,6 @@ export const LINK_LABELS = {
     from: ['paper'],
     to: ['topic'],
   },
-  /** A person's own work (`handoffs/pages.md` Phase 3): put on their page by themselves, so their choice to show it. */
-  wrote: { reads: 'wrote', inverse: 'written by', group: 'person', from: ['user'], to: ['paper'] },
-  /** A person elsewhere: only from their own page, to an https address. */
-  homepage: { reads: 'homepage', inverse: 'homepage of', group: 'person', from: ['user'], web: {} },
-  orcid: { reads: 'ORCID', inverse: 'ORCID of', group: 'person', from: ['user'], web: { hosts: ['orcid.org'] } },
-  scholar: {
-    reads: 'Google Scholar',
-    inverse: 'Google Scholar of',
-    group: 'person',
-    from: ['user'],
-    web: { hosts: ['scholar.google.com'] },
-  },
 } as const satisfies Record<string, LinkLabel>;
 
 export type LinkLabelName = keyof typeof LINK_LABELS;
@@ -137,7 +125,7 @@ export const labeledLinkSchema = z
       .meta({ description: 'The link\'s id, unique in its file: a ULID such as "01JC8Z4X6Q0N4C3T6G1W6R2B7M".' }),
     to: z.string().max(300).meta({
       description:
-        'The target, by public identifier: arxiv:1706.03762, doi:10.…, openreview:…, venue:iclr/2027, topic:linear-attention, org:eth, user:alice. For homepage, orcid and scholar (on a user page), an https address.',
+        'The target, by public identifier: arxiv:1706.03762, doi:10.…, openreview:…, venue:iclr/2027, topic:linear-attention, org:eth, user:alice.',
     }),
     label: z.enum(LINK_LABEL_NAMES).meta({ description: 'What the link says (DESIGN.md §8).' }),
     note: z.string().trim().min(1).max(MAX_NOTE).optional().meta({

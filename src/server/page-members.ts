@@ -223,7 +223,7 @@ export async function indexMembers(database: Database, pageId: string, head: str
 
   let kindFile: unknown = null;
   try {
-    kindFile = JSON.parse((await readText(database, pageId, files.get(KINDS[page.kind].kindFile))) ?? 'null');
+    kindFile = JSON.parse((await readText(database, pageId, files.get(KINDS[page.kind].kindFile ?? ''))) ?? 'null');
   } catch {
     // A kind file that doesn't parse names no sources and no parents.
   }

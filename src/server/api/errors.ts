@@ -20,6 +20,7 @@ export const API_ERROR_CODES = [
   'primary_affiliation',
   'password_already_set',
   'invalid_handle',
+  'invalid_link',
   'handle_taken',
   'institution_already_listed',
   'domain_not_institutional',

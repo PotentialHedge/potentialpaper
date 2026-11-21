@@ -36,6 +36,9 @@ export const Me = z.object({
   handle: z.string(),
   realName: z.string().nullable(),
   bio: z.string().nullable(),
+  homepage: z.string().nullable(),
+  orcid: z.string().nullable(),
+  scholar: z.string().nullable(),
   showInstitution: z.boolean(),
   institutions: z.array(z.string()),
   verified: z.boolean(),
@@ -50,6 +53,10 @@ export const MePatch = z
     realName: z.string().max(REAL_NAME_MAX).nullable().optional(),
     /** A few lines about the person, Markdown with TeX, on their page; `null` or blank clears it. */
     bio: z.string().max(BIO_MAX).nullable().optional(),
+    /** Links on their page: an https homepage, an ORCID iD (or its orcid.org address), a Google Scholar profile's address. */
+    homepage: z.string().max(400).nullable().optional(),
+    orcid: z.string().max(400).nullable().optional(),
+    scholar: z.string().max(400).nullable().optional(),
     showInstitution: z.boolean().optional(),
     /** Whether a `@` mention in a comment is mailed. */
     mentionMail: z.boolean().optional(),

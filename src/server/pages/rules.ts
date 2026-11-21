@@ -360,10 +360,6 @@ function kindFileRule(kind: Exclude<PageKind, 'paper'>): PathRule {
     covers: (path) => path === kindFile,
     layout: fine,
     denied: (roles, path) => {
-      // A person's profile.json is written by the site from their `user.show.*` settings (`server/user-pages.ts`),
-      // which are what count, so the file and the settings never disagree.
-      if (kind === 'user')
-        return roles.system ? null : `${kindFile} follows your user.show.* settings: change them at /settings`;
       if (kind === 'topic') return may.verified(roles);
       if (roles.system) return METADATA_ONLY;
       return roles.owner || roles.admin || may.granted(roles, path)
@@ -429,13 +425,15 @@ const PAPER_RULES: PathRule[] = [
   },
 ];
 
+/** Why nothing is written to a person's page. */
+export const NO_REPO = "a person's page has no files: it shows their profile, which they change at /profile";
+
 /** Every rule of a kind's pages, in the order they are tried. */
 function rulesOf(kind: PageKind): PathRule[] {
   const { owners, community } = KINDS[kind];
-  const ownersRefusal =
-    kind === 'user'
-      ? 'only this account can change its page'
-      : `only this ${kind}'s ${owners?.noun} can edit ${OWNERS_DIR}/`;
+  // A person's page has no files (`KINDS.user.repo`): nobody, not even the system, writes one.
+  if (!KINDS[kind].repo) return [{ covers: () => true, layout: () => NO_REPO, denied: () => NO_REPO }];
+  const ownersRefusal = `only this ${kind}'s ${owners?.noun} can edit ${OWNERS_DIR}/`;
   const systemPaths = kind === 'paper' ? SYSTEM_PATHS : new Set([METADATA_PATH]);
   return [
     {

@@ -53,7 +53,5 @@ export async function ownersOf(
       return { ...base, claimed: (await pageClaimRoles(database, page, null)).claimed };
     case 'domain':
       return { ...base, claimed: (await orgDomains(database, page)).length > 0 };
-    case 'self':
-      return { ...base, claimed: true, claimPath: null };
   }
 }

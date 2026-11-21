@@ -86,6 +86,9 @@ async function ownership(
   account: { id: string; isBot: boolean; verified: boolean; handle: string | null } | null,
 ): Promise<{ owner: boolean; claimed: boolean; claimIdentity: string | null }> {
   const person = account && !account.isBot ? account : null;
+  // A person's page is its account's (a plugin's `viewer.isOwner`), though it has no files to write.
+  if (page.kind === 'user')
+    return { owner: person !== null && person.handle === page.key, claimed: false, claimIdentity: null };
   switch (KINDS[page.kind].owners?.claim) {
     case 'authors': {
       const confirmed = await db
@@ -104,9 +107,6 @@ async function ownership(
         claimed: false,
         claimIdentity: null,
       };
-    case 'self':
-      // A user page is its account's, and its agents' tokens act as the account.
-      return { owner: person !== null && person.handle === page.key, claimed: false, claimIdentity: null };
     default:
       return { owner: false, claimed: false, claimIdentity: null };
   }

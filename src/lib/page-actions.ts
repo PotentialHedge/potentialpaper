@@ -1,4 +1,4 @@
-import type { PageKind } from './kinds';
+import { KINDS, PAGE_KINDS, type PageKind } from './kinds';
 import { arrangePanels } from './panels';
 import type { InstalledPlugin } from './plugins/installed';
 import { whenHolds, type WhenContext } from './plugins/when';
@@ -19,12 +19,15 @@ export interface ActionInfo {
   kinds?: PageKind[];
 }
 
+/** The kinds whose pages have files to edit and a history: all but a person's (`KINDS[kind].repo`). */
+const REPO_KINDS = PAGE_KINDS.filter((kind) => KINDS[kind].repo);
+
 export const PAGE_ACTIONS: ActionInfo[] = [
   { id: 'cite', title: 'cite', kinds: ['paper'] },
-  { id: 'edit', title: 'edit' },
+  { id: 'edit', title: 'edit', kinds: REPO_KINDS },
   { id: 'follow', title: 'follow', kinds: ['paper'] },
   { id: 'share', title: 'share' },
-  { id: 'history', title: 'history' },
+  { id: 'history', title: 'history', kinds: REPO_KINDS },
   { id: 'agents', title: 'for agents', kinds: ['paper'] },
 ];
 

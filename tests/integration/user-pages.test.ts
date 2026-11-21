@@ -5,12 +5,9 @@ import { accounts, authorClaims, pageRedirects, pages } from '@/db/schema';
 import type { PaperId } from '@/lib/paper-ids';
 import { DEFAULT_SHOWN } from '@/lib/user-pages';
 import { decideClaim } from '@/server/claims';
-import { CONSUMERS } from '@/server/consumers';
-import { runConsumer } from '@/server/consumers/run';
-import { linksFrom, linksTo } from '@/server/page-links';
 import { commitPage } from '@/server/pages/commit';
 import { findKeyedPage, findPage } from '@/server/pages/kinds';
-import { readCommit, readFiles, readHead, readText } from '@/server/pages/repo';
+import { readHead } from '@/server/pages/repo';
 import { savePaper } from '@/server/papers';
 import { readPageForPlugins } from '@/server/plugins/pages';
 import { saveSiteSettings } from '@/server/settings';
@@ -57,16 +54,6 @@ async function userPage(handle: string) {
   return page;
 }
 
-async function files(pageId: string): Promise<Record<string, string>> {
-  const head = await readHead(getDb(), pageId);
-  const commit = await readCommit(getDb(), pageId, head!);
-  const out: Record<string, string> = {};
-  for (const [path, blob] of await readFiles(getDb(), pageId, commit.tree)) {
-    out[path] = (await readText(getDb(), pageId, blob)) ?? '';
-  }
-  return out;
-}
-
 async function confirmClaim(cookie: string, paperId: string, authorIndex: number) {
   expect((await api('POST', '/claims', { cookie, body: { paper: PAPER, authorIndex } })).status).toBe(201);
   const [row] = await getDb().select().from(authorClaims).where(eq(authorClaims.paperId, paperId));
@@ -78,22 +65,18 @@ const showAll =
   '{ "user.show.realName": true, "user.show.claimedPapers": true, "user.show.activity": true, "user.show.comments": true }';
 
 describe('user pages', () => {
-  it('makes a page with every account, with its repo and profile.json, moved with its handle', async () => {
+  it('makes a page with every account, with no repo, moved with its handle', async () => {
     const cookie = await signUp('ada@ethz.ch');
     const [placeholder] = await getDb().select().from(accounts);
     const first = await userPage(placeholder.handle);
-    expect(JSON.parse((await files(first.id))['profile.json'])).toEqual({ show: DEFAULT_SHOWN });
+    expect(await readHead(getDb(), first.id)).toBeNull();
 
     expect((await api('PATCH', '/me', { cookie, body: { handle: 'ada', showInstitution: false } })).status).toBe(200);
     const moved = await userPage('ada');
     expect(moved.id).toBe(first.id);
     expect(await findKeyedPage(getDb(), 'user', placeholder.handle)).toBeNull();
-    // The old address still finds it, by identifier, and the page's metadata says its new key.
+    // The old address still finds it, by identifier.
     expect((await findPage(`user:${placeholder.handle}`))?.id).toBe(first.id);
-    expect(JSON.parse((await files(first.id))['.potentialpaper/metadata.json'])).toMatchObject({
-      kind: 'user',
-      key: 'ada',
-    });
 
     // Moving again leaves both old addresses leading to the page, until someone else takes one of them.
     expect((await api('PATCH', '/me', { cookie, body: { handle: 'ada-l' } })).status).toBe(200);
@@ -145,7 +128,7 @@ describe('user pages', () => {
     expect((await userPageView(await userPage('ada')))!.claimedPapers).toBeNull();
   });
 
-  it('shows what the account turns on in its settings, and profile.json follows', async () => {
+  it('shows what the account turns on in its settings', async () => {
     const paperId = await paper(PAPER);
     const ada = await person('ada', { realName: 'Ada Lovelace' });
     await confirmClaim(ada.cookie, paperId, 0);
@@ -159,36 +142,17 @@ describe('user pages', () => {
     expect(view.claimedPapers).toMatchObject([
       { page: { identifier: 'arxiv:1706.03762' }, authorName: 'Ada Lovelace' },
     ]);
-    expect(JSON.parse((await files(page.id))['profile.json']).show).toMatchObject({
-      realName: true,
-      institution: true,
-      claimedPapers: true,
-    });
     expect((await readPageForPlugins('user:ada')).kindFile).toMatchObject({
       realName: 'Ada Lovelace',
       institutions: ['ETH Zurich'],
       papers: [{ identifier: 'arxiv:1706.03762', authorName: 'Ada Lovelace' }],
     });
 
-    // Turned off again: gone from the page, and the file says so; the name was never in a commit.
+    // Turned off again: gone from the page.
     const off = '{ "user.show.claimedPapers": false }';
     expect((await api('PUT', '/me/settings', { cookie: ada.cookie, text: off })).status).toBe(200);
     expect((await api('PATCH', '/me', { cookie: ada.cookie, body: { showInstitution: false } })).status).toBe(200);
     expect((await userPageView(page))!).toMatchObject({ realName: null, claimedPapers: null });
-    const show = JSON.parse((await files(page.id))['profile.json']).show;
-    expect(show).toEqual({ ...DEFAULT_SHOWN, claimedPapers: false });
-    expect(Object.values(await files(page.id)).join('\n')).not.toContain('Lovelace');
-
-    // The account writes about/ and its links, but profile.json only through its settings.
-    await expect(
-      commitPage(
-        page.id,
-        await readHead(getDb(), page.id),
-        ada.actor,
-        [{ path: 'profile.json', content: '{}\n' }],
-        'x',
-      ),
-    ).rejects.toMatchObject({ status: 403 });
 
     // An admin can't publish everyone's names by setting a default.
     await saveSiteSettings('{ "user.show.realName": true }');
@@ -272,43 +236,25 @@ describe('user pages', () => {
     expect((await userPageView(await userPage('ada')))!).toMatchObject({ activity: null, comments: null });
   });
 
-  it('links to the person elsewhere and to their work, from their own about/', async () => {
-    await paper(PAPER);
+  it('has no files: its bio and links are the account’s, and nobody commits to it', async () => {
     const ada = await person('ada');
     const page = await userPage('ada');
-    const links = [
-      '{"id":"h","to":"https://ada.example.org/","label":"homepage"}',
-      '{"id":"o","to":"https://orcid.org/0000-0002-1825-0097","label":"orcid"}',
-      '{"id":"w","to":"arxiv:1706.03762","label":"wrote"}',
-    ].join('\n');
-    expect(
-      (
-        await commitPage(
-          page.id,
-          await readHead(getDb(), page.id),
-          ada.actor,
-          [
-            { path: 'owners/10-me.md', content: '# About\n\nI work on engines.\n' },
-            { path: 'owners/links.jsonl', content: `${links}\n` },
-          ],
-          'About me',
-        )
-      ).status,
-    ).toBe('committed');
-    const consumer = CONSUMERS.find((c) => c.name === 'links')!;
-    await runConsumer(consumer, { retryNow: true });
-    const from = await linksFrom(page.id);
-    expect(from.map((link) => [link.label, link.page.url ?? link.page.address])).toEqual([
-      ['homepage', 'https://ada.example.org/'],
-      ['orcid', 'https://orcid.org/0000-0002-1825-0097'],
-      ['wrote', { kind: 'paper', id: PAPER }],
-    ]);
-    const paperPage = await findPage('arxiv:1706.03762');
-    expect((await linksTo(paperPage!.id)).map((link) => [link.label, link.page.name])).toEqual([['wrote', '@ada']]);
-    expect((await readPageForPlugins('user:ada')).links.map((link) => link.to)).toEqual([
-      'https://ada.example.org/',
-      'https://orcid.org/0000-0002-1825-0097',
-      'arxiv:1706.03762',
-    ]);
+    const saved = await api('PATCH', '/me', {
+      cookie: ada.cookie,
+      body: { bio: 'I work on *engines*.', homepage: 'https://ada.example.org/', orcid: '0000-0002-1825-0097' },
+    });
+    expect(saved.body).toMatchObject({ homepage: 'https://ada.example.org/', orcid: '0000-0002-1825-0097' });
+    expect((await api('PATCH', '/me', { cookie: ada.cookie, body: { orcid: 'nope' } })).body.error.code).toBe(
+      'invalid_link',
+    );
+    expect((await userPageView(page))!).toMatchObject({
+      bio: 'I work on *engines*.',
+      links: { homepage: 'https://ada.example.org/', orcid: '0000-0002-1825-0097', scholar: null },
+    });
+    expect((await readPageForPlugins('user:ada')).kindFile).toMatchObject({ homepage: 'https://ada.example.org/' });
+    await expect(
+      commitPage(page.id, null, ada.actor, [{ path: 'owners/10-me.md', content: '# About\n\nMe.\n' }], 'About me'),
+    ).rejects.toMatchObject({ status: expect.any(Number) });
+    expect(await readHead(getDb(), page.id)).toBeNull();
   });
 });

@@ -5,21 +5,19 @@ import {
   authorClaims,
   comments,
   commitIdentities,
-  pageCurrent,
   pageEvents,
   pageRevisions,
   type Account,
 } from '@/db/schema';
 import { keyedPagePath } from '@/lib/kinds';
+import type { ProfileLinks } from '@/lib/profile';
 import { LINKS_FILE } from '@/lib/labeled-links';
 import { parseSettings, resolveSettings } from '@/lib/settings';
-import { profileFileText, shownFromSettings, type UserShown, USER_SHOW_ITEMS } from '@/lib/user-pages';
+import { shownFromSettings, type UserShown } from '@/lib/user-pages';
 import type { PageSummary } from '@/lib/plugins/protocol';
-import { commitPage, SYSTEM_ACTOR } from './pages/commit';
-import { findKeyedPage, type PageRow } from './pages/kinds';
+import type { PageRow } from './pages/kinds';
 import { refreshPageIds, refreshPages } from './pages/refresh';
-import { readHead, type Reader } from './pages/repo';
-import { LAYOUT_VERSION, METADATA_PATH } from './pages/rules';
+import type { Reader } from './pages/repo';
 import { pageSummaries } from './plugins/pages';
 import { summaries } from './my-papers';
 import { userSettingsRow } from './settings';
@@ -128,6 +126,8 @@ export interface UserPageView {
   shown: UserShown;
   /** What the person wrote about themselves (Markdown with TeX), or `null`: public whenever they write one. */
   bio: string | null;
+  /** Their homepage, ORCID iD and Scholar profile, each `null` when unset: public, like the bio. */
+  links: ProfileLinks;
   /** Each item only when shown, else `null`. */
   realName: string | null;
   institutions: string[] | null;
@@ -158,6 +158,7 @@ export async function userPageView(
     bot: account.isBot,
     shown,
     bio: account.bio,
+    links: { homepage: account.homepage, orcid: account.orcid, scholar: account.scholar },
     realName: shown.realName ? account.realName : null,
     institutions: shown.institution ? account.institutions : null,
     claimedPapers,
@@ -303,88 +304,22 @@ async function commentsOf(accountId: string, limit: number, database: Database):
 }
 
 /**
- * Starts the account's page repo, if it hasn't one: the system's first commit, with its `profile.json` as the
- * account's settings say, so it can be cloned and pushed to from the start. The page's row is the trigger's. Never
- * fails what called it (a sign-up).
+ * After what the page shows changed (its `user.show.*` settings, its institution choice, its bio or links): the page is
+ * rendered again, and so are its papers, whose author names link here only while it shows them. Never fails the
+ * change, which has happened.
  */
-export async function startUserPage(
-  account: Pick<Account, 'id' | 'handle'>,
-  database: Database = getDb(),
-): Promise<void> {
+export async function afterProfileChange(account: Pick<Account, 'id' | 'handle'>, database: Database = getDb()) {
   try {
-    await syncProfileFile(account, database);
+    await refreshPages({ kind: 'user', key: account.handle });
+    await refreshAuthoredPapers(account.id, database);
   } catch (err) {
-    console.error(`starting the page of @${account.handle} failed`, err);
+    console.error(`rendering the page of @${account.handle} again failed`, err);
   }
 }
 
-/**
- * Brings the page's `profile.json` in line with the account's `user.show.*` settings and its `show_institution`: a
- * commit by the system, only when it differs; on a page with no repo yet, its first commit. Called when the account is
- * made, when its settings are saved or its profile's institution choice changes, and by `npm run users:pages`. The page reads the settings, never the file, so a failure here shows nothing it shouldn't.
- */
-export async function syncProfileFile(
-  account: Pick<Account, 'id' | 'handle'>,
-  database: Database = getDb(),
-): Promise<'committed' | 'unchanged' | 'no-page'> {
-  const page = await findKeyedPage(database, 'user', account.handle);
-  if (!page) return 'no-page';
-  const [row] = await database
-    .select({ id: accounts.id, showInstitution: accounts.showInstitution })
-    .from(accounts)
-    .where(eq(accounts.id, account.id));
-  if (!row) return 'no-page';
-  const shown = await shownFor(row);
-  const text = profileFileText(shown);
-  const [current] = await database
-    .select({ kindFile: pageCurrent.kindFile })
-    .from(pageCurrent)
-    .where(eq(pageCurrent.pageId, page.id));
-  const head = await readHead(database, page.id);
-  const result = await commitPage(
-    page.id,
-    head,
-    SYSTEM_ACTOR,
-    [{ path: 'profile.json', content: text }],
-    showSummary(shown, current?.kindFile ?? null),
-    {
-      database,
-    },
-  );
-  if (result.status !== 'committed') return 'unchanged';
-  await refreshPages({ kind: 'user', key: account.handle });
-  // Whether its papers link the author's name here may have changed.
-  await refreshAuthoredPapers(account.id, database);
-  return 'committed';
-}
-
-/** The commit's summary: what changed, in words. */
-function showSummary(shown: UserShown, before: Record<string, unknown> | null): string {
-  const was = (before?.show ?? {}) as Partial<UserShown>;
-  const on = USER_SHOW_ITEMS.filter((item) => shown[item] && was[item] !== true);
-  const off = USER_SHOW_ITEMS.filter((item) => !shown[item] && was[item] === true);
-  const words = [...(on.length ? [`Show ${on.join(', ')}`] : []), ...(off.length ? [`Hide ${off.join(', ')}`] : [])];
-  return words.length ? words.join('; ') : 'What this page shows';
-}
-
-/**
- * After a handle changed (the trigger moved the page and left a redirect): the page's metadata says its new key, and
- * both addresses are rendered again. Never fails the change, which has happened.
- */
+/** After a handle changed (the trigger moved the page and left a redirect): both addresses are rendered again. */
 export async function afterHandleChange(oldHandle: string, newHandle: string, database: Database = getDb()) {
   try {
-    const page = await findKeyedPage(database, 'user', newHandle);
-    if (page && (await readHead(database, page.id))) {
-      const content = `${JSON.stringify({ layout: LAYOUT_VERSION, kind: 'user', key: newHandle }, null, 2)}\n`;
-      await commitPage(
-        page.id,
-        await readHead(database, page.id),
-        SYSTEM_ACTOR,
-        [{ path: METADATA_PATH, content }],
-        `Handle is now @${newHandle}`,
-        { database },
-      );
-    }
     await refreshPages({ kind: 'user', key: oldHandle });
     await refreshPages({ kind: 'user', key: newHandle });
     const [account] = await database.select({ id: accounts.id }).from(accounts).where(eq(accounts.handle, newHandle));

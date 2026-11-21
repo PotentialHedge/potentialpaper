@@ -16,7 +16,7 @@ const label = 'mt-2.5 block font-sans text-[13px] text-muted';
 export async function profileRefusal(res: Response | null): Promise<string> {
   if (!res) return 'Could not reach the server. Try again.';
   const error = (await res.json().catch(() => null))?.error;
-  if (error?.code === 'invalid_handle') return error.message;
+  if (error?.code === 'invalid_handle' || error?.code === 'invalid_link') return error.message;
   if (error?.code === 'handle_taken') return 'That handle is taken.';
   return 'Could not save. Try again.';
 }

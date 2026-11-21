@@ -5,7 +5,7 @@ import { useState } from 'react';
 import { Modal } from '@/components/Modal';
 import { ProfileFields, profileRefusal, type ProfileValues } from '@/components/ProfileFields';
 import { ui } from '@/components/ui';
-import { BIO_MAX } from '@/lib/profile';
+import { BIO_MAX, PROFILE_LINK_INFO, PROFILE_LINKS, type ProfileLink } from '@/lib/profile';
 
 /**
  * "edit profile" on `/profile`: a modal with what the public sees, the handle, real name and institution, and the bio
@@ -16,7 +16,7 @@ export function EditProfile({
   institutions,
   className,
 }: {
-  initial: ProfileValues & { bio: string };
+  initial: ProfileValues & { bio: string } & Record<ProfileLink, string>;
   institutions: string[];
   className: string;
 }) {
@@ -51,6 +51,7 @@ export function EditProfile({
                 handle: values.handle.trim(),
                 realName: values.realName.trim() || null,
                 bio: values.bio.trim() || null,
+                ...Object.fromEntries(PROFILE_LINKS.map((link) => [link, values[link].trim() || null])),
                 showInstitution: values.showInstitution,
               }),
             }).catch(() => null);
@@ -75,6 +76,19 @@ export function EditProfile({
               {values.bio.length}/{BIO_MAX}
             </span>
           </label>
+          {PROFILE_LINKS.map((link) => (
+            <label key={link} className="mt-2.5 block font-sans text-[13px] text-muted">
+              {PROFILE_LINK_INFO[link].label} (optional)
+              <input
+                value={values[link]}
+                onChange={(e) => setValues({ ...values, [link]: e.target.value })}
+                placeholder={PROFILE_LINK_INFO[link].placeholder}
+                autoComplete="off"
+                maxLength={300}
+                className={`${ui.input} mt-0.5`}
+              />
+            </label>
+          ))}
           <ProfileFields values={values} onChange={(v) => setValues({ ...values, ...v })} institutions={institutions} />
           <button className={ui.btn({ inline: true })} disabled={busy || !values.handle.trim()}>
             {busy ? 'Saving…' : 'Save'}

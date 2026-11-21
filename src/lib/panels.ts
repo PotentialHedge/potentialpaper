@@ -64,9 +64,7 @@ export const PAGE_PANELS = {
   ],
   user: [
     { id: 'identity', slot: 'user.main', title: 'Bio' },
-    { id: 'sections', slot: 'user.main', title: 'About' },
     { id: 'papers', slot: 'user.main', title: 'Papers they authored' },
-    { id: 'links', slot: 'user.aside', title: 'Labeled links' },
     { id: 'backlinks', slot: 'user.aside', title: 'What links here' },
     { id: 'activity', slot: 'user.tabs', title: 'Activity' },
     { id: 'comments', slot: 'user.tabs', title: 'Comments' },

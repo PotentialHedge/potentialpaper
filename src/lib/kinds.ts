@@ -9,7 +9,6 @@ import {
   type PaperScheme,
 } from './paper-ids';
 import { HANDLE_PATTERN } from './profile';
-import { USER_SHOW, USER_SHOW_ITEMS, type UserShowItem } from './user-pages';
 
 /**
  * The kinds of page (`handoffs/pages.md`): a paper, a venue, a topic, an organisation or a person. Every kind is a
@@ -116,29 +115,6 @@ export const orgFileSchema = z
   })
   .meta({ title: 'Organisation', description: "An organisation page's org.json." });
 
-/**
- * A `profile.json`: what the person chose to show (`lib/user-pages.ts`), one switch per item, as their
- * `user.show.*` settings say. The site writes it from those settings (`server/user-pages.ts`); it holds the choices,
- * never the values (a real name in a commit would stay in the history after it is turned off). A missing item reads as
- * its §5.3-safe default.
- */
-export const profileFileSchema = z
-  .strictObject({
-    show: z
-      .strictObject(
-        Object.fromEntries(
-          USER_SHOW_ITEMS.map((item) => [item, z.boolean().optional().meta({ description: USER_SHOW[item].title })]),
-        ) as Record<UserShowItem, z.ZodOptional<z.ZodBoolean>>,
-      )
-      .optional()
-      .meta({ description: 'What the page shows beyond the handle, owners/ and links.' }),
-  })
-  .meta({
-    title: 'Profile',
-    description:
-      "A user page's profile.json: what the account chose to show, as its user.show.* settings say. Written by the site.",
-  });
-
 export type VenueFile = z.output<typeof venueFileSchema>;
 export type TopicFile = z.output<typeof topicFileSchema>;
 export type OrgFile = z.output<typeof orgFileSchema>;
@@ -152,9 +128,9 @@ export const OWNERS_DIR = 'owners';
 /**
  * How a kind's owners are confirmed: `authors`, a claim on one of the paper's author names (`server/claims.ts`);
  * `organisers`, a claim an admin decides, which holds for the pages under it too (`server/page-claims.ts`);
- * `domain`, a confirmed address at one of its domains (`server/org-roles.ts`); `self`, being the account.
+ * and `domain`, a confirmed address at one of its domains (`server/org-roles.ts`).
  */
-export type ClaimPolicy = 'authors' | 'organisers' | 'domain' | 'self';
+export type ClaimPolicy = 'authors' | 'organisers' | 'domain';
 export type GenericSlot = (typeof GENERIC_SLOTS)[number];
 
 export interface KindInfo {
@@ -163,8 +139,13 @@ export interface KindInfo {
   title: string;
   /** Where its pages are on the site: `/v`. A paper's are by identifier, `/abs`, `/doi`, `/openreview`. */
   route: string;
-  /** The kind file, from the repo's root. */
-  kindFile: string;
+  /**
+   * Whether its pages have a repo: files, history, a clone address, edits. A person's page has none: it is drawn from
+   * their account (`server/user-pages.ts`), which only they change, at `/profile`.
+   */
+  repo: boolean;
+  /** The kind file, from the repo's root; `null` on a kind without a repo. */
+  kindFile: string | null;
   /** Its schema; `null` for a paper's, which is the system's snapshot. */
   kindFileSchema: z.ZodType | null;
   /**
@@ -200,11 +181,12 @@ const slots = (kind: PageKind, extra: readonly string[] = []) => [
 
 const COMMON_CONTEXT = ['page.kind', 'signedIn', 'viewer.isOwner'] as const;
 
-export const KINDS: Record<PageKind, KindInfo> = {
+export const KINDS = {
   paper: {
     kind: 'paper',
     title: 'Paper',
     route: '/abs',
+    repo: true,
     kindFile: '.potentialpaper/metadata.json',
     kindFileSchema: null,
     owners: { dir: OWNERS_DIR, title: 'the authors', noun: 'confirmed authors', claim: 'authors' },
@@ -230,6 +212,7 @@ export const KINDS: Record<PageKind, KindInfo> = {
     kind: 'venue',
     title: 'Venue',
     route: '/v',
+    repo: true,
     kindFile: 'venue.json',
     kindFileSchema: venueFileSchema,
     owners: { dir: OWNERS_DIR, title: 'the organisers', noun: 'confirmed organisers', claim: 'organisers' },
@@ -244,6 +227,7 @@ export const KINDS: Record<PageKind, KindInfo> = {
     kind: 'topic',
     title: 'Topic',
     route: '/t',
+    repo: true,
     kindFile: 'topic.json',
     kindFileSchema: topicFileSchema,
     owners: null,
@@ -258,6 +242,7 @@ export const KINDS: Record<PageKind, KindInfo> = {
     kind: 'org',
     title: 'Organisation',
     route: '/o',
+    repo: true,
     kindFile: 'org.json',
     kindFileSchema: orgFileSchema,
     owners: { dir: OWNERS_DIR, title: 'the members', noun: 'verified members', claim: 'domain' },
@@ -272,17 +257,18 @@ export const KINDS: Record<PageKind, KindInfo> = {
     kind: 'user',
     title: 'Person',
     route: '/u',
-    kindFile: 'profile.json',
-    kindFileSchema: profileFileSchema,
-    owners: { dir: OWNERS_DIR, title: 'the person', noun: 'account', claim: 'self' },
+    repo: false,
+    kindFile: null,
+    kindFileSchema: null,
+    owners: null,
     community: false,
     slots: slots('user'),
-    fileTypes: ['section', 'labeledLink', 'profile'],
+    fileTypes: [],
     contextKeys: [...COMMON_CONTEXT],
     scope: false,
     maxDepth: 1,
   },
-};
+} as const satisfies Record<PageKind, KindInfo>;
 
 /** The kinds other than paper, whose addresses are made from their key. */
 export const KEYED_KINDS = PAGE_KINDS.filter((kind) => kind !== 'paper') as Exclude<PageKind, 'paper'>[];

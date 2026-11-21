@@ -10,6 +10,10 @@ export const dynamic = 'force-dynamic';
 const UPDATES: { date: string; text: string }[] = [
   {
     date: '2026-11-21',
+    text: "A person's page (`user:<handle>`) has no repo any more: nothing to clone, edit or commit, and its old files and history are gone. It is drawn from the account, which only the person changes: `PATCH /api/v1/me` takes `bio`, `homepage` (https), `orcid` (an iD) and `scholar` (a Google Scholar profile's address), each `null` to clear. The `wrote`, `homepage`, `orcid` and `scholar` link labels are gone with it.",
+  },
+  {
+    date: '2026-11-21',
     text: "Every page's link preview (`og:image`) is `/preview/<short id>.png?v=<version>`: drawn once per version of what it shows and kept, so the address changes when the page does. A person's shows their handle, institution and bio; a paper's, its latest decision.",
   },
   {

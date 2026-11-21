@@ -148,8 +148,8 @@ a series' editions, an edition's submissions by status with filters (`GET /api/v
 and organiser claims (`page_claims`, `/claim/venue/<key>`). A venue's review scores (its `scores` panel) come from
 `handoffs/plugins.md` Phase 4's `scope_stats`. Phase 3 (user pages) is built: every account's `/u/<handle>`, made and
 moved with it (`page_redirects`), showing only what its `user.show.*` settings turn on (`server/user-pages.ts`), with
-activity and comments under the handle, person links (`homepage`, `orcid`, `scholar`, `wrote`) and
-`npm run users:pages`. Phase 4 (organisation pages) is built: the `orgs` bot (`npm run orgs:sync`, and on confirmed
+activity and comments under the handle; since 2026-11-21 without a repo, drawn from the account (bio, homepage, ORCID,
+Scholar). Phase 4 (organisation pages) is built: the `orgs` bot (`npm run orgs:sync`, and on confirmed
 addresses and ingest passes) makes institutions' pages from the allowlist with ROR ids (`config/institution-ror.json`,
 `npm run institutions:build -- --ror-only`); members by confirmed address own `members/` and `org.json` and make
 departments and labs (`/new/org/<key>`); an org's papers (`page_members` `via` `affiliation`) come from members'

@@ -1,8 +1,7 @@
 import { describe, expect, it } from 'vitest';
-import { parseLabeledLinks } from '@/lib/labeled-links';
 import { checkSettings, CORE_SETTINGS, parseSettings, resolveSettings, settingsJsonSchema } from '@/lib/settings';
-import { DEFAULT_SHOWN, profileFileText, shownFromSettings, USER_SHOW_SETTINGS, userShowKey } from '@/lib/user-pages';
-import { profileFileSchema } from '@/lib/kinds';
+import { DEFAULT_SHOWN, shownFromSettings, USER_SHOW_SETTINGS, userShowKey } from '@/lib/user-pages';
+import { cleanProfileLink, profileLinkHref } from '@/lib/profile';
 import { commentExcerpt } from '@/server/user-pages';
 
 describe('what a user page shows', () => {
@@ -58,11 +57,20 @@ describe('what a user page shows', () => {
     expect(schema.properties['user.show.claimedPapers']).toMatchObject({ type: 'boolean' });
   });
 
-  it('writes profile.json as the choices only, which its schema takes', () => {
-    const text = profileFileText({ ...DEFAULT_SHOWN, realName: true });
-    expect(JSON.parse(text)).toEqual({ show: { ...DEFAULT_SHOWN, realName: true } });
-    expect(profileFileSchema.safeParse(JSON.parse(text)).success).toBe(true);
-    expect(profileFileSchema.safeParse({ show: { realName: true }, realName: 'Ada' }).success).toBe(false);
+  it('keeps a person’s links in one form, and says what is wrong with a bad one', () => {
+    expect(cleanProfileLink('homepage', '  ')).toEqual({ value: null });
+    expect(cleanProfileLink('homepage', 'https://ada.example/me')).toEqual({ value: 'https://ada.example/me' });
+    expect(cleanProfileLink('homepage', 'http://ada.example')).toHaveProperty('problem');
+    expect(cleanProfileLink('homepage', 'javascript:alert(1)')).toHaveProperty('problem');
+    expect(cleanProfileLink('orcid', 'https://orcid.org/0000-0002-1825-009x')).toEqual({
+      value: '0000-0002-1825-009X',
+    });
+    expect(cleanProfileLink('orcid', '1234')).toHaveProperty('problem');
+    expect(cleanProfileLink('scholar', 'https://scholar.google.de/citations?hl=de&user=AbC_12-xyz')).toEqual({
+      value: 'https://scholar.google.com/citations?user=AbC_12-xyz',
+    });
+    expect(cleanProfileLink('scholar', 'https://evil.example/citations?user=AbC_12-xyz')).toHaveProperty('problem');
+    expect(profileLinkHref('orcid', '0000-0002-1825-0097')).toBe('https://orcid.org/0000-0002-1825-0097');
   });
 
   it('lists comments by their opening words', () => {
@@ -70,47 +78,5 @@ describe('what a user page shows', () => {
       'Nice result, see quote',
     );
     expect(commentExcerpt('x'.repeat(400))).toHaveLength(240);
-  });
-});
-
-describe("a person's links", () => {
-  const line = (link: object) => `${JSON.stringify({ id: 'a', ...link })}\n`;
-
-  it('go to addresses elsewhere, on the hosts their label names', () => {
-    const ok = parseLabeledLinks(
-      [
-        line({ id: 'h', to: 'https://ada.example.org/', label: 'homepage' }),
-        line({ id: 'o', to: 'https://orcid.org/0000-0002-1825-0097', label: 'orcid' }),
-        line({ id: 's', to: 'https://scholar.google.com/citations?user=abc', label: 'scholar' }),
-        line({ id: 'w', to: 'arxiv:1706.03762', label: 'wrote' }),
-      ].join(''),
-      'user',
-    );
-    expect(ok).toMatchObject({
-      links: [
-        { target: 'https://ada.example.org/', targetKind: 'web' },
-        { targetKind: 'web' },
-        { targetKind: 'web' },
-        { target: 'arxiv:1706.03762', targetKind: 'paper' },
-      ],
-    });
-    expect(parseLabeledLinks(line({ to: 'https://example.org/0000', label: 'orcid' }), 'user')).toMatchObject({
-      problem: expect.stringMatching(/orcid\.org/),
-    });
-    expect(parseLabeledLinks(line({ to: 'http://ada.example.org/', label: 'homepage' }), 'user')).toMatchObject({
-      problem: expect.stringMatching(/https/),
-    });
-    expect(parseLabeledLinks(line({ to: 'topic:x', label: 'wrote' }), 'user')).toMatchObject({
-      problem: expect.stringMatching(/paper/),
-    });
-  });
-
-  it('are only on user pages', () => {
-    expect(parseLabeledLinks(line({ to: 'https://ada.example.org/', label: 'homepage' }), 'paper')).toMatchObject({
-      problem: expect.stringMatching(/from user pages/),
-    });
-    expect(parseLabeledLinks(line({ to: 'arxiv:1706.03762', label: 'wrote' }), 'topic')).toMatchObject({
-      problem: expect.stringMatching(/from user pages/),
-    });
   });
 });

@@ -1,6 +1,6 @@
 import { notFound, redirect } from 'next/navigation';
 import { ui } from '@/components/ui';
-import { addressOfPath, formatIdentifier, type PageAddress, type PageRef, pageRefOf } from '@/lib/kinds';
+import { addressOfPath, formatIdentifier, KINDS, type PageAddress, type PageRef, pageRefOf } from '@/lib/kinds';
 import { type Tool, toolPath } from '@/lib/page-tools';
 import { namedPage, type NamedPage } from '@/server/pages/named';
 import type { FoundPaper } from '@/server/papers';
@@ -23,7 +23,8 @@ export async function toolPage(tool: Tool, params: ToolParams, query = ''): Prom
   const { scheme, value } = await params;
   const asked = addressOfPath(scheme, value);
   const found = asked && (await namedPage(asked));
-  if (!asked || !found) notFound();
+  // A person's page has no files, so no history, edit or claim page (`KINDS.user.repo`).
+  if (!asked || !found || !KINDS[found.address.kind].repo) notFound();
   if (formatIdentifier(found.address) !== formatIdentifier(asked)) redirect(toolPath(tool, found.address, query));
   return { ...found, ref: pageRefOf(found.address) };
 }

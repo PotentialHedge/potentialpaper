@@ -221,12 +221,15 @@ export async function readPageForPlugins(identifier: string, database: Database 
 }
 
 /**
- * A user page's "kind file" as plugins and the public routes read it: its `profile.json` choices, and the values of
- * the items the account shows (its real name, institutions, the papers it authored), nothing else.
+ * A person's page has no files; plugins and the public routes read this in place of a kind file: what the account
+ * chose to show, its bio and links, and the values of the items it shows (its real name, institutions, the papers it
+ * authored), nothing else.
  */
 export function userKindFile(view: UserPageView): Record<string, unknown> {
   return {
     show: view.shown,
+    ...(view.bio ? { bio: view.bio } : {}),
+    ...Object.fromEntries(Object.entries(view.links).filter(([, value]) => value)),
     ...(view.realName ? { realName: view.realName } : {}),
     ...(view.institutions ? { institutions: view.institutions } : {}),
     ...(view.claimedPapers

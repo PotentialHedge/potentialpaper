@@ -18,7 +18,7 @@ import type { HideUntil } from '@/lib/scope-stats';
 import { shownFromSettings, USER_SHOW_SETTINGS } from '@/lib/user-pages';
 import { ApiError } from './api/errors';
 import { pluginSettingsOf } from './plugins/installed';
-import { syncProfileFile } from './user-pages';
+import { afterProfileChange } from './user-pages';
 
 /**
  * settings.json on the server (DESIGN.md §10): each account's document (`user_settings`) over the site layer
@@ -117,9 +117,9 @@ export async function saveUserSettings(account: Account, text: string): Promise<
     .insert(userSettings)
     .values({ accountId: account.id, doc: text })
     .onConflictDoUpdate({ target: userSettings.accountId, set: { doc: text, updatedAt: sql`now()` } });
-  // What the account's page shows changed: its profile.json follows, and the page is rendered again.
+  // What the account's page shows changed: it and its papers are rendered again.
   const after = shownFromSettings(resolveSettings({ user: parseSettings(text) }), account.showInstitution);
-  if (USER_SHOW_SETTINGS.some((item) => before[item] !== after[item])) await syncProfileFile(account);
+  if (USER_SHOW_SETTINGS.some((item) => before[item] !== after[item])) await afterProfileChange(account);
   return settingsFor(account);
 }
 

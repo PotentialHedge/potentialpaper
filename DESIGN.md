@@ -211,11 +211,11 @@ extensions/<id>/...             reserved: data owned by one extension (section 1
 page; venues (`/v/iclr/2027`), topics (`/t/<slug>`), organisations (`/o/<slug>`) and people (`/u/<handle>`) are
 pages built the same way, each a repo with the same shape: `.gitattributes`, `prek.toml` and
 `.potentialpaper/metadata.json` (`{ layout, kind, key }`) for the system; its parts' sections, `owners/` (on every
-kind with owners) and `community/` (all but a user's); each part's `links.jsonl` (§8); its kind file (`venue.json`,
-`topic.json`, `org.json`, `profile.json`); and `extensions/`. The kind registry, `src/lib/kinds.ts`, declares each
+kind with owners) and `community/`; each part's `links.jsonl` (§8); its kind file (`venue.json`, `topic.json`,
+`org.json`); and `extensions/`. **A person's page is the exception: it has no repo** (decided 2026-11-21,
+`KINDS.user.repo`), only its account, which they change at `/profile`. The kind registry, `src/lib/kinds.ts`, declares each
 kind's address, kind file and schema, parts, **how its owners are confirmed** (a paper's authors by claim, a venue's
-organisers by a claim an admin decides, an org's members by address, a person's page by being the account; a topic
-has none), slots (`<kind>.main`, `<kind>.aside`, `<kind>.body`, `<kind>.tabs`), file types and plugin context keys;
+organisers by a claim an admin decides, an org's members by address; a topic and a person's page have none), slots (`<kind>.main`, `<kind>.aside`, `<kind>.body`, `<kind>.tabs`), file types and plugin context keys;
 `rules.ts` holds one table of path rules per kind, which decides both what a page may hold and who writes it.
 
 **One page, every kind** (decided 2026-11-20). Every kind is shown by the same page (`components/pages/PageView.tsx`):
@@ -239,16 +239,16 @@ their own handle's identity, since organising is a public role.
 A venue's page also shows its review scores (`scores`, from `scope_stats`, §10): the first score field as a
 histogram stacked by outcome, and every field's median, middle half and medians by decision, per venue on a series.
 
-**User pages** (built in `handoffs/pages.md` Phase 3). Every account has a page at `/u/<handle>`, keyed by its
-handle and made with the account by a trigger on `accounts` (migration `0037`, which also made one for every existing
-account); its repo starts at sign-up (`npm run users:pages` starts the rest). A handle change moves the page's key in
-the same transaction and leaves a redirect (`page_redirects`): `/u/<old>` and `user:<old>` lead to the page until
-another account takes the old handle. The page shows its handle, its `owners/` and its links, and of the rest only what
-the account turned on (§5.3): its real name, institutions, the papers it is a confirmed author of, its activity
-(commits under its handle, from the outbox) and its comments under its handle, each a `user.show.*` setting
-(`lib/user-pages.ts`). Its `profile.json` repeats the choices, never the values, and is written only by the site
-from those settings. A person's own links may also go elsewhere (`homepage`, `orcid`, `scholar`, to https addresses)
-and to their work (`wrote`, to a paper), §8.
+**User pages** (built in `handoffs/pages.md` Phase 3; without a repo since 2026-11-21). Every account has a page at
+`/u/<handle>`, keyed by its handle and made with the account by a trigger on `accounts` (migration `0037`). A handle
+change moves the page's key in the same transaction and leaves a redirect (`page_redirects`): `/u/<old>` and
+`user:<old>` lead to the page until another account takes the old handle. **The page is drawn from the account
+alone**, so only the person changes it, at `/profile`: its handle, bio (as its abstract) and links (homepage, ORCID iD,
+Google Scholar profile; `accounts.homepage`, `.orcid`, `.scholar`), and of the rest only what the account turned on
+(§5.3): its real name, institutions, the papers it is a confirmed author of, its activity (commits under its handle,
+from the outbox) and its comments under its handle, each a `user.show.*` setting (`lib/user-pages.ts`). It has no
+repo, files, history or edit; nobody commits to it (`server/pages/rules.ts`, `NO_REPO`). Its `pages` row stays, for
+its short id, views and the links to it ("what links here").
 
 **Organisation pages** (built in `handoffs/pages.md` Phase 4). An institution (`/o/eth-zurich`) and its departments
 and labs (`/o/eth-zurich/inf`, up to three levels) each have a page whose `org.json` holds its name, its email
@@ -854,15 +854,11 @@ Labels are data, in a table, with a reading in each direction:
 | `related`            | related to         | (symmetric)       | discourse |                |               |
 | `in-topic`           | is about           | covered by        | topic     |                |               |
 | `introduces-topic`   | introduces         | introduced by     | topic     |                |               |
-| `wrote`              | wrote              | written by        | person    |                |               |
-| `homepage`           | homepage           | homepage of       | person    |                |               |
-| `orcid`              | ORCID              | ORCID of          | person    |                |               |
-| `scholar`            | Google Scholar     | Google Scholar of | person    |                |               |
 
 Built 2026-11-16 (`handoffs/pages.md` Phase 1): the vocabulary is `src/lib/labeled-links.ts`, where each label
 also says which kinds it goes from and to (the classic labels paper to paper, `related` between any kinds, the
-topic labels paper to topic, the person labels from a user page only, `homepage`, `orcid` and `scholar` to an https
-address rather than a page, which no page's "what links here" lists). `page_links` is kept by the `links` outbox consumer (`server/page-links.ts`), not in
+topic labels paper to topic). The person labels (`wrote`, `homepage`, `orcid`, `scholar`) went with person pages'
+repos on 2026-11-21: a person's links are on their account, and their papers are their confirmed author claims. `page_links` is kept by the `links` outbox consumer (`server/page-links.ts`), not in
 the commit's transaction, and the paper page and every other kind show "Links" and "What links here".
 
 - Contested labels **require a note**, because that is where the content is.
@@ -1032,7 +1028,7 @@ Arbitrary JavaScript on the main origin could act as any signed-in user. So:
   `https://ppusercontent.com/sdk/v1/pp.js`, with `pp.d.ts` beside it; `examples/plugins/hello/` uses it.
 - The reads go through public routes anyone can call, `GET /api/v1/pages/<identifier>` and its `/files`, `/members`
   and `/submissions`, so a plugin's own backend reads the same data; they give only what the page shows the public
-  (a user page's `owners/` and links, and only the items its account shows, `userPageView`, §5.3).
+  (on a person's page, its bio and links and only the items its account shows, `userPageView`, §5.3).
 - **Consent is not in settings.json.** The document lists installed plugins (the `plugins` key), and a hand-edited
   file can add one, but a grant row (`user_plugin_grants`: plugin id, SHA, permissions, network origins) records
   what was approved. A plugin whose manifest asks for anything its grant lacks shows an approval prompt instead of

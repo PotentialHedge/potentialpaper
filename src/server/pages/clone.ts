@@ -1,7 +1,7 @@
 import { and, eq } from 'drizzle-orm';
 import { getDb, type Database } from '@/db';
 import { paperIdentifiers } from '@/db/schema';
-import { isPageKind, keyProblem, type PageAddress } from '@/lib/kinds';
+import { isPageKind, KINDS, keyProblem, type PageAddress } from '@/lib/kinds';
 import { canonicalPaperId, PAPER_SCHEMES, type PaperId, parsePaperId } from '@/lib/paper-ids';
 import { findPaper } from '../papers';
 import { findKeyedPage, type PageRow } from './kinds';
@@ -98,6 +98,7 @@ export async function findRepo(
   { page, scheme, raw, file }: GitAddress,
   database: Database = getDb(),
 ): Promise<FoundRepo | { kind: 'redirect'; to: string } | { kind: 'missing' }> {
+  if (!KINDS[page.kind].repo) return { kind: 'missing' };
   if (page.kind !== 'paper') {
     const row = await findKeyedPage(database, page.kind, page.key);
     if (!row) return { kind: 'missing' };

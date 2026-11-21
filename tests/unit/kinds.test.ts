@@ -45,8 +45,8 @@ describe('the kind registry', () => {
     expect(partsOf('paper')).toEqual(['owners', 'community']);
     expect(partsOf('venue')).toEqual(['owners', 'community']);
     expect(partsOf('topic')).toEqual(['community']);
-    expect(partsOf('user')).toEqual(['owners']);
-    expect(kindsOfFileType('labeledLink')).toEqual(PAGE_KINDS);
+    expect(partsOf('user')).toEqual([]);
+    expect(kindsOfFileType('labeledLink')).toEqual(PAGE_KINDS.filter((kind) => kind !== 'user'));
     expect(kindsOfFileType('venue')).toEqual(['venue']);
     expect(kindsOfFileType('submission')).toEqual(['paper']);
   });
@@ -131,7 +131,7 @@ describe('path rules per kind', () => {
     expect(layoutProblem('owners/links.jsonl', 'paper')).toBeNull();
     expect(layoutProblem('versions/v_k3x9q2ab.json', 'venue')).toMatch(/venue pages hold/);
     expect(layoutProblem('topic.json', 'venue')).toMatch(/venue pages hold/);
-    expect(layoutProblem('community/10-x.md', 'user')).toMatch(/user pages hold/);
+    expect(layoutProblem('community/10-x.md', 'user')).toMatch(/no files/);
     expect(layoutProblem('community/links.json', 'topic')).toMatch(/links\.jsonl/);
     expect(layoutProblem('venue.json', 'paper')).not.toBeNull();
   });
@@ -145,12 +145,11 @@ describe('path rules per kind', () => {
     expect(pathDenied('venue.json', roles(), 'venue')).toMatch(/organisers/);
     expect(pathDenied('venue.json', roles({ grants: ['venue.json'] }), 'venue')).toBeNull();
     expect(pathDenied('org.json', roles({ owner: true }), 'org')).toBeNull();
-    expect(pathDenied('owners/10-me.md', roles(), 'user')).toMatch(/only this account/);
-    // A person's profile.json follows their user.show.* settings: only the site writes it.
-    expect(pathDenied('profile.json', roles({ owner: true }), 'user')).toMatch(/user\.show/);
-    expect(pathDenied('profile.json', roles({ admin: true }), 'user')).toMatch(/user\.show/);
-    expect(pathDenied('profile.json', { ...roles(), system: true }, 'user')).toBeNull();
-    expect(pathDenied('.potentialpaper/metadata.json', roles({ owner: true }), 'user')).toMatch(/system/);
+    // A person's page has no files: nobody writes one, not even the system.
+    for (const path of ['owners/10-me.md', 'profile.json', '.potentialpaper/metadata.json']) {
+      expect(pathDenied(path, roles({ owner: true }), 'user')).toMatch(/no files/);
+      expect(pathDenied(path, { ...roles({ admin: true }), system: true }, 'user')).toMatch(/no files/);
+    }
     expect(pathDenied('extensions/x/a.json', roles({ admin: true }), 'topic')).toMatch(/reserved/);
     expect(pathDenied('community/links.jsonl', roles(), 'paper')).toBeNull();
     expect(pathDenied('owners/links.jsonl', roles(), 'paper')).toMatch(/authors/);
@@ -162,11 +161,6 @@ describe('path rules per kind', () => {
     ).toBeNull();
     expect(contentProblem('venue.json', '{ "name": "" }', 'venue')).toMatch(/venue\.json/);
     expect(contentProblem('topic.json', '{ "name": "X", "broader": ["Not A Slug"] }', 'topic')).toMatch(/broader/);
-    expect(contentProblem('profile.json', '{}', 'user')).toBeNull();
-    expect(contentProblem('profile.json', '{ "realName": "x" }', 'user')).not.toBeNull();
-    expect(contentProblem('profile.json', '{ "show": { "realName": true, "activity": false } }', 'user')).toBeNull();
-    expect(contentProblem('profile.json', '{ "show": { "email": true } }', 'user')).not.toBeNull();
-    expect(contentProblem('profile.json', '{ "show": { "realName": "yes" } }', 'user')).not.toBeNull();
     expect(contentProblem('.potentialpaper/metadata.json', '{ "kind": "topic" }', 'venue')).toMatch(/"kind": "venue"/);
     expect(grantProblem('venue.json', 'venue')).toBeNull();
     expect(grantProblem('org.json', 'org')).toBeNull();
@@ -207,7 +201,7 @@ describe('page addresses', () => {
       claimed: false,
       ...more,
     });
-    for (const kind of ['paper', 'venue', 'org', 'user'] as const) {
+    for (const kind of ['paper', 'venue', 'org'] as const) {
       expect(layoutProblem('owners/10-a.md', kind)).toBeNull();
       expect(pathDenied('owners/10-a.md', roles(), kind)).not.toBeNull();
       expect(pathDenied('owners/10-a.md', roles({ owner: true }), kind)).toBeNull();

@@ -1,12 +1,10 @@
 /**
- * What a person's page (`/u/<handle>`, `handoffs/pages.md` Phase 3) may show beyond its handle, its `owners/` and its
- * links: each item is a `user.show.<item>` setting in the account's settings.json, and defaults to what DESIGN.md
+ * What a person's page (`/u/<handle>`, `handoffs/pages.md` Phase 3) may show beyond its handle, bio and links: each item is a `user.show.<item>` setting in the account's settings.json, and defaults to what DESIGN.md
  * §5.3 allows without asking, so that nothing ties the handle to a real name or an author identity unless the account
  * turns it on. **The institution is the one exception** (`handoffs/pages.md` Phase 4): it is the account's
  * `show_institution`, asked at sign-up and changed on `/profile`, which also puts the institution beside the handle on
  * comments, lists the account among its organisation's members and counts its papers there. One switch, so the
- * institution is never public in one place and hidden in another. The page's `profile.json` repeats the choices (never the values), so a clone of the page says what it
- * shows; the settings are what counts (`server/user-pages.ts`).
+ * institution is never public in one place and hidden in another.
  *
  * The items and their defaults are a decision for Benedict to confirm (`handoffs/pages.md`, Open questions).
  *
@@ -84,9 +82,4 @@ export function shownFromSettings(values: Record<string, unknown>, showInstituti
   return Object.fromEntries(
     USER_SHOW_ITEMS.map((item) => [item, item === 'institution' ? showInstitution : shown[item]]),
   ) as UserShown;
-}
-
-/** A `profile.json` as the site writes it: the choices, in the items' order, ending with a newline. */
-export function profileFileText(shown: UserShown): string {
-  return `${JSON.stringify({ show: shown }, null, 2)}\n`;
 }

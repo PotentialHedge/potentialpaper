@@ -52,6 +52,10 @@ export const accounts = pgTable(
     realName: text('real_name'),
     /** A few lines about the person, in Markdown with TeX, shown on their page as its abstract. Public when set. */
     bio: text('bio'),
+    /** The person's links on their page (`lib/profile.ts`): an https homepage, an ORCID iD, a Scholar profile. */
+    homepage: text('homepage'),
+    orcid: text('orcid'),
+    scholar: text('scholar'),
     /** Whether `institutions` is shown publicly. Asked explicitly in onboarding; false until then. */
     showInstitution: boolean('show_institution').notNull().default(false),
     /** When the person chose their handle and answered about their institution. */

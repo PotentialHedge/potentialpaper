@@ -43,7 +43,6 @@
     "claims:decide": "tsx scripts/decide-claim.ts",
     "venues:sync": "tsx scripts/sync-venue-pages.ts",
     "orgs:sync": "tsx scripts/sync-org-pages.ts",
-    "users:pages": "tsx scripts/user-pages.ts",
     "institutions:build": "NODE_OPTIONS=--max-old-space-size=4096 tsx scripts/build-institution-domains.ts",
     "editor:build": "scripts/build-web-editor.sh",
     "editor:extension": "node scripts/build-editor-extension.mjs",

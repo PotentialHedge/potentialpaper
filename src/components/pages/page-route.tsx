@@ -144,16 +144,22 @@ export async function KeyedPageRoute({ kind, segments }: { kind: KeyedKind; segm
       actions={
         <PageActions
           pageId={page.id}
-          historyPath={toolPath('history', address)}
+          historyPath={KINDS[kind].repo ? toolPath('history', address) : undefined}
           share={shortId === null ? null : { url: shortUrl(shortId), title: props.name }}
-          edit={{
-            codePath: toolPath('code', address),
-            clone: cloneAddresses(address),
-            hasRepo: current !== null,
-            // A topic's names, broader topics and article have a form of their own.
-            form:
-              kind === 'topic' ? { href: `${keyedPagePath('topic', key)}/edit`, label: 'Edit the topic' } : undefined,
-          }}
+          edit={
+            KINDS[kind].repo
+              ? {
+                  codePath: toolPath('code', address),
+                  clone: cloneAddresses(address),
+                  hasRepo: current !== null,
+                  // A topic's names, broader topics and article have a form of their own.
+                  form:
+                    kind === 'topic'
+                      ? { href: `${keyedPagePath('topic', key)}/edit`, label: 'Edit the topic' }
+                      : undefined,
+                }
+              : undefined
+          }
         />
       }
     />

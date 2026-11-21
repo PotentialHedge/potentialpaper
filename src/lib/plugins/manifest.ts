@@ -508,7 +508,7 @@ function crossChecks(
     }
     const keys = whenKeys(parseWhen(when));
     for (const kind of kinds) {
-      const missing = keys.filter((key) => !KINDS[kind].contextKeys.includes(key));
+      const missing = keys.filter((key) => !(KINDS[kind].contextKeys as readonly string[]).includes(key));
       if (missing.length) {
         warn(`${at}.when`, `${kind} pages don't offer ${missing.join(', ')}, which read as false there`);
       }

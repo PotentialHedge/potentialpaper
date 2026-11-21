@@ -16,6 +16,7 @@ import { listTokens } from '@/server/tokens';
 import { ApiKeys } from './ApiKeys';
 import { Affiliations } from './Affiliations';
 import { MailSettings } from './MailSettings';
+import { ProfileLinksLine } from '@/components/ProfileLinksLine';
 import { EditProfile } from './ProfileForm';
 import { SshKeys } from './SshKeys';
 
@@ -53,6 +54,7 @@ export default async function Profile() {
             </span>
           ))}
         </p>
+        <ProfileLinksLine links={account} className="mt-2.5" />
         <p className="mt-2.5 font-mono text-xs text-faint">{viewer.email}</p>
         <div className="mt-4 flex flex-wrap justify-center gap-2">
           <a href={keyedPagePath('user', account.handle)} className={BUTTON} title="Your page as everyone sees it">
@@ -64,6 +66,9 @@ export default async function Profile() {
               handle: account.handle,
               realName: account.realName ?? '',
               bio: account.bio ?? '',
+              homepage: account.homepage ?? '',
+              orcid: account.orcid ?? '',
+              scholar: account.scholar ?? '',
               showInstitution: account.showInstitution,
             }}
             institutions={account.institutions}

@@ -5,7 +5,6 @@ import {
   orgFileSchema,
   PAGE_KINDS,
   type PageKind,
-  profileFileSchema,
   topicFileSchema,
   venueFileSchema,
 } from '@/lib/kinds';
@@ -125,7 +124,7 @@ const PARTS_RE = `(${ALL_PARTS.join('|')})`;
 
 /** A kind file's type: at the top of the repo, written by people (and on venues and orgs, a bot). */
 function kindFileType<S extends z.ZodType>(kind: PageKind, schema: S): FileType<S> {
-  const file = KINDS[kind].kindFile;
+  const file = KINDS[kind].kindFile!;
   return {
     title: KINDS[kind].title,
     schema,
@@ -191,7 +190,6 @@ export const PAGE_SCHEMAS = {
   venue: fileType(kindFileType('venue', venueFileSchema)),
   topic: fileType(kindFileType('topic', topicFileSchema)),
   org: fileType(kindFileType('org', orgFileSchema)),
-  profile: fileType({ ...kindFileType('user', profileFileSchema), index: undefined }),
   link: fileType({
     title: 'Link',
     scope: 'page',
@@ -323,7 +321,7 @@ export function fileTypeOf(path: string): FileTypeName | null {
 
 /** The kinds of page a file type may be on: those whose `fileTypes` name it (`lib/kinds.ts`). */
 export function kindsOfFileType(name: FileTypeName): PageKind[] {
-  return PAGE_KINDS.filter((kind) => KINDS[kind].fileTypes.includes(name));
+  return PAGE_KINDS.filter((kind) => (KINDS[kind].fileTypes as readonly string[]).includes(name));
 }
 
 /** The `in:` scope of the file at this path's search documents, or `null` if it isn't searched. */
