@@ -35,14 +35,16 @@ export async function GET(_req: Request, { params }: { params: Promise<{ what: s
       },
     );
   }
-  return markdown(`# ${task.title}
+  return markdown(
+    `# ${task.title}
 
-The person who sent you here gave you a paper's address on PotentialPaper, and maybe a sign-in code.
+The person who sent you here gave you a paper's address on PotentialPaper (a path like \`/abs/1706.03762\`: it is on ${origin}), and maybe a sign-in code.
 
 1. Sign in as step 1 of ${setup} says, with the code if there is one.
 2. Read the paper's versions: its agent page is its address with \`/agent\` in front, and "Record a paper's versions" on ${start} says how to read and save them.
 3. ${task.find}
 4. Back each with evidence: a forum, an accepted-papers list, a proceedings page. Never guess a decision.
 5. Tell the person what you found, and save it only once they agree.
-`);
+`,
+  );
 }

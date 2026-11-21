@@ -19,7 +19,6 @@ const ASK: Record<Missing, { question: string; title: string }> = {
   submission: { question: 'Missing a submission?', title: 'Add a missing submission' },
 };
 
-
 export function AddMissing({
   what,
   paperPath,
@@ -35,15 +34,14 @@ export function AddMissing({
   const ask = ASK[what];
   const show = async () => {
     const origin = window.location.origin;
-    const paper = origin + paperPath;
-    setPrompt(addPrompt(origin, what, paper));
+    setPrompt(addPrompt(origin, what, paperPath));
     setOpen(true);
     // A signed-in reader's prompt carries a one-time sign-in code for the agent, as `OnboardAgent`'s does.
     try {
       const res = await fetch('/api/v1/me/agent-code', { method: 'POST' });
       if (res.ok) {
         const { code } = (await res.json()) as { code?: string };
-        if (code) setPrompt(addPrompt(origin, what, paper, code));
+        if (code) setPrompt(addPrompt(origin, what, paperPath, code));
       }
     } catch {
       // Signed out, or offline: the agent asks for an email instead (`/agent/start`).

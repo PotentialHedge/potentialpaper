@@ -1,5 +1,6 @@
 'use client';
 
+import { pluginPrompt } from '@/lib/agent-prompt';
 import Link from 'next/link';
 import { type FormEvent, useEffect, useMemo, useState, useSyncExternalStore } from 'react';
 import { CopyField } from '@/components/CopyField';
@@ -100,10 +101,7 @@ export function PluginsSettings() {
 
       <section className="mb-8">
         <h3 className="mb-2 font-serif text-lg font-normal">Build one with your agent</h3>
-        <CopyField
-          value={`Read ${origin || ''}/plugins.md and help me build a PotentialPaper plugin.`}
-          label="Prompt for your AI agent"
-        />
+        <CopyField value={pluginPrompt(origin || '')} label="Prompt for your AI agent" />
       </section>
       {note && <p className={`${ui.note(note.ok)} mb-3 whitespace-pre-line`}>{note.text}</p>}
 

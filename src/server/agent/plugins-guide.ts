@@ -1,4 +1,5 @@
 import { KINDS, PAGE_KINDS } from '@/lib/kinds';
+import { pluginPrompt } from '@/lib/agent-prompt';
 import { API_VERSION, PERMISSIONS, PERMISSION_NAMES } from '@/lib/plugins/manifest';
 import { SDK_BASE } from '@/lib/plugins/origin';
 import {
@@ -17,7 +18,7 @@ import { MAX_PLUGIN_BYTES, MAX_PLUGIN_FILE_BYTES, MAX_PLUGIN_FILES } from '../pl
 
 /**
  * `/plugins.md` (`handoffs/plugins.md` Phase 3): how to build, try and publish a PotentialPaper plugin, written for
- * agents (a person's README says "Read https://…/plugins.md and build me a PotentialPaper plugin."). The tables of
+ * agents (a person's README says "Follow https://…/plugins.md for a new PotentialPaper plugin.", `pluginPrompt`). The tables of
  * permissions, RPC methods and `when` keys are made from the code, so they can't drift from what the host does.
  */
 
@@ -113,7 +114,7 @@ export function pluginsGuide(origin: string): string {
 
   return `# Building a PotentialPaper plugin
 
-> Read ${origin}/plugins.md and build me a PotentialPaper plugin.
+> ${pluginPrompt(origin)}
 
 A PotentialPaper plugin adds panels to pages on ${origin}: a paper, a venue, a topic, an organisation or a person.
 It is an HTML page plus a manifest, \`${MANIFEST_FILE}\`, in a public GitHub repo. Readers find it under
