@@ -44,6 +44,13 @@
   }
   /* `InstitutionStrip`: the doubled row slides by one copy, then repeats. Its duration is set per name there. */
   --animate-marquee: marquee 60s linear infinite;
+  /* A `SheetContent` on a phone: slides up from the bottom edge. */
+  --animate-sheet-up: sheet-up 0.25s ease-out;
+  @keyframes sheet-up {
+    from {
+      transform: translateY(100%);
+    }
+  }
   @keyframes marquee {
     to {
       transform: translateX(-50%);

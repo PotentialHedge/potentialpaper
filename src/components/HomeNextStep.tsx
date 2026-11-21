@@ -1,7 +1,8 @@
 'use client';
 
-import Link from 'next/link';
 import { useEffect, useState } from 'react';
+import type { TutorialExample } from './GettingStarted';
+import { GettingStartedSheet } from './GettingStartedSheet';
 import { OnboardAgent } from './OnboardAgent';
 import { ui } from './ui';
 
@@ -9,10 +10,10 @@ type Seen = { profileComplete: boolean; hasAgent: boolean } | null;
 
 /**
  * The home page's one next step for the viewer, learned after load since the page is the same HTML for
- * everyone (DESIGN.md §2): getting started until they have finished it, then onboarding their agent, then
+ * everyone (DESIGN.md §2): getting started (a sheet, `GettingStartedSheet`) until they have finished it, then onboarding their agent, then
  * nothing once an agent holds a token for them.
  */
-export function HomeNextStep() {
+export function HomeNextStep({ example, host }: { example?: TutorialExample; host: string }) {
   const [seen, setSeen] = useState<Seen | undefined>(undefined);
 
   useEffect(() => {
@@ -32,9 +33,7 @@ export function HomeNextStep() {
       {seen?.profileComplete ? (
         <OnboardAgent className={`text-base font-semibold ${ui.linkBtn}`} />
       ) : (
-        <Link href="/welcome" className="text-base font-semibold text-accent">
-          [getting started]
-        </Link>
+        <GettingStartedSheet example={example} host={host} signedIn={seen !== null} />
       )}
     </div>
   );

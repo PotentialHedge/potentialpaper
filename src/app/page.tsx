@@ -2,6 +2,7 @@ import { cookies, headers } from 'next/headers';
 import Link from 'next/link';
 import { Announcements } from '@/components/Announcements';
 import { Collapsible } from '@/components/Collapsible';
+import type { TutorialExample } from '@/components/GettingStarted';
 import { HomeNextStep } from '@/components/HomeNextStep';
 import { InstitutionStrip } from '@/components/InstitutionStrip';
 import { redirect } from 'next/navigation';
@@ -21,6 +22,7 @@ import { normalizeSearch, SEARCH_MAX_LENGTH, SEARCH_SORTS, type SearchSort } fro
 import { institutionNames } from '@/server/affiliations';
 import { currentAnnouncements } from '@/server/announcements';
 import { viewerFromHeaders } from '@/server/auth';
+import { siteUrl } from '@/server/site';
 import { SEARCH_PAGE_SIZE, searchPapers, topVenues, type SearchFilter, type SearchHit } from '@/server/search';
 
 export const dynamic = 'force-dynamic';
@@ -37,6 +39,12 @@ const MINE_COOKIE = 'home_mine_open';
 /** Same for the "Following" section; `?fpage=` pages it. */
 const FOLLOWING_PAGE = 10;
 const FOLLOWING_COOKIE = 'home_following_open';
+
+/** The getting-started tour's example: the first listed paper with a short title and named authors. */
+function tutorialExample(hits: SearchHit[]): TutorialExample | undefined {
+  const hit = hits.find((h) => h.authors.length > 0 && !/^anonymous/i.test(h.authors[0]) && h.title.length <= 90);
+  return hit && { title: hit.title, authors: hit.authors };
+}
 
 function one(v: string | string[] | undefined): string | undefined {
   return Array.isArray(v) ? v[0] : v;
@@ -162,7 +170,7 @@ export default async function Home({
         <InstitutionStrip names={institutions} />
         {!q && (
           <div className="mx-auto mt-5 max-w-[min(680px,85%)] text-[14px] leading-[1.55]">
-            <HomeNextStep />
+            <HomeNextStep example={tutorialExample(all.hits)} host={new URL(siteUrl()).host} />
             <h2 className={`${ui.boxHeading} text-center`}>Abstract</h2>
             <p className="text-justify hyphens-auto">
               PotentialPaper gives each research paper one page that verified researchers can edit. Its authors keep a

@@ -18,7 +18,7 @@ import { rememberPending } from '@/lib/pending-confirmation';
 import { authHref, VERIFY_EMAIL } from '@/lib/return-to';
 
 /** Getting started's steps, in order, one a page (`components/GettingStarted.tsx`). */
-const TOUR = ['one', 'two', 'three', 'agent'] as const;
+const TOUR = ['open', 'read', 'link'] as const;
 type TourStep = (typeof TOUR)[number];
 
 /** `agent-prompt` is the agent screen past the tour's last step, reached only by "Onboard my agent". */
@@ -26,11 +26,20 @@ type Step = 'intro' | TourStep | 'agent-prompt' | 'email';
 const STEPS: Step[] = ['intro', ...TOUR, 'agent-prompt', 'email'];
 
 /**
- * Getting started, after acceptodds': an intro, a short tour whose last step offers an AI agent instead,
+ * Getting started, after acceptodds': an intro, a three-step tour whose last step offers an AI agent instead,
  * then sign-up. One step on screen at a time (`OnboardingCard`), in the URL as `?step=` so the back button
  * works.
  */
-export function Welcome({ next, institutionCount }: { next: string; institutionCount: number }) {
+export function Welcome({
+  next,
+  institutionCount,
+  host,
+}: {
+  next: string;
+  institutionCount: number;
+  /** This site's domain, for the tour's address trick. */
+  host: string;
+}) {
   const params = useSearchParams();
   const asked = params.get('step') as Step | null;
   const step: Step = asked && STEPS.includes(asked) ? asked : 'intro';
@@ -71,12 +80,11 @@ export function Welcome({ next, institutionCount }: { next: string; institutionC
         </>,
       );
 
-    case 'one':
-    case 'two':
-    case 'three':
-    case 'agent': {
+    case 'open':
+    case 'read':
+    case 'link': {
       const at = TOUR.indexOf(step);
-      const tour = tutorialSteps();
+      const tour = tutorialSteps({ host });
       const last = at === TOUR.length - 1;
       return card(
         `${at + 1}. ${tour[at].title}`,

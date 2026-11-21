@@ -6,35 +6,63 @@ import { ui } from './ui';
 /** One step of getting started: an illustration, if it has one, and its text. */
 export type TutorialStep = { title: string; art?: ReactNode; body: ReactNode; fine?: ReactNode };
 
-/**
- * Getting started's steps, after acceptodds': a few about the site, then an AI agent instead, whose button
- * (`OnboardAgentButton`) the last step shows under its own, leading to one more screen
- * (`agentPromptStep`) that copies the prompt. Shown one step a page by `/welcome`.
- *
- * TODO: the first steps are placeholders, to be written.
- */
-export function tutorialSteps(): TutorialStep[] {
-  return [
-    { title: 'Step one', body: <>To be written.</> },
-    { title: 'Step two', body: <>To be written.</> },
-    { title: 'Step three', body: <>To be written.</> },
-    agentStep(),
-  ];
-}
+/** A real paper the illustrations are drawn from, so the tour shows the site's own content. */
+export type TutorialExample = { title: string; authors: string[] };
 
-/** The last step: an AI agent instead. Its button, which copies the prompt, sits under the step's own. */
-function agentStep(): TutorialStep {
-  return {
-    title: '[optional] onboard your agent',
-    art: <AgentSketch />,
-    body: (
-      <>
-        Put your agent to work on the papers you care about: it reads them, checks their results and compares notes with
-        other agents on each paper&apos;s agent page. Paste a prompt into your AI agent: it signs in with a code we
-        email you.
-      </>
-    ),
-  };
+/** The paper the illustrations fall back on when there is no example. */
+const FALLBACK: TutorialExample = {
+  title: 'Attention Is All You Need',
+  authors: ['Ashish Vaswani', 'Noam Shazeer', 'Niki Parmar', 'Jakob Uszkoreit'],
+};
+
+/**
+ * Getting started's steps, after acceptodds': three about the site: open a paper, read both sections, link papers.
+ * The last one offers an AI agent instead, with a second button (`OnboardAgentButton`) under its own, leading to one
+ * more screen (`agentPromptStep`) that copies the prompt. Shown as a sheet by `GettingStartedSheet` and one step a
+ * page by `/welcome`. `host` is this site's, for the address trick.
+ */
+export function tutorialSteps({
+  example = FALLBACK,
+  host,
+  signedIn = false,
+}: {
+  example?: TutorialExample;
+  host: string;
+  signedIn?: boolean;
+}): TutorialStep[] {
+  return [
+    {
+      title: 'Open any paper',
+      art: <AddressSketch host={host} />,
+      body: (
+        <>
+          Every paper has a page here. In any arXiv link, change <span className={ui.mono}>arxiv.org</span> to{' '}
+          <span className={`${ui.mono} text-ink`}>{host}</span>.
+        </>
+      ),
+    },
+    {
+      title: 'Read what researchers say',
+      art: <PageSketch example={example} />,
+      body: (
+        <>
+          Its authors keep one section. Verified researchers write the other: summaries, critique and reproductions.
+          Every change is a git commit.
+        </>
+      ),
+    },
+    {
+      title: 'Say how papers connect',
+      art: <LinksSketch example={example} />,
+      body: signedIn ? (
+        <>Link papers that extend, replicate or contradict each other, with your name on each link.</>
+      ) : (
+        <>
+          Link papers that extend, replicate or contradict each other. Sign up with your institutional email to write.
+        </>
+      ),
+    },
+  ];
 }
 
 /**
@@ -88,6 +116,118 @@ export function TutorialText({ step }: { step: TutorialStep }) {
       <p className="mt-3 text-base leading-relaxed text-subtle">{step.body}</p>
       {step.fine && <p className="mt-4 text-xs text-muted">{step.fine}</p>}
     </>
+  );
+}
+
+/** Shown at the size the illustrations are set in, and never wider than the sheet. */
+const SKETCH = 'w-80 max-w-full shadow-lg';
+
+/** "A, B, C et al.", as the home list names authors. */
+function authorLine(names: string[]): string {
+  return names.length > 3 ? `${names.slice(0, 3).join(', ')} et al.` : names.join(', ');
+}
+
+/** A blank line of text, as a sketch draws what it does not spell out. */
+function Blank({ w }: { w: string }) {
+  return <span className={`block h-2 ${w} bg-rule-soft`} />;
+}
+
+/** Two browser address bars: arXiv's address, then the same address on this site, which opens its page. */
+function AddressSketch({ host }: { host: string }) {
+  const bar = (children: ReactNode, live: boolean) => (
+    <div
+      className={`flex items-center gap-2 rounded-full border px-3 py-1.5 font-mono text-[12px] ${live ? 'border-frame bg-card text-ink' : 'border-rule bg-rule-soft/60 text-muted'}`}
+    >
+      <span className={`size-2 shrink-0 rounded-full ${live ? 'bg-up' : 'bg-rule-strong'}`} />
+      <span className="truncate">{children}</span>
+    </div>
+  );
+  return (
+    <div className={`${SKETCH} -rotate-1 space-y-3 border border-frame bg-card p-4 shadow-lg`}>
+      {bar(
+        <>
+          <span className="line-through decoration-accent decoration-2">arxiv.org</span>/abs/1706.03762
+        </>,
+        false,
+      )}
+      <div className="text-center text-lg leading-none text-accent">↓</div>
+      {bar(
+        <>
+          <span className="rounded-sm bg-highlight px-0.5 font-semibold">{host}</span>/abs/1706.03762
+        </>,
+        true,
+      )}
+      <div className="space-y-1.5 pt-1">
+        <span className="block font-serif text-sm text-ink">Attention Is All You Need</span>
+        <Blank w="w-3/4" />
+      </div>
+    </div>
+  );
+}
+
+/** A paper's page: its title, then the authors' section and the community's, each with a few lines. */
+function PageSketch({ example }: { example: TutorialExample }) {
+  return (
+    <div className={`${SKETCH} rotate-1 border border-frame bg-card px-4 pt-3 pb-4`}>
+      <span className="line-clamp-2 font-serif text-[15px] leading-snug text-ink">{example.title}</span>
+      {example.authors.length > 0 && (
+        <span className="mt-0.5 block truncate text-xs text-muted">{authorLine(example.authors)}</span>
+      )}
+      <div className="mt-3 border-l-2 border-ink pl-2.5">
+        <div className={`${ui.runIn} text-[13px]`}>
+          From the authors <span className={ui.badge}>authors</span>
+        </div>
+        <div className="mt-1.5">
+          <Blank w="w-5/6" />
+        </div>
+      </div>
+      <div className="mt-3 border-l-2 border-accent pl-2.5">
+        <div className={`${ui.runIn} text-[13px]`}>Community</div>
+        {[
+          ['Summary', 'ada', 'Cambridge'],
+          ['Reproduction', 'alan', 'MIT'],
+        ].map(([what, who, where]) => (
+          <div key={what} className="mt-1.5">
+            <div className="text-xs text-ink">
+              {what} <span className="text-muted">· {who}</span>
+              <span className={ui.badge}>{where}</span>
+            </div>
+            <div className="mt-1">
+              <Blank w="w-11/12" />
+            </div>
+          </div>
+        ))}
+      </div>
+    </div>
+  );
+}
+
+/** The paper's "What links here": labeled links from two other papers, one of them contested. */
+function LinksSketch({ example }: { example: TutorialExample }) {
+  const link = (label: string, tone: string, note?: string) => (
+    <div className="flex items-start gap-2">
+      <span className="text-xs text-muted">←</span>
+      <div className="min-w-0 flex-1">
+        <span className="flex items-center gap-2">
+          <span className={`shrink-0 rounded-[3px] px-1.5 text-[11px] font-semibold ${tone}`}>{label}</span>
+          <span className="flex-1">
+            <Blank w="w-full" />
+          </span>
+        </span>
+        {note && <span className="mt-1 block text-[11px] text-subtle italic">“{note}”</span>}
+      </div>
+    </div>
+  );
+  return (
+    <div className={`${SKETCH} -rotate-2 border border-frame bg-card px-4 pt-3 pb-5`}>
+      <span className="line-clamp-1 font-serif text-sm text-ink">{example.title}</span>
+      <div className={`${ui.runIn} mt-2 text-[13px]`}>What links here</div>
+      <div className="mt-2 space-y-2.5">
+        {link('extended by', 'bg-tint text-ink')}
+        {link('replicated by', 'bg-up/10 text-up')}
+        {link('contradicted by', 'bg-down/10 text-down', 'The gain vanishes with a tuned baseline.')}
+      </div>
+    </div>
   );
 }
 
