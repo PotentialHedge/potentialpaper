@@ -333,7 +333,7 @@ export const manifestSchema = z
           .meta({ description: 'Its settings, in settings.json as "<plugin id>.<name>".' }),
         actions: z.array(actionSchema).max(4).default([]).meta({
           description:
-            "Actions under a page's title, beside cite and share, each opening a popover with a frame of its own. Readers arrange and hide them in settings (actions.order, actions.hidden).",
+            "Actions under a page's title, beside cite and share, each opening a popover with a frame of its own. Readers arrange and hide them in settings (<kind>.actions.order, <kind>.actions.hidden).",
         }),
         commands: z
           .array(commandSchema)

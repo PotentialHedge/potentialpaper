@@ -68,8 +68,11 @@ export function useSettingItems() {
       ...coreItems((list) =>
         list === 'navbar'
           ? pluginNavItems(plugins).map((i) => ({ value: i.id, label: `${i.title} (${i.plugin})` }))
-          : list === 'actions'
-            ? pluginActions(plugins).map((a) => ({ value: a.id, label: `${a.title} (${a.plugin})` }))
+          : list.endsWith('.actions')
+            ? pluginActions(plugins, { kind: list.split('.')[0] as PanelKind }).map((a) => ({
+                value: a.id,
+                label: `${a.title} (${a.plugin})`,
+              }))
             : pluginPanelChoices(plugins, list.split('.')[0] as PanelKind),
       ),
       ...withPages.flatMap((p) => pluginItems(p.plugin!.id, p.plugin!.manifest.contributes.settings)),

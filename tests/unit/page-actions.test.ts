@@ -60,12 +60,15 @@ describe('page actions', () => {
     expect(manifest([{ id: 'a', title: 'a', kinds: ['paper'], when: '&&' }]).errors).toHaveLength(1);
   });
 
-  it('checks actions.order and actions.hidden', () => {
-    expect(checkSettings('{ "actions.order": ["o/tr.translate", "share"], "actions.hidden": ["cite"] }')).toEqual([]);
-    expect(checkSettings('{ "actions.hidden": ["nope"] }').some((p) => p.severity === 'error')).toBe(true);
-    expect(resolveSettings({ user: { 'actions.order': ['history', 'nope', 'history'] } })['actions.order']).toEqual([
-      'history',
-    ]);
+  it("checks each kind's actions.order and actions.hidden, against that kind's actions", () => {
+    expect(
+      checkSettings('{ "paper.actions.order": ["o/tr.translate", "share"], "paper.actions.hidden": ["cite"] }'),
+    ).toEqual([]);
+    expect(checkSettings('{ "paper.actions.hidden": ["nope"] }').some((p) => p.severity === 'error')).toBe(true);
+    expect(checkSettings('{ "venue.actions.hidden": ["cite"] }').some((p) => p.severity === 'error')).toBe(true);
+    expect(
+      resolveSettings({ user: { 'paper.actions.order': ['history', 'nope', 'history'] } })['paper.actions.order'],
+    ).toEqual(['history']);
   });
 });
 

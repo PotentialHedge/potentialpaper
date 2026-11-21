@@ -22,8 +22,8 @@ const SECONDARY = 'cursor-pointer text-muted hover:text-ink hover:underline';
 
 /**
  * The actions under a page's title, on every kind (`lib/page-actions.ts`): edit, share, history, on a paper also
- * cite, follow and the page for agents, and installed plugins' actions. The reader's `actions.order` and
- * `actions.hidden` arrange them; the first few are in the bar and the rest in its "⋯" menu. A client island for the
+ * cite, follow and the page for agents, and installed plugins' actions. The reader's `<kind>.actions.order` and
+ * `.hidden` arrange them; the first few are in the bar and the rest in its "⋯" menu. A client island for the
  * BibTeX's clipboard, the Edit dialog, the reader's settings and plugins. Plugins and settings are known only once
  * fetched, so the bar starts in its usual order.
  */
@@ -44,9 +44,10 @@ export function PageActions({
   /** A paper's own: its BibTeX, the paper to follow, and its page for AI agents. */
   paper?: { id: PaperId; bibtex: string; agentPath: string };
 }) {
-  const order = useSetting<string[] | undefined>('actions.order') ?? [];
-  const hidden = useSetting<string[] | undefined>('actions.hidden') ?? [];
   const page = usePluginPage();
+  const kind = page?.kind ?? (paper ? 'paper' : null);
+  const order = useSetting<string[] | undefined>(`${kind}.actions.order`) ?? [];
+  const hidden = useSetting<string[] | undefined>(`${kind}.actions.hidden`) ?? [];
   const { plugins, viewer } = usePlugins(page ? page.page.identifier : null);
 
   const actions = new Map<string, ReactNode>();

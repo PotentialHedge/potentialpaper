@@ -107,12 +107,6 @@ export const CATEGORIES: Category[] = [
     description: 'Which links the bar at the top shows, and in what order.',
     section: 'Pages',
   },
-  {
-    id: 'actions',
-    title: 'Page actions',
-    description: "Which actions show under a page's title, and in what order.",
-    section: 'Pages',
-  },
   ...PANEL_KINDS.map((kind): Category => ({
     id: KIND_CATEGORY[kind],
     title: kind === 'user' ? "People's pages" : `${KINDS[kind].title} pages`,
@@ -137,7 +131,6 @@ function coreCategory(key: string, setting: CoreSetting): string | null {
   if (setting.siteOnly || setting.group === 'Plugins') return null;
   if (setting.group === USER_PAGE_GROUP) return 'public-page';
   if (key.startsWith('navbar.')) return 'navbar';
-  if (key.startsWith('actions.')) return 'actions';
   const kind = key.split('.')[0] as PanelKind;
   return PANEL_KINDS.includes(kind) ? KIND_CATEGORY[kind] : null;
 }
@@ -158,22 +151,22 @@ function coreControl(setting: CoreSetting, extra: Choice[]): Control {
 
 /**
  * The list a setting arranges, for settings drawn as an order with a switch per item: `<kind>.panels` for a kind's
- * panels, `navbar` for the navbar's links, `actions` for the actions under a page's title. `null` for any other
- * setting.
+ * panels, `navbar` for the navbar's links, `<kind>.actions` for the actions under the title of a kind's pages. `null`
+ * for any other setting.
  */
 export function arrangedList(key: string): string | null {
   const m = /^(.+)\.(order|hidden)$/.exec(key);
   if (!m) return null;
   const [, prefix] = m;
-  if (prefix === 'navbar' || prefix === 'actions') return prefix;
+  if (prefix === 'navbar') return prefix;
   const kind = prefix.split('.')[0] as PanelKind;
-  return PANEL_KINDS.includes(kind) && prefix === `${kind}.panels` ? prefix : null;
+  return PANEL_KINDS.includes(kind) && (prefix === `${kind}.panels` || prefix === `${kind}.actions`) ? prefix : null;
 }
 
 /**
  * The core settings the form shows, in order. `pluginChoices` adds installed plugins' items to an arranged list
  * (`arrangedList`): their panels to a kind's panels (`pluginPanelChoices`), their pages to the navbar, their actions to
- * the page actions.
+ * a kind's actions.
  */
 export function coreItems(pluginChoices: (list: string) => Choice[] = () => []): SettingItem[] {
   const out: SettingItem[] = [];
@@ -189,22 +182,23 @@ export function coreItems(pluginChoices: (list: string) => Choice[] = () => []):
     const control = coreControl(setting, list ? pluginChoices(list) : []);
     const pageTitle = findCategory(category)?.title.toLowerCase() ?? 'these pages';
     const arranged = list && control.kind === 'rank';
+    const actions = list?.endsWith('.actions') ?? false;
     out.push({
       key,
-      title: !arranged ? setting.title : list === 'navbar' ? 'Links' : list === 'actions' ? 'Actions' : 'Panels',
+      title: !arranged ? setting.title : list === 'navbar' ? 'Links' : actions ? 'Actions' : 'Panels',
       description: !arranged
         ? setting.description
         : list === 'navbar'
           ? 'Drag to reorder the links, and switch one off to leave it out.'
-          : list === 'actions'
-            ? `Drag to reorder the actions, and switch one off to leave it out. The first ${BAR_SIZE} shown are in the bar, the rest in its ⋯ menu. Cite, follow and for agents are on papers only.`
+          : actions
+            ? `Drag to reorder the actions under the title, and switch one off to leave it out. The first ${BAR_SIZE} shown are in the bar, the rest in its ⋯ menu.`
             : `Drag to reorder the panels within each part of ${pageTitle}, and switch one off to leave it out. A plugin's panel can also be moved to another part.`,
       category,
       control: arranged
         ? {
             ...control,
             toggleKey: `${list}.hidden`,
-            ...(list === 'actions' ? { menuAfter: BAR_SIZE } : list !== 'navbar' && { placeKey: `${list}.placement` }),
+            ...(actions ? { menuAfter: BAR_SIZE } : list !== 'navbar' && { placeKey: `${list}.placement` }),
           }
         : control,
       fallback: setting.default,

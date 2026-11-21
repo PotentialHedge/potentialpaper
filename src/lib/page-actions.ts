@@ -5,8 +5,8 @@ import { whenHolds, type WhenContext } from './plugins/when';
 
 /**
  * The actions under a page's title (`components/pages/PageActions.tsx`): the site's own (`PAGE_ACTIONS`) and those
- * installed plugins offer (`contributes.actions`, `<plugin id>.<action id>`). A reader hides (`actions.hidden`) or
- * reorders (`actions.order`) them in settings, as they do the navbar's links (`lib/nav.ts`). The first `BAR_SIZE`
+ * installed plugins offer (`contributes.actions`, `<plugin id>.<action id>`). A reader hides (`<kind>.actions.hidden`)
+ * or reorders (`<kind>.actions.order`) them for each kind of page in settings, as they do the navbar's links. The first `BAR_SIZE`
  * shown are in the bar; the rest are in its "⋯" menu.
  *
  * **Ids are stable.** They are what people's settings name.
@@ -28,7 +28,10 @@ export const PAGE_ACTIONS: ActionInfo[] = [
   { id: 'agents', title: 'for agents', kinds: ['paper'] },
 ];
 
-export const ACTION_IDS = PAGE_ACTIONS.map((a) => a.id);
+/** The site's actions on a kind's pages. */
+export function actionsOf(kind: PageKind): ActionInfo[] {
+  return PAGE_ACTIONS.filter((a) => !a.kinds || a.kinds.includes(kind));
+}
 
 /** How many actions the bar shows before the rest go in its menu. */
 export const BAR_SIZE = 4;
@@ -46,11 +49,11 @@ export interface PluginAction {
 
 /**
  * The actions installed plugins offer, once each: those whose plugin runs or waits for the reader's approval. With
- * `on`, only those for that kind of page whose `when` holds there.
+ * `on`, only those for that kind of page, and with its `context`, only those whose `when` holds there.
  */
 export function pluginActions(
   plugins: readonly Pick<InstalledPlugin, 'plugin' | 'status'>[],
-  on?: { kind: PageKind; context: WhenContext },
+  on?: { kind: PageKind; context?: WhenContext },
 ): PluginAction[] {
   const out: PluginAction[] = [];
   const seen = new Set<string>();
@@ -59,7 +62,8 @@ export function pluginActions(
     for (const action of plugin.manifest.contributes.actions ?? []) {
       const id = `${plugin.id}.${action.id}`;
       if (seen.has(id)) continue;
-      if (on && (!action.kinds.includes(on.kind) || !whenHolds(action.when, on.context))) continue;
+      if (on && !action.kinds.includes(on.kind)) continue;
+      if (on?.context && !whenHolds(action.when, on.context)) continue;
       seen.add(id);
       out.push({ id, action: action.id, title: action.title, pluginId: plugin.id, plugin: plugin.manifest.name });
     }

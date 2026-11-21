@@ -10,7 +10,7 @@ export const dynamic = 'force-dynamic';
 const UPDATES: { date: string; text: string }[] = [
   {
     date: '2026-11-21',
-    text: "The actions under a page's title are arranged in settings: `actions.order` and `actions.hidden` (`cite`, `edit`, `follow`, `share`, `history`, `agents`, and plugins' actions as `<plugin id>.<action id>`). The first four shown are in the bar, the rest in its ⋯ menu. A plugin offers an action with `contributes.actions` in its manifest (see `/plugins.md`). A paper's abstract is now rendered as Markdown with TeX.",
+    text: "The actions under a page's title are arranged in settings, for each kind of page: `<kind>.actions.order` and `<kind>.actions.hidden` (`edit`, `share`, `history`, on papers also `cite`, `follow` and `agents`, and plugins' actions as `<plugin id>.<action id>`). The first four shown are in the bar, the rest in its ⋯ menu. A plugin offers an action with `contributes.actions` in its manifest (see `/plugins.md`). A paper's abstract is now rendered as Markdown with TeX.",
   },
   {
     date: '2026-11-18',
