@@ -1,14 +1,13 @@
 'use client';
 
+import { usePathname } from 'next/navigation';
 import { useEffect, useState } from 'react';
+import { authHref } from '@/lib/return-to';
 import { EyeIcon, WITH_ICON } from './icons';
 
 /** The page this tab showed last, for `from`: after this long, the next page is not "next". */
 const LAST_PAGE_KEY = 'pp:lastPage';
 const LAST_PAGE_MS = 30 * 60_000;
-
-/** Below this many views the count is not shown: a handful reads as neglect, not information. */
-const MIN_SHOWN_VIEWS = 10;
 
 interface LastPage {
   id: string;
@@ -76,11 +75,13 @@ function reportTimeOnPage(pageId: string): () => void {
  * page served from the cache still counts and a crawler that runs no script does not. Sent with the session cookie,
  * so a signed-in reader counts as their account rather than as their network. The page is the same cached HTML for
  * everyone, so the count is the one the beacon returns. Also names the page this tab showed before (`from`), which
- * the server keeps only as a total per pair. Shown to everyone, as acceptodds does; under `MIN_SHOWN_VIEWS` it still
- * counts, but shows nothing.
+ * the server keeps only as a total per pair. Under the server's `MIN_SHOWN_VIEWS` it still counts, but shows
+ * nothing. The number is for signed-in readers: anyone else sees it blurred, a stand-in the server never filled in,
+ * with a link to sign in.
  */
 export function ViewCount({ pageId, className = 'text-muted' }: { pageId: string; className?: string }) {
-  const [views, setViews] = useState<number | null>(null);
+  const pathname = usePathname();
+  const [state, setState] = useState<{ views: number | null; shown: boolean } | null>(null);
 
   useEffect(() => {
     const abort = new AbortController();
@@ -93,8 +94,8 @@ export function ViewCount({ pageId, className = 'text-muted' }: { pageId: string
       signal: abort.signal,
     })
       .then((res) => (res.ok ? res.json() : null))
-      .then((body: { views?: number } | null) => {
-        if (typeof body?.views === 'number') setViews(body.views);
+      .then((body: { views?: number | null; shown?: boolean } | null) => {
+        if (typeof body?.shown === 'boolean') setState({ views: body.views ?? null, shown: body.shown });
       })
       .catch(() => {});
     return () => abort.abort();
@@ -102,7 +103,29 @@ export function ViewCount({ pageId, className = 'text-muted' }: { pageId: string
 
   useEffect(() => reportTimeOnPage(pageId), [pageId]);
 
-  if (views === null || views < MIN_SHOWN_VIEWS) return null;
+  if (!state?.shown) return null;
+  const { views } = state;
+  if (views === null) {
+    return (
+      <a
+        href={authHref('/signin', pathname)}
+        aria-label="Sign in to see page views"
+        className={`group relative no-underline ${WITH_ICON} ${className} hover:text-ink`}
+      >
+        <EyeIcon />
+        <span className="font-mono blur-[3px] select-none" aria-hidden>
+          0,000
+        </span>{' '}
+        views
+        <span
+          role="tooltip"
+          className="pointer-events-none absolute top-full left-1/2 z-10 mt-1 -translate-x-1/2 border border-frame bg-card px-2 py-1 text-xs whitespace-nowrap text-ink opacity-0 shadow-sm transition-opacity group-hover:opacity-100 group-focus-visible:opacity-100"
+        >
+          Sign in to see page views
+        </span>
+      </a>
+    );
+  }
   return (
     <span className={`${WITH_ICON} ${className}`}>
       <EyeIcon />

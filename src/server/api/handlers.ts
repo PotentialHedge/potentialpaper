@@ -98,7 +98,7 @@ import {
   topicOverview,
   topicSuggestionList,
 } from '../topic-pages';
-import { countTransition, countView, transitionCounts } from '../view-counter';
+import { countTransition, countView, MIN_SHOWN_VIEWS, transitionCounts } from '../view-counter';
 import { countInstitution, countTime, pageAnalytics } from '../page-analytics';
 import { ApiError } from './errors';
 import {
@@ -586,7 +586,8 @@ export const deleteFollow = route(async (req) => {
 /**
  * Counts the caller as a viewer of the page today (`server/view-counter.ts`): every page's beacon. Sent with the
  * session cookie, so a signed-in reader counts as their account, anyone else as their network. `from`, the page this
- * tab read just before, is counted as a transition; a stale or mangled one never costs the view.
+ * tab read just before, is counted as a transition; a stale or mangled one never costs the view. Answers the count
+ * to a signed-in caller only.
  */
 export const postView = route(async (req) => {
   const principal = await authenticate(req);
@@ -597,7 +598,8 @@ export const postView = route(async (req) => {
   const fromId = S.IdParam.safeParse(from);
   if (fromId.success) await countTransition(fromId.data, page, viewer);
   if (principal) await countInstitution(page, principal.account.id);
-  return respond(S.ViewState, { views }, { principal });
+  // The number is for signed-in readers; anyone else learns only whether there is one to sign in for.
+  return respond(S.ViewState, { views: principal ? views : null, shown: views >= MIN_SHOWN_VIEWS }, { principal });
 });
 
 /**

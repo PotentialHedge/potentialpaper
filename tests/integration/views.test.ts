@@ -38,9 +38,10 @@ const view = (ip: string, opts: { cookie?: string; page?: string; from?: string 
 describe('POST /views', () => {
   it('counts a visitor once a day, and a different visitor again', async () => {
     const id = (pageId = await paper());
-    expect((await view('203.0.113.1')).body).toEqual({ views: 1 });
-    expect((await view('203.0.113.1')).body).toEqual({ views: 1 });
-    expect((await view('203.0.113.2')).body).toEqual({ views: 2 });
+    const reader = await signUp('reader@ethz.ch');
+    expect((await view('203.0.113.1')).body).toEqual({ views: null, shown: false });
+    expect((await view('203.0.113.1')).body).toEqual({ views: null, shown: false });
+    expect((await view('203.0.113.2', { cookie: reader })).body).toEqual({ views: 2, shown: false });
     const [row] = await getDb().select({ n: pages.viewCount }).from(pages).where(eq(pages.id, id));
     expect(row.n).toBe(2);
   });
@@ -49,7 +50,9 @@ describe('POST /views', () => {
     pageId = await paper();
     await view('2001:db8:1:2::1');
     await view('2001:db8:1:2:ffff:ffff:ffff:ffff');
-    expect((await view('2001:db8:1:3::1')).body.views).toBe(2);
+    await view('2001:db8:1:3::1');
+    const [row] = await getDb().select({ n: pages.viewCount }).from(pages).where(eq(pages.id, pageId));
+    expect(row.n).toBe(2);
   });
 
   it('counts each signed-in account once, apart from its network', async () => {
@@ -78,7 +81,8 @@ describe('POST /views', () => {
 
   it('counts a page of any kind', async () => {
     const venue = await insertPage('venue', 'iclr/2027');
-    expect((await view('203.0.113.1', { page: venue.id })).body).toEqual({ views: 1 });
+    const cookie = await signUp('reader@ethz.ch');
+    expect((await view('203.0.113.1', { page: venue.id, cookie })).body).toEqual({ views: 1, shown: false });
   });
 
   it('counts a transition once a day per visitor and pair, and ignores a bad from', async () => {
@@ -92,6 +96,14 @@ describe('POST /views', () => {
     const rows = await getDb().select().from(pageTransitions);
     expect(rows).toEqual([{ fromPageId: venue.id, toPageId: pageId, count: 2 }]);
     expect(await countTransition('00000000-0000-4000-8000-000000000000', pageId, { ip: '203.0.113.5' })).toBe(false);
+  });
+
+  it('gives the number to signed-in readers only, and says when there are enough to show', async () => {
+    pageId = await paper();
+    for (let i = 1; i < 10; i++) await view(`203.0.113.${i}`);
+    expect((await view('203.0.113.200')).body).toEqual({ views: null, shown: true });
+    const cookie = await signUp('reader@ethz.ch');
+    expect((await view('203.0.113.201', { cookie })).body).toEqual({ views: 11, shown: true });
   });
 });
 

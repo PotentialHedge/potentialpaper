@@ -24,6 +24,9 @@ import { pageSummaries } from './plugins/pages';
  */
 
 /** Who is viewing: the account when there is one, else the client's network. */
+/** Below this many viewers a page's count is not shown: a handful reads as neglect, not information (as acceptodds). */
+export const MIN_SHOWN_VIEWS = 10;
+
 export interface Viewer {
   accountId?: string | null;
   ip: string | null;
