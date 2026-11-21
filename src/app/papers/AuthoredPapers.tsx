@@ -2,7 +2,8 @@
 
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
-import { Fragment, useState, type FormEvent } from 'react';
+import { useState, type FormEvent } from 'react';
+import { Modal } from '@/components/Modal';
 import { ui } from '@/components/ui';
 import type { PaperId } from '@/lib/paper-ids';
 import type { AuthoredPaper, WaitingClaim } from '@/server/my-papers';
@@ -22,8 +23,8 @@ async function messageOf(res: Response): Promise<string> {
 const claimPath = (path: string) => `/claim${path}`;
 
 /**
- * The papers the viewer is an author of, or has claimed, as Table `n`. A confirmed author opens a paper's row to
- * add a co-author, by handle, or to confirm someone waiting on a claim (`POST /api/v1/me/papers/co-authors`).
+ * The papers the viewer is an author of, or has claimed, as Table `n`. A confirmed author opens a modal from a paper's
+ * row to add a co-author, by handle, or to confirm someone waiting on a claim (`POST /api/v1/me/papers/co-authors`).
  */
 export function AuthoredPapers({
   initial: rows,
@@ -35,6 +36,7 @@ export function AuthoredPapers({
   canVouch: boolean;
 }) {
   const [open, setOpen] = useState<string | null>(null);
+  const openRow = rows.find((r) => r.paperId === open);
   return (
     <div className="font-sans text-sm">
       <div className={ui.tableScroll}>
@@ -54,63 +56,56 @@ export function AuthoredPapers({
           <tbody>
             {rows.map((row) => {
               const confirmed = row.mine.status === 'confirmed';
-              const isOpen = open === row.paperId;
               return (
-                <Fragment key={row.paperId}>
-                  <tr className="align-baseline">
-                    <td className={`${ui.td} font-serif`}>
-                      <Link href={row.path}>{row.title}</Link>
-                      {(row.year || row.venue) && (
-                        <div className="font-sans text-xs text-faint">
-                          {[row.venue, row.year].filter(Boolean).join(' ')}
-                        </div>
-                      )}
-                    </td>
-                    <td className={ui.td}>
-                      {row.mine.authorName}
-                      {!confirmed && (
-                        <Link href={claimPath(row.path)} className="hover:no-underline">
-                          <span className={ui.badge}>pending</span>
-                        </Link>
-                      )}
-                    </td>
-                    <td className={ui.td}>
-                      {row.confirmed.length === 0 ? (
-                        <span className="text-muted">none yet</span>
-                      ) : (
-                        row.confirmed.map((c) => c.authorName).join(', ')
-                      )}{' '}
-                      <span className="text-xs whitespace-nowrap text-faint">
-                        ({row.confirmed.length} of {row.authors.length})
-                      </span>
-                    </td>
-                    <td className={`${ui.td} text-right whitespace-nowrap`}>
-                      {confirmed && canVouch && (
-                        <button
-                          type="button"
-                          className={ui.linkBtn}
-                          aria-expanded={isOpen}
-                          onClick={() => setOpen(isOpen ? null : row.paperId)}
-                        >
-                          {isOpen ? 'close' : 'add co-author'}
-                        </button>
-                      )}
-                      {row.waiting.length > 0 && <div className="text-xs text-down">{row.waiting.length} waiting</div>}
-                    </td>
-                  </tr>
-                  {isOpen && (
-                    <tr>
-                      <td colSpan={4} className="bg-card px-3 pt-1 pb-3">
-                        <CoAuthors row={row} />
-                      </td>
-                    </tr>
-                  )}
-                </Fragment>
+                <tr key={row.paperId} className="align-baseline">
+                  <td className={`${ui.td} font-serif`}>
+                    <Link href={row.path}>{row.title}</Link>
+                    {(row.year || row.venue) && (
+                      <div className="font-sans text-xs text-faint">
+                        {[row.venue, row.year].filter(Boolean).join(' ')}
+                      </div>
+                    )}
+                  </td>
+                  <td className={ui.td}>
+                    {row.mine.authorName}
+                    {!confirmed && (
+                      <Link href={claimPath(row.path)} className="hover:no-underline">
+                        <span className={ui.badge}>pending</span>
+                      </Link>
+                    )}
+                  </td>
+                  <td className={ui.td}>
+                    {row.confirmed.length === 0 ? (
+                      <span className="text-muted">none yet</span>
+                    ) : (
+                      row.confirmed.map((c) => c.authorName).join(', ')
+                    )}{' '}
+                    <span className="text-xs whitespace-nowrap text-faint">
+                      ({row.confirmed.length} of {row.authors.length})
+                    </span>
+                  </td>
+                  <td className={`${ui.td} text-right whitespace-nowrap`}>
+                    {confirmed && canVouch && (
+                      <button
+                        type="button"
+                        className={ui.linkBtn}
+                        aria-haspopup="dialog"
+                        onClick={() => setOpen(row.paperId)}
+                      >
+                        add co-author
+                      </button>
+                    )}
+                    {row.waiting.length > 0 && <div className="text-xs text-down">{row.waiting.length} waiting</div>}
+                  </td>
+                </tr>
               );
             })}
           </tbody>
         </table>
       </div>
+      <Modal open={openRow !== undefined} onClose={() => setOpen(null)} title="Add a co-author">
+        {openRow && <CoAuthors key={openRow.paperId} row={openRow} />}
+      </Modal>
       {!canVouch && rows.some((r) => r.mine.status === 'confirmed') && (
         <p className={ui.fine}>
           Adding co-authors needs a confirmed institutional address. <a href="/profile#affiliations">Add one</a>.
@@ -166,10 +161,11 @@ function CoAuthors({ row }: { row: AuthoredRow }) {
   }
 
   return (
-    <div className="max-w-[640px]">
+    <div>
+      <p className="mt-1 mb-3 font-serif text-base">{row.title}</p>
       {row.waiting.length > 0 && (
         <>
-          <h3 className={`${ui.boxHeading} mt-2`}>Waiting to be confirmed</h3>
+          <h3 className={`${ui.boxHeading} mt-3`}>Waiting to be confirmed</h3>
           <ul className="mb-3">
             {row.waiting.map((w) => (
               <li key={w.claimId} className="mb-2">
@@ -195,7 +191,8 @@ function CoAuthors({ row }: { row: AuthoredRow }) {
           </ul>
         </>
       )}
-      <h3 className={`${ui.boxHeading} mt-2`}>Add a co-author</h3>
+      {/* The modal's title says it, unless someone waiting comes first. */}
+      {row.waiting.length > 0 && <h3 className={`${ui.boxHeading} mt-3`}>Add another</h3>}
       {open.length === 0 ? (
         <p className="text-muted">Every author of this paper is confirmed.</p>
       ) : (
@@ -206,7 +203,14 @@ function CoAuthors({ row }: { row: AuthoredRow }) {
           </p>
           <div className="flex flex-wrap items-start gap-x-2 narrow:flex-col narrow:items-stretch">
             <span className="min-w-0 flex-1">
-              <select name="author" defaultValue="" className={ui.input} aria-label="Which author they are" required>
+              <select
+                name="author"
+                defaultValue=""
+                className={ui.input}
+                aria-label="Which author they are"
+                required
+                data-autofocus
+              >
                 <option value="" disabled>
                   Which author they are…
                 </option>
