@@ -73,7 +73,7 @@ export function PageHeader({ eyebrow, title, children }: { eyebrow?: string; tit
   return (
     <>
       {eyebrow && <p className={`${ui.fine} mt-6 text-center font-sans`}>{eyebrow}</p>}
-      <h1 className={`${eyebrow ? 'mt-1' : 'mt-6'} text-center text-[26px] leading-tight font-normal`}>{title}</h1>
+      <h1 className={`${eyebrow ? 'mt-2' : 'mt-6'} text-center text-[26px] leading-tight font-normal`}>{title}</h1>
       {children}
     </>
   );

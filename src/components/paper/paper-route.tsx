@@ -6,7 +6,6 @@ import { buildPanels } from '@/components/pages/common';
 import { PageActions } from '@/components/pages/PageActions';
 import { PageHeader, PageView } from '@/components/pages/PageView';
 import type { PluginPageData } from '@/components/plugins/PluginPage';
-import { ui } from '@/components/ui';
 import { agentPaperPath, canonicalPaperId, paperPath, parsePaperId, type PaperScheme } from '@/lib/paper-ids';
 import { getDb } from '@/db';
 import { pageCurrent, pdfDocuments } from '@/db/schema';
@@ -147,16 +146,16 @@ export async function PaperRoute({ scheme, segments }: { scheme: PaperScheme; se
       panels={buildPanels('paper', PAPER_PANELS, props)}
       header={
         <PageHeader title={paper.title}>
-          <p className="mt-3 text-center">
+          <p className="mt-4 text-center">
             {paper.authors.length > 0 ? (
               paper.authors.join(', ')
             ) : (
               <span className="text-muted italic">Anonymous authors</span>
             )}
           </p>
-          {about && <p className={`${ui.fine} text-center`}>{about}</p>}
+          {about && <p className="mt-2.5 text-center text-xs text-faint">{about}</p>}
           <nav
-            className="mt-1.5 flex flex-wrap justify-center gap-x-3 font-sans text-[13px]"
+            className="mt-2.5 flex flex-wrap justify-center gap-x-3 font-sans text-[13px]"
             aria-label="The paper elsewhere"
           >
             {titleLinks({ ...linkSources, extra: current?.links ?? [] }).map((l, i) => (

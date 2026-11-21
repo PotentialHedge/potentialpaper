@@ -51,7 +51,7 @@ export function ArrangedTabs({
   const byId = new Map(panels.map((p) => [p.id, p]));
   const title = (id: string) => (id === LEAD ? lead!.title : byId.get(id)!.title);
   return (
-    <section className={lead ? 'mt-5' : 'mt-8'}>
+    <section className={lead ? 'mt-6' : 'mt-8'}>
       {tabs.length > 1 && (
         <div role="tablist" className="mb-3 flex gap-4 border-b border-rule font-sans text-sm">
           {tabs.map((id) => (

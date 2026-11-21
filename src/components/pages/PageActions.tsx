@@ -102,7 +102,7 @@ export function PageActions({
 
   const { bar, menu } = arrangeActions([...actions.keys()], hidden, order);
   return (
-    <div className="mt-2 flex flex-col items-center gap-1 font-sans text-[13px]">
+    <div className="mt-4 flex flex-col items-center gap-2 font-sans text-[13px]">
       <div className="flex flex-wrap items-center justify-center gap-x-4 gap-y-1">
         {bar.map((id) => (
           <span key={id} className="contents">
