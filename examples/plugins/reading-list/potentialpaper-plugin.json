@@ -1,0 +1,19 @@
+{
+  "id": "potentialhedge/reading-list",
+  "name": "Reading list",
+  "version": "1.0.0",
+  "apiVersion": 1,
+  "description": "Mark papers to read and jot a line on any of them, from the home page's list; the mark or your line shows in the row. The example of notes on rows.",
+  "author": "PotentialPaper",
+  "main": "index.html",
+  "permissions": ["lists.read"],
+  "contributes": {
+    "rows": {
+      "title": "Reading list",
+      "commands": [
+        { "id": "toggle", "title": "To read / read" },
+        { "id": "note", "title": "Note", "popover": true }
+      ]
+    }
+  }
+}

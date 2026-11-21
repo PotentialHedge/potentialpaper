@@ -14,9 +14,14 @@ import {
   isEnvelope,
   MAX_FRAME_HEIGHT,
   MAX_PAPERS_CHUNK,
+  MAX_ROW_NOTE_TEXT,
+  MAX_ROW_NOTE_TITLE,
+  MAX_ROW_NOTES,
   PAPER_FIELDS,
   PROTOCOL_VERSION,
   resultOf,
+  ROW_NOTE_TONES,
+  type RowNote,
   STORAGE_KEY_RE,
 } from './protocol';
 
@@ -66,6 +71,10 @@ export interface HostServices {
    * address bar without a reload, so what the reader is looking at can be shared. Rejects in a panel.
    */
   setPath(path: string[]): void;
+  /** On a list's frames: set notes on its rows, by paper identifier (`null` removes one). */
+  setRowNotes?(notes: Record<string, RowNote | null>): void;
+  /** A popover's frame: close it. Elsewhere nothing. */
+  close?(): void;
 }
 
 const identifier = z
@@ -119,6 +128,23 @@ const PARAMS: Partial<Record<HostMethod, z.ZodType>> = {
     with: z.array(z.string().min(1).max(200)).max(10).optional(),
   }),
   'signals.forPaper': z.object({ paper: identifier, set: setId.optional() }),
+  'rows.set': z.object({
+    notes: z
+      .record(
+        z
+          .string()
+          .max(400)
+          .refine((text) => parseIdentifier(text)?.kind === 'paper', "not a paper's identifier"),
+        z
+          .object({
+            text: z.string().trim().min(1).max(MAX_ROW_NOTE_TEXT),
+            title: z.string().max(MAX_ROW_NOTE_TITLE).optional(),
+            tone: z.enum(ROW_NOTE_TONES).optional(),
+          })
+          .nullable(),
+      )
+      .refine((notes) => Object.keys(notes).length <= MAX_ROW_NOTES, `at most ${MAX_ROW_NOTES} notes a call`),
+  }),
   'ui.setHeight': z.object({ height: z.number().finite().min(0) }),
   'ui.openUrl': z.object({ url: z.url({ protocol: /^https?$/ }).max(2000) }),
   'ui.setPath': z.object({ path: z.array(z.string().min(1).max(200)).max(10) }),
@@ -185,9 +211,14 @@ const HANDLERS: Record<HostMethod, Handler> = {
   },
   'signals.forPaper': (s, { paper, set }) =>
     s.api(`/pages/${enc(paper as string)}/signals${set ? `?set=${enc(set as string)}` : ''}`),
+  'rows.set': (s, { notes }) => {
+    if (!s.setRowNotes) throw new HostError('Unavailable', "this frame isn't on a list (contributes.rows)");
+    s.setRowNotes(notes as Record<string, RowNote | null>);
+  },
   'ui.setHeight': (s, { height }) => s.setHeight(Math.min(MAX_FRAME_HEIGHT, Math.round(height as number))),
   'ui.openUrl': (s, { url }) => s.openUrl(url as string),
   'ui.setPath': (s, { path }) => s.setPath(path as string[]),
+  'ui.close': (s) => s.close?.(),
 };
 
 export async function dispatch(services: HostServices, call: CallEnvelope) {

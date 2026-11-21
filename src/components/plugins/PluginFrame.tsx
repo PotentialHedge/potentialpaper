@@ -13,6 +13,8 @@ import {
   type IdentityToken,
   MAX_STORAGE_BYTES,
   PROTOCOL_VERSION,
+  type RowList,
+  type RowNote,
   type Theme,
   THEME_TOKENS,
 } from '@/lib/plugins/protocol';
@@ -170,7 +172,11 @@ function frameContext({ plugin: p, page: pg, viewer: v, surface: s }: Latest, si
           }
         : s.type === 'action'
           ? { type: 'action', action: s.id, size }
-          : { type: 'page', page: s.id, path: s.path ?? [], size },
+          : s.type === 'rows'
+            ? { type: 'rows', list: s.list ?? 'home', papers: s.papers ?? [] }
+            : s.type === 'popover'
+              ? { type: 'popover', list: s.list ?? 'home', command: s.id, paper: s.paper ?? '', size }
+              : { type: 'page', page: s.id, path: s.path ?? [], size },
     page: pg?.page ?? null,
     scopes: pg?.scopes ?? [],
     viewer: v,
@@ -182,9 +188,13 @@ function frameContext({ plugin: p, page: pg, viewer: v, surface: s }: Latest, si
 }
 
 export interface PluginSurface {
-  type: 'panel' | 'page' | 'action';
-  /** The panel's, page's or action's id. */
+  type: 'panel' | 'page' | 'action' | 'rows' | 'popover';
+  /** The panel's, page's or action's id; a popover's command; `rows` for a list's frame. */
   id: string;
+  /** A list's frames: which list, the papers it shows (`rows`), the row a popover is beside. */
+  list?: RowList;
+  papers?: string[];
+  paper?: string;
   /** A panel's slot (`venue.main`); a page's path after its id. */
   slot?: string;
   path?: string[];
@@ -202,6 +212,9 @@ export function PluginFrame({
   title,
   onConnect,
   fill = false,
+  hidden = false,
+  onRowNotes,
+  onClose,
 }: {
   plugin: ReadyPlugin;
   surface: PluginSurface;
@@ -211,15 +224,21 @@ export function PluginFrame({
   onConnect?: (connection: Connection | null) => void;
   /** Fill the box it is in (a `"layout": "full"` page), whatever height the frame asks for. */
   fill?: boolean;
+  /** A frame with nothing to draw (a list's rows frame): it starts at once and takes no room. */
+  hidden?: boolean;
+  /** On a list's frames: the notes it sets on rows (`rows.set`). */
+  onRowNotes?: (notes: Record<string, RowNote | null>) => void;
+  /** A popover's frame: it asks to be closed (`ui.close`). */
+  onClose?: () => void;
 }) {
   const frameRef = useRef<HTMLIFrameElement>(null);
-  const [started, setStarted] = useState(false);
+  const [started, setStarted] = useState(hidden);
   const [height, setHeight] = useState(START_HEIGHT);
   // The latest of what the page knows, for services that outlive a render.
-  const latest = useRef({ plugin, page, viewer, surface, onConnect });
+  const latest = useRef({ plugin, page, viewer, surface, onConnect, onRowNotes, onClose });
   const connectionRef = useRef<Connection | null>(null);
   useEffect(() => {
-    latest.current = { plugin, page, viewer, surface, onConnect };
+    latest.current = { plugin, page, viewer, surface, onConnect, onRowNotes, onClose };
   });
 
   const { origin } = plugin.plugin;
@@ -310,6 +329,10 @@ export function PluginFrame({
         const address = ['x', ...plugin.plugin.id.split('/'), surface.id, ...path].map(encodeURIComponent).join('/');
         window.history.replaceState(window.history.state, '', `/${address}`);
       },
+      ...(latest.current.onRowNotes && {
+        setRowNotes: (notes: Record<string, RowNote | null>) => latest.current.onRowNotes?.(notes),
+      }),
+      close: () => latest.current.onClose?.(),
     };
 
     function onMessage(event: MessageEvent) {
@@ -385,14 +408,25 @@ export function PluginFrame({
     connectionRef.current?.emit('context.change', frameContext(latest.current, frameSize(frameRef.current)));
   }, [viewerKey]);
 
+  // A list's frame is told when the papers listed change (the reader moved to another page of the list, say).
+  const papersKey = surface.type === 'rows' ? JSON.stringify(surface.papers ?? []) : '';
+  const lastPapers = useRef(papersKey);
+  useEffect(() => {
+    if (lastPapers.current === papersKey) return;
+    lastPapers.current = papersKey;
+    connectionRef.current?.emit('rows.change', { papers: latest.current.surface.papers ?? [] });
+  }, [papersKey]);
+
   return (
     <iframe
       ref={frameRef}
       title={title}
       sandbox={SANDBOX}
       referrerPolicy="no-referrer"
-      className="block w-full border-0 bg-transparent"
-      style={{ height: fill ? '100%' : height }}
+      className={hidden ? 'hidden' : 'block w-full border-0 bg-transparent'}
+      style={hidden ? undefined : { height: fill ? '100%' : height }}
+      aria-hidden={hidden || undefined}
+      tabIndex={hidden ? -1 : undefined}
     />
   );
 }

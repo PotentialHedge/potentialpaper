@@ -8,6 +8,7 @@ import { redirect } from 'next/navigation';
 import { FilterIcon, MoreIcon } from '@/components/icons';
 import { Pager } from '@/components/Pager';
 import { PaperCard, PaperRow } from '@/components/paper/PaperRow';
+import { RowPlugins } from '@/components/plugins/RowPlugins';
 import { SearchMatches } from '@/components/paper/SearchMatches';
 import { SearchSyntax } from '@/components/paper/SearchSyntax';
 import { Popover, PopoverClose, PopoverContent, PopoverTrigger } from '@/components/Popover';
@@ -112,6 +113,8 @@ export default async function Home({
   const followingOpen = cookieJar.get(FOLLOWING_COOKIE)?.value !== '0';
   const dismissed = new Set(parseDismissed(cookieJar.get(DISMISSED_COOKIE)?.value));
   const pinnedCount = (mine?.total ?? 0) + (followed?.total ?? 0);
+  // Every paper listed, top to bottom: what plugins that add to rows are told (`RowPlugins`).
+  const listed = [...(mine?.hits ?? []), ...(followed?.hits ?? []), ...all.hits].map(hitIdentifier);
 
   // Filter links keep the search; `q: ''` drops it (and its relevance sort). They go back to page 1:
   // pages are kept only by the pager's own links.
@@ -356,65 +359,73 @@ export default async function Home({
           <div className={ui.empty}>No papers here yet.</div>
         ))}
 
-      {mine && mine.total > 0 && (
-        <Collapsible
-          id="mine"
-          cookie={MINE_COOKIE}
-          open={mineOpen}
-          className="group"
-          summary={
-            <>
-              My papers <span className="font-normal">({mine.total})</span>
-            </>
-          }
-        >
-          {mine.hits.map((hit) => (
-            <Row key={`${hit.scheme}:${hit.value}`} hit={hit} detailed={detailed} />
-          ))}
-          <Pager page={mine.page} pages={mine.pages} href={pageHref('mpage', '#mine')} />
-        </Collapsible>
-      )}
+      <RowPlugins list="home" papers={listed}>
+        {mine && mine.total > 0 && (
+          <Collapsible
+            id="mine"
+            cookie={MINE_COOKIE}
+            open={mineOpen}
+            className="group"
+            summary={
+              <>
+                My papers <span className="font-normal">({mine.total})</span>
+              </>
+            }
+          >
+            {mine.hits.map((hit) => (
+              <Row key={`${hit.scheme}:${hit.value}`} hit={hit} detailed={detailed} />
+            ))}
+            <Pager page={mine.page} pages={mine.pages} href={pageHref('mpage', '#mine')} />
+          </Collapsible>
+        )}
 
-      {followed && followed.total > 0 && (
-        <Collapsible
-          id="following"
-          cookie={FOLLOWING_COOKIE}
-          open={followingOpen}
-          className="group"
-          summary={
-            <>
-              Following <span className="font-normal">({followed.total})</span>
-            </>
-          }
-        >
-          {followed.hits.map((hit) => (
-            <Row key={`${hit.scheme}:${hit.value}`} hit={hit} detailed={detailed} />
-          ))}
-          <Pager page={followed.page} pages={followed.pages} href={pageHref('fpage', '#following')} />
-        </Collapsible>
-      )}
+        {followed && followed.total > 0 && (
+          <Collapsible
+            id="following"
+            cookie={FOLLOWING_COOKIE}
+            open={followingOpen}
+            className="group"
+            summary={
+              <>
+                Following <span className="font-normal">({followed.total})</span>
+              </>
+            }
+          >
+            {followed.hits.map((hit) => (
+              <Row key={`${hit.scheme}:${hit.value}`} hit={hit} detailed={detailed} />
+            ))}
+            <Pager page={followed.page} pages={followed.pages} href={pageHref('fpage', '#following')} />
+          </Collapsible>
+        )}
 
-      {all.total > 0 && (
-        <section id="all">
-          {pinnedCount > 0 ? (
-            <h2 className={`mt-7 mb-2 ${ui.section}`}>
-              All papers <span className="font-normal">({all.total.toLocaleString('en')})</span>
-            </h2>
-          ) : (
-            <div className="h-3.5" />
-          )}
-          {all.hits.map((hit) => (
-            <Row key={`${hit.scheme}:${hit.value}`} hit={hit} detailed={detailed} />
-          ))}
-          <Pager page={all.page} pages={all.pages} href={pageHref('page', pinnedCount > 0 ? '#all' : '')} />
-        </section>
-      )}
+        {all.total > 0 && (
+          <section id="all">
+            {pinnedCount > 0 ? (
+              <h2 className={`mt-7 mb-2 ${ui.section}`}>
+                All papers <span className="font-normal">({all.total.toLocaleString('en')})</span>
+              </h2>
+            ) : (
+              <div className="h-3.5" />
+            )}
+            {all.hits.map((hit) => (
+              <Row key={`${hit.scheme}:${hit.value}`} hit={hit} detailed={detailed} />
+            ))}
+            <Pager page={all.page} pages={all.pages} href={pageHref('page', pinnedCount > 0 ? '#all' : '')} />
+          </section>
+        )}
+      </RowPlugins>
     </main>
   );
 }
 
+/** A hit's page identifier, as plugins name papers: `arxiv:1706.03762`. */
+function hitIdentifier(hit: SearchHit): string {
+  return `${hit.scheme}:${hit.value}`;
+}
+
 function Row({ hit, detailed }: { hit: SearchHit; detailed: boolean }) {
   const props = {
+    paper: hitIdentifier(hit),
     title: hit.title,
     authors: hit.authors,
     venue: hit.venue,

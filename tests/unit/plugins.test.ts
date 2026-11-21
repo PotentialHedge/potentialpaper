@@ -619,3 +619,83 @@ describe('plugins with their own backend (identity, bot)', () => {
     connection.close();
   });
 });
+
+const READING_LIST = JSON.parse(readFileSync('examples/plugins/reading-list/potentialpaper-plugin.json', 'utf8'));
+
+describe('notes on rows (contributes.rows, lists.read, rows.set)', () => {
+  it('accepts the reading list, and wants lists.read for rows', () => {
+    const report = validateManifest(READING_LIST);
+    expect(report.errors).toEqual([]);
+    expect(report.warnings).toEqual([]);
+    expect(report.manifest!.contributes.rows!.commands).toEqual([
+      { id: 'toggle', title: 'To read / read' },
+      { id: 'note', title: 'Note', popover: true },
+    ]);
+    const without = validateManifest({ ...READING_LIST, permissions: [] });
+    expect(without.errors).toEqual([
+      'contributes.rows: needs the "lists.read" permission, to be told which papers are listed',
+    ]);
+    const twice = validateManifest({
+      ...READING_LIST,
+      contributes: {
+        rows: {
+          commands: [
+            { id: 'a', title: 'A' },
+            { id: 'a', title: 'B', colour: 1 },
+          ],
+        },
+      },
+    });
+    expect(twice.errors).toEqual(['contributes.rows.commands[1].id: a second row command "a"']);
+    expect(twice.warnings).toEqual(['contributes.rows.commands[1].colour: not a field this site knows; ignored']);
+  });
+
+  it("sets notes on papers' rows behind lists.read, plain text and short", async () => {
+    const set: unknown[] = [];
+    const s = services({ permissions: ['lists.read'], setRowNotes: (notes) => set.push(notes) });
+    const note = { text: '6.2 · top 15%', title: 'Mean rating at ICLR 2027', tone: 'up' };
+    expect(
+      await dispatch(s, call('rows.set', { notes: { 'arxiv:1706.03762': note, 'doi:10.1145/3442188.3445922': null } })),
+    ).toMatchObject({ result: null });
+    expect(set).toEqual([{ 'arxiv:1706.03762': note, 'doi:10.1145/3442188.3445922': null }]);
+    for (const notes of [
+      { 'venue:iclr/2027': { text: 'a venue' } },
+      { 'arxiv:1706.03762': { text: 'x'.repeat(41) } },
+      { 'arxiv:1706.03762': { text: 'ok', tone: 'rainbow' } },
+    ]) {
+      expect(await dispatch(s, call('rows.set', { notes }))).toMatchObject({ error: { code: 'InvalidParams' } });
+    }
+    expect(await dispatch(services(), call('rows.set', { notes: {} }))).toMatchObject({
+      error: { code: 'PermissionDenied' },
+    });
+    expect(await dispatch(services({ permissions: ['lists.read'] }), call('rows.set', { notes: {} }))).toMatchObject({
+      error: { code: 'Unavailable' },
+    });
+  });
+
+  it('tells the SDK the papers listed, and runs row commands with the paper', async () => {
+    const { win, listeners, parent } = sdkWindow();
+    const set: unknown[] = [];
+    const s = services({ permissions: ['lists.read'], setRowNotes: (notes) => set.push(notes) });
+    const channel = new MessageChannel();
+    open.push(channel.port1, channel.port2);
+    const connection = connect(channel.port1, s);
+    const context = { ...CONTEXT, page: null, surface: { type: 'rows', list: 'home', papers: ['arxiv:2106.09685'] } };
+    for (const listener of listeners) {
+      listener({ source: parent, data: { type: BOOT_MESSAGE, protocol: 1, context }, ports: [channel.port2] });
+    }
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any -- the SDK as the page sees it
+    const pp = win.pp as any;
+    await pp.ready;
+    expect(pp.rows.papers).toEqual(['arxiv:2106.09685']);
+    const seen: unknown[] = [];
+    pp.rows.onChange((papers: string[]) => seen.push(papers));
+    connection.emit('rows.change', { papers: ['arxiv:2005.14165', 'arxiv:1810.04805'] });
+    pp.commands.register('toggle', ({ paper }: { paper: string }) => pp.rows.set({ [paper]: { text: 'to read' } }));
+    await connection.call('commands.run', { command: 'toggle', args: { paper: 'arxiv:2005.14165' } });
+    expect(seen).toEqual([['arxiv:2005.14165', 'arxiv:1810.04805']]);
+    expect(pp.rows.papers).toEqual(['arxiv:2005.14165', 'arxiv:1810.04805']);
+    expect(set).toEqual([{ 'arxiv:2005.14165': { text: 'to read' } }]);
+    connection.close();
+  });
+});

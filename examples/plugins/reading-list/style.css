@@ -1,0 +1,30 @@
+/* The page's tokens arrive as --pp-<name> on :root, so the form matches it in light and dark. */
+body {
+  margin: 0;
+  background: transparent;
+  color: var(--pp-ink, #1d1d1d);
+  font: 13px/1.5 var(--pp-font-sans, sans-serif);
+}
+textarea {
+  box-sizing: border-box;
+  width: 100%;
+  padding: 6px;
+  border: 1px solid var(--pp-rule, #ccc);
+  background: var(--pp-bg, #fff);
+  color: inherit;
+  font: inherit;
+  resize: vertical;
+}
+.actions {
+  display: flex;
+  gap: 12px;
+  margin-top: 6px;
+}
+button {
+  padding: 0;
+  border: 0;
+  background: none;
+  color: var(--pp-accent, #b31b1b);
+  font: inherit;
+  cursor: pointer;
+}

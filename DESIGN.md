@@ -965,6 +965,18 @@ Built 2026-11-16 (`handoffs/plugins.md` Phase 2). A plugin is a public repo (or 
   `/x/<owner>/<name>/<page>`), `settings` (`SettingSpec`s, keyed `<plugin id>.<name>` in settings.json) and
   `commands` (in each of its panels' menus). The validator reports every problem in one pass, each on a line naming
   its field; unknown fields are warnings, so a newer manifest still loads on an older host.
+- **Notes on rows** (built 2026-11-21, `components/plugins/RowPlugins.tsx`): a manifest's `contributes.rows`
+  (`{ title, commands: [{ id, title, popover? }] }`, which needs the `lists.read` permission) adds to the rows of the
+  home page's list. Each such plugin runs **one hidden frame for the whole list**, never one per row, told the papers
+  listed by identifier, top to bottom (`pp.context.surface` `{ type: "rows", list: "home", papers }`, and
+  `rows.change` as they change). It sets plain-text notes with `rows.set` (`{ text ≤ 40, title?, tone? }`, `tone` one
+  of the theme's `muted`, `up`, `down`, `accent`), and the row shows the first installed plugin's note **where it
+  shows the venue**; the venue and any other plugins' notes go in its tooltip. Row commands are in a ⋯ on each row
+  (the year's column widens by `--row-actions` only when some plugin has one): without `popover` one runs in the list
+  frame with `{ paper }`, with it the plugin's frame opens beside the row (`{ type: "popover", command, paper }`) for
+  a form, may set notes too, and closes with `ui.close`. `lists.read` is its own permission because the list is what
+  the reader is looking at, searches included. `examples/plugins/reading-list` is the pattern. Not yet: notes on a
+  phone (the venue's column is hidden there), on venue, topic and org lists, or a setting to choose whose note shows.
 - **`when` conditions** (`lib/plugins/when.ts`), VS Code's clauses cut down: `page.hasScores`,
   `page.kind == venue && signedIn`. Each kind offers its context keys in the kind registry (`KindInfo.contextKeys`:
   `page.kind`, `signedIn`, `viewer.isOwner`, and `page.hasScores`/`page.hasSubmissions` where they mean something). A

@@ -8,8 +8,8 @@ import { MAX_WHEN_LENGTH, whenKeys, parseWhen, whenProblem } from './when';
 /**
  * A plugin's manifest, `potentialpaper-plugin.json` at the top of its folder (`handoffs/plugins.md` Phase 2, DESIGN.md
  * §10): what the plugin is, what it may do and what it adds. A plugin never touches the site's own interface. It
- * declares panels, pages, settings and commands, and the host draws them; its code runs in frames on an origin of
- * its own and reaches the site only through the RPC (`protocol.ts`).
+ * declares panels, pages, settings, commands and notes on rows, and the host draws them; its code runs in frames on an
+ * origin of its own and reaches the site only through the RPC (`protocol.ts`).
  *
  * The validator reports every problem in one pass, each on one line naming its field
  * (`contributes.panels[0].slot: …`). Fields it doesn't know are warnings, not errors, so a newer manifest still
@@ -29,6 +29,8 @@ export const PERMISSIONS = {
   'page.read': "Read the page it is on: its sections, links and kind file (a venue's venue.json, …)",
   'scope.read': 'List the papers of venues, topics and organisations',
   'reviews.read': "Read papers' submissions, reviews and decisions",
+  'lists.read':
+    'See which papers the home page lists for you (your searches, your papers and those you follow), to add a note to each',
   identity:
     "Tell its own backend who you are: your handle, in a short-lived token signed by this site that only this plugin's backend accepts",
 } as const;
@@ -274,6 +276,25 @@ export type SignalSpec =
     }
   | { kind: 'label'; id: string; title: string; description?: string };
 
+const rowCommandSchema = z.looseObject({
+  id: contributionId('row command'),
+  title: text(60, 'What it does, as the row\'s ⋯ menu says it: "Edit note".'),
+  popover: z.boolean().optional().meta({
+    description:
+      "Open a frame of the plugin beside the row, told the command and the paper (pp.context.surface), for a form. Without it, the command runs in the plugin's list frame (pp.commands.register), given { paper }.",
+  }),
+});
+
+const rowsSchema = z
+  .looseObject({
+    title: text(60, 'What its notes are, for settings: "Score standing".').optional(),
+    commands: z.array(rowCommandSchema).max(8).default([]).meta({ description: "Entries in each row's ⋯ menu." }),
+  })
+  .meta({
+    description:
+      'Notes on the rows of the home page\'s list: one hidden frame per page is told the papers listed (pp.rows.papers) and sets a short note for any of them (pp.rows.set), which the row shows where it shows the venue. Needs the "lists.read" permission.',
+  });
+
 export const manifestSchema = z
   .looseObject({
     $schema: z.string().optional(),
@@ -343,6 +364,7 @@ export const manifestSchema = z
         signals: z.array(signalSchema).max(20).default([]).meta({
           description: 'Values it publishes about papers, for any plugin and search to use. Needs a publisher.',
         }),
+        rows: rowsSchema.optional(),
       })
       .default({ panels: [], pages: [], actions: [], settings: {}, commands: [], signals: [] }),
   })
@@ -369,6 +391,13 @@ export interface ActionContribution {
   when?: string;
 }
 
+/** An entry in each row's ⋯ menu: run in the list frame, or with `popover`, in a frame of its own beside the row. */
+export interface RowCommand {
+  id: string;
+  title: string;
+  popover?: boolean;
+}
+
 export interface PluginManifest {
   id: string;
   name: string;
@@ -391,6 +420,8 @@ export interface PluginManifest {
     settings: Record<string, PluginSettingSpec>;
     commands: { id: string; title: string }[];
     signals: SignalSpec[];
+    /** Notes on the rows of the home page's list, and entries in each row's ⋯ menu. */
+    rows?: { title?: string; commands: RowCommand[] };
   };
 }
 
@@ -423,7 +454,7 @@ function unknownFields(raw: Record<string, unknown>, warn: (path: string, messag
   };
   check(raw, Object.keys(manifestSchema.shape), '');
   const contributes = raw.contributes;
-  check(contributes, ['panels', 'pages', 'actions', 'settings', 'commands', 'signals'], 'contributes');
+  check(contributes, ['panels', 'pages', 'actions', 'settings', 'commands', 'signals', 'rows'], 'contributes');
   if (!isObject(contributes)) return;
   const each = (list: unknown, known: string[], at: string) =>
     Array.isArray(list) && list.forEach((item, i) => check(item, known, `${at}[${i}]`));
@@ -443,6 +474,10 @@ function unknownFields(raw: Record<string, unknown>, warn: (path: string, messag
         check(spec, fields[spec.kind], `contributes.signals[${i}]`);
       }
     });
+  }
+  if (isObject(contributes.rows)) {
+    check(contributes.rows, Object.keys(rowsSchema.shape), 'contributes.rows');
+    each(contributes.rows.commands, Object.keys(rowCommandSchema.shape), 'contributes.rows.commands');
   }
   if (isObject(contributes.settings)) {
     const common = ['type', 'default', ...Object.keys(settingCommon)];
@@ -490,7 +525,7 @@ function crossChecks(
   error: (path: string, message: string) => void,
   warn: (path: string, message: string) => void,
 ) {
-  const { panels, pages, actions, settings, commands, signals } = manifest.contributes;
+  const { panels, pages, actions, settings, commands, signals, rows } = manifest.contributes;
   const unique = (list: { id: string }[], at: string, what: string) => {
     const seen = new Set<string>();
     list.forEach((item, i) => {
@@ -526,6 +561,12 @@ function crossChecks(
   });
   if (signals.length > 0 && !manifest.publisher) {
     error('publisher', 'signals need a publisher: the handle of the account that writes them');
+  }
+  if (rows) {
+    unique(rows.commands, 'contributes.rows.commands', 'row command');
+    if (!manifest.permissions.includes('lists.read')) {
+      error('contributes.rows', 'needs the "lists.read" permission, to be told which papers are listed');
+    }
   }
 
   panels.forEach((panel, i) => {
@@ -579,8 +620,8 @@ function crossChecks(
   if (manifest.permissions.includes('identity') && manifest.network.length === 0) {
     warn('permissions', '"identity" gives a token for your own backend, and "network" names none to send it to');
   }
-  if (panels.length === 0 && pages.length === 0 && actions.length === 0 && signals.length === 0) {
-    warn('contributes', 'adds no panels, pages, actions or signals, so it never runs');
+  if (panels.length === 0 && pages.length === 0 && actions.length === 0 && signals.length === 0 && !rows) {
+    warn('contributes', 'adds no panels, pages, actions, signals or rows, so it never runs');
   }
 }
 
