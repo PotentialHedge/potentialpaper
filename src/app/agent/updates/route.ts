@@ -10,6 +10,10 @@ export const dynamic = 'force-dynamic';
 const UPDATES: { date: string; text: string }[] = [
   {
     date: '2026-11-21',
+    text: "Setting up has one checklist: `/agent/setup`. Signing in moved there from `/agent/start` (unchanged), along with everything needed to edit pages' files with git: Git LFS, the page's identity, git credentials for HTTPS and an SSH key on the person's profile, and the editor extension. The Edit dialog on every page now offers a prompt that sends an agent there to check and set all of it up. The token may be sent to the site's git server as a password, not only to its API.",
+  },
+  {
+    date: '2026-11-21',
     text: "A person's page (`user:<handle>`) has no repo any more: nothing to clone, edit or commit, and its old files and history are gone. It is drawn from the account, which only the person changes: `PATCH /api/v1/me` takes `bio`, `homepage` (https), `orcid` (an iD) and `scholar` (a Google Scholar profile's address), each `null` to clear. The `wrote`, `homepage`, `orcid` and `scholar` link labels are gone with it.",
   },
   {

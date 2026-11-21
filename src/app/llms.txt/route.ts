@@ -1,4 +1,4 @@
-import { AGENT_START_PATH } from '@/lib/agent-prompt';
+import { AGENT_SETUP_PATH, AGENT_START_PATH } from '@/lib/agent-prompt';
 import { markdown } from '@/server/agent/text';
 import { siteUrl } from '@/server/site';
 
@@ -21,10 +21,11 @@ export function GET() {
 
 ## For agents
 
-- [Instructions for agents](${origin}${AGENT_START_PATH}): signing in for a person, reading papers and posting to their agent discussion; start here
+- [Setup checklist](${origin}${AGENT_SETUP_PATH}): signing in for a person, and git, Git LFS, credentials and an SSH key to edit pages' files; the only setup instructions, so start here
+- [Instructions for agents](${origin}${AGENT_START_PATH}): working on papers for a person: reading them and posting to their agent discussion
 - [Updates for agents](${origin}/agent/updates): dated notices of what changed, newest first
 - [The import API](${origin}/agent/imports): for import tools, which bring venues' papers, reviews, versions and PDFs in as bots
-- Edit a page with git: clone it as above, commit, and \`git push\` with an API key that may push (scope \`push\` or \`write\`) as the password, any user name. Commits must be authored and committed as your id on that page (\`u_…\`, or \`a_…\` on a paper you are a confirmed author of); the first push with another identity is refused and says which \`git config user.name\`/\`user.email\` to set. Fast-forward only, no merge commits. Or over SSH with a key added on the profile page: user \`git\`, the page's own path (\`abs/<id>.git\`), same identity and rules.
+- Edit a page with git: clone it as above, commit, and \`git push\` with an API key that may push (scope \`push\` or \`write\`) as the password, or over SSH with a key on the profile page. Fast-forward only, no merge commits; each commit is authored as the person's id on that page, which the first refused push names. [The setup checklist](${origin}${AGENT_SETUP_PATH}) sets all of it up (Git LFS, identity, credentials, SSH key): follow it before a first push
 - A person's settings: \`GET ${origin}/api/v1/me/settings\` gives their settings.json (JSONC) and every setting's value; \`PATCH\` it \`{ "<key>": <value> | null }\` to change some keys (\`null\`: back to the default), keeping the rest of the file; \`PUT\` replaces the whole file. Every key, with its meaning and allowed values, including their plugins' keys, is in \`${origin}/schemas/settings.json\` (fetch it with their token). They cover the panels of each kind of page (\`<kind>.panels.order\`, \`.hidden\`), the navbar's links (\`navbar.order\`, \`navbar.hidden\`), the actions under each kind's page titles (\`<kind>.actions.order\`, \`.hidden\`; the first four shown are in the bar, the rest in a menu), what their own page shows (\`user.show.*\`), their plugins (\`plugins\`) and each plugin's settings (\`<plugin id>.<name>\`). Change them only when asked
 - [Building a plugin](${origin}/plugins.md): panels for any page, from a public GitHub repo: the manifest, the SDK, permissions, data routes, developing against the site and publishing
 - A person's plugins: \`POST ${origin}/api/v1/me/plugins\` \`{ "source": "github:<owner>/<repo>[/<folder>][@<tag>]" }\` installs one into their settings.json (the newest release without a tag; it runs once they approve it on a page); \`GET ${origin}/api/v1/plugins/installed\` lists them; \`GET ${origin}/api/v1/me/plugins/updates\` lists newer releases and \`POST\` it \`{ "source" }\` moves to one (one that asks for new permissions waits for their approval); \`GET ${origin}/api/v1/plugins/discover\` lists published plugins. A plugin's manifest schema: \`${origin}/schemas/plugin-manifest.json\`

@@ -1,15 +1,18 @@
 'use client';
 
-import { useEffect, useRef, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
+import { AgentPromptField } from '@/components/AgentPromptField';
 import { PencilIcon, WITH_ICON } from '@/components/icons';
 import { ui } from '@/components/ui';
+import { setupPrompt } from '@/lib/agent-prompt';
 
 /**
- * How to edit a page of any kind: in the web editor (`/code/…`), with git, or a kind's own form (a topic's). Every page is a git repository, so both
- * edit the same files, held to the same rules. Opens from the "edit" button under the title, and from any link to
+ * How to edit a page of any kind: in the web editor (`/code/…`), with git, by having the reader's AI agent set git
+ * up (a prompt pointing at `/agent/setup`, the one setup checklist), or a kind's own form (a topic's). Every page is
+ * a git repository, so all of them edit the same files, held to the same rules. Opens from the "edit" button under the title, and from any link to
  * `#edit` (and the old `#edit-…` links) on the page.
  *
- * It shows as little as it can: the two ways in, and the few words each needs. Copying the clone command then
+ * It shows as little as it can: the three ways in, and the few words each needs. Copying the clone command then
  * offers the desktop extension, as an install command for whichever VS Code-family editor the reader uses: the
  * `.vsix` isn't on the Marketplace or Open VSX, so an `vscode:extension/…` link would have nothing to open.
  */
@@ -41,15 +44,40 @@ export function EditDialog({ codePath, clone, hasRepo, form }: EditOptions) {
   const dialog = useRef<HTMLDialogElement>(null);
   const [via, setVia] = useState<'https' | 'ssh'>('https');
   const [offer, setOffer] = useState(false);
+  const [prompt, setPrompt] = useState('');
+
+  /**
+   * Opens the dialog and writes the agent's prompt: at once without a sign-in code, then, for a signed-in reader,
+   * with a one-time one (`POST /me/agent-code`, an hour), as `AddMissing` does. Made once per page view.
+   */
+  const made = useRef(false);
+  const open = useCallback(() => {
+    if (!dialog.current?.open) dialog.current?.showModal();
+    if (made.current) return;
+    made.current = true;
+    const origin = window.location.origin;
+    const page = origin + window.location.pathname;
+    setPrompt(setupPrompt(origin, page, clone.https));
+    void (async () => {
+      try {
+        const res = await fetch('/api/v1/me/agent-code', { method: 'POST' });
+        if (!res.ok) return;
+        const { code } = (await res.json()) as { code?: string };
+        if (code) setPrompt(setupPrompt(origin, page, clone.https, code));
+      } catch {
+        // Signed out, or offline: the agent asks for an email instead (`/agent/setup`).
+      }
+    })();
+  }, [clone.https]);
 
   useEffect(() => {
     const check = () => {
-      if (OPENS.test(window.location.hash) && !dialog.current?.open) dialog.current?.showModal();
+      if (OPENS.test(window.location.hash)) open();
     };
     check();
     window.addEventListener('hashchange', check);
     return () => window.removeEventListener('hashchange', check);
-  }, []);
+  }, [open]);
 
   const close = () => {
     dialog.current?.close();
@@ -81,7 +109,7 @@ export function EditDialog({ codePath, clone, hasRepo, form }: EditOptions) {
   const address = via === 'ssh' ? clone.ssh : clone.https;
   return (
     <>
-      <button type="button" className={`${ui.linkBtn} ${WITH_ICON}`} onClick={() => dialog.current?.showModal()}>
+      <button type="button" className={`${ui.linkBtn} ${WITH_ICON}`} onClick={open}>
         <PencilIcon />
         edit
       </button>
@@ -105,14 +133,16 @@ export function EditDialog({ codePath, clone, hasRepo, form }: EditOptions) {
             </button>
           </div>
 
-          {form && (
-            <a href={form.href} rel="nofollow" className={`${ui.btn({ inline: true, flush: true })} mr-3`}>
-              {form.label}
+          <div className="mt-2 flex flex-wrap items-baseline justify-center gap-x-4 gap-y-2">
+            {form && (
+              <a href={form.href} rel="nofollow" className={ui.btn({ inline: true, flush: true })}>
+                {form.label}
+              </a>
+            )}
+            <a href={codePath} rel="nofollow" className={form ? 'text-accent' : ui.btn({ inline: true, flush: true })}>
+              Edit in web editor
             </a>
-          )}
-          <a href={codePath} rel="nofollow" className={form ? 'text-accent' : ui.btn({ inline: true, flush: true })}>
-            Edit in web editor
-          </a>
+          </div>
 
           <h3 className={`${ui.runIn} mt-5 block`}>Or clone it with git</h3>
           {hasRepo ? (
@@ -159,6 +189,12 @@ export function EditDialog({ codePath, clone, hasRepo, form }: EditOptions) {
               The page gets its repository with its first edit, so start in the web editor.
             </p>
           )}
+
+          <h3 className={`${ui.runIn} mt-5 block`}>Or let your agent set it up</h3>
+          <p className="mt-1 text-xs text-muted">
+            It checks and sets up everything: signing in, git, the clone, credentials and an SSH key.
+          </p>
+          {prompt && <AgentPromptField prompt={prompt} label="Paste into your AI agent:" />}
         </div>
       </dialog>
     </>

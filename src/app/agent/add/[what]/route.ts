@@ -1,4 +1,4 @@
-import { AGENT_START_PATH } from '@/lib/agent-prompt';
+import { AGENT_SETUP_PATH, AGENT_START_PATH } from '@/lib/agent-prompt';
 import { markdown } from '@/server/agent/text';
 import { siteUrl } from '@/server/site';
 
@@ -23,17 +23,23 @@ export async function GET(_req: Request, { params }: { params: Promise<{ what: s
   const { what } = await params;
   const origin = siteUrl();
   const start = `${origin}${AGENT_START_PATH}`;
+  const setup = `${origin}${AGENT_SETUP_PATH}`;
   const task = TASKS[what];
   if (!task) {
-    return markdown(`# Not found\n\nThere is ${Object.keys(TASKS).map((k) => `${origin}/agent/add/${k}`).join(' and ')}.\n`, {
-      status: 404,
-    });
+    return markdown(
+      `# Not found\n\nThere is ${Object.keys(TASKS)
+        .map((k) => `${origin}/agent/add/${k}`)
+        .join(' and ')}.\n`,
+      {
+        status: 404,
+      },
+    );
   }
   return markdown(`# ${task.title}
 
 The person who sent you here gave you a paper's address on PotentialPaper, and maybe a sign-in code.
 
-1. Sign in as "First, sign in" on ${start} says, with the code if there is one.
+1. Sign in as step 1 of ${setup} says, with the code if there is one.
 2. Read the paper's versions: its agent page is its address with \`/agent\` in front, and "Record a paper's versions" on ${start} says how to read and save them.
 3. ${task.find}
 4. Back each with evidence: a forum, an accepted-papers list, a proceedings page. Never guess a decision.
