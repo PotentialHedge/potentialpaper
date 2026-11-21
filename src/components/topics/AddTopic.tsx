@@ -1,6 +1,6 @@
 'use client';
 
-import { type FormEvent, useState } from 'react';
+import { type FormEvent, type ReactNode, useState } from 'react';
 import { ui } from '@/components/ui';
 import { TOPIC_LINK_CHOICES, type TopicLinkLabel } from '@/lib/topics';
 import { failureOf, send } from './api';
@@ -11,7 +11,7 @@ import { useTopicMatches } from './useTopicMatches';
  * as one types; one no topic has is made. Adds a labeled link from the paper (`in-topic` or `introduces-topic`), as
  * the reader's own edit of the paper's links (`POST /api/v1/pages/{identifier}/topics`).
  */
-export function AddTopic({ identifier }: { identifier: string }) {
+export function AddTopic({ identifier, children }: { identifier: string; children: ReactNode }) {
   const [open, setOpen] = useState(false);
   const [name, setName] = useState('');
   const [chosen, setChosen] = useState<string | null>(null);
@@ -52,14 +52,21 @@ export function AddTopic({ identifier }: { identifier: string }) {
     }
   }
 
-  if (!open) {
-    return (
-      <button type="button" className={`${ui.linkBtn} mt-1.5 text-xs`} onClick={() => setOpen(true)}>
-        Add a topic
-      </button>
-    );
-  }
   return (
+    <div className={ui.box}>
+      <div className={ui.boxHeadingRow}>
+        <h2 className={ui.runIn}>Topics</h2>
+        <button type="button" className={ui.boxAction} onClick={() => setOpen(!open)} title="Add a topic">
+          {open ? 'Cancel' : 'Add'}
+        </button>
+      </div>
+      {children}
+      {open && form()}
+    </div>
+  );
+
+  function form() {
+    return (
     <form onSubmit={submit} className="mt-2 text-[13px]">
       <input
         value={name}
@@ -120,4 +127,5 @@ export function AddTopic({ identifier }: { identifier: string }) {
       )}
     </form>
   );
+  }
 }

@@ -123,7 +123,7 @@ export function Sections({ kind, address, ownersHtml, communityHtml, owners }: P
       )}
       {community && (
         <div id="community" className={both ? 'mt-6' : undefined}>
-          {both && (
+          {both && communityHtml && (
             <PartLabel>
               From the community ·{' '}
               <a href={EDIT} rel="nofollow">
@@ -136,7 +136,7 @@ export function Sections({ kind, address, ownersHtml, communityHtml, owners }: P
             <Html html={communityHtml} />
           ) : (
             <p className={ui.empty}>
-              Nobody has written anything here yet.{' '}
+              {both ? 'Nothing from the community yet.' : 'Nobody has written anything here yet.'}{' '}
               <a href={EDIT} rel="nofollow">
                 Start it
               </a>

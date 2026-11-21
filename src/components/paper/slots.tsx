@@ -106,20 +106,20 @@ function ReadThePaper({ identifiers, pdf, picture }: PanelProps) {
   );
 }
 
-function Submissions({ submissions }: PanelProps) {
-  return <SubmissionsSection submissions={submissions} />;
+function Submissions({ submissions, canonical }: PanelProps) {
+  return <SubmissionsSection submissions={submissions} paperPath={paperPath(canonical)} />;
 }
 
-function SubmissionsAside({ submissions }: PanelProps) {
-  return <SubmissionsBox submissions={submissions} />;
+function SubmissionsAside({ submissions, canonical }: PanelProps) {
+  return <SubmissionsBox submissions={submissions} paperPath={paperPath(canonical)} />;
 }
 
 function Versions({ versions, canonical, paper }: PanelProps) {
   return <VersionsSection versions={versions} canonical={canonical} paperTitle={paper.title} />;
 }
 
-function VersionsAside({ versions }: PanelProps) {
-  return <VersionsBox versions={versions} />;
+function VersionsAside({ versions, canonical }: PanelProps) {
+  return <VersionsBox versions={versions} paperPath={paperPath(canonical)} />;
 }
 
 /** The discussion (DESIGN.md §9): a client island, since what it shows depends on who is reading. */
@@ -139,8 +139,7 @@ function Links({ linksFrom }: PanelProps) {
 function Topics({ linksFrom, canonical }: PanelProps) {
   const topics = linksFrom.filter((link) => TOPIC_LABELS.includes(link.label));
   return (
-    <div className={ui.box}>
-      <h2 className={ui.boxHeading}>Topics</h2>
+    <AddTopic identifier={`${canonical.scheme}:${canonical.value}`}>
       {topics.length > 0 ? (
         <ul className="space-y-1">
           {topics.map((link, i) => (
@@ -160,8 +159,7 @@ function Topics({ linksFrom, canonical }: PanelProps) {
       ) : (
         <p className="text-xs text-muted">Not in a topic yet.</p>
       )}
-      <AddTopic identifier={`${canonical.scheme}:${canonical.value}`} />
-    </div>
+    </AddTopic>
   );
 }
 

@@ -24,6 +24,10 @@ export const ui = {
   subsection,
   /** An unnumbered subsection heading, for a box or popover beside the page's flow. */
   boxHeading: `mb-2 ${subsectionLook}`,
+  /** A box's heading with a small action pulled right ("Add"): the row, around a `runIn` heading. */
+  boxHeadingRow: 'mb-2 flex items-baseline justify-between gap-2',
+  /** That action. */
+  boxAction: 'cursor-pointer font-sans text-xs text-accent hover:underline',
   /** A run-in heading, set in a line of other text. */
   runIn: subsectionLook,
   /**

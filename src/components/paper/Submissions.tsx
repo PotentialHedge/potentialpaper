@@ -16,6 +16,7 @@ import {
   type SubmissionNote,
 } from '@/lib/submissions';
 import { renderSourceText } from '@/server/comments/render';
+import { AddMissing } from '@/components/paper/AddMissing';
 import { Fold } from '@/components/paper/Fold';
 
 /**
@@ -259,24 +260,47 @@ function SubmissionView({ submission }: { submission: Submission }) {
   );
 }
 
-export function SubmissionsSection({ submissions }: { submissions: Submission[] }) {
+export function SubmissionsSection({
+  submissions,
+  paperPath,
+}: {
+  submissions: Submission[];
+  paperPath: string;
+}) {
+  const add = <AddMissing what="submission" paperPath={paperPath} />;
   return (
     <Fold id="submissions" title="Submissions">
       {submissions.length === 0 ? (
-        <p className={ui.empty}>We don&apos;t know of a submission of this paper to a venue with open reviews.</p>
+        <div className={ui.empty}>
+          We don&apos;t know of a submission of this paper to a venue with open reviews. {add}
+        </div>
       ) : (
-        submissions.map((submission) => <SubmissionView key={submission.venue.id} submission={submission} />)
+        <>
+          {submissions.map((submission) => (
+            <SubmissionView key={submission.venue.id} submission={submission} />
+          ))}
+          <div className="mt-3 font-sans text-xs">{add}</div>
+        </>
       )}
     </Fold>
   );
 }
 
 /** One line per submission beside the page, with the mean of its first score, out of its most when known. */
-export function SubmissionsBox({ submissions }: { submissions: Submission[] }) {
+export function SubmissionsBox({
+  submissions,
+  paperPath,
+}: {
+  submissions: Submission[];
+  paperPath: string;
+}) {
   if (submissions.length === 0) return null;
   return (
     <div className={ui.box}>
-      <h2 className={ui.boxHeading}>Submissions</h2>
+      <div className={ui.boxHeadingRow}>
+        <h2 className={ui.runIn}>Submissions</h2>
+        <AddMissing what="submission" paperPath={paperPath} compact />
+      </div>
       <ul className="space-y-1.5">
         {submissions.map((submission) => {
           const table = scoreTable(submission);

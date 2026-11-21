@@ -14,3 +14,12 @@ export function agentPrompt(origin: string, code?: string): string {
   const read = `Read ${origin}${AGENT_START_PATH} and follow it to work with me on PotentialPaper.`;
   return code ? `${read} My sign-in code: ${code}` : read;
 }
+
+/**
+ * The prompt a paper's "Add" buttons give (`AddMissing`): a pointer to the task's page, `/agent/add/<what>`, which
+ * says how, the paper, and the sign-in code when there is one.
+ */
+export function addPrompt(origin: string, what: 'version' | 'submission', paperUrl: string, code?: string): string {
+  const follow = `Follow ${origin}/agent/add/${what} for ${paperUrl}`;
+  return code ? `${follow}. My sign-in code: ${code}` : `${follow}.`;
+}

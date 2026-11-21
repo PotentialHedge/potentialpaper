@@ -137,7 +137,17 @@ export function Comments({ paper, path }: { paper: PaperId; path: string }) {
       {!first ? (
         <p className={ui.fine}>{failed ? 'The discussion could not be loaded.' : 'Loading the discussion…'}</p>
       ) : viewer?.canComment ? (
-        <CommentForm paper={paper} viewer={viewer} onPosted={() => void reload()} />
+        <CommentForm
+          paper={paper}
+          viewer={viewer}
+          onPosted={() => void reload()}
+          // With no comments yet, the box says so itself, instead of a second line under it.
+          placeholder={
+            threads.length === 0
+              ? 'No comments yet. Questions, critique and pointers to related work are welcome.'
+              : undefined
+          }
+        />
       ) : (
         <p className={`${ui.fine} font-sans`}>
           {viewer ? (
@@ -155,7 +165,7 @@ export function Comments({ paper, path }: { paper: PaperId; path: string }) {
         </p>
       )}
 
-      {first && threads.length === 0 && (
+      {first && threads.length === 0 && !viewer?.canComment && (
         <p className={ui.empty}>No comments yet. Questions, critique and pointers to related work are welcome.</p>
       )}
 

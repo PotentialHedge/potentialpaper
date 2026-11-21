@@ -2,6 +2,7 @@
 
 import { useState } from 'react';
 import { agentPrompt } from '@/lib/agent-prompt';
+import { AgentPromptField } from './AgentPromptField';
 import { ui } from './ui';
 
 /**
@@ -80,16 +81,8 @@ export function OnboardAgent({
       </button>
       {state === 'copied' && <p className={ui.fine}>Paste it into your AI agent.</p>}
       {state === 'shown' && (
-        <div className="mt-2 text-left">
-          <p className={`${ui.fine} mb-1`}>Copy this into your AI agent:</p>
-          <textarea
-            readOnly
-            value={prompt}
-            rows={3}
-            aria-label="Prompt for your AI agent"
-            className={`${ui.input} font-mono text-xs`}
-            onFocus={(e) => e.currentTarget.select()}
-          />
+        <div className="text-left">
+          <AgentPromptField prompt={prompt} label="Copy this into your AI agent:" />
         </div>
       )}
       {state === 'failed' && <div className={ui.note(false)}>Could not make the prompt. Try again in a moment.</div>}

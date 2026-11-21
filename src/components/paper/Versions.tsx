@@ -10,6 +10,8 @@ import {
   type VersionSubmission,
 } from '@/lib/versions';
 import { toolPath } from '@/lib/page-tools';
+import { paperPath } from '@/lib/paper-ids';
+import { AddMissing } from '@/components/paper/AddMissing';
 import { Fold } from '@/components/paper/Fold';
 
 /**
@@ -86,6 +88,7 @@ export function VersionsSection({
 }) {
   const [a, b] = defaults(versions);
   const comparable = versions.length >= 2;
+  const here = paperPath(canonical);
   return (
     <Fold
       id="versions"
@@ -102,14 +105,10 @@ export function VersionsSection({
       }
     >
       {versions.length === 0 ? (
-        <p className={ui.empty}>
-          No versions are recorded yet.{' '}
-          <a href="#edit" rel="nofollow">
-            Add them
-          </a>
-          : its preprint, the venues it went to and what they decided, the camera-ready, a file each in{' '}
-          <code>versions/</code>.
-        </p>
+        <div className={ui.empty}>
+          No versions are recorded yet: its preprint, the venues it went to and what they decided, the camera-ready.{' '}
+          <AddMissing what="version" paperPath={here} />
+        </div>
       ) : (
         <form action={toolPath('versions', { kind: 'paper', id: canonical })} method="get">
           <div className={ui.tableScroll}>
@@ -199,14 +198,19 @@ export function VersionsSection({
               </tbody>
             </table>
           </div>
-          {comparable && (
-            <p className="mt-2 flex flex-wrap items-baseline gap-x-3 font-sans text-sm">
-              <button type="submit" className={ui.btn({ inline: true, ghost: true, flush: true })}>
-                Compare A with B
-              </button>
-              <span className={ui.fine}>Their titles, abstracts and, where both have a PDF, the text.</span>
-            </p>
-          )}
+          <div className="mt-2 flex flex-wrap items-baseline gap-x-3 font-sans text-sm">
+            {comparable && (
+              <>
+                <button type="submit" className={ui.btn({ inline: true, ghost: true, flush: true })}>
+                  Compare A with B
+                </button>
+                <span className={ui.fine}>Their titles, abstracts and, where both have a PDF, the text.</span>
+              </>
+            )}
+            <span className="text-xs">
+              <AddMissing what="version" paperPath={here} />
+            </span>
+          </div>
         </form>
       )}
     </Fold>
@@ -214,11 +218,20 @@ export function VersionsSection({
 }
 
 /** Beside the page: each version on a line, with what its latest venue decided. */
-export function VersionsBox({ versions }: { versions: PaperVersion[] }) {
+export function VersionsBox({
+  versions,
+  paperPath,
+}: {
+  versions: PaperVersion[];
+  paperPath: string;
+}) {
   if (versions.length === 0) return null;
   return (
     <div className={ui.box}>
-      <h2 className={ui.boxHeading}>Versions</h2>
+      <div className={ui.boxHeadingRow}>
+        <h2 className={ui.runIn}>Versions</h2>
+        <AddMissing what="version" paperPath={paperPath} compact />
+      </div>
       <ul className="space-y-1">
         {versions.map((v) => {
           const last = v.submissions?.at(-1);
