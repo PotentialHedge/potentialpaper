@@ -1,5 +1,6 @@
 'use client';
 
+import { Select } from '@/components/Select';
 import { useEffect, useRef, useState, type FormEvent } from 'react';
 import { ui } from '@/components/ui';
 import { STATUS_LABELS, type SubmissionStatus } from '@/lib/submissions';
@@ -125,8 +126,9 @@ export function VenuePapersList({
         {decisions.length > 1 && (
           <label className="flex items-center gap-1.5">
             <span className="text-muted">Decision</span>
-            <select
-              className="border border-rule bg-card p-1 font-sans text-sm narrow:text-base"
+            <Select
+              compact
+              className=""
               value={filter.decision ?? ''}
               onChange={(event) => setFilter((f) => ({ ...f, decision: event.target.value || null }))}
             >
@@ -136,7 +138,7 @@ export function VenuePapersList({
                   {d.decision} ({d.count.toLocaleString('en')})
                 </option>
               ))}
-            </select>
+            </Select>
           </label>
         )}
         <form onSubmit={search} className="flex min-w-[220px] flex-1" role="search">

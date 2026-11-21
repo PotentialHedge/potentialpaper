@@ -141,3 +141,18 @@ export function CheckIcon({ className = 'size-[1em]' }: { className?: string }) 
     </svg>
   );
 }
+
+export function ChevronDownIcon({ className = 'size-3' }: { className?: string }) {
+  return (
+    <svg
+      viewBox="0 0 12 12"
+      className={className}
+      aria-hidden="true"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth="1.5"
+    >
+      <path d="M2.5 4.5 6 8l3.5-3.5" />
+    </svg>
+  );
+}

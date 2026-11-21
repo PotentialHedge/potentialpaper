@@ -1,3 +1,4 @@
+import { Select } from '@/components/Select';
 import type { Metadata } from 'next';
 import { first, ToolHeader, toolPaper, type ToolParams, type ToolSearchParams } from '@/components/pages/page-tools';
 import { toolPath } from '@/lib/page-tools';
@@ -70,19 +71,14 @@ function Side({ version, side }: { version: PaperVersion; side: 'A' | 'B' }) {
 
 function Picker({ versions, name, value }: { versions: PaperVersion[]; name: 'a' | 'b'; value: string }) {
   return (
-    <select
-      name={name}
-      defaultValue={value}
-      aria-label={name === 'a' ? 'Version A' : 'Version B'}
-      className={`${ui.input} mb-0 w-auto`}
-    >
+    <Select name={name} defaultValue={value} aria-label={name === 'a' ? 'Version A' : 'Version B'} className="">
       {versions.map((v) => (
         <option key={v.id} value={v.id}>
           {[formatVersionDate(v.date), v.label].filter(Boolean).join(' · ')}
           {v.pdf ? '' : ' (no PDF)'}
         </option>
       ))}
-    </select>
+    </Select>
   );
 }
 

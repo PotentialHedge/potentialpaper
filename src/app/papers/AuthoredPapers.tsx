@@ -4,6 +4,7 @@ import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { useState, type FormEvent } from 'react';
 import { Modal } from '@/components/Modal';
+import { Select } from '@/components/Select';
 import { ui } from '@/components/ui';
 import type { PaperId } from '@/lib/paper-ids';
 import type { AuthoredPaper, WaitingClaim } from '@/server/my-papers';
@@ -203,14 +204,7 @@ function CoAuthors({ row }: { row: AuthoredRow }) {
           </p>
           <div className="flex flex-wrap items-start gap-x-2 narrow:flex-col narrow:items-stretch">
             <span className="min-w-0 flex-1">
-              <select
-                name="author"
-                defaultValue=""
-                className={ui.input}
-                aria-label="Which author they are"
-                required
-                data-autofocus
-              >
+              <Select name="author" defaultValue="" aria-label="Which author they are" required data-autofocus>
                 <option value="" disabled>
                   Which author they are…
                 </option>
@@ -219,7 +213,7 @@ function CoAuthors({ row }: { row: AuthoredRow }) {
                     {a.name}
                   </option>
                 ))}
-              </select>
+              </Select>
             </span>
             <span className="min-w-0 flex-1">
               <input
@@ -232,7 +226,11 @@ function CoAuthors({ row }: { row: AuthoredRow }) {
                 required
               />
             </span>
-            <button type="submit" className={ui.btn({ inline: true, flush: true })} disabled={busy}>
+            <button
+              type="submit"
+              className={`${ui.btn({ inline: true, flush: true })} border border-transparent`}
+              disabled={busy}
+            >
               {busy ? 'Adding…' : 'Add'}
             </button>
           </div>
