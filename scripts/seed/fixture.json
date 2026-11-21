@@ -5,6 +5,191 @@
    "name": "ICLR 2026",
    "year": 2026,
    "anonymous": false,
+   "url": "https://openreview.net/group?id=ICLR.cc%2F2026%2FConference",
+   "license": "CC-BY-4.0",
+   "forms": {
+    "Meta_Review": {
+     "label": "Meta-review",
+     "fields": [
+      {
+       "key": "metareview",
+       "label": "Meta-review",
+       "type": "text"
+      },
+      {
+       "key": "summary",
+       "label": "Summary",
+       "type": "text"
+      },
+      {
+       "key": "additional_comments_on_reviewer_discussion",
+       "label": "Reviewer discussion",
+       "type": "text"
+      },
+      {
+       "key": "recommendation",
+       "label": "Recommendation",
+       "type": "choice"
+      }
+     ]
+    },
+    "Decision": {
+     "label": "Decision",
+     "fields": [
+      {
+       "key": "title",
+       "label": "Title",
+       "hidden": true
+      },
+      {
+       "key": "decision",
+       "label": "Decision",
+       "type": "choice"
+      },
+      {
+       "key": "comment",
+       "label": "Comment",
+       "type": "text"
+      }
+     ]
+    },
+    "Official_Comment": {
+     "label": "Comment",
+     "fields": [
+      {
+       "key": "title",
+       "label": "Title",
+       "type": "choice"
+      },
+      {
+       "key": "comment",
+       "label": "Comment",
+       "type": "text"
+      }
+     ]
+    },
+    "Public_Comment": {
+     "label": "Public comment",
+     "fields": [
+      {
+       "key": "title",
+       "label": "Title",
+       "type": "choice"
+      },
+      {
+       "key": "comment",
+       "label": "Comment",
+       "type": "text"
+      }
+     ]
+    },
+    "Withdrawal": {
+     "label": "Withdrawal",
+     "fields": [
+      {
+       "key": "withdrawal_confirmation",
+       "label": "Confirmation",
+       "hidden": true
+      }
+     ]
+    },
+    "Desk_Rejection": {
+     "label": "Desk rejection",
+     "fields": [
+      {
+       "key": "desk_reject_comments",
+       "label": "Reason",
+       "type": "text"
+      }
+     ]
+    },
+    "Official_Review": {
+     "label": "Official review",
+     "summary": [
+      "rating",
+      "confidence",
+      "soundness",
+      "presentation",
+      "contribution"
+     ],
+     "fields": [
+      {
+       "key": "rating",
+       "label": "Rating",
+       "type": "score",
+       "min": 0,
+       "max": 10
+      },
+      {
+       "key": "confidence",
+       "label": "Confidence",
+       "type": "score",
+       "min": 1,
+       "max": 5
+      },
+      {
+       "key": "soundness",
+       "label": "Soundness",
+       "type": "score",
+       "min": 1,
+       "max": 4
+      },
+      {
+       "key": "presentation",
+       "label": "Presentation",
+       "type": "score",
+       "min": 1,
+       "max": 4
+      },
+      {
+       "key": "contribution",
+       "label": "Contribution",
+       "type": "score",
+       "min": 1,
+       "max": 4
+      },
+      {
+       "key": "summary",
+       "label": "Summary",
+       "type": "text"
+      },
+      {
+       "key": "strengths",
+       "label": "Strengths",
+       "type": "text"
+      },
+      {
+       "key": "weaknesses",
+       "label": "Weaknesses",
+       "type": "text"
+      },
+      {
+       "key": "questions",
+       "label": "Questions",
+       "type": "text"
+      },
+      {
+       "key": "flag_for_ethics_review",
+       "label": "Flag for ethics review",
+       "type": "choice",
+       "omitWhen": [
+        "No",
+        "No ethics review needed."
+       ]
+      },
+      {
+       "key": "details_of_ethics_concerns",
+       "label": "Ethics concerns",
+       "type": "text"
+      },
+      {
+       "key": "code_of_conduct",
+       "label": "Code of conduct",
+       "hidden": true
+      }
+     ]
+    }
+   },
    "papers": [
     {
      "id": "00F7BfXLYJ",
@@ -6345,6 +6530,186 @@
    "name": "ICLR 2027",
    "year": 2027,
    "anonymous": true,
+   "url": "https://openreview.net/group?id=ICLR.cc%2F2027%2FConference",
+   "license": "CC-BY-4.0",
+   "forms": {
+    "Meta_Review": {
+     "label": "Meta-review",
+     "fields": [
+      {
+       "key": "metareview",
+       "label": "Meta-review",
+       "type": "text"
+      },
+      {
+       "key": "summary",
+       "label": "Summary",
+       "type": "text"
+      },
+      {
+       "key": "additional_comments_on_reviewer_discussion",
+       "label": "Reviewer discussion",
+       "type": "text"
+      },
+      {
+       "key": "recommendation",
+       "label": "Recommendation",
+       "type": "choice"
+      }
+     ]
+    },
+    "Decision": {
+     "label": "Decision",
+     "fields": [
+      {
+       "key": "title",
+       "label": "Title",
+       "hidden": true
+      },
+      {
+       "key": "decision",
+       "label": "Decision",
+       "type": "choice"
+      },
+      {
+       "key": "comment",
+       "label": "Comment",
+       "type": "text"
+      }
+     ]
+    },
+    "Official_Comment": {
+     "label": "Comment",
+     "fields": [
+      {
+       "key": "title",
+       "label": "Title",
+       "type": "choice"
+      },
+      {
+       "key": "comment",
+       "label": "Comment",
+       "type": "text"
+      }
+     ]
+    },
+    "Public_Comment": {
+     "label": "Public comment",
+     "fields": [
+      {
+       "key": "title",
+       "label": "Title",
+       "type": "choice"
+      },
+      {
+       "key": "comment",
+       "label": "Comment",
+       "type": "text"
+      }
+     ]
+    },
+    "Withdrawal": {
+     "label": "Withdrawal",
+     "fields": [
+      {
+       "key": "withdrawal_confirmation",
+       "label": "Confirmation",
+       "hidden": true
+      }
+     ]
+    },
+    "Desk_Rejection": {
+     "label": "Desk rejection",
+     "fields": [
+      {
+       "key": "desk_reject_comments",
+       "label": "Reason",
+       "type": "text"
+      }
+     ]
+    },
+    "Official_Review": {
+     "label": "Official review",
+     "summary": [
+      "rating",
+      "confidence",
+      "soundness",
+      "presentation",
+      "informativeness"
+     ],
+     "fields": [
+      {
+       "key": "rating",
+       "label": "Rating",
+       "type": "score",
+       "min": 1,
+       "max": 4
+      },
+      {
+       "key": "confidence",
+       "label": "Confidence",
+       "type": "score",
+       "min": 1,
+       "max": 4
+      },
+      {
+       "key": "soundness",
+       "label": "Soundness",
+       "type": "score",
+       "min": 1,
+       "max": 3
+      },
+      {
+       "key": "presentation",
+       "label": "Presentation",
+       "type": "score",
+       "min": 1,
+       "max": 3
+      },
+      {
+       "key": "informativeness",
+       "label": "Informativeness",
+       "type": "score",
+       "min": 1,
+       "max": 3
+      },
+      {
+       "key": "paper_summary",
+       "label": "Summary",
+       "type": "text"
+      },
+      {
+       "key": "critical_strengths",
+       "label": "Strengths",
+       "type": "text"
+      },
+      {
+       "key": "critical_weaknesses",
+       "label": "Weaknesses",
+       "type": "text"
+      },
+      {
+       "key": "questions_for_authors",
+       "label": "Questions for the authors",
+       "type": "text"
+      },
+      {
+       "key": "flag_for_ethics_review",
+       "label": "Flag for ethics review",
+       "type": "choice",
+       "omitWhen": [
+        "No",
+        "No ethics review needed."
+       ]
+      },
+      {
+       "key": "details_of_ethics_concerns",
+       "label": "Ethics concerns",
+       "type": "text"
+      }
+     ]
+    }
+   },
    "papers": [
     {
      "id": "001PJNwZiT",
@@ -38231,6 +38596,9 @@
    "name": "NeurIPS 2026",
    "year": 2026,
    "anonymous": false,
+   "url": "https://openreview.net/group?id=NeurIPS.cc%2F2026%2FConference",
+   "license": "CC-BY-4.0",
+   "forms": {},
    "papers": [
     {
      "id": "uhy1JdsQsE",

@@ -31,10 +31,20 @@ export interface PageCommon {
 export const EDIT = '#edit';
 
 /** How each kind asks its owners in, while it has none, and once it has some. */
-const ASK: Partial<Record<OwnersInfo['claim'], { question: string; action: string; join: string }>> = {
-  authors: { question: 'Are you an author?', action: 'Claim this paper', join: 'also an author?' },
-  organisers: { question: 'Organise this venue?', action: 'Claim it', join: 'also organising?' },
-  domain: { question: 'A member?', action: 'See how', join: 'how to join' },
+const ASK: Partial<Record<OwnersInfo['claim'], { question: string; action: string; join: string; pitch: string }>> = {
+  authors: {
+    question: 'Are you an author?',
+    action: 'Claim this paper',
+    join: 'also an author?',
+    pitch: "to see who's reading it, with views and other statistics, and to write about it here.",
+  },
+  organisers: {
+    question: 'Organise this venue?',
+    action: 'Claim it',
+    join: 'also organising?',
+    pitch: "to see who's reading it, with views and other statistics, and to write here.",
+  },
+  domain: { question: 'A member?', action: 'See how', join: 'how to join', pitch: 'to write here.' },
 };
 
 /** What to write in a community part nobody has started, by kind. */
@@ -70,10 +80,10 @@ export function Sections({ kind, address, ownersHtml, communityHtml, owners }: P
           {ask && !owners.claimed ? (
             <p className={`${ui.fine} font-sans`}>
               {ask.question}{' '}
-              <a href={owners.claimPath ?? undefined} rel="nofollow">
+              <a href={owners.claimPath ?? undefined} rel="nofollow" className="font-semibold text-accent">
                 {ask.action}
               </a>{' '}
-              to write here.
+              {ask.pitch}
             </p>
           ) : (
             both && (

@@ -20,9 +20,9 @@ import type { Actor } from '@/server/pages/check';
 import { findPage } from '@/server/pages/kinds';
 import { createTopic, linkPaperToTopic } from '@/server/topic-pages';
 import { syncVenuePages } from '@/server/venue-pages';
-import { openReviewForms } from '@/server/venue-sources/iclr-forms';
-import { forumUrl, OPENREVIEW_NOTE_LICENSE, venueUrl } from '@/server/venue-sources/openreview';
 import { FIXTURE_PATH, type Fixture } from './fixture';
+
+const forumUrl = (forum: string) => `https://openreview.net/forum?id=${forum}`;
 
 /**
  * `npm run db:seed`: wipes the database in DATABASE_URL, migrates it, and fills it with a small dev data set through
@@ -120,9 +120,9 @@ async function papers(fixture: Fixture) {
         source: 'openreview',
         id: venue.group,
         name: venue.name,
-        url: venueUrl(venue.group),
-        forms: openReviewForms(venue.group),
-        license: OPENREVIEW_NOTE_LICENSE,
+        url: venue.url,
+        forms: venue.forms,
+        license: venue.license,
       },
       venue.papers.map((p) => ({
         externalId: p.id,

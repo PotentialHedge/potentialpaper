@@ -1,5 +1,5 @@
 import type { NoteInput } from '@/server/import-reviews';
-import type { SubmissionStatus } from '@/lib/submissions';
+import type { SubmissionStatus, VenueForms } from '@/lib/submissions';
 
 /** The dev fixture: a few real papers per venue, with what OpenReview published about them. */
 export const FIXTURE_PATH = 'scripts/seed/fixture.json';
@@ -35,6 +35,12 @@ export interface FixtureVenue {
   group: string;
   name: string;
   year: number;
+  /** Its page on OpenReview. */
+  url: string;
+  /** The license of its notes. */
+  license: string;
+  /** How to show each kind of its notes, by OpenReview's name for it. */
+  forms: VenueForms;
   /** Under review: no authors, and the papers are named "<name> (under review)". */
   anonymous: boolean;
   papers: FixturePaper[];

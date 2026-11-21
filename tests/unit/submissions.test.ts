@@ -10,14 +10,6 @@ import {
   type SubmissionNote,
   type VenueForms,
 } from '@/lib/submissions';
-import {
-  licenseId,
-  noteKind,
-  parseReply,
-  signatureName,
-  submissionStatus,
-  type OpenReviewNote,
-} from '@/server/venue-sources/openreview';
 
 const REVIEW_FORM: NoteForm = {
   label: 'Official review',
@@ -149,84 +141,5 @@ describe('threads', () => {
     ]);
     const all = (list: typeof forum): string[] => list.flatMap((t) => [t.note.externalId, ...all(t.replies)]);
     expect(all(forum).sort()).toEqual(['a', 'b']);
-  });
-});
-
-describe('OpenReview notes', () => {
-  const REVIEW: OpenReviewNote = {
-    id: 'n1',
-    forum: 'f1',
-    replyto: 'f1',
-    invitations: ['ICLR.cc/2027/Conference/Submission2/-/Official_Review', 'ICLR.cc/2027/Conference/-/Edit'],
-    signatures: ['ICLR.cc/2027/Conference/Submission2/Reviewer_B3x7'],
-    readers: ['everyone'],
-    content: { rating: { value: 4 }, summary: { value: 'Fine\u0000.' }, nested: { value: { a: 1 } } },
-    license: 'CC BY 4.0',
-    cdate: 1793848807349,
-  };
-
-  it('become notes with their kind, writer, license and link', () => {
-    expect(parseReply(REVIEW)).toMatchObject({
-      externalId: 'n1',
-      replyTo: null,
-      kind: 'review',
-      invitation: 'Official_Review',
-      signature: 'Reviewer B3x7',
-      content: { rating: 4, summary: 'Fine.' },
-      license: 'CC-BY-4.0',
-      url: 'https://openreview.net/forum?id=f1&noteId=n1',
-    });
-  });
-
-  it('are kept only when everyone may read them', () => {
-    expect(parseReply({ ...REVIEW, readers: ['ICLR.cc/2027/Conference/Program_Chairs'] })).toBeNull();
-    expect(parseReply({ ...REVIEW, ddate: 1 })).toBeNull();
-    expect(parseReply({ ...REVIEW, id: 'f1' })).toBeNull();
-  });
-
-  it('keep the note they answer', () => {
-    expect(parseReply({ ...REVIEW, replyto: 'n0' })?.replyTo).toBe('n0');
-  });
-
-  it('are sorted into kinds', () => {
-    expect(
-      [
-        'Official_Review',
-        'Ethics_Review',
-        'Meta_Review',
-        'Decision',
-        'Official_Comment',
-        'Rebuttal',
-        'Withdrawal',
-        'Revision',
-      ].map(noteKind),
-    ).toEqual(['review', 'review', 'meta_review', 'decision', 'comment', 'comment', 'withdrawal', 'other']);
-  });
-
-  it('name their writer as OpenReview does', () => {
-    expect(signatureName('ICLR.cc/2026/Conference/Submission3/Area_Chair_qfG5')).toBe('Area Chair qfG5');
-    expect(signatureName('ICLR.cc/2026/Conference/Program_Chairs')).toBe('Program Chairs');
-    expect(signatureName('~Ada_Lovelace1')).toBe('Ada Lovelace');
-    expect(signatureName(undefined)).toBe('Anonymous');
-  });
-
-  it('record licenses as SPDX ids', () => {
-    expect(licenseId('CC BY 4.0')).toBe('CC-BY-4.0');
-    expect(licenseId('CC BY-SA 4.0')).toBe('CC-BY-SA-4.0');
-    expect(licenseId('CC0 1.0')).toBe('CC0-1.0');
-    expect(licenseId('Custom')).toBe('Custom');
-  });
-});
-
-describe('where a submission stands', () => {
-  it('follows the venue id it is filed under, then its decision', () => {
-    expect(submissionStatus('ICLR.cc/2027/Conference/Submission', null)).toBe('under_review');
-    expect(submissionStatus('ICLR.cc/2026/Conference/Withdrawn_Submission', null)).toBe('withdrawn');
-    expect(submissionStatus('ICLR.cc/2026/Conference/Desk_Rejected_Submission', null)).toBe('desk_rejected');
-    expect(submissionStatus('ICLR.cc/2026/Conference/Rejected_Submission', null)).toBe('rejected');
-    expect(submissionStatus('ICLR.cc/2026/Conference', null)).toBe('accepted');
-    expect(submissionStatus('ICLR.cc/2026/Conference/Submission', 'Accept (Poster)')).toBe('accepted');
-    expect(submissionStatus('ICLR.cc/2026/Conference/Submission', 'Reject')).toBe('rejected');
-    expect(submissionStatus(null, null)).toBeNull();
   });
 });

@@ -43,7 +43,6 @@ import { getDb } from '@/db';
 import { refreshPageIds, refreshPages, refreshPaperPages } from '../pages/refresh';
 import { fetchPdf, storeFile } from '../files';
 import { mergeFoundVersions, setVersions, versionsAt } from '../versions';
-import { lookUpVersions } from '../version-sources';
 import { consume, type RateLimitConfig } from '../ratelimit';
 import { sortVersions, type VersionPdf } from '@/lib/versions';
 import { setFirstPassword, startOnboarding } from '../onboarding';
@@ -420,35 +419,6 @@ export const postVersions = route(async (req) => {
   if (result.status === 'committed') await refreshPaperPages(identifiers);
   notifyEdit(paper.id, principal, result);
   return respond(S.PageCommitted, committed(result), { principal });
-});
-
-const LOOKUP_BUDGET: RateLimitConfig = { burst: 10, perSecond: 10 / 3600 };
-
-/**
- * Finds the paper's versions on OpenReview and arXiv, copies their PDFs where the license allows, and answers
- * with the page's versions with them folded in. Commits nothing: the editor shows the list to be checked.
- */
-export const postVersionsLookup = route(async (req) => {
-  const principal = await requireVerified(req);
-  const { paper: id, arxiv } = await parseBody(req, S.VersionsLookupBody);
-  const { paper, identifiers } = await knownPaper(id.scheme, id.value);
-  const budget = await consume(`version-lookup:${principal.account.id}`, LOOKUP_BUDGET);
-  if (!budget.allowed) {
-    throw new ApiError(429, 'rate_limited', 'too many look-ups; try again later', {
-      retryAfterSeconds: budget.retryAfterSeconds,
-    });
-  }
-  const { versions: existing } = await versionsAt(paper.id);
-  // PDFs the page already holds, by where they were copied from, so a lookup doesn't copy them again.
-  const known = new Map<string, VersionPdf>();
-  for (const v of existing) if (v.pdf?.source) known.set(v.pdf.source, v.pdf);
-  const { versions: found, problems } = await lookUpVersions({
-    title: paper.title,
-    arxiv: arxiv ?? identifiers.find((i) => i.scheme === 'arxiv')?.value ?? null,
-    accountId: principal.account.id,
-    known,
-  });
-  return respond(S.VersionsLookup, { versions: mergeFoundVersions(existing, found), problems }, { principal });
 });
 
 /**

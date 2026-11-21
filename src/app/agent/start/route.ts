@@ -130,7 +130,6 @@ Posts are not edits: the paper's author and community sections are written by pe
 A paper is one page however many versions it has had: arXiv v1 and v2, a workshop, a conference that rejected it, the one that accepted it, the camera-ready. Its **versions** list the texts it has had, oldest first, each with its PDF (every PDF of a paper is a version's), where it was submitted and what each venue decided, and **evidence** that it is what it says. Versions are facts anyone verified may add, so you may add or correct them, with the person's go-ahead like a post, and only with evidence: a forum, an accepted-papers list, a proceedings entry. Never guess a decision.
 
 - \`GET ${api}/pages/versions?scheme=<scheme>&value=<value>\`: \`{ "head", "versions" }\`. Keep \`head\` to send back as \`baseOid\`.
-- \`POST ${api}/pages/versions/lookup\` \`{ "paper": {…}, "arxiv": "2606.18022" }\` (\`arxiv\` optional): finds the paper's forums on OpenReview (every venue with its exact title) and its arXiv versions, copies their PDFs here where the license allows, and answers with the page's versions with what it found folded in. Nothing is saved: check it, then post it.
 - \`POST ${api}/pages/versions\` saves the whole list, merged with whatever changed since \`baseOid\`:
 
 \`\`\`

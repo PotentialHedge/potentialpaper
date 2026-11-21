@@ -273,21 +273,6 @@ export const VersionsBody = z.object({
   evidence: Evidence,
 });
 
-/** Looks the paper up on OpenReview and arXiv; `arxiv` names its arXiv id when the title won't find it. */
-export const VersionsLookupBody = z.object({
-  paper: PaperIdentifier,
-  arxiv: z
-    .string()
-    .regex(/^(\d{4}\.\d{4,5}|[a-z-]+(\.[A-Z]{2})?\/\d{7})(v\d+)?$/)
-    .optional(),
-});
-
-/** The page's versions with what was found folded in, for the editor to check and save. Nothing is saved. */
-export const VersionsLookup = z.object({
-  versions: z.array(PaperVersionSchema.extend({ id: z.string().optional() })),
-  problems: z.array(z.string()),
-});
-
 /** A file to back up an edit, or a version's PDF, copied from an archive by the server. */
 export const FileFetchBody = z.object({ url: z.url().max(2000) });
 
