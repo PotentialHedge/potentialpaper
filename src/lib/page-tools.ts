@@ -1,4 +1,4 @@
-import { type PageAddress, pagePath } from './kinds';
+import { type PageAddress, identifierPath } from './kinds';
 
 /**
  * The tools of a page of any kind (`app/<tool>/[scheme]/[...value]`), each at its own prefix in front of the page's
@@ -8,5 +8,5 @@ import { type PageAddress, pagePath } from './kinds';
 export type Tool = 'edit' | 'code' | 'history' | 'diff' | 'claim' | 'versions';
 
 export function toolPath(tool: Tool, address: PageAddress, query = ''): string {
-  return `/${tool}${pagePath(address)}${query ? `?${query}` : ''}`;
+  return `/${tool}${identifierPath(address)}${query ? `?${query}` : ''}`;
 }

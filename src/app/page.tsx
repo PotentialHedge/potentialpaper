@@ -15,7 +15,7 @@ import { Popover, PopoverClose, PopoverContent, PopoverTrigger } from '@/compone
 import { SearchInput } from '@/components/SearchInput';
 import { ui } from '@/components/ui';
 import { DISMISSED_COOKIE, parseDismissed } from '@/lib/announcements';
-import { paperIdFromText, paperPath, sourceLinks } from '@/lib/paper-ids';
+import { paperIdFromText, paperPath, shortPath, sourceLinks } from '@/lib/paper-ids';
 import { parseSearch } from '@/lib/query';
 import { normalizeSearch, SEARCH_MAX_LENGTH, SEARCH_SORTS, type SearchSort } from '@/lib/search';
 import { institutionNames } from '@/server/affiliations';
@@ -431,7 +431,7 @@ function Row({ hit, detailed }: { hit: SearchHit; detailed: boolean }) {
     venue: hit.venue,
     year: hit.year,
     pdf: hit.pdf ?? sourceLinks(hit).find((link) => link.label === 'PDF')?.url ?? null,
-    href: paperPath(hit),
+    href: shortPath(hit.shortId),
   };
   return (
     <>

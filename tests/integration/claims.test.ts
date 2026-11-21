@@ -147,7 +147,7 @@ describe('My papers and co-authors', () => {
       expect.objectContaining({
         title: 'Attention Is All You Need',
         paper: PAPER,
-        path: '/abs/1706.03762',
+        path: expect.stringMatching(/^\/s\/\d+$/),
         mine: expect.objectContaining({ authorName: 'Ashish Vaswani', status: 'confirmed' }),
         confirmed: [{ authorIndex: 0, authorName: 'Ashish Vaswani' }],
         waiting: [],

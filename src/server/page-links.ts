@@ -121,7 +121,14 @@ async function linkedPages(db: Reader, ids: readonly string[]): Promise<Map<stri
   const out = new Map<string, LinkedPage>();
   if (ids.length === 0) return out;
   const rows = await db
-    .select({ id: pages.id, kind: pages.kind, key: pages.key, name: pageCurrent.name, title: papers.title })
+    .select({
+      id: pages.id,
+      kind: pages.kind,
+      key: pages.key,
+      shortId: pages.shortId,
+      name: pageCurrent.name,
+      title: papers.title,
+    })
     .from(pages)
     .leftJoin(pageCurrent, eq(pageCurrent.pageId, pages.id))
     .leftJoin(papers, eq(papers.id, pages.id))
@@ -140,7 +147,7 @@ async function linkedPages(db: Reader, ids: readonly string[]): Promise<Map<stri
       out.set(row.id, {
         pageId: row.id,
         kind: 'paper',
-        address: id ? { kind: 'paper', id: { scheme: id.scheme, value: id.value } } : null,
+        address: id ? { kind: 'paper', id: { scheme: id.scheme, value: id.value }, shortId: row.shortId } : null,
         name: row.title,
       });
     } else {

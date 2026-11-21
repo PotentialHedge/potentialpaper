@@ -4,6 +4,7 @@ import {
   PAPER_SCHEMES,
   PATH_PREFIX,
   paperPath,
+  shortPath,
   parsePaperId,
   type PaperId,
   type PaperScheme,
@@ -296,7 +297,11 @@ export function keyProblem(kind: KeyedKind, key: string): string | null {
 }
 
 /** A page as its public identifier names it: a paper by one of its identifiers, any other kind by its key. */
-export type PageAddress = { kind: 'paper'; id: PaperId } | { kind: KeyedKind; key: string };
+/**
+ * A page's address. A paper's is its short one, `/s/<n>`, when `shortId` is known (`pagePath`); its identifier still
+ * names it, and the page tools are in front of the identifier's path (`identifierPath`).
+ */
+export type PageAddress = { kind: 'paper'; id: PaperId; shortId?: number } | { kind: KeyedKind; key: string };
 
 /**
  * A public identifier (DESIGN.md §8), as a link's `to` holds it: `arxiv:1706.03762`, `doi:10.…`,
@@ -326,8 +331,14 @@ export function keyedPagePath(kind: KeyedKind, key: string): string {
   return `${KINDS[kind].route}/${key.split('/').map(encodeURIComponent).join('/')}`;
 }
 
-/** Any page's address on the site. */
+/** Any page's address on the site: a paper's short one where its `shortId` is known. */
 export function pagePath(address: PageAddress): string {
+  if (address.kind === 'paper' && address.shortId !== undefined) return shortPath(address.shortId);
+  return identifierPath(address);
+}
+
+/** A page's path by its identifier (`/abs/1706.03762`, `/v/iclr/2027`), which the page tools go in front of. */
+export function identifierPath(address: PageAddress): string {
   return address.kind === 'paper' ? paperPath(address.id) : keyedPagePath(address.kind, address.key);
 }
 

@@ -22,7 +22,7 @@ export function resubmitted(
   const sqlite = new DatabaseSync(scrape, { readOnly: true });
   const candidates = sqlite
     .prepare(
-      `select s.id, s.number, s.title, s.abstract, s.authors, s.keywords, s.venueid
+      `select s.id, s.number, s.title, s.abstract, s.authors, s.keywords, s.venueid, s.cdate
        from submissions s join (select forum, count(*) n from replies group by forum) r on r.forum = s.id
        where length(s.abstract) >= 200 and r.n <= ${MAX_REPLIES} order by s.id`,
     )
@@ -34,6 +34,7 @@ export function resubmitted(
     authors: string | null;
     keywords: string | null;
     venueid: string | null;
+    cdate: number | null;
   }[];
   const repliesOf = sqlite.prepare(`select raw from replies where forum = ? order by cdate`);
   const perStatus = new Map<string, number>();
@@ -60,6 +61,8 @@ export function resubmitted(
         abstract: row.abstract,
         authors: JSON.parse(row.authors ?? '[]') as string[],
         keywords: JSON.parse(row.keywords ?? '[]') as string[],
+        ...(row.cdate ? { submittedAt: new Date(row.cdate).toISOString() } : {}),
+        ...(row.cdate ? { submittedAt: new Date(row.cdate).toISOString() } : {}),
         status,
         decision: decisionText,
         notes,

@@ -25,6 +25,7 @@ interface Row {
   authors: string | null;
   keywords: string | null;
   venueid: string | null;
+  cdate: number | null;
 }
 
 function main() {
@@ -48,7 +49,7 @@ function main() {
   const hasReplies = (sqlite.prepare(`select count(*) n from replies`).get() as { n: number }).n > 0;
   const rows = sqlite
     .prepare(
-      `select s.id, s.number, s.title, s.abstract, s.authors, s.keywords, s.venueid
+      `select s.id, s.number, s.title, s.abstract, s.authors, s.keywords, s.venueid, s.cdate
        from submissions s left join (select forum, count(*) n from replies group by forum) r on r.forum = s.id
        where length(s.abstract) >= 200 and coalesce(r.n, 0) <= ${MAX_REPLIES} ${hasReplies ? 'and r.n > 0' : ''}
        order by s.id`,
@@ -75,6 +76,7 @@ function main() {
       abstract: row.abstract ?? '',
       authors: values.anonymous ? [] : (JSON.parse(row.authors ?? '[]') as string[]),
       keywords: JSON.parse(row.keywords ?? '[]') as string[],
+      ...(row.cdate ? { submittedAt: new Date(row.cdate).toISOString() } : {}),
       status,
       decision: decisionText,
       notes,

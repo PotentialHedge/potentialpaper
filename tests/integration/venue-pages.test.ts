@@ -226,7 +226,7 @@ describe("a venue's pages", () => {
     expect(route.body.papers[0]).toMatchObject({
       title: 'Linear attention, again',
       identifier: 'openreview:forum2',
-      address: '/openreview/forum2',
+      address: expect.stringMatching(/^\/s\/\d+$/),
       decision: 'Accept (Poster)',
     });
     const onSeries = await api('GET', `/pages/${encodeURIComponent('venue:iclr')}/venue-papers?q=older`);

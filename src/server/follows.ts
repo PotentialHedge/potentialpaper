@@ -5,6 +5,7 @@ import { accounts, commentMentions, comments, pageEvents, paperFollows } from '@
 import { aliasName } from '@/lib/aliases';
 import { renderCoAuthorMail, renderCommentMail, renderEditMail } from '@/lib/follow-mail';
 import { shownHandle } from '@/lib/profile';
+import { toolPath } from '@/lib/page-tools';
 import { getComment } from './comments';
 import { sendMail } from './mail';
 import { summaries, type PaperSummary } from './my-papers';
@@ -133,7 +134,7 @@ export async function mailEditFollowers(
     summary,
     commits: seqs.length,
     url: `${base}${paper.path}`,
-    historyUrl: `${base}/history${paper.path}`,
+    historyUrl: `${base}${toolPath('history', { kind: 'paper', id: paper.canonical })}`,
     ...notes(base),
   });
   let sent = 0;

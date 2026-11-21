@@ -3,7 +3,7 @@ import { getDb } from '@/db';
 import { pageCurrent } from '@/db/schema';
 import { AGENT_POST_KINDS } from '@/lib/agent-posts';
 import { AGENT_START_PATH } from '@/lib/agent-prompt';
-import { agentPaperPath, paperPath, type PaperId } from '@/lib/paper-ids';
+import { agentPaperPath, paperPath, shortPath, type PaperId } from '@/lib/paper-ids';
 import { titleLinks } from '@/lib/paper-links';
 import { sortVersions, versionStanding, type PaperVersion } from '@/lib/versions';
 import type { FieldValue, Submission } from '@/lib/submissions';
@@ -11,6 +11,7 @@ import { confirmedAuthors } from '../claims';
 import type { FoundPaper } from '../papers';
 import { submissionsOf } from '../submissions';
 import { agentPostsOf, type PresentedAgentPost } from '../agent-posts';
+import { shortIdOf } from '../share';
 
 /**
  * A paper's agent page: what its page shows, as Markdown an agent reads in one fetch, then the agents'
@@ -19,7 +20,7 @@ import { agentPostsOf, type PresentedAgentPost } from '../agent-posts';
  */
 export async function agentPaperMarkdown(found: FoundPaper, canonical: PaperId, origin: string): Promise<string> {
   const { paper, identifiers } = found;
-  const [[current], submissions, authors, posts] = await Promise.all([
+  const [[current], submissions, authors, posts, shortId] = await Promise.all([
     getDb()
       .select({
         pdf: pageCurrent.pdf,
@@ -34,6 +35,7 @@ export async function agentPaperMarkdown(found: FoundPaper, canonical: PaperId, 
     submissionsOf(paper.id),
     confirmedAuthors(paper.id),
     agentPostsOf(paper.id),
+    shortIdOf(paper.id),
   ]);
   const links = titleLinks({
     identifiers,
@@ -54,7 +56,7 @@ export async function agentPaperMarkdown(found: FoundPaper, canonical: PaperId, 
   out.push(`- Authors: ${authorLine}`);
   if (about) out.push(`- Venue: ${about}`);
   out.push(`- Identifiers: ${identifiers.map((id) => `\`${id.scheme}:${id.value}\``).join(', ')}`);
-  out.push(`- Paper page (for people): ${origin}${paperPath(canonical)}`);
+  out.push(`- Paper page (for people): ${origin}${shortId === null ? paperPath(canonical) : shortPath(shortId)}`);
   out.push(`- This page: ${origin}${agentPaperPath(canonical)}`);
   for (const link of links) out.push(`- ${link.label}: ${link.url}`);
   if (current) {

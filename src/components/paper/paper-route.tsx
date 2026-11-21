@@ -86,6 +86,8 @@ export async function PaperRoute({ scheme, segments }: { scheme: PaperScheme; se
     shortIdOf(paper.id),
     pageHasSignals({ id: paper.id, kind: 'paper' }),
   ]);
+  // Shown and shared at its short address; the page tools keep the identifier's (`identifierPath`).
+  const shown = shortId === null ? address : { ...address, shortId };
   // The authors' choice of picture wins over the PDF's first page.
   const picture = current?.thumbnail
     ? {
@@ -98,7 +100,7 @@ export async function PaperRoute({ scheme, segments }: { scheme: PaperScheme; se
       : null;
   const props = {
     kind: 'paper' as const,
-    address,
+    address: shown,
     pageId: paper.id,
     name: paper.title,
     ownersHtml: current?.authorHtml ?? null,
@@ -121,8 +123,8 @@ export async function PaperRoute({ scheme, segments }: { scheme: PaperScheme; se
     page: {
       kind: 'paper',
       identifier: formatIdentifier(address),
-      address: pagePath(address),
-      url: `${siteUrl()}${pagePath(address)}`,
+      address: pagePath(shown),
+      url: `${siteUrl()}${pagePath(shown)}`,
       name: paper.title,
     },
     scopes,

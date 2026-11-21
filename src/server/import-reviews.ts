@@ -69,6 +69,8 @@ export interface SubmissionInput {
   decision: string | null;
   /** The keywords its authors gave the source. */
   keywords?: string[];
+  /** When it was submitted, as the source says: OpenReview's `cdate`. Its version is dated by it. */
+  submittedAt?: Date | null;
   url: string;
   notes: NoteInput[];
 }
@@ -210,7 +212,8 @@ async function importOne(
   for (const path of held?.keys() ?? []) if (!wanted.has(path)) changes.push({ path, content: null });
   // What the venue decided goes in the version the submission is of, the one place a decision is kept.
   const before = tree ? await readVersions(database, paperId, await readFiles(database, paperId, tree)) : [];
-  changes.push(...versionChanges(before, attachSubmission(before, versionEntry(venue, input))));
+  const date = input.submittedAt ? input.submittedAt.toISOString().slice(0, 10) : undefined;
+  changes.push(...versionChanges(before, attachSubmission(before, versionEntry(venue, input), { date })));
   if (changes.length === 0) return 'unchanged';
   const isNew = !held?.has(submissionFilePath(venue.source, input.externalId));
   const result = await commitPage(paperId, head, actor, changes, describe(venue, input, changes, isNew), {

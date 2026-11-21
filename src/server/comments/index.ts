@@ -6,13 +6,14 @@ import {
   commentAliases,
   commentMentions,
   comments,
+  pages,
   paperIdentifiers,
   papers,
   type Account,
 } from '@/db/schema';
 import { mentionedNames, randomAlias } from '@/lib/aliases';
 import { MAX_COMMENT_LENGTH } from '@/lib/comments';
-import { canonicalPaperId, paperPath } from '@/lib/paper-ids';
+import { canonicalPaperId, paperPath, shortPath } from '@/lib/paper-ids';
 import { ApiError } from '../api/errors';
 import { consume, rateLimitHeaders, type RateLimitConfig } from '../ratelimit';
 import { renderComment } from './render';
@@ -589,7 +590,11 @@ async function papersOf(ids: string[], database: Database): Promise<Map<string, 
   const paperIds = [...new Set(ids)];
   if (paperIds.length === 0) return new Map();
   const [titles, identifiers] = await Promise.all([
-    database.select({ id: papers.id, title: papers.title }).from(papers).where(inArray(papers.id, paperIds)),
+    database
+      .select({ id: papers.id, title: papers.title, shortId: pages.shortId })
+      .from(papers)
+      .innerJoin(pages, eq(pages.id, papers.id))
+      .where(inArray(papers.id, paperIds)),
     database
       .select({ paperId: paperIdentifiers.paperId, scheme: paperIdentifiers.scheme, value: paperIdentifiers.value })
       .from(paperIdentifiers)
@@ -597,8 +602,7 @@ async function papersOf(ids: string[], database: Database): Promise<Map<string, 
   ]);
   return new Map(
     titles.map((p) => {
-      const id = canonicalPaperId(identifiers.filter((i) => i.paperId === p.id));
-      return [p.id, { title: p.title, path: `${id ? paperPath(id) : '/'}#discussion` }];
+      return [p.id, { title: p.title, path: `${shortPath(p.shortId)}#discussion` }];
     }),
   );
 }

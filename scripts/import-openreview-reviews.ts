@@ -36,6 +36,8 @@ interface SubmissionRow {
   venueid: string | null;
   /** A JSON array, in scrapes that kept the submission's keywords. */
   keywords?: string | null;
+  /** When it was submitted, in ms, in scrapes that kept it. */
+  cdate?: number | null;
 }
 
 function keywordsOf(row: SubmissionRow): string[] {
@@ -57,6 +59,7 @@ function toSubmission(row: SubmissionRow, notes: ParsedNote[]): SubmissionInput 
     status: submissionStatus(row.venueid, decisionText),
     decision: decisionText,
     keywords: keywordsOf(row),
+    submittedAt: row.cdate ? new Date(row.cdate) : null,
     url: forumUrl(row.id),
     notes: notes.map((note) => {
       const input: Partial<ParsedNote> = { ...note };
@@ -92,13 +95,13 @@ async function main() {
     forms: openReviewForms(group),
     license: OPENREVIEW_NOTE_LICENSE,
   };
-  // Older scrapes have no keywords column.
+  // Older scrapes have no keywords or cdate column.
   const columns = (sqlite.prepare(`select name from pragma_table_info('submissions')`).all() as { name: string }[]).map(
     (c) => c.name,
   );
-  const keywords = columns.includes('keywords') ? ', keywords' : '';
+  const extra = ['keywords', 'cdate'].filter((column) => columns.includes(column)).map((column) => `, ${column}`);
   const rows = sqlite
-    .prepare(`select id, number, venueid${keywords} from submissions where id >= ? order by id`)
+    .prepare(`select id, number, venueid${extra.join('')} from submissions where id >= ? order by id`)
     .all(from) as unknown as SubmissionRow[];
   const started = Date.now();
   const replies = sqlite.prepare(`select raw from replies where forum >= ? and forum <= ? order by forum`);

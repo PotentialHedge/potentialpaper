@@ -18,6 +18,8 @@ export const SEARCH_PAGE_SIZE = 50;
 export interface SearchHit {
   scheme: 'arxiv' | 'doi' | 'openreview';
   value: string;
+  /** Its page's short id: the paper is at `/s/<shortId>`. */
+  shortId: number;
   title: string;
   authors: string[];
   abstract: string | null;
@@ -291,7 +293,7 @@ async function readPage(
   const [{ rows: counted }, { rows }] = await Promise.all([
     database.execute<{ total: number }>(sql`select count(*)::int as total from papers p where ${where}`),
     database.execute<Found & Record<string, unknown>>(sql`
-      select p.id, i.scheme, i.value, p.title, p.authors, left(p.abstract, 400) as abstract, p.year, p.venue,
+      select p.id, i.scheme, i.value, pg.short_id as "shortId", p.title, p.authors, left(p.abstract, 400) as abstract, p.year, p.venue,
              c.pdf ->> 'url' as pdf, coalesce(c.thumbnail ->> 'url', pd.cover_url) as cover
       from unnest(array(
         select p.id from papers p
@@ -302,6 +304,7 @@ async function readPage(
         limit ${limit} offset ${(page - 1) * limit}
       )) with ordinality as shown(id, position)
       join papers p on p.id = shown.id
+      join pages pg on pg.id = p.id
       left join page_current c on c.page_id = p.id
       left join pdf_documents pd on pd.sha256 = c.pdf ->> 'sha256'
       cross join lateral (
@@ -331,8 +334,8 @@ async function withMatches(
 ): Promise<SearchHit[]> {
   const wanted = scopes.files.length > 0 ? wantedWords(node) : null;
   // The paper's id stays inside: addresses use its identifiers.
-  const bare = ({ scheme, value, title, authors, abstract, year, venue, pdf, cover }: Found): SearchHit => ({
-    ...{ scheme, value, title, authors, abstract, year, venue, pdf, cover },
+  const bare = ({ scheme, value, shortId, title, authors, abstract, year, venue, pdf, cover }: Found): SearchHit => ({
+    ...{ scheme, value, shortId, title, authors, abstract, year, venue, pdf, cover },
     matches: [],
     matchCount: 0,
   });

@@ -25,6 +25,7 @@
       "Multimodal Large Language Models",
       "Test-Time Scaling"
      ],
+     "submittedAt": "2025-09-16T04:46:53.559Z",
      "status": "withdrawn",
      "decision": null,
      "notes": [
@@ -162,6 +163,7 @@
       "Autoregressive models",
       "3D shape generation"
      ],
+     "submittedAt": "2025-09-17T12:51:35.159Z",
      "status": "withdrawn",
      "decision": null,
      "notes": [
@@ -306,6 +308,7 @@
       "Contradiction Detection",
       "Abstention Mechanism"
      ],
+     "submittedAt": "2025-09-19T14:43:06.416Z",
      "status": "withdrawn",
      "decision": null,
      "notes": [
@@ -418,6 +421,7 @@
       "data efficiency",
       "trajectory prediction"
      ],
+     "submittedAt": "2025-09-06T20:12:58.927Z",
      "status": "withdrawn",
      "decision": null,
      "notes": [
@@ -556,6 +560,7 @@
      "keywords": [
       "Personalized text-to-image generation"
      ],
+     "submittedAt": "2025-09-16T03:52:43.056Z",
      "status": "withdrawn",
      "decision": null,
      "notes": [
@@ -697,6 +702,7 @@
       "Reactive Synthesis",
       "Expert Iteration"
      ],
+     "submittedAt": "2025-09-19T22:58:25.432Z",
      "status": "rejected",
      "decision": "Reject",
      "notes": [
@@ -913,6 +919,7 @@
       "Sparsity",
       "Unified Framework"
      ],
+     "submittedAt": "2025-09-18T21:48:59.112Z",
      "status": "rejected",
      "decision": "Reject",
      "notes": [
@@ -1141,6 +1148,7 @@
       "robust estimation",
       "uncertainty estimation"
      ],
+     "submittedAt": "2025-09-16T10:43:21.870Z",
      "status": "rejected",
      "decision": "Reject",
      "notes": [
@@ -1299,6 +1307,7 @@
       "knowledge distillation",
       "multi modal large language model"
      ],
+     "submittedAt": "2025-09-01T16:29:53.214Z",
      "status": "rejected",
      "decision": "Reject",
      "notes": [
@@ -1500,6 +1509,7 @@
       "associative recall",
       "learning dynamics"
      ],
+     "submittedAt": "2025-09-20T03:51:03.445Z",
      "status": "rejected",
      "decision": "Reject",
      "notes": [
@@ -1790,6 +1800,7 @@
       "mask diffusion model",
       "neural combinatorial optimization"
      ],
+     "submittedAt": "2025-09-02T14:21:33.695Z",
      "status": "accepted",
      "decision": "Accept (Poster)",
      "notes": [
@@ -2057,6 +2068,7 @@
       "self supervision",
       "spatial statistics"
      ],
+     "submittedAt": "2025-09-18T12:56:33.649Z",
      "status": "accepted",
      "decision": "Accept (Poster)",
      "notes": [
@@ -2267,6 +2279,7 @@
       "scaling laws",
       "multilinguality"
      ],
+     "submittedAt": "2025-09-20T04:16:09.702Z",
      "status": "accepted",
      "decision": "Accept (Poster)",
      "notes": [
@@ -2458,6 +2471,7 @@
       "Quantum Gradient Estimation",
       "Approximation Algorithms"
      ],
+     "submittedAt": "2025-09-17T10:54:16.114Z",
      "status": "accepted",
      "decision": "Accept (Poster)",
      "notes": [
@@ -2718,6 +2732,7 @@
      "keywords": [
       "In-Context Learning; World Models"
      ],
+     "submittedAt": "2025-09-18T09:38:55.809Z",
      "status": "accepted",
      "decision": "Accept (Poster)",
      "notes": [
@@ -2971,6 +2986,7 @@
       "Gaussian noise calibration",
       "Newton method"
      ],
+     "submittedAt": "2025-09-20T00:39:50.343Z",
      "status": "accepted",
      "decision": "Accept (Oral)",
      "notes": [
@@ -3261,6 +3277,7 @@
       "transformer",
       "attention"
      ],
+     "submittedAt": "2025-09-19T06:43:16.512Z",
      "status": "accepted",
      "decision": "Accept (Oral)",
      "notes": [
@@ -3488,6 +3505,7 @@
       "Compression",
       "Low rank"
      ],
+     "submittedAt": "2025-09-18T14:48:12.672Z",
      "status": "accepted",
      "decision": "Accept (Oral)",
      "notes": [
@@ -3776,6 +3794,7 @@
       "open science",
       "multilingual"
      ],
+     "submittedAt": "2025-09-20T11:20:38.097Z",
      "status": "accepted",
      "decision": "Accept (Oral)",
      "notes": [
@@ -4067,6 +4086,7 @@
       "Symbolic Computation",
       "Multivariate Polynomial Equations"
      ],
+     "submittedAt": "2025-09-19T14:09:46.980Z",
      "status": "accepted",
      "decision": "Accept (Oral)",
      "notes": [
@@ -4251,6 +4271,7 @@
       "LLM",
       "energy footprint"
      ],
+     "submittedAt": "2025-09-07T18:06:34.585Z",
      "status": "desk_rejected",
      "decision": null,
      "notes": [
@@ -4285,6 +4306,7 @@
       "pruning",
       "gradient descent"
      ],
+     "submittedAt": "2025-09-06T16:27:59.870Z",
      "status": "desk_rejected",
      "decision": null,
      "notes": [
@@ -4322,6 +4344,7 @@
       "LLM Reasoning Enhancement",
       "Label-free Supervision"
      ],
+     "submittedAt": "2025-09-17T12:30:15.422Z",
      "status": "desk_rejected",
      "decision": null,
      "notes": [
@@ -4363,6 +4386,7 @@
       "Multi-Agent",
       "Academic Illustration"
      ],
+     "submittedAt": "2025-09-20T11:55:29.328Z",
      "status": "desk_rejected",
      "decision": null,
      "notes": [
@@ -4508,6 +4532,7 @@
       "Large Language Models",
       "Evaluation Benchmark"
      ],
+     "submittedAt": "2025-09-15T15:50:00.609Z",
      "status": "desk_rejected",
      "decision": null,
      "notes": [
@@ -4680,6 +4705,7 @@
      "keywords": [
       "Reinforcement Learning; Signal Temporal Logic"
      ],
+     "submittedAt": "2025-09-03T07:32:54.931Z",
      "status": "rejected",
      "decision": "Reject",
      "notes": [
@@ -4938,6 +4964,7 @@
       "Bregman divergence",
       "Adversarial learning"
      ],
+     "submittedAt": "2025-09-19T01:59:13.266Z",
      "status": "rejected",
      "decision": "Reject",
      "notes": [
@@ -5185,6 +5212,7 @@
       "neural network friendly",
       "frequency richness"
      ],
+     "submittedAt": "2025-09-01T18:59:00.826Z",
      "status": "desk_rejected",
      "decision": null,
      "notes": [
@@ -5224,6 +5252,7 @@
       "Riemannian Manifolds",
       "Riemannian Networks"
      ],
+     "submittedAt": "2025-09-01T12:34:07.887Z",
      "status": "withdrawn",
      "decision": null,
      "notes": [
@@ -5363,6 +5392,7 @@
       "Nerual Operator",
       "PDEs"
      ],
+     "submittedAt": "2025-09-19T04:30:27.461Z",
      "status": "withdrawn",
      "decision": null,
      "notes": [
@@ -5503,6 +5533,7 @@
       "one-class classification",
       "representation learning"
      ],
+     "submittedAt": "2025-09-18T15:31:36.628Z",
      "status": "rejected",
      "decision": "Reject",
      "notes": [
@@ -5754,6 +5785,7 @@
       "Logit Lens",
       "Scaling Law"
      ],
+     "submittedAt": "2025-09-20T09:17:19.245Z",
      "status": "rejected",
      "decision": "Reject",
      "notes": [
@@ -5911,6 +5943,7 @@
       "Large Language Model",
       "Quantization"
      ],
+     "submittedAt": "2025-09-16T02:21:15.199Z",
      "status": "rejected",
      "decision": "Reject",
      "notes": [
@@ -6171,6 +6204,7 @@
       "multi-modal learning",
       "audio-visual"
      ],
+     "submittedAt": "2025-09-10T11:04:40.449Z",
      "status": "withdrawn",
      "decision": null,
      "notes": [
@@ -6284,6 +6318,7 @@
       "Wasserstein barycenters",
       "differential privacy"
      ],
+     "submittedAt": "2025-09-18T23:29:41.200Z",
      "status": "withdrawn",
      "decision": null,
      "notes": [

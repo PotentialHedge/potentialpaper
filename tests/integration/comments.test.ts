@@ -113,7 +113,7 @@ describe('comments', () => {
     expect(inbox.body.mentions).toHaveLength(1);
     expect(inbox.body.mentions[0].paper).toEqual({
       title: 'Attention Is All You Need',
-      path: '/abs/1706.03762#discussion',
+      path: expect.stringMatching(/^\/s\/\d+#discussion$/),
     });
     expect(await mailMentions(reply.body.id)).toBe(1);
     expect(lastMailTo('ada@ethz.ch')?.subject).toBe('@bob mentioned you on “Attention Is All You Need”');

@@ -411,7 +411,7 @@ describe('the page routes plugins read', () => {
     expect(paperSummary.body).toMatchObject({
       kind: 'paper',
       identifier: 'arxiv:2701.00001',
-      address: '/abs/2701.00001',
+      address: expect.stringMatching(/^\/s\/\d+$/),
       name: 'Linear attention at scale',
       scopes: [{ kind: 'venue', identifier: 'venue:iclr/2027', name: 'ICLR 2027', address: '/v/iclr/2027' }],
       facts: { hasSubmissions: true, hasScores: true },

@@ -40,7 +40,14 @@ export async function pageSummaries(
   const out = new Map<string, PageSummary>();
   if (ids.length === 0) return out;
   const rows = await database
-    .select({ id: pages.id, kind: pages.kind, key: pages.key, name: pageCurrent.name, title: papers.title })
+    .select({
+      id: pages.id,
+      kind: pages.kind,
+      key: pages.key,
+      shortId: pages.shortId,
+      name: pageCurrent.name,
+      title: papers.title,
+    })
     .from(pages)
     .leftJoin(pageCurrent, eq(pageCurrent.pageId, pages.id))
     .leftJoin(papers, eq(papers.id, pages.id))
@@ -56,7 +63,11 @@ export async function pageSummaries(
   for (const row of rows) {
     if (row.kind === 'paper') {
       const id = canonicalPaperId(identifiers.filter((i) => i.paperId === row.id));
-      if (id) out.set(row.id, summary({ kind: 'paper', id: { scheme: id.scheme, value: id.value } }, row.title ?? ''));
+      if (id)
+        out.set(
+          row.id,
+          summary({ kind: 'paper', id: { scheme: id.scheme, value: id.value }, shortId: row.shortId }, row.title ?? ''),
+        );
     } else {
       out.set(row.id, summary({ kind: row.kind, key: row.key }, row.name ?? pageName(row.kind, row.key, null)));
     }

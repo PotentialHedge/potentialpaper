@@ -1,7 +1,7 @@
 import { and, eq } from 'drizzle-orm';
 import { getDb } from '@/db';
 import { pages, papers } from '@/db/schema';
-import { canonicalPaperId, PATH_PREFIX, PAPER_SCHEMES, paperPath, parsePaperId } from '@/lib/paper-ids';
+import { canonicalPaperId, PATH_PREFIX, PAPER_SCHEMES, paperPath, parsePaperId, shortPath } from '@/lib/paper-ids';
 import { identifiersOf, lookupPaper, type LookupOptions } from './papers';
 
 export type PaperGateResult = { action: 'redirect'; to: string } | { action: 'missing' } | { action: 'unavailable' };
@@ -42,11 +42,6 @@ export async function paperGate(pathname: string, options: LookupOptions = {}): 
 async function shortIdOf(pageId: string, database = getDb()): Promise<number | null> {
   const [row] = await database.select({ shortId: pages.shortId }).from(pages).where(eq(pages.id, pageId));
   return row?.shortId ?? null;
-}
-
-/** A paper's address: its page's short id. */
-export function shortPath(shortId: number): string {
-  return `/s/${shortId}`;
 }
 
 export type ShortGateResult =

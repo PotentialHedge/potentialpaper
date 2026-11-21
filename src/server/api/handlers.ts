@@ -47,7 +47,7 @@ import { lookUpVersions } from '../version-sources';
 import { consume, type RateLimitConfig } from '../ratelimit';
 import { sortVersions, type VersionPdf } from '@/lib/versions';
 import { setFirstPassword, startOnboarding } from '../onboarding';
-import { canonicalPaperId, paperPath, parsePaperId } from '@/lib/paper-ids';
+import { canonicalPaperId, paperPath, parsePaperId, shortPath } from '@/lib/paper-ids';
 import { findPaper, lookupPaper } from '../papers';
 import { searchPapers } from '../search';
 import { siteUrl } from '../site';
@@ -306,7 +306,7 @@ export const search = route(async (req) => {
   const limit = 20;
   const { hits, total } = await searchPapers({ q, venue, sort: sort ?? (q ? 'relevance' : 'activity'), page, limit });
   return respond(S.SearchResponse, {
-    hits: hits.map(({ scheme, value, ...hit }) => ({ ...hit, path: paperPath({ scheme, value }) })),
+    hits: hits.map(({ scheme, value, shortId, ...hit }) => ({ ...hit, path: shortPath(shortId) })),
     total,
     hasMore: page * limit < total,
   });

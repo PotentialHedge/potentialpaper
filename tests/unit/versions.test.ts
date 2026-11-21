@@ -176,18 +176,29 @@ describe('versions/<id>.json', () => {
     let n = 0;
     const id = () => `v_new${n++}`;
     // None at its forum: a new submitted version.
-    const made = attachSubmission([workshop], entry, id);
-    expect(made.find((v) => v.id === 'v_new0')).toMatchObject({ kind: 'submitted', url: forum, submissions: [entry] });
+    const made = attachSubmission([workshop], entry, { newId: id, date: '2026-09-19' });
+    expect(made.find((v) => v.id === 'v_new0')).toMatchObject({
+      kind: 'submitted',
+      date: '2026-09-19',
+      url: forum,
+      submissions: [entry],
+    });
     // Again, decided: the same entry, brought up to date, and a decision dropped by the source is gone.
-    const decided = attachSubmission(made, { ...entry, status: 'accepted', decision: 'Poster' }, id);
+    const decided = attachSubmission(made, { ...entry, status: 'accepted', decision: 'Poster' }, { newId: id });
     expect(decided).toHaveLength(2);
     expect(decided.find((v) => v.id === 'v_new0')?.submissions).toEqual([
       { ...entry, status: 'accepted', decision: 'Poster' },
     ]);
-    expect(attachSubmission(decided, entry, id).find((v) => v.id === 'v_new0')?.submissions).toEqual([entry]);
+    expect(attachSubmission(decided, entry, { newId: id }).find((v) => v.id === 'v_new0')?.submissions).toEqual([
+      entry,
+    ]);
     // Someone's entry for the same forum gains the link rather than a second entry.
     const hand = { ...conference, submissions: [{ venue: 'ICLR 2027', url: forum, evidence: ['https://e.org'] }] };
-    expect(attachSubmission([hand], entry, id)[0].submissions).toEqual([{ ...entry, evidence: ['https://e.org'] }]);
+    // A date someone gave a version stands.
+    expect(attachSubmission([hand], entry, { newId: id, date: '2026-01-01' })[0].date).toBe(conference.date);
+    expect(attachSubmission([hand], entry, { newId: id })[0].submissions).toEqual([
+      { ...entry, evidence: ['https://e.org'] },
+    ]);
   });
 
   it('gives a PDF to the version at its address, and shows the newest version’s', () => {

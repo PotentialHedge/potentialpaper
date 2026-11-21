@@ -387,7 +387,7 @@ describe('the API', () => {
     const req = new Request(`${ORIGIN}/api/v1/search?q=attention`);
     const res = await searchRoute.GET(req, { params: Promise.resolve({}) });
     const body = await res.json();
-    expect(body.hits[0].path).toBe('/abs/1706.03762');
+    expect(body.hits[0].path).toMatch(/^\/s\/\d+$/);
     expect(body.total).toBe(1);
     expect(body.hasMore).toBe(false);
   });

@@ -1,7 +1,15 @@
 import { and, asc, eq, inArray, isNull, ne } from 'drizzle-orm';
 import { getDb, type Database } from '@/db';
-import { accounts, authorClaims, paperIdentifiers, papers, type ClaimMethod, type ClaimStatus } from '@/db/schema';
-import { canonicalPaperId, paperPath, type PaperId } from '@/lib/paper-ids';
+import {
+  accounts,
+  authorClaims,
+  pages,
+  paperIdentifiers,
+  papers,
+  type ClaimMethod,
+  type ClaimStatus,
+} from '@/db/schema';
+import { canonicalPaperId, shortPath, type PaperId } from '@/lib/paper-ids';
 import { canStepDown } from './claims';
 
 /**
@@ -48,8 +56,9 @@ export async function summaries(paperIds: readonly string[], database: Database)
   if (paperIds.length === 0) return new Map();
   const [rows, ids] = await Promise.all([
     database
-      .select({ id: papers.id, title: papers.title, year: papers.year, venue: papers.venue })
+      .select({ id: papers.id, title: papers.title, year: papers.year, venue: papers.venue, shortId: pages.shortId })
       .from(papers)
+      .innerJoin(pages, eq(pages.id, papers.id))
       .where(and(inArray(papers.id, [...paperIds]), isNull(papers.mergedInto))),
     database
       .select({ paperId: paperIdentifiers.paperId, scheme: paperIdentifiers.scheme, value: paperIdentifiers.value })
@@ -68,7 +77,7 @@ export async function summaries(paperIds: readonly string[], database: Database)
       year: row.year,
       venue: row.venue,
       canonical: { scheme: canonical.scheme, value: canonical.value },
-      path: paperPath(canonical),
+      path: shortPath(row.shortId),
     });
   }
   return out;

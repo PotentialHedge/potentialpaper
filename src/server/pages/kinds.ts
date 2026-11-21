@@ -119,7 +119,9 @@ async function paperIds(db: Reader, paperId: string): Promise<PaperId[]> {
 export async function addressOf(db: Reader, page: PageRow): Promise<PageAddress | null> {
   if (page.kind !== 'paper') return { kind: page.kind, key: page.key };
   const id = canonicalPaperId(await paperIds(db, page.id));
-  return id ? { kind: 'paper', id } : null;
+  if (!id) return null;
+  const [row] = await db.select({ shortId: pages.shortId }).from(pages).where(eq(pages.id, page.id));
+  return { kind: 'paper', id, ...(row ? { shortId: row.shortId } : {}) };
 }
 
 /** A page's path on the site, as `addressOf` names it. */

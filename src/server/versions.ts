@@ -287,9 +287,16 @@ export function mergeFoundVersions(
 export function attachSubmission(
   versions: readonly PaperVersion[],
   entry: VersionSubmission & { url: string; reviews: string },
-  newId: () => string = newVersionId,
+  {
+    date,
+    newId = newVersionId,
+  }: {
+    /** When it was submitted (`YYYY-MM-DD`): the date of a version made for it, or of one that has none. */
+    date?: string;
+    newId?: () => string;
+  } = {},
 ): PaperVersion[] {
-  const out = versions.map((v) => ({ ...v, submissions: v.submissions?.map((s) => ({ ...s })) }));
+  const out: PaperVersion[] = versions.map((v) => ({ ...v, submissions: v.submissions?.map((s) => ({ ...s })) }));
   const merge = (was: VersionSubmission): VersionSubmission => {
     const next: VersionSubmission = { ...was, ...entry };
     const evidence = [...new Set([...(was.evidence ?? []), ...(entry.evidence ?? [])])];
@@ -307,22 +314,27 @@ export function attachSubmission(
   };
   const hit =
     find((s) => s.reviews === entry.reviews) ?? find((s) => !s.reviews && sameUrl(s.url) === sameUrl(entry.url));
+  let version: PaperVersion | undefined;
   if (hit) {
     hit.v.submissions![hit.at] = merge(hit.v.submissions![hit.at]);
+    version = hit.v;
   } else {
-    const version = out.find((v) => sameUrl(v.url) === sameUrl(entry.url));
+    version = out.find((v) => sameUrl(v.url) === sameUrl(entry.url));
     if (version) version.submissions = [...(version.submissions ?? []), entry];
     else {
-      out.push({
+      version = {
         id: newId(),
         label: entry.venue,
         kind: 'submitted',
         url: entry.url,
         submissions: [entry],
         evidence: [entry.url],
-      });
+      };
+      out.push(version);
     }
   }
+  // A date someone gave the version stands; the source's fills one in that has none.
+  if (date && !version.date) version.date = date;
   for (const v of out) if (!v.submissions?.length) delete v.submissions;
   return sortVersions(out);
 }

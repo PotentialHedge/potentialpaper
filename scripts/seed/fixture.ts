@@ -19,6 +19,8 @@ export interface FixturePaper {
   /** Empty while the venue is under review. */
   authors: string[];
   keywords: string[];
+  /** When it was submitted (ISO 8601), from the scrape's `cdate`, where it has one. */
+  submittedAt?: string;
   status: SubmissionStatus | null;
   decision: string | null;
   notes: (FixtureNote | NoteInput)[];
