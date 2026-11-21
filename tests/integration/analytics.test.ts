@@ -57,7 +57,8 @@ describe('GET /analytics', () => {
     await api('POST', '/views', { body: { page: id }, headers: { 'cf-connecting-ip': '203.0.113.2' } });
     expect(await countDaily(id, 'git', 'git', { ip: '203.0.113.1' })).toBe(true);
     expect(await countDaily(id, 'git', 'git', { ip: '203.0.113.1' })).toBe(false);
-    const time = (seconds: number) => api('POST', '/views/time', { text: JSON.stringify({ page: id, seconds }), headers });
+    const time = (seconds: number) =>
+      api('POST', '/views/time', { text: JSON.stringify({ page: id, seconds }), headers });
     expect((await time(75)).status).toBe(204);
     await time(5);
     expect((await api('POST', '/views/time', { text: 'nonsense', headers })).status).toBe(400);

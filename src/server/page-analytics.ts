@@ -171,10 +171,14 @@ export async function pageAnalytics(
     const entry = byDay.get(row.day);
     const n = Number(row.count);
     if (row.metric.startsWith('time:')) time[Number(row.metric.slice(5))] += n;
-    else if (entry && (row.metric === 'views' || row.metric === 'git' || row.metric === 'agent')) entry[row.metric] += n;
+    else if (entry && (row.metric === 'views' || row.metric === 'git' || row.metric === 'agent'))
+      entry[row.metric] += n;
   }
 
-  const summaries = await pageSummaries([...next.rows, ...previous.rows].map((r) => r.id), database);
+  const summaries = await pageSummaries(
+    [...next.rows, ...previous.rows].map((r) => r.id),
+    database,
+  );
   const related = (rows: { id: string; count: number }[]) =>
     rows
       .flatMap((r) => {

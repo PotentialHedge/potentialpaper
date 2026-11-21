@@ -117,11 +117,11 @@ export default function PrivacyPage() {
             Which page was read after which is kept only as a total per pair of pages.
           </li>
           <li>
-            <b>Page analytics.</b> A page&apos;s owners (a paper&apos;s confirmed authors, for example) see its visitors,
-            git clones and AI agent reads per day, how long visitors kept it open, and what its readers read before and
-            after it, all as totals. They also see which institutions signed-in readers came from, counted once a month
-            and shown only for an institution with at least five readers that month, so no one reader can be picked
-            out.
+            <b>Page analytics.</b> A page&apos;s owners (a paper&apos;s confirmed authors, for example) see its
+            visitors, git clones and AI agent reads per day, how long visitors kept it open, and what its readers read
+            before and after it, all as totals. They also see which institutions signed-in readers came from, counted
+            once a month and shown only for an institution with at least five readers that month, so no one reader can
+            be picked out.
           </li>
           <li>
             <b>Cloudflare</b> sits in front of the site, protects it from abuse and so sees every visitor&apos;s network
