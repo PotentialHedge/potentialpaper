@@ -1,7 +1,7 @@
 import { afterAll, beforeEach, describe, expect, it } from 'vitest';
 import { eq, sql } from 'drizzle-orm';
 import { getDb } from '@/db';
-import { pageRevisions, papers, submissions, venues } from '@/db/schema';
+import { accounts, pageRevisions, papers, submissions, venues } from '@/db/schema';
 import { noteFilePath, submissionFilePath } from '@/lib/review-files';
 import { ensureBot, grantBot, OPENREVIEW_BOT } from '@/server/bots';
 import { CONSUMERS } from '@/server/consumers';
@@ -19,6 +19,7 @@ import { readCommit, readFiles, readHead, readText } from '@/server/pages/repo';
 import { findPaper } from '@/server/papers';
 import { projectReviews, reviewsConsumer } from '@/server/review-projection';
 import { submissionsOf } from '@/server/submissions';
+import { setVersions, versionsAt } from '@/server/versions';
 import { closePool, resetDatabase } from './helpers';
 
 beforeEach(resetDatabase);
@@ -152,10 +153,11 @@ describe('importing reviews', () => {
     expect(later).toMatchObject({ committed: 1, notes: 1 });
     const last = (await revisions(paper)).at(-1)!;
     expect(last.summary).toBe('Update Test 2027 submission forum1: 1 note, 1 removed');
+    // The decision is the version's to say, so its file changes, and submission.json doesn't.
     expect([...last.paths].sort()).toEqual([
       'reviews/openreview/forum1/notes/a.json',
       'reviews/openreview/forum1/notes/b.json',
-      'reviews/openreview/forum1/submission.json',
+      expect.stringMatching(/^versions\/v_[a-z2-9]{8}\.json$/),
     ]);
 
     await project();
@@ -229,5 +231,56 @@ describe('importing reviews', () => {
 
     await importReviews(VENUE, [submission('Forum2', [review('a', 3)])], OPTIONS);
     expect((await files(survivor)).has('reviews/openreview/forum2/submission.json')).toBe(true);
+  });
+
+  it("records the venue's decision in the version, which only its bot and admins change", async () => {
+    await importReviews(VENUE, [submission('forum1', [review('a', 3)])], OPTIONS);
+    const paper = await paperId('forum1');
+    const { head, versions } = await versionsAt(paper);
+    expect(versions).toMatchObject([
+      {
+        kind: 'submitted',
+        label: 'Test 2027',
+        url: 'https://openreview.net/forum?id=forum1',
+        submissions: [{ venue: 'Test 2027', status: 'under_review', reviews: 'openreview/forum1' }],
+      },
+    ]);
+    const [{ verifiedAt: _v, ...rest }] = await getDb()
+      .insert(accounts)
+      .values({ handle: 'a-person', verifiedAt: new Date() })
+      .returning();
+    void _v;
+    const person = { kind: 'account' as const, accountId: rest.id, isAdmin: false };
+    const [version] = versions;
+    const edit = (v: typeof version) => ({ baseOid: head, versions: [v], evidence: ['https://e.org'] });
+    // A person may not decide for the venue...
+    const decided = { ...version, submissions: [{ ...version.submissions![0], status: 'accepted' as const }] };
+    await expect(setVersions(paper, person, edit(decided), OPTIONS)).rejects.toMatchObject({ status: 403 });
+    await expect(
+      setVersions(paper, person, edit({ ...version, submissions: undefined }), OPTIONS),
+    ).rejects.toMatchObject({ status: 403 });
+    // ...but may add to the version, and an admin may correct it.
+    expect(await setVersions(paper, person, edit({ ...version, note: 'Four pages.' }), OPTIONS)).toMatchObject({
+      status: 'committed',
+    });
+    const admin = { ...person, isAdmin: true };
+    expect(
+      await setVersions(
+        paper,
+        admin,
+        { ...edit({ ...decided, note: 'Four pages.' }), baseOid: await readHead(getDb(), paper) },
+        OPTIONS,
+      ),
+    ).toMatchObject({ status: 'committed' });
+
+    // The import brings it back to what the venue says; the projection shows that.
+    await importReviews(VENUE, [{ ...submission('forum1', [review('a', 3)]), status: 'rejected' }], OPTIONS);
+    const after = await versionsAt(paper);
+    expect(after.versions[0]).toMatchObject({
+      note: 'Four pages.',
+      submissions: [{ status: 'rejected', reviews: 'openreview/forum1' }],
+    });
+    await project();
+    expect((await submissionsOf(paper))[0]).toMatchObject({ status: 'rejected' });
   });
 });

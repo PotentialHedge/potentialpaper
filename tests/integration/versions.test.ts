@@ -66,15 +66,19 @@ describe('versions', () => {
         versions: [
           {
             label: 'SPIGM @ ICML 2026',
-            kind: 'workshop',
+            kind: 'submitted',
             date: '2026-04-29',
-            status: 'accepted',
-            decision: 'Poster',
+            submissions: [{ venue: 'SPIGM @ ICML 2026', status: 'accepted', decision: 'Poster' }],
             url: 'https://openreview.net/forum?id=zI2IeuDcoS',
             pdf: { url: workshopPdf.url },
             evidence: ['https://openreview.net/group?id=ICML.cc/2026/Workshop/SPIGM'],
           },
-          { label: 'ICLR 2027', kind: 'conference', date: '2026-09-11', status: 'under_review' },
+          {
+            label: 'ICLR 2027',
+            kind: 'submitted',
+            date: '2026-09-11',
+            submissions: [{ venue: 'ICLR 2027', status: 'under_review' }],
+          },
         ],
         evidence: ['https://openreview.net/forum?id=zI2IeuDcoS'],
       },
@@ -92,7 +96,10 @@ describe('versions', () => {
       body: {
         paper: PAPER,
         baseOid: loaded.head,
-        versions: [workshop, { ...iclr, status: 'accepted', decision: 'Poster' }],
+        versions: [
+          workshop,
+          { ...iclr, submissions: [{ venue: 'ICLR 2027', status: 'accepted', decision: 'Poster' }] },
+        ],
       },
     });
     expect(bobs.status).toBe(200);
@@ -107,7 +114,7 @@ describe('versions', () => {
     expect(adas.status).toBe(200);
     expect(adas.body.merged).toBe(true);
     const [row] = await getDb().select().from(pageCurrent).where(eq(pageCurrent.pageId, paperId));
-    expect(row.versions?.map((v) => [v.label, v.status, v.note ?? null])).toEqual([
+    expect(row.versions?.map((v) => [v.label, v.submissions?.[0].status, v.note ?? null])).toEqual([
       ['SPIGM @ ICML 2026', 'accepted', 'Four pages; the first experiments.'],
       ['ICLR 2027', 'accepted', null],
     ]);

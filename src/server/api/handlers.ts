@@ -40,8 +40,6 @@ import { revertCommit, type Actor, type CommitResult } from '../pages/commit';
 import { renderHtml } from '../pages/html';
 import { renderMarkdown } from '../pages/markdown';
 import { getDb } from '@/db';
-import { pageCurrent } from '@/db/schema';
-import { eq } from 'drizzle-orm';
 import { refreshPageIds, refreshPages, refreshPaperPages } from '../pages/refresh';
 import { fetchPdf, storeFile } from '../files';
 import { mergeFoundVersions, setVersions, versionsAt } from '../versions';
@@ -413,8 +411,6 @@ export const postVersions = route(async (req) => {
     versions: edit.versions.map((v) => ({
       ...v,
       date: v.date ?? undefined,
-      status: v.status ?? undefined,
-      decision: v.decision ?? undefined,
       title: v.title ?? undefined,
       abstract: v.abstract ?? undefined,
       url: v.url ?? undefined,
@@ -442,12 +438,10 @@ export const postVersionsLookup = route(async (req) => {
       retryAfterSeconds: budget.retryAfterSeconds,
     });
   }
-  const [{ versions: existing }, [current]] = await Promise.all([
-    versionsAt(paper.id),
-    getDb().select({ pdf: pageCurrent.pdf }).from(pageCurrent).where(eq(pageCurrent.pageId, paper.id)),
-  ]);
+  const { versions: existing } = await versionsAt(paper.id);
+  // PDFs the page already holds, by where they were copied from, so a lookup doesn't copy them again.
   const known = new Map<string, VersionPdf>();
-  if (current?.pdf) known.set(current.pdf.source, current.pdf);
+  for (const v of existing) if (v.pdf?.source) known.set(v.pdf.source, v.pdf);
   const { versions: found, problems } = await lookUpVersions({
     title: paper.title,
     arxiv: arxiv ?? identifiers.find((i) => i.scheme === 'arxiv')?.value ?? null,

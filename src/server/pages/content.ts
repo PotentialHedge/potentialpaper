@@ -7,18 +7,14 @@ import {
   encodeLfsPointer,
   isLinkPath,
   LINKS_DIR,
-  PAPER_PDF_PATH,
   parseLfsPointer,
-  parsePdfSource,
   parseThumbnailWords,
-  PDF_PATH,
   THUMBNAIL_PATH,
   thumbnailImageType,
   versionIdOf,
   versionPath,
   versionPdfPath,
   type LfsPointer,
-  type PdfPointer,
   type ThumbnailPointer,
 } from './rules';
 import { slugOf } from './sections';
@@ -106,19 +102,6 @@ export function versionChanges(before: readonly PaperVersion[], after: readonly 
   for (const path of was.keys()) if (!now.has(path)) changes.push({ path, content: null });
   for (const [path, text] of now) if (was.get(path) !== text) changes.push({ path, content: text });
   return changes;
-}
-
-/** The paper's PDF, from `.potentialpaper/paper.pdf` and `pdf.json`, if both are there and its bytes are known. */
-export async function readPagePdf(
-  db: Reader,
-  pageId: string,
-  files: ReadonlyMap<string, string>,
-): Promise<PdfPointer | null> {
-  const pointer = parseLfsPointer((await readText(db, pageId, files.get(PAPER_PDF_PATH))) ?? '');
-  const source = parsePdfSource((await readText(db, pageId, files.get(PDF_PATH))) ?? '');
-  if (!pointer || !source) return null;
-  const url = (await findLfsObjects(db, [pointer.sha256])).get(pointer.sha256)?.url;
-  return url ? { sha256: pointer.sha256, bytes: pointer.bytes, url, ...source } : null;
 }
 
 /** The picture's file in a tree (`thumbnail.png`, …), if there is one. */

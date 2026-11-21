@@ -4,7 +4,8 @@ import { authorClaims, commitIdentities, pageCurrent, pageRefs, pageRevisions } 
 import { KINDS, pageName } from '@/lib/kinds';
 import { AUTHOR_PLUGINS_PATH, type AuthorPanel, parseAuthorPlugins } from '@/lib/plugins/author-plugins';
 import { pageDemoSources } from '../demos/attach';
-import { readLinks, readPagePdf, readThumbnail, readVersions } from './content';
+import { readLinks, readThumbnail, readVersions } from './content';
+import { paperPdfOf } from '@/lib/versions';
 import { type Commit, SYSTEM_AUTHOR_ID } from './git-objects';
 import { mustPage, type PageRow } from './kinds';
 import { demoRefs } from './markdown';
@@ -115,10 +116,11 @@ async function readAuthorPlugins(
 /** Makes `page_current` say what the commit at the head says. */
 export async function writeCurrent(tx: Writer, pageId: string, head: string, commit: Commit): Promise<void> {
   const files = await readFiles(tx, pageId, commit.tree);
-  const pdf = await readPagePdf(tx, pageId, files);
   const thumbnail = await readThumbnail(tx, pageId, files);
   const links = await readLinks(tx, pageId, files);
   const versions = await readVersions(tx, pageId, files);
+  // Every PDF is a version's: the page shows the newest.
+  const pdf = paperPdfOf(versions);
   // The owners' part, `owners/`, goes in the `author_*` columns.
   const page = await mustPage(tx, pageId);
   const { owners, community: hasCommunity } = KINDS[page.kind];

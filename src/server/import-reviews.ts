@@ -6,6 +6,7 @@ import {
   MAX_KEYWORDS,
   NOTE_SCHEMA,
   noteFilePath,
+  reviewsKey,
   submissionDir,
   SUBMISSION_SCHEMA,
   submissionFilePath,
@@ -16,7 +17,10 @@ import { ApiError } from './api/errors';
 import { botActor, OPENREVIEW_BOT } from './bots';
 import { type Actor, commitPage, type FileChange } from './pages/commit';
 import { gitObject } from './pages/git-objects';
-import { readCommit, readFolder, readHead } from './pages/repo';
+import { readVersions, versionChanges } from './pages/content';
+import { readCommit, readFiles, readFolder, readHead } from './pages/repo';
+import { attachSubmission } from './versions';
+import { MAX_VERSION_DECISION, MAX_VENUE, type VersionSubmission } from '@/lib/versions';
 import { findPaper } from './papers';
 import type { RateLimitConfig } from './ratelimit';
 
@@ -124,8 +128,6 @@ export function submissionFiles(venue: VenueInput, input: SubmissionInput): Map<
       id: input.externalId,
       venue: { id: venue.id, name: venue.name, url: venue.url },
       number: input.number,
-      status: input.status,
-      decision: input.decision?.trim() ? input.decision.trim().slice(0, 500) : null,
       ...cleanKeywords(input.keywords),
       url: input.url,
       license: venue.license,
@@ -157,6 +159,23 @@ export function submissionFiles(venue: VenueInput, input: SubmissionInput): Map<
   return files;
 }
 
+/** The submission as its version records it. */
+export function versionEntry(
+  venue: VenueInput,
+  input: SubmissionInput,
+): VersionSubmission & { url: string; reviews: string } {
+  const decision = input.decision?.replace(/\s+/g, ' ').trim().slice(0, MAX_VERSION_DECISION);
+  return {
+    venue: venue.name.trim().slice(0, MAX_VENUE) || venue.id.slice(0, MAX_VENUE),
+    ...(input.status ? { status: input.status } : {}),
+    ...(decision ? { decision } : {}),
+    ...(input.number !== null && input.number > 0 ? { number: input.number } : {}),
+    url: input.url,
+    reviews: reviewsKey(venue.source, input.externalId),
+    evidence: [input.url],
+  };
+}
+
 const blobId = (content: string) => gitObject('blob', Buffer.from(content)).oid;
 
 function describe(venue: VenueInput, input: SubmissionInput, changes: FileChange[], isNew: boolean): string {
@@ -182,12 +201,16 @@ async function importOne(
   const wanted = submissionFiles(venue, input);
   const dir = submissionDir(venue.source, input.externalId);
   const head = await readHead(database, paperId);
-  const held = head ? await readFolder(database, paperId, (await readCommit(database, paperId, head)).tree, dir) : null;
+  const tree = head ? (await readCommit(database, paperId, head)).tree : null;
+  const held = tree ? await readFolder(database, paperId, tree, dir) : null;
   const changes: FileChange[] = [];
   for (const [path, content] of wanted) {
     if (held?.get(path) !== blobId(content)) changes.push({ path, content });
   }
   for (const path of held?.keys() ?? []) if (!wanted.has(path)) changes.push({ path, content: null });
+  // What the venue decided goes in the version the submission is of, the one place a decision is kept.
+  const before = tree ? await readVersions(database, paperId, await readFiles(database, paperId, tree)) : [];
+  changes.push(...versionChanges(before, attachSubmission(before, versionEntry(venue, input))));
   if (changes.length === 0) return 'unchanged';
   const isNew = !held?.has(submissionFilePath(venue.source, input.externalId));
   const result = await commitPage(paperId, head, actor, changes, describe(venue, input, changes, isNew), {

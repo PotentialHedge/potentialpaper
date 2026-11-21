@@ -23,7 +23,7 @@ export interface SearchHit {
   abstract: string | null;
   year: number | null;
   venue: string | null;
-  /** The copy this site hosts, from the page's `pdf.json`. */
+  /** The copy this site hosts: its newest version's PDF. */
   pdf: string | null;
   /**
    * The paper's picture: the thumbnail its authors chose, or else the hosted PDF's first page

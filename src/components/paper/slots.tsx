@@ -84,12 +84,14 @@ function ReadThePaper({ identifiers, pdf, picture }: PanelProps) {
             <a href={pdf.url} rel="noopener" className={ui.hyperref}>
               PDF
             </a>{' '}
-            <span className={ui.fine}>
-              {pdf.license}, from{' '}
-              <a href={pdf.source} rel="noopener" className={ui.hyperref}>
-                {sourceName(pdf.source)}
-              </a>
-            </span>
+            {pdf.source && (
+              <span className={ui.fine}>
+                {pdf.license ? `${pdf.license}, from` : 'from'}{' '}
+                <a href={pdf.source} rel="noopener" className={ui.hyperref}>
+                  {sourceName(pdf.source)}
+                </a>
+              </span>
+            )}
           </li>
         )}
         {links.map(({ label, url }) => (
@@ -112,15 +114,8 @@ function SubmissionsAside({ submissions }: PanelProps) {
   return <SubmissionsBox submissions={submissions} />;
 }
 
-function Versions({ versions, canonical, paper, submissions }: PanelProps) {
-  return (
-    <VersionsSection
-      versions={versions}
-      canonical={canonical}
-      paperTitle={paper.title}
-      submissionUrls={submissions.map((s) => s.url)}
-    />
-  );
+function Versions({ versions, canonical, paper }: PanelProps) {
+  return <VersionsSection versions={versions} canonical={canonical} paperTitle={paper.title} />;
 }
 
 function VersionsAside({ versions }: PanelProps) {

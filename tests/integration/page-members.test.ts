@@ -51,8 +51,6 @@ const submission = (forum: string, venue: string) =>
     id: forum,
     venue: { id: venue, name: venue, url: null },
     number: 1,
-    status: 'under_review',
-    decision: null,
     url: `https://openreview.net/forum?id=${forum}`,
     license: 'CC-BY-4.0',
   });

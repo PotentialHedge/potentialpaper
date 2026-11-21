@@ -4,10 +4,10 @@ import * as paperRoute from '@/app/api/v1/papers/[scheme]/[...value]/route';
 import * as searchRoute from '@/app/api/v1/search/route';
 import type { SearchSort } from '@/lib/search';
 import { getDb } from '@/db';
-import { paperIdentifiers, papers } from '@/db/schema';
+import { pages, paperIdentifiers, papers } from '@/db/schema';
 import { importSubmissions } from '@/server/import-submissions';
 import { SourceUnavailable, type PaperSource, type SourcePaper } from '@/server/paper-sources/types';
-import { paperGate } from '@/server/paper-gate';
+import { paperGate, shortGate } from '@/server/paper-gate';
 import { lookupPaper, savePaper } from '@/server/papers';
 import { searchPapers, topVenues } from '@/server/search';
 import { closePool, ORIGIN, resetDatabase } from './helpers';
@@ -131,10 +131,19 @@ describe('looking up a paper', () => {
 
 describe('the gate in front of paper pages', () => {
   const noSource = { sources: {} };
+  /** Where a paper's page is: its short address. */
+  const short = async (paperId: string) => {
+    const [row] = await getDb().select({ shortId: pages.shortId }).from(pages).where(eq(pages.id, paperId));
+    return { action: 'redirect', to: `/s/${row.shortId}` };
+  };
 
-  it('lets a known paper through at its own address', async () => {
-    await savePaper(ATTENTION);
-    expect(await paperGate('/abs/1706.03762', noSource)).toEqual({ action: 'render' });
+  it("sends a known paper's address to its short one, where it is rendered", async () => {
+    const id = await savePaper(ATTENTION);
+    expect(await paperGate('/abs/1706.03762', noSource)).toEqual(await short(id));
+    const [row] = await getDb().select({ shortId: pages.shortId }).from(pages).where(eq(pages.id, id));
+    expect(await shortGate(String(row.shortId))).toEqual({ action: 'render', path: '/abs/1706.03762' });
+    expect(await shortGate('999999')).toEqual({ action: 'missing' });
+    expect(await shortGate('x1')).toEqual({ action: 'missing' });
   });
 
   it('redirects another spelling without looking anything up', async () => {
@@ -148,11 +157,11 @@ describe('the gate in front of paper pages', () => {
     expect(arxiv.calls()).toBe(0);
   });
 
-  it('keeps old arXiv ids and encoded DOIs at their address', async () => {
-    await savePaper({ ...ATTENTION, identifiers: [{ scheme: 'arxiv', value: 'hep-th/9901001' }] });
-    await savePaper({ ...ATTENTION, identifiers: [{ scheme: 'doi', value: '10.1000/(a)<b>' }] });
-    expect(await paperGate('/abs/hep-th/9901001', noSource)).toEqual({ action: 'render' });
-    expect(await paperGate('/doi/10.1000/(a)%3Cb%3E', noSource)).toEqual({ action: 'render' });
+  it('knows old arXiv ids and encoded DOIs', async () => {
+    const old = await savePaper({ ...ATTENTION, identifiers: [{ scheme: 'arxiv', value: 'hep-th/9901001' }] });
+    const doi = await savePaper({ ...ATTENTION, identifiers: [{ scheme: 'doi', value: '10.1000/(a)<b>' }] });
+    expect(await paperGate('/abs/hep-th/9901001', noSource)).toEqual(await short(old));
+    expect(await paperGate('/doi/10.1000/(a)%3Cb%3E', noSource)).toEqual(await short(doi));
   });
 
   it('calls junk missing, however it is spelled', async () => {
@@ -161,9 +170,9 @@ describe('the gate in front of paper pages', () => {
     }
   });
 
-  it('fetches a new paper once, then renders it', async () => {
+  it('fetches a new paper once', async () => {
     const arxiv = fakeSource(async () => ATTENTION);
-    expect(await paperGate('/abs/1706.03762', { sources: { arxiv } })).toEqual({ action: 'render' });
+    expect(await paperGate('/abs/1706.03762', { sources: { arxiv } })).toMatchObject({ action: 'redirect' });
     expect(arxiv.calls()).toBe(1);
   });
 
@@ -172,8 +181,8 @@ describe('the gate in front of paper pages', () => {
     expect(await paperGate('/abs/1706.03762', { sources: { arxiv } })).toEqual({ action: 'unavailable' });
   });
 
-  it("sends a paper's other identifiers to its canonical address", async () => {
-    await savePaper({
+  it("sends each of a paper's identifiers to its short address, rendered from the canonical one", async () => {
+    const id = await savePaper({
       ...ATTENTION,
       identifiers: [
         { scheme: 'arxiv', value: '1706.03762' },
@@ -181,17 +190,18 @@ describe('the gate in front of paper pages', () => {
         { scheme: 'openreview', value: 'attn123' },
       ],
     });
-    for (const path of ['/doi/10.1000/attention', '/openreview/attn123']) {
-      expect(await paperGate(path, noSource)).toEqual({ action: 'redirect', to: '/abs/1706.03762' });
+    for (const path of ['/doi/10.1000/attention', '/openreview/attn123', '/abs/1706.03762']) {
+      expect(await paperGate(path, noSource)).toEqual(await short(id));
     }
-    expect(await paperGate('/abs/1706.03762', noSource)).toEqual({ action: 'render' });
   });
 
-  it("sends a merged duplicate's address to the survivor", async () => {
+  it("sends a merged duplicate's addresses to the survivor's", async () => {
     const survivor = await savePaper(ATTENTION);
     const duplicate = await savePaper({ ...ATTENTION, identifiers: [{ scheme: 'doi', value: '10.1000/dup' }] });
     await getDb().update(papers).set({ mergedInto: survivor }).where(eq(papers.id, duplicate));
-    expect(await paperGate('/doi/10.1000/dup', noSource)).toEqual({ action: 'redirect', to: '/abs/1706.03762' });
+    expect(await paperGate('/doi/10.1000/dup', noSource)).toEqual(await short(survivor));
+    const [row] = await getDb().select({ shortId: pages.shortId }).from(pages).where(eq(pages.id, duplicate));
+    expect(await shortGate(String(row.shortId))).toEqual(await short(survivor));
   });
 });
 

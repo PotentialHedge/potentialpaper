@@ -7,17 +7,21 @@ import {
   parseReviewFile,
   parseReviewPath,
   REVIEWS_DIR,
+  reviewsKey,
   type SubmissionFile,
 } from '@/lib/review-files';
+import { parseVersionFile, type VersionSubmission } from '@/lib/versions';
 import type { Consumer } from './consumers/types';
 import { pageRepo } from './git/repo';
-import { readCommit, readFolder } from './pages/repo';
+import { readCommit, readFolder, readText } from './pages/repo';
+import { versionIdOf, VERSIONS_DIR } from './pages/rules';
 import { markPaperScopes } from './scope-stats';
 
 /**
  * The review projection (DESIGN.md §4.9): the `reviews` outbox consumer, which brings a page's rows in
  * `submissions` and `submission_notes`, and the forms of their `venues`, up to a commit, from the files a bot
- * wrote under `reviews/<source>/<submission>/` (`lib/review-files.ts`). The Submissions panel reads only these
+ * wrote under `reviews/<source>/<submission>/` (`lib/review-files.ts`), with each one's status and decision from
+ * its entry in the version it is of (`lib/versions.ts`, the one place a decision is kept). The Submissions panel reads only these
  * tables (`submissions.ts`), so it shows what the repo says once the worker has caught up.
  *
  * A venue's id is `<source>:<the source's venue id>` (`openreview:ICLR.cc/2027/Conference`). Its forms are
@@ -57,9 +61,31 @@ function reviewFolders(files: ReadonlyMap<string, string>): Map<string, Folder> 
   return folders;
 }
 
+/**
+ * Each imported submission's entry in the version it is of, by its `reviews` (`<source>/<submission>`): where its
+ * status and decision are kept.
+ */
+async function versionEntries(
+  database: Database,
+  paperId: string,
+  tree: string,
+): Promise<Map<string, VersionSubmission>> {
+  const entries = new Map<string, VersionSubmission>();
+  for (const [path, blob] of await readFolder(database, paperId, tree, VERSIONS_DIR)) {
+    const id = versionIdOf(path);
+    if (!id) continue;
+    const parsed = parseVersionFile(id, (await readText(database, paperId, blob)) ?? '');
+    if (!('version' in parsed)) continue;
+    for (const entry of parsed.version.submissions ?? []) if (entry.reviews) entries.set(entry.reviews, entry);
+  }
+  return entries;
+}
+
 interface Projected {
   venueId: string;
   submission: SubmissionFile;
+  /** Its entry in its version, which says what the venue decided. */
+  entry: VersionSubmission | null;
   forms: FormsFile | null;
   notes: NoteFile[];
   changedAt: Date;
@@ -97,6 +123,7 @@ export async function projectReviews(database: Database, paperId: string, head: 
   const commit = await readCommit(database, paperId, head);
   const folders = reviewFolders(await readFolder(database, paperId, commit.tree, REVIEWS_DIR));
   const times = await changedAt(database, paperId, head, [...folders.keys()]);
+  const entries = folders.size > 0 ? await versionEntries(database, paperId, commit.tree) : new Map();
   const fallback = commit.at;
   // Every review file in one read.
   const blobs = [...folders.values()].flatMap((f) =>
@@ -126,6 +153,7 @@ export async function projectReviews(database: Database, paperId: string, head: 
     projected.push({
       venueId: `${folder.source}:${submission.file.venue.id}`,
       submission: submission.file,
+      entry: entries.get(reviewsKey(folder.source, submission.file.id)) ?? null,
       forms,
       notes,
       changedAt: times.get(folder.dir) ?? fallback,
@@ -151,6 +179,8 @@ export async function projectReviews(database: Database, paperId: string, head: 
           },
         });
       const s = item.submission;
+      const status = item.entry?.status ?? null;
+      const decision = item.entry?.decision ?? null;
       const [row] = await tx
         .insert(submissions)
         .values({
@@ -158,8 +188,8 @@ export async function projectReviews(database: Database, paperId: string, head: 
           venueId: item.venueId,
           externalId: s.id,
           number: s.number,
-          status: s.status,
-          decision: s.decision,
+          status,
+          decision,
           keywords: s.keywords ?? [],
           url: s.url,
           fetchedAt: item.changedAt,
@@ -169,8 +199,8 @@ export async function projectReviews(database: Database, paperId: string, head: 
           set: {
             paperId,
             number: s.number,
-            status: s.status,
-            decision: s.decision,
+            status,
+            decision,
             keywords: s.keywords ?? [],
             url: s.url,
             fetchedAt: item.changedAt,

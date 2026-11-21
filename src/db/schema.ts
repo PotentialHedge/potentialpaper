@@ -386,7 +386,7 @@ export const pageCurrent = pgTable('page_current', {
   /** The two parts' sections, rendered at commit (`pages/sections.ts`), which is all a reader is sent. */
   authorHtml: text('author_html'),
   communityHtml: text('community_html'),
-  /** The page's `.potentialpaper/paper.pdf` and `pdf.json`, with where the bytes are (`lfs_objects`). */
+  /** The paper's PDF: its newest version's (`lib/versions.ts`, `paperPdfOf`), with where the bytes are. */
   pdf: jsonb('pdf').$type<PdfPointer>(),
   /** The page's picture, `thumbnail.<ext>`, and its words, `thumbnail.json`. */
   thumbnail: jsonb('thumbnail').$type<ThumbnailPointer>(),

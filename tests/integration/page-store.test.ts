@@ -1,3 +1,4 @@
+import { encodeVersionFile } from '@/lib/versions';
 import { execFile, execFileSync } from 'node:child_process';
 import { mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { createServer, type Server } from 'node:http';
@@ -30,14 +31,7 @@ import { looseObject } from '@/server/pages/git-objects';
 import { mergeFile } from '@/server/pages/merge';
 import { rebuildAllPages } from '@/server/pages/projections';
 import { diffCommits, pageHistory, readHead } from '@/server/pages/repo';
-import {
-  encodeLfsPointer,
-  LAYOUT_VERSION,
-  MAX_CHANGES,
-  PAPER_PDF_PATH,
-  PDF_PATH,
-  THUMBNAIL_PATH,
-} from '@/server/pages/rules';
+import { encodeLfsPointer, LAYOUT_VERSION, MAX_CHANGES, THUMBNAIL_PATH } from '@/server/pages/rules';
 import { recordLfsObject } from '@/server/lfs';
 import { savePaper } from '@/server/papers';
 import { searchPapers } from '@/server/search';
@@ -1187,11 +1181,14 @@ describe('the PDF', () => {
     url: `https://pdfs.example.org/pdf/${'a'.repeat(64)}.pdf`,
     source: 'https://openreview.net/forum?id=submission1',
     license: 'CC BY 4.0',
-    fetchedAt: '2026-10-06T14:18:10.000Z',
   };
-  const change = ({ sha256, bytes, source, license, fetchedAt }: typeof POINTER): FileChange[] => [
-    { path: PAPER_PDF_PATH, content: encodeLfsPointer({ sha256, bytes }) },
-    { path: PDF_PATH, content: `${JSON.stringify({ source, license, fetchedAt })}\n` },
+  // Every PDF of a paper is a version's.
+  const change = (pdf: typeof POINTER): FileChange[] => [
+    {
+      path: 'versions/v_submitted.json',
+      content: encodeVersionFile({ id: 'v_submitted', label: 'ICLR 2027', kind: 'submitted', pdf }),
+    },
+    { path: 'versions/v_submitted.pdf', content: encodeLfsPointer(pdf) },
   ];
   beforeEach(() => recordLfsObject(getDb(), { ...POINTER, type: 'application/pdf' }));
 
@@ -1217,7 +1214,13 @@ describe('the PDF', () => {
     expect(current.pdf).toEqual(POINTER);
     const [revision] = await getDb().select().from(pageRevisions).where(eq(pageRevisions.pageId, id));
     expect(revision.paths.toSorted()).toEqual(
-      ['.gitattributes', '.potentialpaper/metadata.json', PAPER_PDF_PATH, PDF_PATH, ...STARTER_PATHS].toSorted(),
+      [
+        '.gitattributes',
+        '.potentialpaper/metadata.json',
+        'versions/v_submitted.json',
+        'versions/v_submitted.pdf',
+        ...STARTER_PATHS,
+      ].toSorted(),
     );
   });
 
@@ -1231,29 +1234,35 @@ describe('the PDF', () => {
     expect(await hit()).toMatchObject({ pdf: POINTER.url, cover });
   });
 
-  it('refuses a source a page could not safely link to, bytes not stored here, and one file without the other', async () => {
+  it('refuses a source a page could not safely link to, bytes not stored here, and a PDF of no version', async () => {
     const id = await paper();
     for (const bad of [
       change({ ...POINTER, source: 'javascript:alert(1)' }),
       change({ ...POINTER, sha256: 'c'.repeat(64) }),
       change({ ...POINTER, bytes: 3 }),
-      change(POINTER).slice(0, 1),
+      change(POINTER).slice(1),
     ]) {
       await expect(commitPage(id, null, SYSTEM_ACTOR, bad, 'Bad')).rejects.toMatchObject({ status: 422 });
     }
   });
 
-  it('can only be written by the system and admins', async () => {
+  it('is a version’s, which anyone verified may add, and nobody else', async () => {
     const id = await paper();
-    const [bot] = await getDb()
-      .insert(accounts)
-      .values({ handle: 'some-bot', isBot: true, verifiedAt: new Date() })
-      .returning();
+    const [unverified] = await getDb().insert(accounts).values({ handle: 'not-yet' }).returning();
     await expect(
-      commitPage(id, null, { kind: 'account', accountId: bot.id, isAdmin: false }, change(POINTER), 'Mine', {
+      commitPage(id, null, { kind: 'account', accountId: unverified.id, isAdmin: false }, change(POINTER), 'Mine', {
         rateLimit: NO_LIMIT,
       }),
     ).rejects.toMatchObject({ status: 403 });
+    await expect(
+      commitPage(
+        id,
+        null,
+        SYSTEM_ACTOR,
+        [{ path: '.potentialpaper/paper.pdf', content: encodeLfsPointer(POINTER) }],
+        'Old',
+      ),
+    ).rejects.toMatchObject({ status: 422 });
   });
 });
 
@@ -1286,11 +1295,11 @@ describe('the picture', () => {
       null,
       SYSTEM_ACTOR,
       [
-        { path: PAPER_PDF_PATH, content: encodeLfsPointer(PDF) },
         {
-          path: PDF_PATH,
-          content: JSON.stringify({ source: 'https://openreview.net/forum?id=x', license: 'CC BY 4.0', fetchedAt: '' }),
+          path: 'versions/v_submitted.json',
+          content: encodeVersionFile({ id: 'v_submitted', label: 'ICLR 2027', kind: 'submitted' }),
         },
+        { path: 'versions/v_submitted.pdf', content: encodeLfsPointer(PDF) },
       ],
       'Add the PDF',
     );

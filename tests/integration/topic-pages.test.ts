@@ -14,7 +14,7 @@ import { readCommit, readFiles, readHead, readText } from '@/server/pages/repo';
 import { savePaper } from '@/server/papers';
 import { topicSuggestionsConsumer } from '@/server/topic-suggestions';
 import { topicPapers } from '@/server/topic-papers';
-import { api, closePool, resetDatabase, signUp } from './helpers';
+import { api, closePool, resetDatabase, signUp, submittedVersion } from './helpers';
 
 /**
  * Topic pages (`handoffs/pages.md` Phase 5): making one with names checked first, putting a paper in one (and making
@@ -525,7 +525,10 @@ describe('keywords and scores from a venue', () => {
       paperId,
       null,
       bot,
-      [...files].map(([path, content]) => ({ path, content })),
+      [
+        ...[...files].map(([path, content]) => ({ path, content })),
+        submittedVersion(forum, 'ICLR 2027', 'accepted', 'Accept (Poster)'),
+      ],
       'Import',
     );
     return paperId;

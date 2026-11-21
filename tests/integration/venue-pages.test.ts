@@ -23,7 +23,7 @@ import {
   venueSiblings,
   venueStatusCounts,
 } from '@/server/venue-pages';
-import { api, closePool, resetDatabase, signUp } from './helpers';
+import { api, closePool, resetDatabase, signUp, submittedVersion } from './helpers';
 
 /**
  * Venue pages (`handoffs/pages.md` Phase 2): the `venues` bot making series and edition pages from the venues the
@@ -90,12 +90,11 @@ async function submitted(
           id: forum,
           venue: { id, name: id.startsWith('ICLR.cc/2027') ? 'ICLR 2027' : 'ICLR 2026', url: null },
           number: papers,
-          status,
-          decision,
           url: `https://openreview.net/forum?id=${forum}`,
           license: 'CC-BY-4.0',
         }),
       },
+      submittedVersion(forum, id.startsWith('ICLR.cc/2027') ? 'ICLR 2027' : 'ICLR 2026', status, decision),
     ],
     'Import',
   );

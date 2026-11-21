@@ -16,7 +16,7 @@ import { scoreOf } from '@/lib/submissions';
 import { versionFileSchema } from '@/lib/versions';
 import { leadingHtmlTitle } from './html';
 import { leadingTitle } from './markdown';
-import { pdfSourceSchema, sectionName, thumbnailWordsSchema } from './rules';
+import { sectionName, thumbnailWordsSchema } from './rules';
 
 /**
  * The file types of a page repo (DESIGN.md §4.8): the contract between whoever writes a file (people, bots) and
@@ -210,11 +210,16 @@ export const PAGE_SCHEMAS = {
     index: (version) => [
       {
         kind: 'version',
-        text: words(version.label, version.title, version.decision, version.note, version.abstract),
+        text: words(
+          version.label,
+          version.title,
+          ...(version.submissions ?? []).flatMap((s) => [s.venue, s.decision]),
+          version.note,
+          version.abstract,
+        ),
         fields: {
           label: version.label,
           kind: version.kind,
-          status: version.status ?? null,
           date: version.date ?? null,
         },
       },
@@ -232,14 +237,6 @@ export const PAGE_SCHEMAS = {
       picture.alt || picture.caption ? [{ kind: 'picture', text: words(picture.alt, picture.caption) }] : [],
     render: { panel: 'ReadThePaper', slots: ['paper.aside'] },
   }),
-  pdf: fileType({
-    title: 'Paper PDF',
-    schema: pdfSourceSchema,
-    glob: '.potentialpaper/pdf.json',
-    filesRegex: '^\\.potentialpaper/pdf\\.json$',
-    writable: false,
-    render: { panel: 'ReadThePaper', slots: ['paper.aside'] },
-  }),
   submission: fileType({
     title: 'Submission',
     scope: 'reviews',
@@ -250,8 +247,8 @@ export const PAGE_SCHEMAS = {
     index: (submission) => [
       {
         kind: 'submission',
-        text: words(submission.venue.name, submission.decision),
-        fields: { venue: submission.venue.id, status: submission.status, number: submission.number },
+        text: words(submission.venue.name),
+        fields: { venue: submission.venue.id, number: submission.number },
       },
     ],
     render: { panel: 'Submissions', slots: ['paper.aside', 'paper.body'] },

@@ -1,6 +1,7 @@
-import { eq } from 'drizzle-orm';
+import { and, eq } from 'drizzle-orm';
 import { revalidatePath } from 'next/cache';
-import { paperIdentifiers } from '@/db/schema';
+import { getDb } from '@/db';
+import { pages, paperIdentifiers } from '@/db/schema';
 import { type PageAddress, pagePath } from '@/lib/kinds';
 import { paperPath, type PaperId } from '@/lib/paper-ids';
 import { revalidateInApp } from '../internal';
@@ -17,12 +18,28 @@ import type { Reader } from './repo';
  * do it (`revalidateInApp`), when `APP_INTERNAL_URL` says where it is; tests have none.
  */
 export async function refreshPaperPages(identifiers: readonly PaperId[]): Promise<void> {
-  await refreshPaths(identifiers.map(paperPath));
+  await refreshPaths(await paperPaths(getDb(), identifiers));
 }
 
-/** The same for a page of any kind: a paper's at each of its identifiers, any other at its address. */
+/**
+ * A paper's addresses: each identifier's, whose route renders it, and its short one, `/s/<n>`, where it is shown and
+ * the edge keeps it.
+ */
+async function paperPaths(db: Reader, identifiers: readonly PaperId[]): Promise<string[]> {
+  const paths = identifiers.map(paperPath);
+  const [first] = identifiers;
+  if (!first) return paths;
+  const rows = await db
+    .select({ shortId: pages.shortId })
+    .from(paperIdentifiers)
+    .innerJoin(pages, eq(pages.id, paperIdentifiers.paperId))
+    .where(and(eq(paperIdentifiers.scheme, first.scheme), eq(paperIdentifiers.value, first.value)));
+  return [...paths, ...rows.map((row) => `/s/${row.shortId}`)];
+}
+
+/** The same for a page of any kind: a paper's at each of its addresses, any other at its address. */
 export async function refreshPages(address: PageAddress, identifiers: readonly PaperId[] = []): Promise<void> {
-  await refreshPaths(address.kind === 'paper' ? identifiers.map(paperPath) : [pagePath(address)]);
+  await refreshPaths(address.kind === 'paper' ? await paperPaths(getDb(), identifiers) : [pagePath(address)]);
 }
 
 /** The same for pages by id, of any kind: what a commit elsewhere changed, such as the links to them. */
@@ -39,7 +56,8 @@ export async function refreshPageIds(db: Reader, ids: Iterable<string>): Promise
       .select({ scheme: paperIdentifiers.scheme, value: paperIdentifiers.value })
       .from(paperIdentifiers)
       .where(eq(paperIdentifiers.paperId, id));
-    paths.push(...identifiers.map(paperPath));
+    const [row] = await db.select({ shortId: pages.shortId }).from(pages).where(eq(pages.id, id));
+    paths.push(...identifiers.map(paperPath), ...(row ? [`/s/${row.shortId}`] : []));
   }
   if (paths.length > 0) await refreshPaths(paths);
 }

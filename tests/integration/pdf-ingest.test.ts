@@ -1,3 +1,4 @@
+import { encodeVersionFile } from '@/lib/versions';
 import { spawnSync } from 'node:child_process';
 import { createHash } from 'node:crypto';
 import { mkdtempSync, rmSync, writeFileSync } from 'node:fs';
@@ -12,7 +13,7 @@ import { claimByEmail, ownAddressesOnPaper } from '@/server/claims';
 import { commitPage, SYSTEM_ACTOR } from '@/server/pages/commit';
 import { readHead } from '@/server/pages/repo';
 import { recordLfsObject } from '@/server/lfs';
-import { encodeLfsPointer, PAPER_PDF_PATH, PDF_PATH, versionPath, versionPdfPath } from '@/server/pages/rules';
+import { encodeLfsPointer, versionPath, versionPdfPath } from '@/server/pages/rules';
 import { savePaper } from '@/server/papers';
 import { ingest, MAX_ATTEMPTS } from '@/server/pdfs/ingest';
 import { ORIGIN, api, closePool, lastMailTo, resetDatabase, signUp } from './helpers';
@@ -93,19 +94,23 @@ async function paperWithPdf(sha256 = SHA, url = `https://pdfs.invalid/pdf/${SHA}
     metadataLicense: 'CC0-1.0',
     abstractLicense: null,
   });
-  const source = {
-    source: 'https://arxiv.org/abs/1706.03762',
-    license: 'CC BY 4.0',
-    fetchedAt: '2026-11-08T00:00:00Z',
-  };
+  const source = { source: 'https://arxiv.org/abs/1706.03762', license: 'CC BY 4.0' };
   await recordLfsObject(getDb(), { sha256, bytes: PDF.length, url, type: 'application/pdf' });
   await commitPage(
     paperId,
     await readHead(getDb(), paperId),
     SYSTEM_ACTOR,
     [
-      { path: PAPER_PDF_PATH, content: encodeLfsPointer({ sha256, bytes: PDF.length }) },
-      { path: PDF_PATH, content: `${JSON.stringify(source, null, 2)}\n` },
+      {
+        path: versionPath('v_arxiv'),
+        content: encodeVersionFile({
+          id: 'v_arxiv',
+          label: 'arXiv',
+          kind: 'preprint',
+          pdf: { sha256, bytes: PDF.length, url, ...source },
+        }),
+      },
+      { path: versionPdfPath('v_arxiv'), content: encodeLfsPointer({ sha256, bytes: PDF.length }) },
     ],
     'Add the PDF',
   );
@@ -129,8 +134,8 @@ describePoppler('pdfs:ingest', () => {
       stages: {
         text: { done: 1, failed: 0 },
         emails: { done: 1, failed: 0 },
-        // Only a version's PDF has its whole text read.
-        fulltext: { done: 0, failed: 0 },
+        // Every PDF is a version's, so its whole text is read, for comparing versions.
+        fulltext: { done: 1, failed: 0 },
         cover: { done: 1, failed: 0 },
       },
     });
@@ -140,27 +145,11 @@ describePoppler('pdfs:ingest', () => {
     expect(doc.firstPageRaw).toContain('Google Brain');
     expect(doc.emails.sort()).toEqual([...ON_PAPER].sort());
     expect(doc.coverUrl).toBe(`/covers/${SHA}.jpg`);
-    expect(Object.keys(doc.stages).sort()).toEqual(['cover', 'emails', 'text']);
-    expect(doc.fullText).toBeNull();
+    expect(Object.keys(doc.stages).sort()).toEqual(['cover', 'emails', 'fulltext', 'text']);
+    expect(doc.fullText).toContain('Attention Is All You Need');
 
     expect((await ingest({ pdfDir })).documents).toBe(0);
-
-    // Once a version points at it, its text is read for comparing versions, and nothing else runs again.
-    const version = { label: 'arXiv v1', kind: 'preprint' };
-    await commitPage(
-      paperId,
-      await readHead(getDb(), paperId),
-      SYSTEM_ACTOR,
-      [
-        { path: versionPath('v_abcdefgh'), content: `${JSON.stringify(version)}\n` },
-        { path: versionPdfPath('v_abcdefgh'), content: encodeLfsPointer({ sha256: SHA, bytes: PDF.length }) },
-      ],
-      'Add a version',
-    );
-    expect((await ingest({ pdfDir })).stages).toMatchObject({ text: { done: 0 }, fulltext: { done: 1, failed: 0 } });
-    const [read] = await getDb().select().from(pdfDocuments).where(eq(pdfDocuments.sha256, SHA));
-    expect(read.fullText).toContain('Attention Is All You Need');
-    expect((await ingest({ pdfDir })).documents).toBe(0);
+    void paperId;
     // --stage … --force reruns only that stage; --sha reruns all of one PDF's.
     expect((await ingest({ pdfDir, stages: ['emails'], force: true })).stages).toEqual({
       emails: { done: 1, failed: 0 },

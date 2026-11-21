@@ -25,7 +25,7 @@ import {
   venuePagesOf,
 } from '@/server/scope-stats';
 import { syncVenuePages, VENUES_BOT, venueScoreStats } from '@/server/venue-pages';
-import { api, closePool, ORIGIN, resetDatabase } from './helpers';
+import { api, closePool, ORIGIN, resetDatabase, submittedVersion } from './helpers';
 
 /**
  * Data for plugins (`handoffs/plugins.md` Phase 4): the score statistics of a scope (A, `scope_stats`, kept up by the
@@ -87,12 +87,16 @@ async function submitted(venue: string, status: SubmissionStatus | null, ratings
           id: forum,
           venue: { id, name: id.includes('2027') ? 'ICLR 2027' : 'ICLR 2026', url: null },
           number: papers,
-          status,
-          decision: status === 'accepted' ? 'Accept (Poster)' : status === 'rejected' ? 'Reject' : null,
           url: `https://openreview.net/forum?id=${forum}`,
           license,
         }),
       },
+      submittedVersion(
+        forum,
+        id.includes('2027') ? 'ICLR 2027' : 'ICLR 2026',
+        status,
+        status === 'accepted' ? 'Accept (Poster)' : status === 'rejected' ? 'Reject' : null,
+      ),
       {
         path: formsFilePath('openreview', forum),
         content: encodeReviewFile({ schema: 'forms/1', forms: FORMS, url: 'https://openreview.net/group', license }),

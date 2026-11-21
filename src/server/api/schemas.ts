@@ -9,7 +9,8 @@ import {
 import { MAX_EVIDENCE, MAX_EVIDENCE_URL } from '@/lib/evidence';
 import { TOKEN_SCOPES } from '@/db/schema';
 import { BIO_MAX, REAL_NAME_MAX } from '@/lib/profile';
-import { MAX_VERSIONS, VERSION_KINDS, VERSION_STATUSES } from '@/lib/versions';
+import { MAX_SUBMISSIONS, MAX_VERSIONS, VERSION_KINDS } from '@/lib/versions';
+import { SUBMISSION_STATUSES } from '@/lib/submissions';
 import { SEARCH_SORTS } from '@/lib/search';
 import { MAX_COMMENT_LENGTH } from '@/lib/comments';
 
@@ -208,12 +209,22 @@ const VersionPdf = z.object({
   license: z.string().optional(),
 });
 
+const VersionSubmissionSchema = z.object({
+  venue: z.string().max(1000),
+  status: z.enum(SUBMISSION_STATUSES).optional(),
+  decision: z.string().max(1000).optional(),
+  number: z.number().int().optional(),
+  url: z.string().max(2000).optional(),
+  /** Set by the bot that imported the venue's reviews; only it and admins change such an entry. */
+  reviews: z.string().max(400).optional(),
+  evidence: z.array(z.string().max(MAX_EVIDENCE_URL)).max(MAX_EVIDENCE).optional(),
+});
+
 const VersionFields = {
   label: z.string().max(1000),
   kind: z.enum(VERSION_KINDS),
   date: z.string().max(20).nullish(),
-  status: z.enum(VERSION_STATUSES).nullish(),
-  decision: z.string().max(1000).nullish(),
+  submissions: z.array(VersionSubmissionSchema).max(MAX_SUBMISSIONS).optional(),
   title: z.string().max(2000).nullish(),
   abstract: z.string().max(20_000).nullish(),
   url: z.string().max(2000).nullish(),
@@ -226,8 +237,7 @@ export const PaperVersionSchema = z.object({
   label: z.string(),
   kind: z.enum(VERSION_KINDS),
   date: z.string().optional(),
-  status: z.enum(VERSION_STATUSES).optional(),
-  decision: z.string().optional(),
+  submissions: z.array(VersionSubmissionSchema).optional(),
   title: z.string().optional(),
   abstract: z.string().optional(),
   url: z.string().optional(),

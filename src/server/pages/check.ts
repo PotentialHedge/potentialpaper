@@ -5,7 +5,7 @@ import { isUnderDomain, KINDS, orgFileSchema, type PageKind, partsOf } from '@/l
 import { parseReviewPath, SUBMISSION_FILE } from '@/lib/review-files';
 import { cleanEvidence } from '@/lib/evidence';
 import { MAX_LINKS, parseLinkFile } from '@/lib/paper-links';
-import { MAX_VERSIONS } from '@/lib/versions';
+import { MAX_VERSIONS, parseVersionFile } from '@/lib/versions';
 import { ApiError } from '../api/errors';
 import { checkDemos } from '../demos/attach';
 import { findLfsObjects, PDF_TYPE } from '../lfs';
@@ -31,10 +31,8 @@ import {
   MAX_SECTIONS,
   METADATA_PATH,
   normalizePath,
-  PAPER_PDF_PATH,
   parseLfsPointer,
   pathDenied,
-  PDF_PATH,
   PREK_PATH,
   type Roles,
   sectionName,
@@ -353,9 +351,6 @@ function checkTreeShape(files: FileTree, kind: PageKind): void {
       });
     }
   }
-  if (files.has(PAPER_PDF_PATH) !== files.has(PDF_PATH)) {
-    throw new ApiError(422, 'validation_error', `${PAPER_PDF_PATH} and ${PDF_PATH} go together`, { path: PDF_PATH });
-  }
 }
 
 /** What every kind's tree keeps to: its files' count, sections per part, and no path both a file and a folder. */
@@ -498,6 +493,51 @@ async function checkOrgDomains(db: Reader, check: TreeCheck): Promise<void> {
   }
 }
 
+/** Each version's submission that names imported reviews, by its `reviews`, as text that ignores key order. */
+async function importedSubmissions(
+  files: FileTree,
+  text: TextOf,
+): Promise<Map<string, { entry: string; path: string }>> {
+  const entries = new Map<string, { entry: string; path: string }>();
+  for (const [path, blob] of files) {
+    const id = versionIdOf(path);
+    if (!id) continue;
+    const parsed = parseVersionFile(id, (await text(blob)) ?? '');
+    if (!('version' in parsed)) continue;
+    for (const entry of parsed.version.submissions ?? []) {
+      if (!entry.reviews) continue;
+      const sorted = Object.fromEntries(Object.entries(entry).sort(([a], [b]) => (a < b ? -1 : 1)));
+      entries.set(entry.reviews, { entry: JSON.stringify(sorted), path });
+    }
+  }
+  return entries;
+}
+
+/**
+ * A version's submission whose `reviews` names a bot's folder says what the venue decided, as that bot imported it:
+ * only the bot granted the folder's source and admins add, change or remove one (DESIGN.md §3). Moving it to
+ * another version unchanged is anyone's to do, as is everything else in the version.
+ */
+async function checkImportedSubmissions(check: TreeCheck): Promise<void> {
+  const { roles } = check;
+  if (roles.system || roles.admin) return;
+  const before = await importedSubmissions(check.before, check.text);
+  const after = await importedSubmissions(check.after, check.text);
+  for (const key of new Set([...before.keys(), ...after.keys()])) {
+    const was = before.get(key);
+    const now = after.get(key);
+    if (was?.entry === now?.entry) continue;
+    const folder = `reviews/${key}/`;
+    if (roles.grants?.some((pattern) => grantCovers(pattern, `${folder}${SUBMISSION_FILE}`))) continue;
+    throw new ApiError(
+      403,
+      'forbidden',
+      `the submission with reviews ${key} is what the venue decided, as its bot imported it: only the bot granted ${folder.replace(/[^/]+\/$/, '')} and admins change it`,
+      { path: (now ?? was)!.path },
+    );
+  }
+}
+
 export interface TreeCheck {
   pageId: string;
   /** The roles of whoever commits, on this page; `kind` is the page's (a paper's when absent). */
@@ -567,6 +607,7 @@ export async function checkTree(db: Reader, check: TreeCheck): Promise<string[]>
   // Pages of other kinds have no title links, PDFs, pictures or demos (`lib/kinds.ts`'s file types).
   if (kind !== 'paper') return [];
   if (changed.some(isLinkPath)) await checkLinkLabels(after, text);
+  if (changed.some((path) => versionIdOf(path))) await checkImportedSubmissions(check);
   await checkLfsFiles(changed, after, text, db);
   return checkDemos(db, {
     pageId: check.pageId,

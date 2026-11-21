@@ -4,7 +4,7 @@ import { KINDS, OWNERS_DIR, PAGE_KINDS, type PageKind, partsOf } from '@/lib/kin
 import { LINKS_FILE, parseLabeledLinks } from '@/lib/labeled-links';
 import { parseLinkFile } from '@/lib/paper-links';
 import { parseReviewPath, parseReviewFile, REVIEWS_DIR, reviewSourceOf } from '@/lib/review-files';
-import { parseVersionFile, VERSION_ID } from '@/lib/versions';
+import { parseVersionFile, VERSION_ID, type VersionPdf } from '@/lib/versions';
 import { AUTHOR_PLUGINS_PATH, parseAuthorPlugins } from '@/lib/plugins/author-plugins';
 import { htmlProblem } from './html';
 
@@ -16,14 +16,12 @@ import { htmlProblem } from './html';
  *   .gitattributes                  the system's, always the same: which files are kept with Git LFS
  *   prek.toml                       the system's, always the same: checks to run before a commit
  *   .potentialpaper/metadata.json   the system's: the layout's version, identifiers, title, authors, abstract
- *   .potentialpaper/paper.pdf       the system's: the paper's PDF (Git LFS)
- *   .potentialpaper/pdf.json        the system's: where that PDF came from, and its license
  *   owners/10-overview.md           the owners' sections (on a paper, its confirmed authors'), a file per section
  *                                   (Markdown or HTML)
  *   owners/plugins.json             the plugins' panels the authors let into them (`lib/plugins/author-plugins.ts`)
  *   community/10-tl-dr.md           the community section, the same way
  *   versions/v_k3x9q2ab.json        a version of the paper, named by its id
- *   versions/v_k3x9q2ab.pdf         that version's PDF (Git LFS)
+ *   versions/v_k3x9q2ab.pdf         that version's PDF (Git LFS); every PDF of a paper is a version's
  *   links/10-code.json              a link under the title
  *   thumbnail.png                   the paper's picture (Git LFS), or .jpg, .gif, .webp, .avif
  *   thumbnail.json                  its alt text and caption
@@ -47,11 +45,7 @@ import { htmlProblem } from './html';
 /** Files only the system and admins write. The one directory whose name may start with a dot. */
 export const SYSTEM_DIR = '.potentialpaper';
 export const METADATA_PATH = `${SYSTEM_DIR}/metadata.json`;
-/** The paper's PDF, a Git LFS pointer; the bytes are in R2 (DESIGN.md §4.3). */
-export const PAPER_PDF_PATH = `${SYSTEM_DIR}/paper.pdf`;
-/** Where `paper.pdf` came from and under what license, which the license requires us to say. */
-export const PDF_PATH = `${SYSTEM_DIR}/pdf.json`;
-const SYSTEM_PATHS = new Set([METADATA_PATH, PAPER_PDF_PATH, PDF_PATH]);
+const SYSTEM_PATHS = new Set([METADATA_PATH]);
 
 /**
  * The version of this layout, which `metadata.json` records as `"layout"`, so that after a breaking change
@@ -64,8 +58,11 @@ const SYSTEM_PATHS = new Set([METADATA_PATH, PAPER_PDF_PATH, PDF_PATH]);
  *      (`planLayout`)
  *   3  PDFs and pictures as Git LFS pointers, with `.gitattributes` (`planLfs`)
  *   4  the owners' part is `owners/` on every kind, not `author/`, `organizers/`, `members/` or `about/` (`planOwners`)
+ *   5  every PDF is a version's (no `.potentialpaper/paper.pdf` or `pdf.json`), and a version records where it was
+ *      submitted and what each venue decided, which `submission.json` no longer says. No move: the database was
+ *      wiped and reseeded.
  */
-export const LAYOUT_VERSION = 4;
+export const LAYOUT_VERSION = 5;
 
 /** The layout a page's `metadata.json` says it has; `null` if it says none, as the first layout's doesn't. */
 export function layoutVersionOf(metadata: string | undefined): number | null {
@@ -256,7 +253,7 @@ export function thumbnailImagePath(type: ThumbnailType): string {
 
 /** What a Git LFS file at this path has to be, or `null` if the path isn't one. */
 export function lfsKindOf(path: string): 'pdf' | 'image' | null {
-  if (path === PAPER_PDF_PATH || versionPdfIdOf(path)) return 'pdf';
+  if (versionPdfIdOf(path)) return 'pdf';
   if (thumbnailImageType(path)) return 'image';
   return null;
 }
@@ -304,7 +301,7 @@ function kindLayout(kind: PageKind): string {
     return `${kind} pages hold .gitattributes, prek.toml, ${METADATA_PATH}, ${KINDS[kind].kindFile}, ${sections} and extensions/`;
   }
   return (
-    `pages hold .gitattributes, prek.toml, .potentialpaper/ (metadata.json, paper.pdf, pdf.json), ${sections}, ` +
+    `pages hold .gitattributes, prek.toml, .potentialpaper/ (metadata.json), ${sections}, ` +
     'versions/<id>.json and <id>.pdf, links/ (named like 10-code.json), thumbnail.png (or .jpg, .gif, .webp, .avif) ' +
     'and thumbnail.json, demos/<name>/, reviews/<source>/<submission>/ and extensions/'
   );
@@ -605,49 +602,8 @@ function jsonProblem(text: string, mustBeObject: boolean): string | null {
   return jsonValueProblem(value);
 }
 
-export interface PdfPointer {
-  sha256: string;
-  bytes: number;
-  /** Where the bytes are. */
-  url: string;
-  /** The page it was copied from, which the license requires us to credit. */
-  source: string;
-  license: string;
-  fetchedAt: string;
-}
-
-/** What `pdf.json` says about `paper.pdf`. */
-export type PdfSource = Pick<PdfPointer, 'source' | 'license' | 'fetchedAt'>;
-
-/**
- * A `.potentialpaper/pdf.json`: the one definition, which both checks the file and is its JSON Schema
- * (`schemas.ts`). Pages credit `source`, so it has to be checked.
- */
-export const pdfSourceSchema = z
-  .strictObject({
-    source: z
-      .url({ protocol: /^https$/ })
-      .meta({ description: 'The page the PDF was copied from, which the license requires us to credit.' }),
-    license: z.string().min(1).meta({ description: 'The license it was copied under, such as "CC BY 4.0".' }),
-    fetchedAt: z.string().meta({ description: 'When it was copied (ISO 8601).' }),
-  })
-  .meta({ title: 'Paper PDF', description: 'Where .potentialpaper/paper.pdf came from. Written by the system.' });
-
-/** A `pdf.json`, or `null` if it isn't one. */
-export function parsePdfSource(text: string): PdfSource | null {
-  let value: unknown;
-  try {
-    value = JSON.parse(text);
-  } catch {
-    return null;
-  }
-  const parsed = pdfSourceSchema.safeParse(value);
-  return parsed.success ? parsed.data : null;
-}
-
-export function encodePdfSource({ source, license, fetchedAt }: PdfSource): string {
-  return `${JSON.stringify({ source, license, fetchedAt }, null, 2)}\n`;
-}
+/** The paper's PDF as a page shows it: its newest version's (`lib/versions.ts`, `paperPdfOf`). */
+export type PdfPointer = VersionPdf;
 
 export const THUMBNAIL_TYPES = ['image/jpeg', 'image/png', 'image/gif', 'image/webp', 'image/avif'] as const;
 export type ThumbnailType = (typeof THUMBNAIL_TYPES)[number];
@@ -772,9 +728,6 @@ export function contentProblem(path: string, content: string, kind: PageKind = '
     }
     if (path === METADATA_PATH) return kindMetadataProblem(content, kind);
     return path.endsWith('.json') ? jsonProblem(content, false) : null;
-  }
-  if (path === PDF_PATH) {
-    return parsePdfSource(content) ? null : 'is not { "source": "https://…", "license": "…", "fetchedAt": "…" }';
   }
   if (path === THUMBNAIL_PATH) {
     return parseThumbnailWords(content) ? null : 'is not { "alt": "…", "caption": "…" } (both optional)';

@@ -2,15 +2,17 @@ import 'dotenv/config';
 import { readFileSync } from 'node:fs';
 import { eq, sql } from 'drizzle-orm';
 import { getDb, getPool } from '@/db';
-import { pageCurrent, pageRefs, paperIdentifiers } from '@/db/schema';
+import { pageCurrent, pageRefs, paperIdentifiers, papers } from '@/db/schema';
 import { commitPage, SYSTEM_ACTOR } from '@/server/pages/commit';
 import { recordLfsObject } from '@/server/lfs';
-import { encodeLfsPointer, encodePdfSource, PAPER_PDF_PATH, PDF_PATH, PDF_TYPE } from '@/server/pages/rules';
+import { PDF_TYPE } from '@/server/pages/rules';
+import { versionChanges } from '@/server/pages/content';
+import { attachPdf, versionsAt } from '@/server/versions';
 import type { ManifestRow } from './upload-pdfs';
 
 /**
- * Commits a `.potentialpaper/paper.pdf` (a Git LFS pointer) and its `pdf.json` to the page of each paper in a
- * manifest from `upload-pdfs`. Safe to run again: a
+ * Gives each paper in a manifest from `upload-pdfs` its OpenReview PDF, as the PDF of the version at its forum (a
+ * new `submitted` version if it has none there yet): every PDF of a paper is a version's. Safe to run again: a
  * page that already points at those bytes is skipped.
  *
  *   npm run papers:attach-pdfs -- data/iclr2027.jsonl
@@ -32,8 +34,10 @@ async function main() {
       paperId: paperIdentifiers.paperId,
       head: sql<string | null>`encode(${pageRefs.head}, 'hex')`,
       sha256: sql<string | null>`${pageCurrent.pdf} ->> 'sha256'`,
+      venue: papers.venue,
     })
     .from(paperIdentifiers)
+    .innerJoin(papers, eq(papers.id, paperIdentifiers.paperId))
     .leftJoin(pageRefs, eq(pageRefs.pageId, paperIdentifiers.paperId))
     .leftJoin(pageCurrent, eq(pageCurrent.pageId, paperIdentifiers.paperId))
     .where(eq(paperIdentifiers.scheme, 'openreview'));
@@ -57,24 +61,16 @@ async function main() {
           skipped += 1;
           continue;
         }
-        const source = {
-          source: `https://openreview.net/forum?id=${row.id}`,
-          license: row.license,
-          fetchedAt: row.fetchedAt,
-        };
+        const forum = `https://openreview.net/forum?id=${row.id}`;
         try {
           const url = `${PDF_BASE}/pdf/${row.sha256}.pdf`;
           await recordLfsObject(getDb(), { sha256: row.sha256, bytes: row.bytes, type: PDF_TYPE, url });
-          await commitPage(
-            page.paperId,
-            page.head,
-            SYSTEM_ACTOR,
-            [
-              { path: PAPER_PDF_PATH, content: encodeLfsPointer(row) },
-              { path: PDF_PATH, content: encodePdfSource(source) },
-            ],
-            'Add the PDF',
-          );
+          const { head, versions } = await versionsAt(page.paperId);
+          const pdf = { sha256: row.sha256, bytes: row.bytes, url, source: forum, license: row.license };
+          const after = attachPdf(versions, pdf, { url: forum, label: page.venue ?? 'OpenReview' });
+          await commitPage(page.paperId, head, SYSTEM_ACTOR, versionChanges(versions, after), 'Add the PDF', {
+            evidence: [forum],
+          });
           committed += 1;
           if (committed % 1000 === 0) console.log(`${committed} committed`);
         } catch (err) {

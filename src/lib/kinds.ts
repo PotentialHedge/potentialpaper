@@ -199,7 +199,6 @@ export const KINDS = {
       'link',
       'version',
       'thumbnail',
-      'pdf',
       'submission',
       'forms',
       'note',

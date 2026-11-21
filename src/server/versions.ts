@@ -8,6 +8,7 @@ import {
   versionProblem,
   type PaperVersion,
   type VersionPdf,
+  type VersionSubmission,
 } from '@/lib/versions';
 import { diffShort, diffTexts, type DiffPart, type TextDiff } from '@/lib/text-diff';
 import { ApiError } from './api/errors';
@@ -48,6 +49,21 @@ function clean(text: string | undefined | null, multiline = false): string | und
   return value === '' ? undefined : value;
 }
 
+function cleanSubmission(input: VersionSubmission): VersionSubmission {
+  const evidence = [...new Set((input.evidence ?? []).map((url) => url.trim()).filter(Boolean))];
+  const out: VersionSubmission = {
+    venue: clean(input.venue) ?? '',
+    status: input.status ?? undefined,
+    decision: clean(input.decision),
+    number: input.number ?? undefined,
+    url: clean(input.url),
+    reviews: input.reviews ?? undefined,
+    evidence: evidence.length > 0 ? evidence : undefined,
+  };
+  for (const key of Object.keys(out) as (keyof VersionSubmission)[]) if (out[key] === undefined) delete out[key];
+  return out;
+}
+
 /** Each input as a version: ids for new ones, PDFs resolved to what we store, text trimmed. */
 async function resolve(
   inputs: readonly VersionInput[],
@@ -76,8 +92,7 @@ async function resolve(
       label: clean(input.label) ?? '',
       kind: input.kind,
       date: clean(input.date),
-      status: input.status ?? undefined,
-      decision: clean(input.decision),
+      submissions: input.submissions?.length ? input.submissions.map(cleanSubmission) : undefined,
       title: clean(input.title),
       abstract: clean(input.abstract, true),
       url: clean(input.url),
@@ -214,6 +229,23 @@ function sameUrl(url: string | undefined): string {
 }
 
 /**
+ * A version's submissions with the ones a lookup found: one at the same forum takes what the source says now, unless
+ * a bot imported its reviews (`reviews`), whose entry only that bot changes; the rest are added.
+ */
+function mergeSubmissions(
+  was: readonly VersionSubmission[] | undefined,
+  found: readonly VersionSubmission[] | undefined,
+): VersionSubmission[] | undefined {
+  const out = (was ?? []).map((s) => ({ ...s }));
+  for (const submission of found ?? []) {
+    const at = out.findIndex((s) => sameUrl(s.url) === sameUrl(submission.url) && s.venue === submission.venue);
+    if (at === -1) out.push({ ...submission });
+    else if (!out[at].reviews) out[at] = { ...out[at], ...submission };
+  }
+  return out.length > 0 ? out : undefined;
+}
+
+/**
  * Found versions folded into the ones the page has: one already there (by its address) takes what the
  * source says now, such as a decision, and keeps its id, its note and its evidence; the rest are added,
  * without ids. Returned in the editor's input form, PDFs by address.
@@ -239,8 +271,77 @@ export function mergeFoundVersions(
       label: (relabel ? version.label : was.label) || version.label,
       note: was.note,
       pdf: was.pdf ?? version.pdf,
+      submissions: mergeSubmissions(was.submissions, version.submissions),
       evidence: [...new Set([...(was.evidence ?? []), ...(version.evidence ?? [])])],
     };
+    if (!out[at].submissions) delete out[at].submissions;
   }
+  return sortVersions(out);
+}
+
+/**
+ * The versions with a bot's submission recorded where it belongs: the entry already naming its reviews is brought
+ * up to date; else an entry someone added for the same forum gains the link; else the version at that forum gains
+ * the entry; else a new `submitted` version is made for it. The one place an import writes a decision.
+ */
+export function attachSubmission(
+  versions: readonly PaperVersion[],
+  entry: VersionSubmission & { url: string; reviews: string },
+  newId: () => string = newVersionId,
+): PaperVersion[] {
+  const out = versions.map((v) => ({ ...v, submissions: v.submissions?.map((s) => ({ ...s })) }));
+  const merge = (was: VersionSubmission): VersionSubmission => {
+    const next: VersionSubmission = { ...was, ...entry };
+    const evidence = [...new Set([...(was.evidence ?? []), ...(entry.evidence ?? [])])];
+    if (evidence.length > 0) next.evidence = evidence;
+    // What the source no longer says is gone, not kept from before.
+    for (const key of ['status', 'decision', 'number'] as const) if (entry[key] === undefined) delete next[key];
+    return next;
+  };
+  const find = (match: (s: VersionSubmission) => boolean) => {
+    for (const v of out) {
+      const at = v.submissions?.findIndex(match) ?? -1;
+      if (at !== -1) return { v, at };
+    }
+    return null;
+  };
+  const hit =
+    find((s) => s.reviews === entry.reviews) ?? find((s) => !s.reviews && sameUrl(s.url) === sameUrl(entry.url));
+  if (hit) {
+    hit.v.submissions![hit.at] = merge(hit.v.submissions![hit.at]);
+  } else {
+    const version = out.find((v) => sameUrl(v.url) === sameUrl(entry.url));
+    if (version) version.submissions = [...(version.submissions ?? []), entry];
+    else {
+      out.push({
+        id: newId(),
+        label: entry.venue,
+        kind: 'submitted',
+        url: entry.url,
+        submissions: [entry],
+        evidence: [entry.url],
+      });
+    }
+  }
+  for (const v of out) if (!v.submissions?.length) delete v.submissions;
+  return sortVersions(out);
+}
+
+/**
+ * The versions with a PDF given to the version at `url` (its own address, or a venue's forum one of its submissions
+ * names), or to a new version there when none is. Every PDF of a paper is a version's.
+ */
+export function attachPdf(
+  versions: readonly PaperVersion[],
+  pdf: VersionPdf,
+  at: { url: string; label: string; kind?: PaperVersion['kind'] },
+  newId: () => string = newVersionId,
+): PaperVersion[] {
+  const out = versions.map((v) => ({ ...v }));
+  const version =
+    out.find((v) => sameUrl(v.url) === sameUrl(at.url)) ??
+    out.find((v) => v.submissions?.some((s) => sameUrl(s.url) === sameUrl(at.url)));
+  if (version) version.pdf = pdf;
+  else out.push({ id: newId(), label: at.label, kind: at.kind ?? 'submitted', url: at.url, pdf, evidence: [at.url] });
   return sortVersions(out);
 }

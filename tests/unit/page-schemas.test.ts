@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { parseLinkFile } from '@/lib/paper-links';
 import { parseVersionFile } from '@/lib/versions';
-import { contentProblem, layoutProblem, parsePdfSource, parseThumbnailWords, pathDenied } from '@/server/pages/rules';
+import { contentProblem, layoutProblem, parseThumbnailWords, pathDenied } from '@/server/pages/rules';
 import { PAGE_SCHEMA_NAMES, pageJsonSchema } from '@/server/pages/schemas';
 import { missingStarterFiles, prekConfig, prekProblem, starterFiles } from '@/server/pages/starter';
 
@@ -23,7 +23,10 @@ describe('page file schemas', () => {
       properties: Record<string, { enum?: string[] }>;
     };
     expect(version.required).toEqual(['label', 'kind']);
-    expect(version.properties.kind.enum).toContain('workshop');
+    expect(version.properties.kind.enum).toContain('submitted');
+    expect(version.properties.kind.enum).not.toContain('workshop');
+    expect(Object.keys(version.properties)).toContain('submissions');
+    expect(Object.keys(version.properties)).not.toContain('status');
   });
 
   it('checks files with the same definitions', () => {
@@ -46,10 +49,6 @@ describe('page file schemas', () => {
       problem: 'has an unknown field “what”',
     });
 
-    expect(
-      parsePdfSource('{"source":"https://arxiv.org/abs/1","license":"CC BY 4.0","fetchedAt":"2026"}'),
-    ).toBeTruthy();
-    expect(parsePdfSource('{"source":"http://arxiv.org/abs/1","license":"CC BY 4.0","fetchedAt":"2026"}')).toBeNull();
     expect(parseThumbnailWords('{"alt":"","caption":"A plot"}')).toEqual({ caption: 'A plot' });
   });
 });

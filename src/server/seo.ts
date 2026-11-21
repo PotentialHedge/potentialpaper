@@ -1,7 +1,6 @@
 import { sql } from 'drizzle-orm';
 import { getDb, type Database } from '@/db';
 import { isPageKind, keyedPagePath } from '@/lib/kinds';
-import { paperPath, type PaperScheme } from '@/lib/paper-ids';
 
 /**
  * What the sitemaps read (`app/sitemap.xml`, `app/sitemaps/[file]`): the public pages' addresses. **Reads only.**
@@ -23,15 +22,14 @@ export async function paperSitemapCount(database: Database = getDb()): Promise<n
   return Math.ceil((rows[0]?.n ?? 0) / PAPERS_PER_SITEMAP);
 }
 
-/** The `index`th file of papers (0-based), each at its canonical address (arXiv, then DOI, then OpenReview). */
+/** The `index`th file of papers (0-based), each at its address, `/s/<n>`. */
 export async function paperPaths(index: number, database: Database = getDb()): Promise<string[]> {
-  const { rows } = await database.execute<{ scheme: PaperScheme; value: string }>(sql`
-    select distinct on (p.id) i.scheme, i.value
-    from papers p join paper_identifiers i on i.paper_id = p.id
-    where p.merged_into is null
-    order by p.id, case i.scheme when 'arxiv' then 0 when 'doi' then 1 else 2 end
+  const { rows } = await database.execute<{ short_id: number }>(sql`
+    select pg.short_id from papers p join pages pg on pg.id = p.id
+    where p.merged_into is null and exists (select 1 from paper_identifiers i where i.paper_id = p.id)
+    order by p.id
     offset ${index * PAPERS_PER_SITEMAP} limit ${PAPERS_PER_SITEMAP}`);
-  return rows.map((r) => paperPath(r));
+  return rows.map((r) => `/s/${r.short_id}`);
 }
 
 /** Every venue, topic, organisation and person's page that isn't merged into another. */

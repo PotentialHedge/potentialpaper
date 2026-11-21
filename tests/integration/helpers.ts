@@ -83,6 +83,9 @@ import * as protectionRoute from '@/app/api/v1/pages/[identifier]/protection/rou
 import { getDb, getPool } from '@/db';
 import { clearDevOutbox, devOutbox } from '@/server/mail';
 
+import { encodeVersionFile } from '@/lib/versions';
+import type { SubmissionStatus } from '@/lib/submissions';
+
 export const ORIGIN = 'http://test.local';
 
 export async function resetDatabase(): Promise<void> {
@@ -271,4 +274,35 @@ export async function signUp(email: string): Promise<string> {
   const cookie = cookieFrom(confirmed);
   if (!cookie.includes('session_token')) throw new Error(`no session: ${confirmed.status} ${await confirmed.text()}`);
   return cookie;
+}
+
+/**
+ * The version an imported submission is of, with what the venue decided: since layout 5 the one place a decision is
+ * kept, so a test that writes a bot's `submission.json` by hand writes this beside it, as the import does.
+ */
+export function submittedVersion(
+  forum: string,
+  venue: string,
+  status: SubmissionStatus | null,
+  decision: string | null = null,
+): { path: string; content: string } {
+  const url = `https://openreview.net/forum?id=${forum}`;
+  return {
+    path: `versions/v_${forum.toLowerCase()}.json`,
+    content: encodeVersionFile({
+      id: `v_${forum.toLowerCase()}`,
+      label: venue,
+      kind: 'submitted',
+      url,
+      submissions: [
+        {
+          venue,
+          ...(status ? { status } : {}),
+          ...(decision ? { decision } : {}),
+          url,
+          reviews: `openreview/${forum.toLowerCase()}`,
+        },
+      ],
+    }),
+  };
 }

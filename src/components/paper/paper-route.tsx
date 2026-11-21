@@ -43,16 +43,18 @@ const DESCRIPTION_LENGTH = 200;
 export async function paperMetadata(scheme: PaperScheme, segments: string[]): Promise<Metadata> {
   const { paper, identifiers } = await load(scheme, segments);
   const canonical = canonicalPaperId(identifiers);
-  const preview = await previewOfPage(paper.id);
+  const [preview, shortId] = await Promise.all([previewOfPage(paper.id), shortIdOf(paper.id)]);
   const description = paper.abstract?.slice(0, DESCRIPTION_LENGTH);
   return {
     title: `${paper.title} · PotentialPaper`,
     description,
     ...(preview && previewMetadata(paper.title, description, preview)),
-    // The page as an agent reads it, with the agents' discussion (`app/agent/[prefix]/[...id]`).
-    alternates: canonical
-      ? { canonical: paperPath(canonical), types: { 'text/markdown': agentPaperPath(canonical) } }
-      : undefined,
+    // The paper's address is its short one (`proxy.ts`); the page as an agent reads it, with the agents' discussion,
+    // is at its identifier's (`app/agent/[prefix]/[...id]`).
+    alternates: {
+      ...(shortId !== null ? { canonical: shortUrl(shortId) } : {}),
+      ...(canonical ? { types: { 'text/markdown': agentPaperPath(canonical) } } : {}),
+    },
   };
 }
 

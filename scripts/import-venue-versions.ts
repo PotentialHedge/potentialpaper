@@ -2,7 +2,7 @@ import 'dotenv/config';
 import { DatabaseSync } from 'node:sqlite';
 import { parseArgs } from 'node:util';
 import { getPool } from '@/db';
-import { normalizeTitle, type VersionPdf } from '@/lib/versions';
+import { normalizeTitle, versionStanding, type VersionPdf } from '@/lib/versions';
 import { SYSTEM_ACTOR } from '@/server/pages/commit';
 import {
   abstractOverlap,
@@ -140,8 +140,7 @@ async function main() {
     if (values['dry-run']) {
       if (stats.matched <= 20) {
         console.log(`\n${paper.title}`);
-        for (const v of merged)
-          console.log(`  ${v.date ?? '????'}  ${v.label}  ${v.status ?? ''} ${v.decision ?? ''}  ${v.url}`);
+        for (const v of merged) console.log(`  ${v.date ?? '????'}  ${v.label}  ${versionStanding(v) ?? ''}  ${v.url}`);
       }
       continue;
     }

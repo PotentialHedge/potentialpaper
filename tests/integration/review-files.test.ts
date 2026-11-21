@@ -45,8 +45,6 @@ const submission = encodeReviewFile({
   id: 'Forum1AbC',
   venue: { id: 'ICLR.cc/2027/Conference', name: 'ICLR 2027', url: null },
   number: 7,
-  status: 'under_review',
-  decision: null,
   url: 'https://openreview.net/forum?id=Forum1AbC',
   license: 'CC-BY-4.0',
 });

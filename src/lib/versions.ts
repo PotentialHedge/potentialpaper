@@ -9,37 +9,41 @@
 import { z } from 'zod';
 import { evidenceProblem, MAX_EVIDENCE } from './evidence';
 import { httpUrl } from './paper-links';
+import { STATUS_LABELS, SUBMISSION_STATUSES, type SubmissionStatus } from './submissions';
 
-export const VERSION_KINDS = ['preprint', 'workshop', 'conference', 'journal', 'camera-ready', 'other'] as const;
+/**
+ * What text a version is. Where it went is not a kind: a version sent to a workshop and then a conference is one
+ * `submitted` version with two submissions.
+ */
+export const VERSION_KINDS = ['preprint', 'submitted', 'camera-ready', 'journal', 'other'] as const;
 export type VersionKind = (typeof VERSION_KINDS)[number];
 
 export const VERSION_KIND_LABELS: Record<VersionKind, string> = {
   preprint: 'Preprint',
-  workshop: 'Workshop',
-  conference: 'Conference',
-  journal: 'Journal',
+  submitted: 'Submitted',
   'camera-ready': 'Camera-ready',
+  journal: 'Journal',
   other: 'Other',
 };
 
-export const VERSION_STATUSES = [
-  'submitted',
-  'under_review',
-  'accepted',
-  'rejected',
-  'withdrawn',
-  'published',
-] as const;
-export type VersionStatus = (typeof VERSION_STATUSES)[number];
-
-export const VERSION_STATUS_LABELS: Record<VersionStatus, string> = {
-  submitted: 'Submitted',
-  under_review: 'Under review',
-  accepted: 'Accepted',
-  rejected: 'Rejected',
-  withdrawn: 'Withdrawn',
-  published: 'Published',
-};
+/**
+ * A version sent to a venue, and what the venue decided: the one place a decision is kept (DESIGN.md §3). A bot
+ * that imports the venue's reviews names their folder in `reviews`; only that bot and admins change such an entry.
+ */
+export interface VersionSubmission {
+  /** The venue as people say it: "ICLR 2027", "SPIGM @ ICML 2026". */
+  venue: string;
+  status?: SubmissionStatus;
+  /** As the venue words it: "Accept (Poster)", "Reject". */
+  decision?: string;
+  /** Its number at the venue. */
+  number?: number;
+  /** Where it is at the venue: its forum. */
+  url?: string;
+  /** The folder of the venue's reviews, `<source>/<submission>` under `reviews/`, when a bot imported them. */
+  reviews?: string;
+  evidence?: string[];
+}
 
 /**
  * A version's PDF, hosted here by its SHA-256 as the page's own is. In the repo it is two things: the PDF
@@ -66,9 +70,8 @@ export interface PaperVersion {
   kind: VersionKind;
   /** `YYYY`, `YYYY-MM` or `YYYY-MM-DD`: when it was submitted, or made public. */
   date?: string;
-  status?: VersionStatus;
-  /** As the venue words it: "Poster", "Oral", "Accept (Spotlight)". */
-  decision?: string;
+  /** Where it was sent, and what became of it there, oldest first. */
+  submissions?: VersionSubmission[];
   /** The title it had, when not the paper's. */
   title?: string;
   abstract?: string;
@@ -87,6 +90,8 @@ export const MAX_VERSION_DECISION = 120;
 export const MAX_VERSION_TITLE = 400;
 export const MAX_VERSION_ABSTRACT = 6000;
 export const MAX_VERSION_NOTE = 2000;
+export const MAX_SUBMISSIONS = 10;
+export const MAX_VENUE = 200;
 const MAX_URL = 2000;
 
 /**
@@ -94,6 +99,8 @@ const MAX_URL = 2000;
  * file by hand may name it as they like within this.
  */
 export const VERSION_ID = /^[a-z0-9][a-z0-9_-]{0,47}$/;
+/** `openreview/abc123`: a folder under `reviews/` (`lib/review-files.ts`). */
+export const REVIEWS_KEY = /^[a-z0-9]+(?:-[a-z0-9]+)*\/[a-z0-9_-]+$/;
 const DATE = /^\d{4}(-(0[1-9]|1[0-2])(-(0[1-9]|[12]\d|3[01]))?)?$/;
 
 /** Free text: not blank, and no control characters but newlines. */
@@ -128,10 +135,29 @@ const versionShape = {
     .regex(DATE)
     .optional()
     .meta({ description: 'When it was submitted, or made public: YYYY, YYYY-MM or YYYY-MM-DD.' }),
-  status: z.enum(VERSION_STATUSES).optional().meta({ description: 'Where it stands at its venue.' }),
-  decision: text(MAX_VERSION_DECISION)
+  submissions: z
+    .array(
+      z.strictObject({
+        venue: text(MAX_VENUE).meta({ description: 'The venue as people say it: "ICLR 2027".' }),
+        status: z
+          .enum(SUBMISSION_STATUSES)
+          .optional()
+          .meta({ description: `Where it stands there: ${SUBMISSION_STATUSES.join(', ')}.` }),
+        decision: text(MAX_VERSION_DECISION)
+          .optional()
+          .meta({ description: 'The decision as the venue words it: "Accept (Poster)", "Reject".' }),
+        number: z.number().int().positive().optional().meta({ description: 'Its number at the venue.' }),
+        url: httpUrl(MAX_URL).optional().meta({ description: 'Where it is at the venue: its forum.' }),
+        reviews: z.string().regex(REVIEWS_KEY).optional().meta({
+          description:
+            'The folder of its imported reviews, <source>/<submission> under reviews/. Set by the bot that imports them; only it and admins change this entry.',
+        }),
+        evidence: evidenceSchema.optional(),
+      }),
+    )
+    .max(MAX_SUBMISSIONS)
     .optional()
-    .meta({ description: 'The decision as the venue words it: "Poster", "Oral", "Accept (Spotlight)".' }),
+    .meta({ description: 'Where this version was sent, and what each venue decided, oldest first.' }),
   title: text(MAX_VERSION_TITLE).optional().meta({ description: "The title it had, when not the paper's." }),
   abstract: text(MAX_VERSION_ABSTRACT).optional().meta({ description: "Its abstract, when not the paper's." }),
   url: httpUrl(MAX_URL)
@@ -149,8 +175,7 @@ const FIELD_PROBLEMS: Record<string, string> = {
   label: `needs a label of 1 to ${MAX_VERSION_LABEL} characters`,
   kind: `needs a kind: ${VERSION_KINDS.join(', ')}`,
   date: 'needs a date as YYYY, YYYY-MM or YYYY-MM-DD',
-  status: `needs a status: ${VERSION_STATUSES.join(', ')}`,
-  decision: 'has a bad decision',
+  submissions: `has a bad submission: each needs a venue, and a status of ${SUBMISSION_STATUSES.join(', ')}`,
   title: 'has a bad title',
   abstract: 'has a bad abstract',
   note: 'has a bad note',
@@ -254,8 +279,7 @@ const ORDER: (keyof PaperVersion)[] = [
   'date',
   'kind',
   'label',
-  'status',
-  'decision',
+  'submissions',
   'title',
   'url',
   'pdf',
@@ -294,17 +318,36 @@ export function sortVersions<T extends Pick<PaperVersion, 'date'>>(versions: rea
 }
 
 /** "Accepted · Poster", "Under review", or `null`. */
-export function versionStanding(version: Pick<PaperVersion, 'status' | 'decision'>): string | null {
-  const status = version.status ? VERSION_STATUS_LABELS[version.status] : null;
+export function submissionStanding(submission: Pick<VersionSubmission, 'status' | 'decision'>): string | null {
+  const status = submission.status ? STATUS_LABELS[submission.status] : null;
   // "Accept (Oral)" already says accepted.
   const stem = status
     ?.toLowerCase()
     .replace(/(ed|n)$/, '')
     .slice(0, 6);
-  if (status && version.decision && !version.decision.toLowerCase().includes(stem!)) {
-    return `${status} · ${version.decision}`;
+  if (status && submission.decision && !submission.decision.toLowerCase().includes(stem!)) {
+    return `${status} · ${submission.decision}`;
   }
-  return version.decision ?? status;
+  return submission.decision ?? status;
+}
+
+/** "ICLR 2027: Accepted · Poster", each of a version's submissions, or `null` for a version sent nowhere. */
+export function versionStanding(version: Pick<PaperVersion, 'submissions'>): string | null {
+  const parts = (version.submissions ?? []).map((s) => {
+    const standing = submissionStanding(s);
+    return standing ? `${s.venue}: ${standing}` : s.venue;
+  });
+  return parts.length > 0 ? parts.join('; ') : null;
+}
+
+/**
+ * The paper's PDF: the newest version's that has one. Every PDF belongs to a version, so the page shows the
+ * latest text it has.
+ */
+export function paperPdfOf<T extends Pick<PaperVersion, 'date' | 'pdf'>>(versions: readonly T[]): VersionPdf | null {
+  const sorted = sortVersions(versions);
+  for (let i = sorted.length - 1; i >= 0; i -= 1) if (sorted[i].pdf) return sorted[i].pdf!;
+  return null;
 }
 
 /** "14 Jun 2026", "Jun 2026" or "2026". */

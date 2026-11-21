@@ -8,6 +8,8 @@ import {
   parseVersionFile,
   sortVersions,
   versionProblem,
+  paperPdfOf,
+  submissionStanding,
   versionStanding,
   type PaperVersion,
 } from '@/lib/versions';
@@ -21,7 +23,7 @@ import {
   sameWork,
   venueName,
 } from '@/server/version-sources';
-import { mergeFoundVersions } from '@/server/versions';
+import { attachPdf, attachSubmission, mergeFoundVersions } from '@/server/versions';
 import { versionChanges, versionsIn } from '@/server/pages/content';
 
 const SHA = 'a'.repeat(64);
@@ -29,10 +31,16 @@ const SHA = 'a'.repeat(64);
 const workshop: PaperVersion = {
   id: 'v_k3x9q2mf',
   label: 'SPIGM @ ICML 2026',
-  kind: 'workshop',
+  kind: 'submitted',
   date: '2026-04-29',
-  status: 'accepted',
-  decision: 'Poster',
+  submissions: [
+    {
+      venue: 'SPIGM @ ICML 2026',
+      status: 'accepted',
+      decision: 'Poster',
+      url: 'https://openreview.net/forum?id=zI2IeuDcoS',
+    },
+  ],
   url: 'https://openreview.net/forum?id=zI2IeuDcoS',
   pdf: { sha256: SHA, bytes: 1000, url: 'https://pdfs.example.org/pdf/x.pdf' },
   evidence: ['https://openreview.net/forum?id=zI2IeuDcoS'],
@@ -40,9 +48,9 @@ const workshop: PaperVersion = {
 const conference: PaperVersion = {
   id: 'v_9q2mfk3x',
   label: 'ICLR 2027',
-  kind: 'conference',
+  kind: 'submitted',
   date: '2026-09-11',
-  status: 'under_review',
+  submissions: [{ venue: 'ICLR 2027', status: 'under_review' }],
 };
 
 describe('versions/<id>.json', () => {
@@ -89,6 +97,11 @@ describe('versions/<id>.json', () => {
 
   it('refuses a bad version, a duplicate id, an unknown field', () => {
     expect(versionProblem({ ...workshop, kind: 'blog' })).toMatch(/kind/);
+    expect(versionProblem({ ...workshop, kind: 'workshop' })).toMatch(/kind/);
+    expect(versionProblem({ ...workshop, submissions: [{ venue: 'X', status: 'published' }] })).toMatch(/submission/);
+    expect(versionProblem({ ...workshop, submissions: [{ status: 'accepted' }] })).toMatch(/submission/);
+    expect(versionProblem({ ...workshop, submissions: [{ venue: 'X', reviews: '../x' }] })).toMatch(/submission/);
+    expect(versionProblem({ ...workshop, status: 'accepted' })).toMatch(/unknown field/);
     expect(versionProblem({ ...workshop, date: '26-04-29' })).toMatch(/date/);
     expect(versionProblem({ ...workshop, url: 'javascript:alert(1)' })).toMatch(/address/);
     expect(versionProblem({ ...workshop, evidence: ['http://x.org'] })).toMatch(/evidence/);
@@ -108,9 +121,13 @@ describe('versions/<id>.json', () => {
   });
 
   it('words a version', () => {
-    expect(versionStanding(workshop)).toBe('Accepted · Poster');
-    expect(versionStanding({ status: 'accepted', decision: 'Accept (Oral)' })).toBe('Accept (Oral)');
+    expect(versionStanding(workshop)).toBe('SPIGM @ ICML 2026: Accepted · Poster');
+    expect(submissionStanding({ status: 'accepted', decision: 'Accept (Oral)' })).toBe('Accept (Oral)');
+    expect(submissionStanding({ status: 'desk_rejected' })).toBe('Desk rejected');
     expect(versionStanding({})).toBeNull();
+    expect(
+      versionStanding({ submissions: [{ venue: 'ICLR 2026', status: 'rejected' }, { venue: 'NeurIPS 2026' }] }),
+    ).toBe('ICLR 2026: Rejected; NeurIPS 2026');
     expect(formatVersionDate('2026-04-09')).toBe('9 Apr 2026');
     expect(formatVersionDate('2026-04')).toBe('Apr 2026');
     expect(newVersionId()).toMatch(/^v_[a-z2-9]{8}$/);
@@ -129,9 +146,8 @@ describe('versions/<id>.json', () => {
       [
         {
           label: 'ICLR 2027 Conference',
-          kind: 'conference',
-          status: 'accepted',
-          decision: 'Poster',
+          kind: 'submitted',
+          submissions: [{ venue: 'ICLR 2027', status: 'accepted', decision: 'Poster' }],
           url: 'http://openreview.net/forum?id=dskf2Ppd9o/',
           evidence: ['https://e.org'],
         },
@@ -139,8 +155,59 @@ describe('versions/<id>.json', () => {
       ],
     );
     expect(merged.map((v) => v.label)).toEqual(['arXiv v1', 'ICLR 2027']);
-    expect(merged[1]).toMatchObject({ id: conference.id, status: 'accepted', decision: 'Poster', note: 'ours' });
+    expect(merged[1]).toMatchObject({
+      id: conference.id,
+      submissions: [{ venue: 'ICLR 2027', status: 'accepted', decision: 'Poster' }],
+      note: 'ours',
+    });
     expect(merged[0].id).toBeUndefined();
+    // What a venue's bot imported stays as it said.
+    const imported = { venue: 'ICLR 2027', status: 'rejected' as const, reviews: 'openreview/dskf2ppd9o' };
+    const kept = mergeFoundVersions(
+      [{ ...conference, submissions: [imported] }],
+      [{ label: 'x', kind: 'submitted', url: '', submissions: [{ venue: 'ICLR 2027', status: 'accepted' }] }],
+    );
+    expect(kept.find((v) => v.id === conference.id)?.submissions).toEqual([imported]);
+  });
+
+  it('records an imported submission in the version it is of, once', () => {
+    const forum = 'https://openreview.net/forum?id=dskf2Ppd9o';
+    const entry = { venue: 'ICLR 2027', status: 'under_review' as const, url: forum, reviews: 'openreview/dskf2ppd9o' };
+    let n = 0;
+    const id = () => `v_new${n++}`;
+    // None at its forum: a new submitted version.
+    const made = attachSubmission([workshop], entry, id);
+    expect(made.find((v) => v.id === 'v_new0')).toMatchObject({ kind: 'submitted', url: forum, submissions: [entry] });
+    // Again, decided: the same entry, brought up to date, and a decision dropped by the source is gone.
+    const decided = attachSubmission(made, { ...entry, status: 'accepted', decision: 'Poster' }, id);
+    expect(decided).toHaveLength(2);
+    expect(decided.find((v) => v.id === 'v_new0')?.submissions).toEqual([
+      { ...entry, status: 'accepted', decision: 'Poster' },
+    ]);
+    expect(attachSubmission(decided, entry, id).find((v) => v.id === 'v_new0')?.submissions).toEqual([entry]);
+    // Someone's entry for the same forum gains the link rather than a second entry.
+    const hand = { ...conference, submissions: [{ venue: 'ICLR 2027', url: forum, evidence: ['https://e.org'] }] };
+    expect(attachSubmission([hand], entry, id)[0].submissions).toEqual([{ ...entry, evidence: ['https://e.org'] }]);
+  });
+
+  it('gives a PDF to the version at its address, and shows the newest version’s', () => {
+    const pdf = { sha256: 'b'.repeat(64), bytes: 9, url: '/x.pdf', source: workshop.url };
+    const given = attachPdf([conference, { ...workshop, pdf: undefined }], pdf, { url: workshop.url!, label: 'x' });
+    expect(given.find((v) => v.id === workshop.id)?.pdf).toEqual(pdf);
+    expect(
+      attachPdf([], pdf, { url: 'https://arxiv.org/abs/1', label: 'arXiv', kind: 'preprint' }, () => 'v_a'),
+    ).toEqual([
+      {
+        id: 'v_a',
+        label: 'arXiv',
+        kind: 'preprint',
+        url: 'https://arxiv.org/abs/1',
+        pdf,
+        evidence: ['https://arxiv.org/abs/1'],
+      },
+    ]);
+    expect(paperPdfOf([workshop, conference])).toEqual(workshop.pdf);
+    expect(paperPdfOf([conference])).toBeNull();
   });
 });
 
@@ -218,10 +285,16 @@ describe('finding versions', () => {
   it('reads what became of a submission from OpenReview', () => {
     expect(openReviewVersion(note('SPIGM @ ICML Poster', 'ICML.cc/2026/Workshop/SPIGM'))).toMatchObject({
       label: 'SPIGM @ ICML 2026',
-      kind: 'workshop',
+      kind: 'submitted',
       date: '2026-04-29',
-      status: 'accepted',
-      decision: 'Poster',
+      submissions: [
+        {
+          venue: 'SPIGM @ ICML 2026',
+          status: 'accepted',
+          decision: 'Poster',
+          url: 'https://openreview.net/forum?id=zI2IeuDcoS',
+        },
+      ],
       url: 'https://openreview.net/forum?id=zI2IeuDcoS',
       pdfSource: 'https://openreview.net/pdf/dd92.pdf',
       license: 'CC-BY-4.0',
@@ -230,30 +303,30 @@ describe('finding versions', () => {
       openReviewVersion(note('ICLR 2027 Conference Submission', 'ICLR.cc/2027/Conference/Submission')),
     ).toMatchObject({
       label: 'ICLR 2027',
-      kind: 'conference',
-      status: 'under_review',
+      kind: 'submitted',
+      submissions: [{ venue: 'ICLR 2027', status: 'under_review' }],
     });
     expect(
       openReviewVersion(
         note('ICLR 2026 Conference Desk Rejected Submission', 'ICLR.cc/2026/Conference/Desk_Rejected_Submission'),
       ),
-    ).toMatchObject({ label: 'ICLR 2026', status: 'rejected', decision: 'Desk rejected' });
+    ).toMatchObject({ label: 'ICLR 2026', submissions: [{ status: 'desk_rejected' }] });
     expect(
       openReviewVersion(
         note('ICLR 2026 Conference Withdrawn Submission', 'ICLR.cc/2026/Conference/Withdrawn_Submission'),
       ),
-    ).toMatchObject({ label: 'ICLR 2026', status: 'withdrawn' });
+    ).toMatchObject({ label: 'ICLR 2026', submissions: [{ status: 'withdrawn' }] });
     // A workshop that names itself only by its conference is named by its venue id.
     expect(openReviewVersion(note('NeurIPS 2025 Workshop', 'NeurIPS.cc/2025/Workshop/OPT'))).toMatchObject({
       label: 'OPT @ NeurIPS 2025',
-      kind: 'workshop',
-      status: 'accepted',
+      kind: 'submitted',
+      submissions: [{ venue: 'OPT @ NeurIPS 2025', status: 'accepted' }],
     });
     expect(
       openReviewVersion(note('Submitted to ICLR 2026', 'ICLR.cc/2026/Conference/Rejected_Submission')),
     ).toMatchObject({
       label: 'ICLR 2026',
-      status: 'rejected',
+      submissions: [{ status: 'rejected' }],
     });
   });
 
@@ -296,14 +369,14 @@ describe('venueName', () => {
   it('names a venue from its id, whatever its organisers typed', () => {
     expect(venueName('ICLR.cc/2027/Conference/Submission')).toEqual({
       label: 'ICLR 2027',
-      kind: 'conference',
+      kind: 'submitted',
       year: 2027,
     });
-    expect(venueName('AAAI.org/2026/Workshop/DAI')).toMatchObject({ label: 'DAI @ AAAI 2026', kind: 'workshop' });
+    expect(venueName('AAAI.org/2026/Workshop/DAI')).toMatchObject({ label: 'DAI @ AAAI 2026', kind: 'submitted' });
     expect(venueName('AAAI.org/2026/Workshop/AgriAI/Rejected_Submission').label).toBe('AgriAI @ AAAI 2026');
     expect(venueName('AAAI.org/2026/Bridge/LMReasoning')).toMatchObject({
       label: 'LMReasoning @ AAAI 2026',
-      kind: 'workshop',
+      kind: 'submitted',
     });
     expect(venueName('thecvf.com/CVPR/2026/Conference').label).toBe('CVPR 2026');
     expect(venueName('NeurIPS.cc/2025/Datasets_and_Benchmarks_Track').label).toBe(
@@ -312,7 +385,7 @@ describe('venueName', () => {
     expect(venueName('TMLR')).toEqual({ label: 'TMLR', kind: 'journal', year: null });
   });
 
-  it('says a past submission with no public decision was submitted, not under review', () => {
+  it('gives a past submission with no public decision no status, not under review', () => {
     const old = openReviewVersion(
       {
         id: 'x',
@@ -323,6 +396,7 @@ describe('venueName', () => {
       },
       new Date('2026-11-13'),
     );
-    expect(old).toMatchObject({ label: 'AI4WCN @ AAAI 2025', status: 'submitted' });
+    expect(old).toMatchObject({ label: 'AI4WCN @ AAAI 2025', submissions: [{ venue: 'AI4WCN @ AAAI 2025' }] });
+    expect(old?.submissions?.[0].status).toBeUndefined();
   });
 });

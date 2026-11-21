@@ -1,11 +1,6 @@
 import type { Database } from '@/db';
-import {
-  normalizeTitle,
-  type PaperVersion,
-  type VersionKind,
-  type VersionPdf,
-  type VersionStatus,
-} from '@/lib/versions';
+import type { SubmissionStatus } from '@/lib/submissions';
+import { normalizeTitle, type PaperVersion, type VersionKind, type VersionPdf } from '@/lib/versions';
 import { fetchPdf } from './files';
 import { forumUrl, licenseId, OPENREVIEW } from './venue-sources/openreview';
 
@@ -62,29 +57,27 @@ export function venueName(venueId: string): { label: string; kind: VersionKind; 
   while (parts.length > 1 && STANDING_PART.test(parts[parts.length - 1])) parts.pop();
   const at = parts.findIndex((part) => /^(19|20)\d\d$/.test(part));
   const journal = /Journal|^TMLR$|^JMLR$|^DMLR$/i.test(venueId);
-  if (at === -1) return { label: spaced(parts.join(' ')), kind: journal ? 'journal' : 'conference', year: null };
+  // A venue is not a kind of text: what goes to a workshop or a conference is a submitted version.
+  const textKind: VersionKind = journal ? 'journal' : 'submitted';
+  if (at === -1) return { label: spaced(parts.join(' ')), kind: textKind, year: null };
   const host = spaced((parts[at - 1] ?? parts[0]).replace(/\.(cc|org|com|net|io|ai|edu|info)$/i, ''));
   const year = Number(parts[at]);
   const base = `${host} ${year}`;
   const rest = parts.slice(at + 1).filter((part) => !/^Conference$/i.test(part));
-  if (rest.length === 0) return { label: base, kind: journal ? 'journal' : 'conference', year };
+  if (rest.length === 0) return { label: base, kind: textKind, year };
   if (WORKSHOP_PART.test(rest[0]) && rest.length > 1) {
-    return { label: `${spaced(rest.slice(1).join(' '))} @ ${base}`, kind: 'workshop', year };
+    return { label: `${spaced(rest.slice(1).join(' '))} @ ${base}`, kind: textKind, year };
   }
-  const kind: VersionKind = journal
-    ? 'journal'
-    : rest.some((part) => WORKSHOP_PART.test(part))
-      ? 'workshop'
-      : 'conference';
-  return { label: `${base} ${spaced(rest.join(' '))}`, kind, year };
+  return { label: `${base} ${spaced(rest.join(' '))}`, kind: textKind, year };
 }
 
 const DECISION = /\b(Oral|Spotlight|Poster|Notable[\w -]*|Highlight|(?:Lightning |Contributed )?Talk)\s*$/i;
 
 /**
  * A forum as a version of its paper: "SPIGM @ ICML Poster" filed under `ICML.cc/2026/Workshop/SPIGM` → an
- * accepted workshop version, a poster. "ICLR 2027 Conference Submission" → under review (or, once its year is
- * past with no decision public, just submitted); "Submitted to ICLR 2026" → not accepted.
+ * accepted workshop submission, a poster. "ICLR 2027 Conference Submission" → under review (or, once its year is
+ * past with no decision public, submitted with no status); "Submitted to ICLR 2026" → rejected. The decision goes
+ * on the version's submission to the venue, not on the version.
  */
 export function openReviewVersion(note: OpenReviewSearchNote, now = new Date()): FoundVersion | null {
   const venue = value(note, 'venue');
@@ -92,16 +85,15 @@ export function openReviewVersion(note: OpenReviewSearchNote, now = new Date()):
   if (!venue || !venueId) return null;
   const { label, kind, year } = venueName(venueId);
   const standing = venueId.split('/').pop() ?? '';
-  let status: VersionStatus;
+  let status: SubmissionStatus | undefined;
   let decision: string | undefined;
   if (/Withdrawn/i.test(standing) || /\bwithdrawn\b/i.test(venue)) status = 'withdrawn';
-  else if (/Desk_Rejected/i.test(standing) || /desk.rejected/i.test(venue)) {
-    status = 'rejected';
-    decision = 'Desk rejected';
-  } else if (/Rejected/i.test(standing) || /^Submitted to /i.test(venue) || /\brejected\b/i.test(venue)) {
+  else if (/Desk_Rejected/i.test(standing) || /desk.rejected/i.test(venue)) status = 'desk_rejected';
+  else if (/Rejected/i.test(standing) || /^Submitted to /i.test(venue) || /\brejected\b/i.test(venue)) {
     status = 'rejected';
   } else if (/(Submission|Under_Review|Submitted)$/i.test(standing) || /(Submission|under review)$/i.test(venue)) {
-    status = year !== null && year < now.getUTCFullYear() ? 'submitted' : 'under_review';
+    // Once its year is past with no decision public, it is only known to have been submitted.
+    status = year !== null && year < now.getUTCFullYear() ? undefined : 'under_review';
   } else {
     status = 'accepted';
     decision = DECISION.exec(venue)?.[1];
@@ -114,8 +106,9 @@ export function openReviewVersion(note: OpenReviewSearchNote, now = new Date()):
     label,
     kind,
     date: isoDay(note.cdate ?? note.odate ?? note.pdate),
-    status,
-    ...(decision ? { decision } : {}),
+    submissions: [
+      { venue: label, ...(status ? { status } : {}), ...(decision ? { decision } : {}), url: forumUrl(forum) },
+    ],
     ...(title ? { title: title.trim() } : {}),
     ...(abstract ? { abstract: abstract.trim() } : {}),
     url: forumUrl(forum),
@@ -179,7 +172,6 @@ export function parseArxivHistory(html: string, id: string): FoundVersion[] {
       label: `arXiv v${n}`,
       kind: 'preprint',
       date: `${year}-${MONTHS[month] ?? '01'}-${day.padStart(2, '0')}`,
-      status: 'published',
       url,
       pdfSource: license ? `https://arxiv.org/pdf/${id}v${n}` : null,
       license,

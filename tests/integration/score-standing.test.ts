@@ -18,7 +18,7 @@ import { savePaper } from '@/server/papers';
 import { servePlugin } from '@/server/plugins/serve';
 import { pluginHostLabel } from '@/server/plugins/snapshot';
 import { recomputeDueScopes } from '@/server/scope-stats';
-import { api, closePool, resetDatabase, signUp } from './helpers';
+import { api, closePool, resetDatabase, signUp, submittedVersion } from './helpers';
 
 /**
  * Score standing (`handoffs/plugins.md` Phase 6), the first plugin outside this repo, installed from GitHub as any
@@ -88,12 +88,11 @@ async function submitted(
           id: forum,
           venue: { id: VENUE, name: 'ICLR 2027', url: null },
           number: 1,
-          status,
-          decision: status === 'accepted' ? 'Accept (poster)' : 'Reject',
           url: `https://openreview.net/forum?id=${forum}`,
           license,
         }),
       },
+      submittedVersion(forum, 'ICLR 2027', status, status === 'accepted' ? 'Accept (poster)' : 'Reject'),
       {
         path: formsFilePath('openreview', forum),
         content: encodeReviewFile({

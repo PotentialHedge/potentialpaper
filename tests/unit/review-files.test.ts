@@ -20,8 +20,6 @@ const SUBMISSION: SubmissionFile = {
     url: 'https://openreview.net/group?id=ICLR.cc/2027/Conference',
   },
   number: 1234,
-  status: 'accepted',
-  decision: 'Accept (Poster)',
   url: 'https://openreview.net/forum?id=dskf2Ppd9o',
   license: 'CC-BY-4.0',
 };

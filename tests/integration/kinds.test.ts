@@ -75,7 +75,7 @@ describe('pages', () => {
     expect(await findPage('venue:iclr/2027')).toMatchObject({ id: venue.id, kind: 'venue', key: 'iclr/2027' });
     const tree = await files(venue.id);
     expect(Object.keys(tree).sort()).toEqual(['.gitattributes', '.potentialpaper/metadata.json', 'prek.toml']);
-    expect(JSON.parse(tree['.potentialpaper/metadata.json'])).toEqual({ layout: 4, kind: 'venue', key: 'iclr/2027' });
+    expect(JSON.parse(tree['.potentialpaper/metadata.json'])).toEqual({ layout: 5, kind: 'venue', key: 'iclr/2027' });
     await expect(createPage('venue', 'ICLR 2027')).rejects.toThrow(/slugs/);
     await expect(createPage('topic', 'a/b')).rejects.toThrow(/more than 1 part/);
     await expect(createPage('user', 'x')).rejects.toThrow(/handle/);

@@ -6,15 +6,12 @@ import { linkChanges, versionChanges } from './content';
 import { shiftHeadings, splitSections } from './markdown';
 import {
   encodeLfsPointer,
-  encodePdfSource,
   encodeThumbnailWords,
   GITATTRIBUTES,
   GITATTRIBUTES_PATH,
   layoutProblem,
   layoutVersionOf,
   METADATA_PATH,
-  PAPER_PDF_PATH,
-  PDF_PATH,
   PDF_TYPE,
   THUMBNAIL_PATH,
   THUMBNAIL_TYPES,
@@ -30,6 +27,10 @@ import { planSections } from './sections';
  * top) to files and folders (`rules.ts`), layout 2, which `metadata.json` then records. Pure:
  * `scripts/migrate-page-layout.ts` commits what this says, as the system, a commit per page.
  */
+
+/** The paper's own PDF and where it came from, from layout 2 until layout 5 made every PDF a version's. */
+const PAPER_PDF_PATH = '.potentialpaper/paper.pdf';
+const PDF_PATH = '.potentialpaper/pdf.json';
 
 const MOVED: Record<string, string> = { 'metadata.json': METADATA_PATH, 'pdf.json': PDF_PATH };
 /** A paper's parts in the first layout, before layout 4 named the owners' `owners/`. */
@@ -160,7 +161,7 @@ export function planLfs(files: ReadonlyMap<string, string>): LfsPlan {
       { path: PAPER_PDF_PATH, content: encodeLfsPointer(pdfFile) },
       {
         path: PDF_PATH,
-        content: encodePdfSource({ source: pdf.source, license: pdf.license, fetchedAt: String(pdf.fetchedAt ?? '') }),
+        content: `${JSON.stringify({ source: pdf.source, license: pdf.license, fetchedAt: String(pdf.fetchedAt ?? '') }, null, 2)}\n`,
       },
     );
   }

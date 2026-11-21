@@ -1,12 +1,13 @@
 import { ui } from '@/components/ui';
 import { evidenceLabel } from '@/lib/evidence';
 import type { PaperId } from '@/lib/paper-ids';
+import type { SubmissionStatus } from '@/lib/submissions';
 import {
   formatVersionDate,
+  submissionStanding,
   VERSION_KIND_LABELS,
-  versionStanding,
   type PaperVersion,
-  type VersionStatus,
+  type VersionSubmission,
 } from '@/lib/versions';
 import { toolPath } from '@/lib/page-tools';
 import { Fold } from '@/components/paper/Fold';
@@ -16,15 +17,43 @@ import { Fold } from '@/components/paper/Fold';
  * PDF and evidence. Two are compared on their own page, by a plain form, so the cached page needs no script.
  */
 
-function tone(status: VersionStatus | undefined): string {
-  if (status === 'accepted' || status === 'published') return 'text-up';
-  if (status === 'rejected' || status === 'withdrawn') return 'text-down';
+function tone(status: SubmissionStatus | undefined): string {
+  if (status === 'accepted') return 'text-up';
+  if (status === 'rejected' || status === 'withdrawn' || status === 'desk_rejected') return 'text-down';
   return 'text-muted';
 }
 
-function sameUrl(a: string | null | undefined, b: string | null | undefined): boolean {
-  const clean = (u: string) => u.replace(/^https?:\/\/(www\.)?/, '').replace(/\/$/, '');
-  return Boolean(a && b && clean(a) === clean(b));
+/** Where a version went, a line per venue: "ICLR 2026 Rejected · reviews ↓". */
+function Sent({ submissions }: { submissions: VersionSubmission[] }) {
+  return (
+    <>
+      {submissions.map((s, i) => {
+        const standing = submissionStanding(s);
+        return (
+          <span key={`${s.venue}-${i}`} className="block">
+            {s.url ? (
+              <a href={s.url} rel="noopener">
+                {s.venue}
+              </a>
+            ) : (
+              s.venue
+            )}
+            {standing && <span className={`ml-2 ${tone(s.status)}`}>{standing}</span>}
+            {s.reviews && (
+              <a href="#submissions" className="ml-2 text-xs">
+                reviews ↓
+              </a>
+            )}
+            {s.evidence?.length ? (
+              <span className="ml-1">
+                <Evidence urls={s.evidence} />
+              </span>
+            ) : null}
+          </span>
+        );
+      })}
+    </>
+  );
 }
 
 /** The two versions the form starts on: the oldest and the newest with a PDF, or else at all. */
@@ -50,12 +79,10 @@ export function VersionsSection({
   versions,
   canonical,
   paperTitle,
-  submissionUrls,
 }: {
   versions: PaperVersion[];
   canonical: PaperId;
   paperTitle: string;
-  submissionUrls: (string | null)[];
 }) {
   const [a, b] = defaults(versions);
   const comparable = versions.length >= 2;
@@ -101,15 +128,13 @@ export function VersionsSection({
                   )}
                   <th className={ui.th()}>Date</th>
                   <th className={ui.th()}>Version</th>
-                  <th className={ui.th()}>Outcome</th>
+                  <th className={ui.th()}>Submitted to</th>
                   <th className={ui.th()}>PDF</th>
                   <th className={ui.th()}>Evidence</th>
                 </tr>
               </thead>
               <tbody>
                 {versions.map((v) => {
-                  const standing = versionStanding(v);
-                  const reviewed = submissionUrls.some((url) => sameUrl(url, v.url));
                   return (
                     <tr key={v.id} className="align-baseline">
                       {comparable && (
@@ -144,17 +169,18 @@ export function VersionsSection({
                           v.label
                         )}
                         <span className={ui.badge}>{VERSION_KIND_LABELS[v.kind].toLowerCase()}</span>
-                        {reviewed && (
-                          <a href="#submissions" className="ml-2 text-xs">
-                            reviews ↓
-                          </a>
-                        )}
                         {v.title && v.title !== paperTitle && (
                           <span className="block text-xs text-muted italic">as “{v.title}”</span>
                         )}
                         {v.note && <span className="block text-xs text-subtle">{v.note}</span>}
                       </td>
-                      <td className={`${ui.td} ${tone(v.status)}`}>{standing ?? '—'}</td>
+                      <td className={ui.td}>
+                        {v.submissions?.length ? (
+                          <Sent submissions={v.submissions} />
+                        ) : (
+                          <span className="text-faint">—</span>
+                        )}
+                      </td>
                       <td className={ui.td}>
                         {v.pdf ? (
                           <a href={v.pdf.url} rel="noopener">
@@ -187,23 +213,26 @@ export function VersionsSection({
   );
 }
 
-/** Beside the page: each version on a line, with what became of it. */
+/** Beside the page: each version on a line, with what its latest venue decided. */
 export function VersionsBox({ versions }: { versions: PaperVersion[] }) {
   if (versions.length === 0) return null;
   return (
     <div className={ui.box}>
       <h2 className={ui.boxHeading}>Versions</h2>
       <ul className="space-y-1">
-        {versions.map((v) => (
-          <li key={v.id} className="flex items-baseline justify-between gap-2">
-            <a href="#versions" className="min-w-0 truncate text-ink" title={v.label}>
-              {v.label}
-            </a>
-            <span className={`shrink-0 text-xs ${tone(v.status)}`}>
-              {versionStanding(v) ?? formatVersionDate(v.date)}
-            </span>
-          </li>
-        ))}
+        {versions.map((v) => {
+          const last = v.submissions?.at(-1);
+          return (
+            <li key={v.id} className="flex items-baseline justify-between gap-2">
+              <a href="#versions" className="min-w-0 truncate text-ink" title={v.label}>
+                {v.label}
+              </a>
+              <span className={`shrink-0 text-xs ${tone(last?.status)}`}>
+                {(last && submissionStanding(last)) ?? formatVersionDate(v.date)}
+              </span>
+            </li>
+          );
+        })}
       </ul>
     </div>
   );

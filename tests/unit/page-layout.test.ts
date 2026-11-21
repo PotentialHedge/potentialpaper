@@ -47,7 +47,6 @@ describe('the layout', () => {
       'thumbnail.png',
       'thumbnail.webp',
       '.gitattributes',
-      '.potentialpaper/paper.pdf',
       'versions/v_k3x9q2ab.pdf',
       'demos/attention-3d/index.html',
       'demos/attention-3d/assets/shader.glsl',
@@ -176,7 +175,7 @@ describe('section files', () => {
 describe('versions and links as files', () => {
   it('write the versions that changed, and remove the ones gone', () => {
     const a = { id: 'v_aaaaaaaa', kind: 'preprint' as const, label: 'arXiv v1', date: '2026-01' };
-    const b = { id: 'v_bbbbbbbb', kind: 'conference' as const, label: 'ICLR 2027' };
+    const b = { id: 'v_bbbbbbbb', kind: 'submitted' as const, label: 'ICLR 2027' };
     const changes = versionChanges([a, b], [{ ...a, label: 'arXiv v1 (first)' }]);
     expect(changes).toEqual([
       { path: 'versions/v_bbbbbbbb.json', content: null },
@@ -277,7 +276,7 @@ describe('the move to Git LFS', () => {
     [
       'versions/v_k3x9q2ab.json',
       JSON.stringify({
-        kind: 'workshop',
+        kind: 'submitted',
         label: 'SPIGM',
         pdf: { sha256: sha('c'), bytes: 30, url: 'https://pdfs.example.org/pdf/c.pdf', license: 'CC BY 4.0' },
       }),
@@ -305,12 +304,15 @@ describe('the move to Git LFS', () => {
     expect(JSON.parse(after.get('thumbnail.json')!)).toEqual({ alt: 'A cube' });
     expect(parseLfsPointer(after.get('versions/v_k3x9q2ab.pdf')!)).toEqual({ sha256: sha('c'), bytes: 30 });
     expect(JSON.parse(after.get('versions/v_k3x9q2ab.json')!)).toEqual({
-      kind: 'workshop',
+      kind: 'submitted',
       label: 'SPIGM',
       pdf: { license: 'CC BY 4.0' },
     });
     expect(changes.some((c) => c.path === 'versions/v_9q2mfk3x.json')).toBe(false);
-    for (const [path, text] of after) expect(contentProblem(path, text), path).toBeNull();
+    // Layout 5 has no paper.pdf or pdf.json: that move was a wipe, not a plan.
+    for (const [path, text] of after) {
+      if (!path.startsWith('.potentialpaper/p')) expect(contentProblem(path, text), path).toBeNull();
+    }
     expect(stored.map((f) => [f.sha256[0], f.type, f.url])).toEqual([
       ['a', 'application/pdf', 'https://pdfs.example.org/pdf/a.pdf'],
       ['b', 'image/gif', 'https://pdfs.example.org/thumbnail/b.gif'],

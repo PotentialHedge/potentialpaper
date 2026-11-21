@@ -1,10 +1,8 @@
 import 'dotenv/config';
 import { parseArgs } from 'node:util';
-import { eq } from 'drizzle-orm';
-import { getDb, getPool } from '@/db';
-import { pageCurrent } from '@/db/schema';
+import { getPool } from '@/db';
 import { parsePaperId, PAPER_SCHEMES, type PaperScheme } from '@/lib/paper-ids';
-import type { VersionPdf } from '@/lib/versions';
+import { versionStanding, type VersionPdf } from '@/lib/versions';
 import { SYSTEM_ACTOR } from '@/server/pages/commit';
 import { refreshPaperPages } from '@/server/pages/refresh';
 import { findPaper } from '@/server/papers';
@@ -36,12 +34,9 @@ async function main() {
   if (!found) throw new Error(`no paper ${target} in this database`);
   const paperId = found.paper.id;
 
-  const [current] = await getDb()
-    .select({ pdf: pageCurrent.pdf })
-    .from(pageCurrent)
-    .where(eq(pageCurrent.pageId, paperId));
+  const { head, versions } = await versionsAt(paperId);
   const known = new Map<string, VersionPdf>();
-  if (current?.pdf) known.set(current.pdf.source, current.pdf);
+  for (const v of versions) if (v.pdf?.source) known.set(v.pdf.source, v.pdf);
   const lookup = await lookUpVersions({
     title: found.paper.title,
     arxiv: values.arxiv ?? found.identifiers.find((i) => i.scheme === 'arxiv')?.value ?? null,
@@ -49,12 +44,9 @@ async function main() {
     known,
   });
   for (const problem of lookup.problems) console.warn(`! ${problem}`);
-  const { head, versions } = await versionsAt(paperId);
   const merged = mergeFoundVersions(versions, lookup.versions);
   for (const v of merged) {
-    console.log(
-      `${v.date ?? '????'}  ${v.label}  ${v.status ?? ''} ${v.decision ?? ''}  ${v.pdf ? 'PDF' : 'no PDF'}  ${v.url}`,
-    );
+    console.log(`${v.date ?? '????'}  ${v.label}  ${versionStanding(v) ?? ''}  ${v.pdf ? 'PDF' : 'no PDF'}  ${v.url}`);
   }
   if (values['dry-run']) return void (await getPool().end());
 

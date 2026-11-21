@@ -5,11 +5,12 @@ import { CONTENT_HOSTNAME, demoOfHost, isContentHost } from '@/lib/demos';
 import { pluginHostOf } from '@/lib/plugins/origin';
 import { serveDemo } from '@/server/demos/serve';
 import { servePlugin } from '@/server/plugins/serve';
-import { paperGate } from '@/server/paper-gate';
+import { paperGate, shortGate } from '@/server/paper-gate';
 import { openReviewAliasPath } from '@/lib/paper-ids';
 import { siteUrl } from '@/server/site';
 
 const PAPER_PATH = /^\/(abs|doi|openreview)(\/|$)/;
+const SHORT_PATH = /^\/s\/([^/]+)$/;
 
 /**
  * In front of the paper pages, and behind the edge's cache, so only an edge miss reaches it. Sends each
@@ -42,17 +43,31 @@ export async function proxy(req: NextRequest) {
     const to = `${siteUrl()}${pathname.replace(/\/+$/, '') || '/'}${req.nextUrl.search}`;
     return new NextResponse(null, { status: 308, headers: { Location: to } });
   }
-  // OpenReview's addresses on this domain lead to the paper's own, in one hop.
+  const to = req.nextUrl.clone();
+  to.search = '';
+  // A paper is shown at its short address, from the route of its canonical identifier.
+  const short = SHORT_PATH.exec(pathname);
+  if (short) {
+    const gate = await shortGate(short[1]);
+    switch (gate.action) {
+      case 'render':
+        to.pathname = gate.path;
+        return NextResponse.rewrite(to);
+      case 'redirect':
+        to.pathname = gate.to;
+        return NextResponse.redirect(to, { status: 308, headers: { 'Cache-Control': 'no-store' } });
+      case 'other':
+        return NextResponse.next();
+      case 'missing':
+        to.pathname = '/paper-missing';
+        return NextResponse.rewrite(to);
+    }
+  }
+  // Every identifier's address, OpenReview's own (`/forum?id=`) included, leads to the short one.
   const alias = openReviewAliasPath(pathname, req.nextUrl.searchParams);
   if (!alias && !PAPER_PATH.test(pathname)) return NextResponse.next();
   const gate = await paperGate(alias ?? pathname);
-  const to = req.nextUrl.clone();
-  to.search = '';
   switch (gate.action) {
-    case 'render':
-      if (!alias) return NextResponse.next();
-      to.pathname = alias;
-      return NextResponse.redirect(to, { status: 308, headers: { 'Cache-Control': 'no-store' } });
     case 'redirect':
       to.pathname = gate.to;
       return NextResponse.redirect(to, { status: 308, headers: { 'Cache-Control': 'no-store' } });

@@ -79,26 +79,34 @@ caches it and each commit purges it. This is the largest single speed gain on th
 ## 3. Papers and identity
 
 A paper is a **work**, not a version: arXiv v1 to v5 and the published version share one page.
-The versions themselves are listed in the page's `versions.jsonl` (`lib/versions.ts`): each preprint,
-workshop and conference submission, with its date, what the venue decided, its own PDF and the evidence
-for it. Anyone verified edits them (with evidence), the system imports them from OpenReview and arXiv
-(`npm run papers:import-versions`), and `/versions/<paper>?a=&b=` compares two: title, abstract, and
-the PDFs' text sentence by sentence, from the ingest's `fulltext` stage.
+The versions themselves are files of the page, `versions/<id>.json` (`lib/versions.ts`). **A version is a text**:
+a preprint, the text sent to a venue, the camera-ready, a journal version, each with its date, its own PDF and the
+evidence for it. **A submission is an event**: a version sent to a venue, and what the venue decided. It is kept
+in the version, as one of its `submissions` (venue, status, decision, link), so the same text sent to two venues is
+one version with two submissions, and a version sent nowhere has none (decided 2026-11-21). **That is the one place
+a decision is kept.** A bot that imports a venue's reviews (`reviews/<source>/<submission>/`, below) records the
+decision in the version's entry, names its folder there as `reviews`, and is the only one, with admins, who changes
+that entry (`check.ts`); `submission.json` holds no decision. **Every PDF is a version's**: there is no paper PDF
+of its own, and the page shows its newest version's. Anyone verified edits versions (with evidence), the system
+imports them from OpenReview and arXiv (`npm run papers:import-versions`), and `/versions/<paper>?a=&b=` compares
+two: title, abstract, and the PDFs' text sentence by sentence, from the ingest's `fulltext` stage.
 
 ```
 papers(id ulid pk, title, authors jsonb, abstract, year, venue, created_at, merged_into null)
 paper_identifiers(scheme, value, paper_id, pk(scheme, value))   -- arxiv, doi, openreview, ...
 ```
 
-- **Addresses copy arXiv's.** `/abs/1706.03762` and `/doi/10.1145/...` are the canonical URLs, so
-  changing the domain in an arXiv link opens the same paper's page. Internal ids never appear in URLs.
+- **A paper's address is its short one, `/s/<n>`** (decided 2026-11-21), the page's `short_id`. Every identifier's
+  address leads there: `/abs/1706.03762`, `/doi/10.1145/...`, `/openreview/<id>`, and OpenReview's own forms
+  `/forum?id=` and `/pdf?id=`, so changing the domain in an arXiv or OpenReview link opens the paper's page.
+  `proxy.ts` renders it there from the route of its canonical identifier. Internal ids never appear in URLs.
 - **Pages are created on demand.** The first visit to a valid identifier fetches metadata and makes
   the row. Lookups are rate limited and misses are cached, so crawlers can't drive it. Bulk seeding
   can come later through the same adapters.
 - **Source adapters** cover arXiv and OpenAlex or Crossref first. Check each source's current rate
   limits and metadata license before bulk use, publisher abstracts especially.
 - **Everything imported records its source and license.** A paper row keeps `source`,
-  `metadata_license` and `abstract_license`, `pdf.json` keeps `license`, and anything imported later
+  `metadata_license` and `abstract_license`, a version's PDF keeps `license`, and anything imported later
   (venue reviews, paper text) gets the same. Licenses are SPDX ids where the source names a version
   (`CC0-1.0`, `CC-BY-4.0`) and the source's own label otherwise. arXiv and OpenReview dedicate
   metadata, abstracts included, to CC0; OpenAlex's data is CC0 but an abstract keeps the work's own
@@ -106,8 +114,8 @@ paper_identifiers(scheme, value, paper_id, pk(scheme, value))   -- arxiv, doi, o
   which requires attribution and a link on every one we show.
 - **Submissions and their reviews are imported by bots into the page's repo** (decided 2026-11-16; until
   it is built they are in the `submissions` and `submission_notes` tables). Each source writes
-  `reviews/<source>/<submission>/` (§4.3): the submission (venue, status, decision, link, the version it
-  is of), the venue's forms, and one file per note: reviews, meta-reviews, decisions and comments,
+  `reviews/<source>/<submission>/` (§4.3): the submission (venue, number, keywords, link; its decision is in the
+  version it is of, above), the venue's forms, and one file per note: reviews, meta-reviews, decisions and comments,
   threaded by `reply_to`, each with its license and link. Only notes the source shows everyone are
   imported. Only that source's bot writes its folder, nobody edits them on the site, and a re-import
   commits only what changed, so a reviewer raising a score is a commit in the page's history. The
@@ -189,13 +197,11 @@ big files. `src/server/pages/rules.ts` is the authority.
 ```
 .gitattributes                  system, always the same: which files are Git LFS
 .potentialpaper/metadata.json   system: layout version, identifiers, title, authors, abstract snapshot
-.potentialpaper/paper.pdf       system: the paper's PDF (Git LFS)
-.potentialpaper/pdf.json        system: its source page, license and when it was fetched
 owners/10-tl-dr.md              the owners' sections (a paper's confirmed authors'), one file per section
 owners/20-results.html          … in Markdown or HTML
 community/10-tl-dr.md           the community section, the same way
 versions/v_k3x9q2ab.json        a version of the paper; the file's name is its id
-versions/v_k3x9q2ab.pdf         that version's PDF (Git LFS)
+versions/v_k3x9q2ab.pdf         that version's PDF (Git LFS); every PDF of a paper is a version's
 links/10-code.json              a link under the title: { "label", "url" }
 thumbnail.gif                   the paper's picture, in place of its PDF's first page (Git LFS;
                                 .png, .jpg, .gif, .webp or .avif, named for its type, one a page)
@@ -223,8 +229,8 @@ a header with the same actions (edit, share, history; on a paper also cite, foll
 itself as the first tab (`main` beside `aside`, `body` below both) and `tabs` panels beside it. Its sections read as
 one document: the owners' first, labelled as theirs, then the community's; while nobody owns the page their part is
 one line asking them in. The page tools (`/code`, `/history`, `/diff`, `/claim`, and a paper's `/versions`) work on
-every kind, in front of its address (`/history/v/iclr/2027`). A paper is at its canonical address only
-(`/abs/<arXiv id>` when it has one): its other identifiers' addresses redirect there. Every table of the page store is keyed by `page_id` (`pages(id, kind, key)`); a paper's page id is its
+every kind, in front of its address (`/history/v/iclr/2027`). A paper is at its short address only
+(`/s/<n>`): its identifiers' addresses redirect there, and the page tools keep the canonical identifier's. Every table of the page store is keyed by `page_id` (`pages(id, kind, key)`); a paper's page id is its
 paper id. Other kinds' pages are made by `createPage` (`npm run pages:create`), which starts their repo with the
 system's commit, and are cloned and pushed at `/git/<kind>/<key>.git` (or over SSH at their own address).
 

@@ -366,8 +366,6 @@ describe('the page routes plugins read', () => {
             id: 'forum1',
             venue: { id: venueId, name: 'ICLR 2027', url: null },
             number: 1,
-            status: 'under_review',
-            decision: null,
             url: 'https://openreview.net/forum?id=forum1',
             license: 'CC-BY-4.0',
           }),

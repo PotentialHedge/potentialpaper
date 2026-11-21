@@ -1,19 +1,11 @@
 import { z } from 'zod';
-import { VERSION_ID } from './versions';
-import {
-  type FieldValue,
-  NOTE_KINDS,
-  type NoteKind,
-  SUBMISSION_STATUSES,
-  type SubmissionStatus,
-  type VenueForms,
-} from './submissions';
+import { type FieldValue, NOTE_KINDS, type NoteKind, type VenueForms } from './submissions';
 
 /**
  * A venue's submissions and what it published about them, as files in the paper's repo (DESIGN.md §3, §4.3,
  * §4.8), written only by the bot granted their source (`rules.ts`):
  *
- *   reviews/<source>/<submission>/submission.json   the submission: venue, status, decision, link
+ *   reviews/<source>/<submission>/submission.json   the submission: venue, number, keywords, link
  *   reviews/<source>/<submission>/forms.json        the venue's forms, which say how to show its notes
  *   reviews/<source>/<submission>/notes/<id>.json   one review, meta-review, decision or comment
  *
@@ -22,6 +14,9 @@ import {
  * source spells them are inside the files. Each file names its shape (`"schema": "review/1"`): a new shape is a
  * new schema beside the old, so files already committed never need migrating. Each carries its license and
  * the address it came from, as OpenReview's CC BY 4.0 asks of every note shown (DESIGN.md §3).
+ *
+ * What the venue decided is not here but in the version the submission is of (`lib/versions.ts`), the one place a
+ * decision is kept, in its entry whose `reviews` is `<source>/<submission>`.
  *
  * What changes on every import (when it was read) is left out, so a re-import that finds nothing new
  * changes no file and commits nothing; the commit's time says when a change was seen.
@@ -77,6 +72,11 @@ export function reviewSourceOf(path: string): string | null {
 /** The folder name for a source's id: lower case. */
 export function reviewSlug(id: string): string {
   return id.toLowerCase();
+}
+
+/** How a version's submission names this folder: `openreview/abc123` (`lib/versions.ts`, `reviews`). */
+export function reviewsKey(source: string, submissionId: string): string {
+  return `${source}/${reviewSlug(submissionId)}`;
 }
 
 export function submissionDir(source: string, submissionId: string): string {
@@ -157,26 +157,16 @@ export const submissionFileSchema = z
       })
       .meta({ description: 'Where it was submitted.' }),
     number: z.number().int().nullable().meta({ description: "The submission's number at the venue, if it has one." }),
-    status: z
-      .enum(SUBMISSION_STATUSES)
-      .nullable()
-      .meta({ description: `Where it stands: ${SUBMISSION_STATUSES.join(', ')}; null when the source doesn't say.` }),
-    decision: shortText().nullable().meta({ description: 'The decision as the venue words it: "Accept (Poster)".' }),
     keywords: z.array(shortText(200)).max(MAX_KEYWORDS).optional().meta({
       description: 'The keywords its authors gave the source, as they wrote them. Topic suggestions match them.',
     }),
-    version: z
-      .string()
-      .regex(VERSION_ID)
-      .optional()
-      .meta({ description: 'The version of the paper it is, as versions/<id>.json names it.' }),
     url: httpsUrl.meta({ description: 'Where it is at the source, linked from its credit.' }),
     license,
   })
   .meta({
     title: 'Submission',
     description:
-      "A submission of the paper to a venue, imported by the bot granted reviews/<source>/. Its notes are in notes/ beside it, and the venue's forms in forms.json.",
+      "A submission of the paper to a venue, imported by the bot granted reviews/<source>/. Its notes are in notes/ beside it, and the venue's forms in forms.json. What the venue decided is in the version it is of: the entry in versions/<id>.json whose reviews names this folder.",
   });
 
 /** A `reviews/<source>/<submission>/forms.json`. */
@@ -227,10 +217,7 @@ export interface SubmissionFile {
   id: string;
   venue: { id: string; name: string; url: string | null };
   number: number | null;
-  status: SubmissionStatus | null;
-  decision: string | null;
   keywords?: string[];
-  version?: string;
   url: string;
   license: string;
 }

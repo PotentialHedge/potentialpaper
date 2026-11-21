@@ -5,7 +5,6 @@ import { accounts, pageRevisions, papers } from '@/db/schema';
 import { foldPages, mergePapers } from '@/server/merge-papers';
 import { commitPage, SYSTEM_ACTOR } from '@/server/pages/commit';
 import { readHead } from '@/server/pages/repo';
-import { PDF_PATH } from '@/server/pages/rules';
 import { findPaper, savePaper } from '@/server/papers';
 import { currentVersions, setVersions } from '@/server/versions';
 import { api, closePool, resetDatabase, signUp } from './helpers';
@@ -29,9 +28,9 @@ async function paper(id: typeof OLD | typeof NEW, year: number): Promise<string>
 
 const version = (forum: string, label: string, date: string, status: 'rejected' | 'under_review') => ({
   label,
-  kind: 'conference' as const,
+  kind: 'submitted' as const,
   date,
-  status,
+  submissions: [{ venue: label, status }],
   url: `https://openreview.net/forum?id=${forum}`,
   evidence: [`https://openreview.net/forum?id=${forum}`],
 });
@@ -59,7 +58,12 @@ describe('merging papers', () => {
         baseOid: await readHead(getDb(), oldId),
         versions: [
           ...(await currentVersions(oldId)),
-          { label: 'SPIGM @ ICML 2026', kind: 'workshop', date: '2026-04-29', status: 'accepted' },
+          {
+            label: 'SPIGM @ ICML 2026',
+            kind: 'submitted',
+            date: '2026-04-29',
+            submissions: [{ venue: 'SPIGM @ ICML 2026', status: 'accepted' }],
+          },
         ],
       },
     });
@@ -90,7 +94,13 @@ describe('merging papers', () => {
     );
 
     await expect(
-      commitPage(oldId, await readHead(getDb(), oldId), SYSTEM_ACTOR, [{ path: PDF_PATH, content: null }], 'x'),
+      commitPage(
+        oldId,
+        await readHead(getDb(), oldId),
+        SYSTEM_ACTOR,
+        [{ path: 'community/10-x.md', content: '# X\n' }],
+        'x',
+      ),
     ).rejects.toMatchObject({ code: 'paper_merged' });
     await expect(
       mergePapers({ duplicateId: oldId, survivorId: newId, from: 'again' }, SYSTEM_ACTOR),

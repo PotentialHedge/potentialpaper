@@ -39,7 +39,7 @@ describe('a Git LFS pointer', () => {
   });
 
   it('is what a PDF or the picture has to be', () => {
-    expect(lfsKindOf('.potentialpaper/paper.pdf')).toBe('pdf');
+    expect(lfsKindOf('.potentialpaper/paper.pdf')).toBeNull();
     expect(lfsKindOf('versions/v_k3x9q2ab.pdf')).toBe('pdf');
     expect(lfsKindOf('thumbnail.png')).toBe('image');
     expect(lfsKindOf('thumbnail.json')).toBeNull();

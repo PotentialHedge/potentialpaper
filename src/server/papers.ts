@@ -41,7 +41,7 @@ export interface LookupOptions {
   sources?: Partial<Record<PaperScheme, PaperSource>>;
 }
 
-async function identifiersOf(paperId: string, database: Database): Promise<PaperId[]> {
+export async function identifiersOf(paperId: string, database: Database = getDb()): Promise<PaperId[]> {
   return database
     .select({ scheme: paperIdentifiers.scheme, value: paperIdentifiers.value })
     .from(paperIdentifiers)
