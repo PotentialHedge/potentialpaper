@@ -56,14 +56,13 @@ export function EditDialog({ codePath, clone, hasRepo, form }: EditOptions) {
     if (made.current) return;
     made.current = true;
     const origin = window.location.origin;
-    const page = origin + window.location.pathname;
-    setPrompt(setupPrompt(origin, page, clone.https));
+    setPrompt(setupPrompt(origin, clone.https));
     void (async () => {
       try {
         const res = await fetch('/api/v1/me/agent-code', { method: 'POST' });
         if (!res.ok) return;
         const { code } = (await res.json()) as { code?: string };
-        if (code) setPrompt(setupPrompt(origin, page, clone.https, code));
+        if (code) setPrompt(setupPrompt(origin, clone.https, code));
       } catch {
         // Signed out, or offline: the agent asks for an email instead (`/agent/setup`).
       }

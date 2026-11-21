@@ -28,10 +28,11 @@ export function addPrompt(origin: string, what: 'version' | 'submission', paperU
 }
 
 /**
- * The prompt the Edit dialog's "Agent" option gives: a pointer to `/agent/setup`, the page and its clone address,
- * and the sign-in code when there is one. The checklist says how; the prompt only asks for all of it to be checked.
+ * The prompt the Edit dialog's "Agent" option gives, in `addPrompt`'s style: a pointer to `/agent/setup`, which says
+ * everything (check and set up sign-in, git, credentials, an SSH key), the page's clone address, and the sign-in
+ * code when there is one.
  */
-export function setupPrompt(origin: string, pageUrl: string, cloneUrl: string, code?: string): string {
-  const read = `Read ${origin}${AGENT_SETUP_PATH} and follow it so I can edit ${pageUrl} with git (clone: ${cloneUrl}). Check that everything is set up and working: my sign-in, git and Git LFS, the clone, git credentials, and an SSH key on my profile; set up what is missing.`;
-  return code ? `${read} My sign-in code: ${code}` : read;
+export function setupPrompt(origin: string, cloneUrl: string, code?: string): string {
+  const follow = `Follow ${origin}${AGENT_SETUP_PATH} for ${cloneUrl}`;
+  return code ? `${follow}. My sign-in code: ${code}` : `${follow}.`;
 }
