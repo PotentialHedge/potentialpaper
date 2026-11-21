@@ -85,6 +85,16 @@ export function HistoryIcon({ className = 'size-3.5' }: { className?: string }) 
   );
 }
 
+/** An eye: how many have viewed a page. */
+export function EyeIcon({ className = 'size-3.5' }: { className?: string }) {
+  return (
+    <svg {...line} className={className}>
+      <path d="M1.5 8S4 3.5 8 3.5 14.5 8 14.5 8 12 12.5 8 12.5 1.5 8 1.5 8z" />
+      <circle cx="8" cy="8" r="2" />
+    </svg>
+  );
+}
+
 /** A star: follow a paper. Filled when followed. */
 export function StarIcon({ className = 'size-3.5', filled = false }: { className?: string; filled?: boolean }) {
   return (

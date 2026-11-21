@@ -102,27 +102,30 @@ export function PageActions({
 
   const { bar, menu } = arrangeActions([...actions.keys()], hidden, order);
   return (
-    <div className="mt-2 flex flex-wrap items-center justify-center gap-x-4 gap-y-1 font-sans text-[13px]">
-      {bar.map((id) => (
-        <span key={id} className="contents">
-          {actions.get(id)}
-        </span>
-      ))}
-      {menu.length > 0 && (
-        // Picking one leaves the menu open: cite, share and a plugin's action open their own popover from it.
-        <Popover>
-          <PopoverTrigger className={SECONDARY} aria-label="More actions" title="More actions">
-            ⋯
-          </PopoverTrigger>
-          <PopoverContent menu align="end">
-            {menu.map((id) => (
-              <span key={id} className="flex">
-                {actions.get(id)}
-              </span>
-            ))}
-          </PopoverContent>
-        </Popover>
-      )}
+    <div className="mt-2 flex flex-col items-center gap-1 font-sans text-[13px]">
+      <div className="flex flex-wrap items-center justify-center gap-x-4 gap-y-1">
+        {bar.map((id) => (
+          <span key={id} className="contents">
+            {actions.get(id)}
+          </span>
+        ))}
+        {menu.length > 0 && (
+          // Picking one leaves the menu open: cite, share and a plugin's action open their own popover from it.
+          <Popover>
+            <PopoverTrigger className={SECONDARY} aria-label="More actions" title="More actions">
+              ⋯
+            </PopoverTrigger>
+            <PopoverContent menu align="end">
+              {menu.map((id) => (
+                <span key={id} className="flex">
+                  {actions.get(id)}
+                </span>
+              ))}
+            </PopoverContent>
+          </Popover>
+        )}
+      </div>
+      {/* On a line of its own below the actions; nothing until the page has enough viewers to show. */}
       <ViewCount pageId={pageId} />
     </div>
   );

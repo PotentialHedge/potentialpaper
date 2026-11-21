@@ -1,6 +1,7 @@
 'use client';
 
 import { useEffect, useState } from 'react';
+import { EyeIcon, WITH_ICON } from './icons';
 
 /** The page this tab showed last, for `from`: after this long, the next page is not "next". */
 const LAST_PAGE_KEY = 'pp:lastPage';
@@ -49,7 +50,10 @@ function reportTimeOnPage(pageId: string): () => void {
     if (sent || visibleMs < 1000) return;
     sent = true;
     try {
-      navigator.sendBeacon('/api/v1/views/time', JSON.stringify({ page: pageId, seconds: Math.round(visibleMs / 1000) }));
+      navigator.sendBeacon(
+        '/api/v1/views/time',
+        JSON.stringify({ page: pageId, seconds: Math.round(visibleMs / 1000) }),
+      );
     } catch {
       // No beacon: the time is simply not counted.
     }
@@ -72,7 +76,8 @@ function reportTimeOnPage(pageId: string): () => void {
  * page served from the cache still counts and a crawler that runs no script does not. Sent with the session cookie,
  * so a signed-in reader counts as their account rather than as their network. The page is the same cached HTML for
  * everyone, so the count is the one the beacon returns. Also names the page this tab showed before (`from`), which
- * the server keeps only as a total per pair. Under `MIN_SHOWN_VIEWS` it still counts, but shows nothing.
+ * the server keeps only as a total per pair. Shown to everyone, as acceptodds does; under `MIN_SHOWN_VIEWS` it still
+ * counts, but shows nothing.
  */
 export function ViewCount({ pageId, className = 'text-muted' }: { pageId: string; className?: string }) {
   const [views, setViews] = useState<number | null>(null);
@@ -99,7 +104,8 @@ export function ViewCount({ pageId, className = 'text-muted' }: { pageId: string
 
   if (views === null || views < MIN_SHOWN_VIEWS) return null;
   return (
-    <span className={className}>
+    <span className={`${WITH_ICON} ${className}`}>
+      <EyeIcon />
       <span className="font-mono">{views.toLocaleString('en-US')}</span> {views === 1 ? 'view' : 'views'}
     </span>
   );
