@@ -201,7 +201,7 @@ export const LinksBody = z.object({
   evidence: Evidence,
 });
 
-const VersionPdf = z.object({
+export const VersionPdf = z.object({
   sha256: z.string(),
   bytes: z.number().int(),
   url: z.string(),
@@ -220,7 +220,7 @@ const VersionSubmissionSchema = z.object({
   evidence: z.array(z.string().max(MAX_EVIDENCE_URL)).max(MAX_EVIDENCE).optional(),
 });
 
-const VersionFields = {
+export const VersionFields = {
   label: z.string().max(1000),
   kind: z.enum(VERSION_KINDS),
   date: z.string().max(20).nullish(),

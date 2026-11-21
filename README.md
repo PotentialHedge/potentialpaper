@@ -20,10 +20,10 @@ server's log.
 
 - `scripts/seed/fixture.json`: 450 real ICLR papers, 2026 (accepted, rejected, withdrawn, with reviews) and 2027
   (under review, with their reviews so far from acceptodds, and 400 more with their scores only so the venue's
-  score distribution has its real shape: `npm run db:seed:acceptodds-reviews`), and 15 accepted NeurIPS 2026
+  score distribution has its real shape), and 15 accepted NeurIPS 2026
   papers from acceptodds. 5 of the NeurIPS papers and 5 of the ICLR 2027 ones were rejected or withdrawn at ICLR
-  2026 first (`--resubmissions`); the seed merges each such pair into one paper. Add a venue's sample from an OpenReview scrape with
-  `npm run db:seed:export`, or an acceptodds kind with `npm run db:seed:export-acceptodds` (`-h` for usage).
+  2026 first (`--resubmissions`); the seed merges each such pair into one paper. The fixture is built from scrapes
+  by the `potentialpaper-tools` repo (`npm run seed:export`, `seed:export-acceptodds`, `seed:acceptodds-reviews` there).
 - `scripts/seed/seed.ts`: people, topics and comments. Edit the lists at the top to add more.
 
 The seed runs the background consumers itself, so search, venue pages and score stats are ready. To keep them

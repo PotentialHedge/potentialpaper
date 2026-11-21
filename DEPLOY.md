@@ -74,18 +74,15 @@ The consumers are:
 
 ### Importing OpenReview reviews
 
-`npm run papers:import-reviews -- <scrape.sqlite> ICLR.cc/2027/Conference "ICLR 2027" [--concurrency 4] [--from
-<forum id>]` (`scripts/import-openreview-reviews.ts`) commits each submission's files as the `openreview` bot, one
-commit per submission that changed (with `IMPORT_RATE_LIMIT`, not the people's limit). Re-running commits only what
-changed, so a stopped run is resumed by running it again. In dev the first full run (42,430 submissions) took about
-25 minutes at concurrency 4. The scrape is a WAL-mode SQLite file, so its folder must be mounted **writable**
-(SQLite makes a `-shm` file beside it even to read; a `:ro` mount fails with "unable to open database file"). Copy
-it out of the scraper's folder first, so a running scrape isn't read mid-write: in production it is
-`~/backups/scrapes/iclr2027.sqlite`, run as `dc --profile tools run -d --name pp-reviews-backfill -v
-~/backups/scrapes:/scrape tools npm run papers:import-reviews -- /scrape/iclr2027.sqlite …` (`docker logs -f
-pp-reviews-backfill` for progress). Run it as a unit that outlives the shell (`systemd-run --user`, or `dc run -d`), then,
-once the worker has caught up, reclaim space: `REPACK (CONCURRENTLY)` (Postgres 19) or `VACUUM (ANALYZE)` on
-`page_objects`, `page_revisions`, `page_events`, `search_docs`, `submission_notes`.
+Imports run outside the platform, from the `potentialpaper-tools` repo, through the import API
+(`/agent/imports`, `src/server/api/imports.ts`), as the `openreview` bot. Give the tool a token once:
+`dc --profile tools run --rm tools npm run bots:token -- openreview "import tool"` (printed once; revoke it as any
+token). Then, from a machine with the scrape, `PP_URL=https://papers.potentialhedge.com PP_TOKEN=… npm run
+import-reviews -- <scrape.sqlite> ICLR.cc/2027/Conference "ICLR 2027" [--from <forum id>]` commits each submission's
+files as the bot, one commit per submission that changed (with `IMPORT_RATE_LIMIT`, not the people's limit).
+Re-running commits only what changed, so a stopped run is resumed by running it again. Once the worker has caught up
+after a big import, reclaim space: `REPACK (CONCURRENTLY)` (Postgres 19) or `VACUUM (ANALYZE)` on `page_objects`,
+`page_revisions`, `page_events`, `search_docs`, `submission_notes`.
 
 In dev the worker is the transient user unit `papertrail-worker` (log `data/worker.log`), started beside
 `papertrail-dev`: `systemd-run --user --unit=papertrail-worker --working-directory=$PWD --setenv=PATH=$PATH

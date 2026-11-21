@@ -109,8 +109,16 @@ describe('importing reviews', () => {
       [submission('forum1', [review('a', 3), review('b', 1), review('c', 0, 'a')]), submission('missing', [])],
       OPTIONS,
     );
-    expect(result).toEqual({ submissions: 1, notes: 3, skipped: 1, committed: 1, unchanged: 0, failed: [] });
     const paper = await paperId('forum1');
+    expect(result).toEqual({
+      submissions: 1,
+      notes: 3,
+      skipped: 1,
+      committed: 1,
+      unchanged: 0,
+      failed: [],
+      changed: [paper],
+    });
     const held = await files(paper);
     expect([...held.keys()].filter((path) => path.startsWith('reviews/')).sort()).toEqual([
       'reviews/openreview/forum1/forms.json',

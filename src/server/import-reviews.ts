@@ -87,6 +87,8 @@ export interface ImportResult {
   unchanged: number;
   /** Submissions whose commit was refused, with why. */
   failed: { externalId: string; error: string }[];
+  /** The pages committed to, by id. */
+  changed: string[];
 }
 
 export interface ImportOptions {
@@ -196,9 +198,9 @@ async function importOne(
   actor: Actor,
   options: ImportOptions,
   database: Database,
-): Promise<'committed' | 'unchanged' | 'skipped'> {
+): Promise<{ status: 'committed' | 'unchanged' | 'skipped'; paperId?: string }> {
   const found = await findPaper(input.paper, database);
-  if (!found) return 'skipped';
+  if (!found) return { status: 'skipped' };
   const paperId = found.paper.id;
   const wanted = submissionFiles(venue, input);
   const dir = submissionDir(venue.source, input.externalId);
@@ -214,14 +216,14 @@ async function importOne(
   const before = tree ? await readVersions(database, paperId, await readFiles(database, paperId, tree)) : [];
   const date = input.submittedAt ? input.submittedAt.toISOString().slice(0, 10) : undefined;
   changes.push(...versionChanges(before, attachSubmission(before, versionEntry(venue, input), { date })));
-  if (changes.length === 0) return 'unchanged';
+  if (changes.length === 0) return { status: 'unchanged', paperId };
   const isNew = !held?.has(submissionFilePath(venue.source, input.externalId));
   const result = await commitPage(paperId, head, actor, changes, describe(venue, input, changes, isNew), {
     database,
     rateLimit: options.rateLimit,
     evidence: [input.url],
   });
-  return result.status;
+  return { status: result.status, paperId };
 }
 
 /** Tries again when the page was busy (someone else committing to it), a few times. */
@@ -244,14 +246,23 @@ export async function importReviews(
   const database = options.database ?? getDb();
   const actor = options.actor ?? (await botActor(OPENREVIEW_BOT, database));
   const all = [...new Map([...input].map((s) => [s.externalId, s])).values()];
-  const result: ImportResult = { submissions: 0, notes: 0, skipped: 0, committed: 0, unchanged: 0, failed: [] };
+  const result: ImportResult = {
+    submissions: 0,
+    notes: 0,
+    skipped: 0,
+    committed: 0,
+    unchanged: 0,
+    failed: [],
+    changed: [],
+  };
   let next = 0;
   let done = 0;
   const work = async () => {
     while (next < all.length) {
       const item = all[next++];
       try {
-        const status = await withRetry(() => importOne(venue, item, actor, options, database));
+        const { status, paperId } = await withRetry(() => importOne(venue, item, actor, options, database));
+        if (status === 'committed' && paperId) result.changed.push(paperId);
         if (status === 'skipped') result.skipped += 1;
         else {
           result.submissions += 1;

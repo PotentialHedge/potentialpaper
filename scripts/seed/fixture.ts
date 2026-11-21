@@ -24,9 +24,9 @@ export interface FixturePaper {
   status: SubmissionStatus | null;
   decision: string | null;
   notes: (FixtureNote | NoteInput)[];
-  /** Added to fill out the venue's score distribution, with its reviewers' scores only (`add-acceptodds-reviews`). */
+  /** Added to fill out the venue's score distribution, with its reviewers' scores only (`seed:acceptodds-reviews` in `potentialpaper-tools`). */
   sample?: boolean;
-  /** Was at an earlier fixture venue too, and added for that (`add-acceptodds-reviews --resubmissions`). */
+  /** Was at an earlier fixture venue too, and added for that (`seed:acceptodds-reviews --resubmissions` there). */
   resubmission?: boolean;
 }
 

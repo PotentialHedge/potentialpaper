@@ -7,7 +7,7 @@ import { forumUrl, licenseId, OPENREVIEW } from './venue-sources/openreview';
 /**
  * Finding a paper's versions where they are published: its forums on OpenReview, one per venue it went to
  * (a workshop, then a conference), and its arXiv versions. What comes back is a suggestion: the editor shows
- * it to be checked and saved, and `scripts/import-versions.ts` commits it. The parsers are pure, for tests.
+ * it to be checked and saved, and `import-versions` in `potentialpaper-tools` saves it. The parsers are pure, for tests.
  */
 
 export { normalizeTitle };

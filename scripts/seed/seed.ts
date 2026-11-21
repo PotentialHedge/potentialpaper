@@ -27,7 +27,7 @@ import { FIXTURE_PATH, type Fixture } from './fixture';
 /**
  * `npm run db:seed`: wipes the database in DATABASE_URL, migrates it, and fills it with a small dev data set through
  * the app's own import and commit paths, so every projection (search, submissions, venue pages, stats) is as the
- * worker would leave it. Papers come from fixture.json (`npm run db:seed:export` adds more); people, comments and
+ * worker would leave it. Papers come from fixture.json (built by `potentialpaper-tools`' `seed:*` commands); people, comments and
  * topics are below: extend them here.
  */
 

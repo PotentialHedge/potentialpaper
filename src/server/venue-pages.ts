@@ -17,7 +17,7 @@ import { venueStatsHideUntil } from './settings';
  * venues the OpenReview import knows, and the reads a venue's page is made of: a series' editions, and an edition's
  * submissions by status.
  *
- * **The bot** (`npm run venues:sync`, and at the end of `papers:import-reviews`) is an account like any bot's, granted
+ * **The bot** (`npm run venues:sync`, and `POST /api/v1/imports/venues`, which an import tool calls at the end) is an account like any bot's, granted
  * `venue.json` on venue pages (migration `0035`). For each venue (`venues` rows, `<source>:<id>`) that is a conference's
  * main edition (`lib/venues.ts`), it makes the series page (`iclr`) and the edition page (`iclr/2027`), each with a
  * `venue.json`; the edition's lists the source, which is what makes the venue's submissions its members

@@ -88,7 +88,7 @@ a decision is kept.** A bot that imports a venue's reviews (`reviews/<source>/<s
 decision in the version's entry, names its folder there as `reviews`, and is the only one, with admins, who changes
 that entry (`check.ts`); `submission.json` holds no decision. **Every PDF is a version's**: there is no paper PDF
 of its own, and the page shows its newest version's. Anyone verified edits versions (with evidence), the system
-imports them from OpenReview and arXiv (`npm run papers:import-versions`), and `/versions/<paper>?a=&b=` compares
+imports them from OpenReview and arXiv (`import-versions` in `potentialpaper-tools`), and `/versions/<paper>?a=&b=` compares
 two: title, abstract, and the PDFs' text sentence by sentence, from the ingest's `fulltext` stage.
 
 ```

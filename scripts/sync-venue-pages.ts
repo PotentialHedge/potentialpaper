@@ -6,7 +6,7 @@ import { syncVenuePages } from '@/server/venue-pages';
 const USAGE = `The \`venues\` bot (handoffs/pages.md Phase 2): makes a series' and an edition's venue pages (/v/iclr,
 /v/iclr/2027) for every venue the site knows from its imports (the \`venues\` table), each with a venue.json whose
 sources make the venue's submissions the edition's papers. Idempotent: it never removes anything, and on a page whose
-venue.json is there it only adds a missing source. papers:import-reviews runs it for its venue at the end.
+venue.json is there it only adds a missing source. An import tool's POST /api/v1/imports/venues runs it for its venues.
 
   npm run venues:sync`;
 
