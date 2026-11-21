@@ -19,7 +19,7 @@
  */
 
 const INK = '#1d1d1d';
-const BG = '#fbfaf7';
+const BG = '#fefdfb';
 const SUBTLE = '#666';
 const MUTED = '#777';
 const RULE = '#ddd';

@@ -16,7 +16,7 @@ export interface BadgeInput {
 const H = 20;
 const FONT = 'Verdana,Geneva,DejaVu Sans,sans-serif';
 const ACCENT = '#b31b1b';
-const PAPER = '#fbfaf7';
+const PAPER = '#fefdfb';
 const FRAME = '#cfc8b8';
 /** A message longer than this is cut, so a long title stays a badge. */
 const MAX_MESSAGE = 60;

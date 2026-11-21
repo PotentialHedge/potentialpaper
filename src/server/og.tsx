@@ -15,7 +15,7 @@ export const OG_SIZE = { width: 1200, height: 630 };
 const INK = '#1d1d1d';
 const MUTED = '#777';
 const ACCENT = '#b31b1b';
-const PAPER = '#fbfaf7';
+const PAPER = '#fefdfb';
 const TONES = { up: '#1a7f37', down: ACCENT, ink: INK } as const;
 
 let serif: Promise<Buffer> | null = null;
