@@ -63,7 +63,7 @@ export const PAGE_PANELS = {
     { id: 'papers', slot: 'org.tabs', title: 'Papers' },
   ],
   user: [
-    { id: 'identity', slot: 'user.main', title: 'Name and institution' },
+    { id: 'identity', slot: 'user.main', title: 'Bio' },
     { id: 'sections', slot: 'user.main', title: 'About' },
     { id: 'papers', slot: 'user.main', title: 'Papers they authored' },
     { id: 'links', slot: 'user.aside', title: 'Labeled links' },

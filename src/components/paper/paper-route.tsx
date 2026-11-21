@@ -23,7 +23,7 @@ import { toolPath } from '@/lib/page-tools';
 import { ownersOf } from '@/server/owners';
 import { scopesOfPage, submissionsHaveScores } from '@/server/plugins/pages';
 import { siteUrl } from '@/server/site';
-import { badgeMarkdown, badgeUrl, previewMetadata, shortIdOf, shortUrl } from '@/server/share';
+import { badgeMarkdown, badgeUrl, previewMetadata, previewOfPage, shortIdOf, shortUrl } from '@/server/share';
 
 /**
  * What the routes at `/abs`, `/doi` and `/openreview` share. Each page is rendered once and cached, by
@@ -43,12 +43,12 @@ const DESCRIPTION_LENGTH = 200;
 export async function paperMetadata(scheme: PaperScheme, segments: string[]): Promise<Metadata> {
   const { paper, identifiers } = await load(scheme, segments);
   const canonical = canonicalPaperId(identifiers);
-  const shortId = await shortIdOf(paper.id);
+  const preview = await previewOfPage(paper.id);
   const description = paper.abstract?.slice(0, DESCRIPTION_LENGTH);
   return {
     title: `${paper.title} · PotentialPaper`,
     description,
-    ...(shortId !== null && previewMetadata(paper.title, description, shortId)),
+    ...(preview && previewMetadata(paper.title, description, preview)),
     // The page as an agent reads it, with the agents' discussion (`app/agent/[prefix]/[...id]`).
     alternates: canonical
       ? { canonical: paperPath(canonical), types: { 'text/markdown': agentPaperPath(canonical) } }

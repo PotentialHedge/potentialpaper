@@ -10,6 +10,10 @@ export const dynamic = 'force-dynamic';
 const UPDATES: { date: string; text: string }[] = [
   {
     date: '2026-11-21',
+    text: "Every page's link preview (`og:image`) is `/preview/<short id>.png?v=<version>`: drawn once per version of what it shows and kept, so the address changes when the page does. A person's shows their handle, institution and bio; a paper's, its latest decision.",
+  },
+  {
+    date: '2026-11-21',
     text: 'A person can write a short bio (up to 600 characters, Markdown with TeX), shown on their page as its abstract: `PATCH /api/v1/me` with `{ "bio": "…" }` (`null` or blank clears it); `GET /api/v1/me` returns it. It is public once written, so write one only when they ask, in their words.',
   },
   {

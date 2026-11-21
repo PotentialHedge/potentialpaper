@@ -17,12 +17,13 @@ import { toolPath } from '@/lib/page-tools';
 import { ownersOf } from '@/server/owners';
 import { buildPanels } from './common';
 import { PageActions } from './PageActions';
+import { UserByline } from './user-panels';
 import { PageHeader, PageView } from './PageView';
 import { KIND_PANELS, type KindPanelProps, presentPanel } from './slots';
 import type { TopicView } from './topic-panels';
 import { topicOverview } from '@/server/topic-pages';
 import { presentTopicPapers } from '@/server/topic-papers';
-import { previewMetadata, shortIdOf, shortUrl } from '@/server/share';
+import { previewMetadata, previewOfPage, shortIdOf, shortUrl } from '@/server/share';
 
 /**
  * What the routes of the kinds other than a paper share (`/v/…`, `/t/…`, `/o/…`, `/u/…`, `lib/kinds.ts`): the page
@@ -78,10 +79,10 @@ export async function keyedPageMetadata(kind: KeyedKind, segments: string[]): Pr
   const found = await load(kind, segments);
   if (!found || 'redirect' in found) return {};
   const name = found.current?.name ?? pageName(kind, found.key, null);
-  const shortId = await shortIdOf(found.page.id);
+  const preview = await previewOfPage(found.page.id);
   return {
     title: `${name} · ${KINDS[kind].title} · PotentialPaper`,
-    ...(shortId !== null && previewMetadata(name, undefined, shortId)),
+    ...(preview && previewMetadata(name, undefined, preview)),
     alternates: { canonical: keyedPagePath(kind, found.key) },
   };
 }
@@ -135,7 +136,11 @@ export async function KeyedPageRoute({ kind, segments }: { kind: KeyedKind; segm
       kind={kind}
       plugins={{ kind, page: summary, scopes, facts }}
       panels={buildPanels(kind, KIND_PANELS[kind], props, (id) => presentPanel(props, id))}
-      header={<PageHeader eyebrow={KINDS[kind].title} title={props.name} />}
+      header={
+        <PageHeader eyebrow={KINDS[kind].title} title={props.name}>
+          {user && <UserByline user={user} />}
+        </PageHeader>
+      }
       actions={
         <PageActions
           pageId={page.id}

@@ -16,6 +16,7 @@ const INK = '#1d1d1d';
 const MUTED = '#777';
 const ACCENT = '#b31b1b';
 const PAPER = '#fbfaf7';
+const TONES = { up: '#1a7f37', down: ACCENT, ink: INK } as const;
 
 let serif: Promise<Buffer> | null = null;
 /** Liberation Serif (OFL, `assets/fonts/`): Times metrics, Latin only. */
@@ -39,11 +40,15 @@ function authorLine(authors: readonly string[]): string | null {
   return cut(authors.length > 4 ? `${shown}, et al.` : shown, 140);
 }
 
-/** A page's preview: its name, a paper's authors, and the line under them. */
+/** A page's preview: its name; a paper's authors, or a person's bio; the line under them; a paper's decision. */
 export async function previewImage(subject: ShareSubject, host: string): Promise<ImageResponse> {
   const title = cut(subject.name, 150);
   const titleSize = title.length > 90 ? 52 : title.length > 50 ? 60 : 68;
   const authors = authorLine(subject.authors);
+  const summary = subject.summary && cut(subject.summary, 220);
+  // A person's handle and institution sit under their name; a paper's venue at the foot, beside its address.
+  const byline = subject.kind === 'user' ? subject.about : null;
+  const foot = byline ? null : subject.about;
   return card(
     subject.kindTitle,
     <div style={BODY}>
@@ -60,9 +65,32 @@ export async function previewImage(subject: ShareSubject, host: string): Promise
         {title}
       </div>
       {authors && <div style={{ display: 'flex', marginTop: 24, fontSize: 32, lineHeight: 1.3 }}>{authors}</div>}
+      {byline && <div style={{ display: 'flex', marginTop: 20, fontSize: 34, color: MUTED }}>{byline}</div>}
+      {summary && (
+        <div
+          style={{ display: 'flex', marginTop: 28, fontSize: 30, lineHeight: 1.4, maxHeight: 168, overflow: 'hidden' }}
+        >
+          {summary}
+        </div>
+      )}
       <div style={{ display: 'flex', flex: 1 }} />
+      {subject.status && (
+        <div style={{ display: 'flex', marginBottom: 18 }}>
+          <div
+            style={{
+              display: 'flex',
+              fontSize: 28,
+              padding: '6px 18px',
+              color: TONES[subject.status.tone],
+              border: `2px solid ${TONES[subject.status.tone]}`,
+            }}
+          >
+            {cut(subject.status.text, 60)}
+          </div>
+        </div>
+      )}
       <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 28, color: MUTED }}>
-        <div style={{ display: 'flex' }}>{subject.about ?? ''}</div>
+        <div style={{ display: 'flex' }}>{foot ? cut(foot, 50) : ''}</div>
         <div style={{ display: 'flex' }}>{`${host}/s/${subject.shortId}`}</div>
       </div>
     </div>,
@@ -122,8 +150,6 @@ async function card(corner: string, children: ReactNode): Promise<ImageResponse>
     {
       ...OG_SIZE,
       fonts: [{ name: 'Serif', data: await serifFont(), style: 'normal', weight: 400 }],
-      // Crawlers fetch previews hard, and chat apps cache the card anyway; an hour is fresh enough.
-      headers: { 'Cache-Control': 'public, max-age=3600, s-maxage=3600' },
     },
   );
 }

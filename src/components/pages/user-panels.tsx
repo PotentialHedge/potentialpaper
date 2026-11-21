@@ -1,5 +1,7 @@
 import { ui } from '@/components/ui';
 import { AbstractText } from '@/components/AbstractText';
+import type { UserPageView } from '@/server/user-pages';
+import { OwnProfileLink } from './OwnProfileLink';
 import type { KindPanelProps } from './slots';
 
 /**
@@ -12,18 +14,25 @@ import type { KindPanelProps } from './slots';
 const day = (at: Date) =>
   at.toLocaleDateString('en', { day: 'numeric', month: 'short', year: 'numeric', timeZone: 'UTC' });
 
-/** The real name and institutions, under the handle, when the account shows them; then its bio, as an abstract. */
-export function UserIdentity({ user }: KindPanelProps) {
-  if (!user) return null;
+/**
+ * Under a person's handle in the header: their real name and institutions, when the account shows them, and for the
+ * person themselves a way back to editing it.
+ */
+export function UserByline({ user }: { user: UserPageView }) {
   const parts = [user.realName, user.institutions?.join(', ')].filter((part): part is string => Boolean(part));
   if (user.bot) parts.push('A bot');
-  if (parts.length === 0 && !user.bio) return null;
   return (
     <>
-      {parts.length > 0 && <p className="text-center font-sans text-[15px] text-muted">{parts.join(' · ')}</p>}
-      {user.bio && <AbstractText text={user.bio} className={parts.length > 0 ? 'mt-4' : ''} />}
+      {parts.length > 0 && <p className="mt-2.5 text-center font-sans text-[15px] text-muted">{parts.join(' · ')}</p>}
+      <OwnProfileLink handle={user.handle} />
     </>
   );
+}
+
+/** The person's bio, as the page's abstract. */
+export function UserIdentity({ user }: KindPanelProps) {
+  if (!user?.bio) return null;
+  return <AbstractText text={user.bio} />;
 }
 
 /** The papers the account is a confirmed author of, with the name it has on each. */

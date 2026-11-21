@@ -1644,3 +1644,17 @@ export const announcements = pgTable(
 );
 
 export type Announcement = typeof announcements.$inferSelect;
+
+/**
+ * Each page's link-preview image, as last drawn (`server/preview-cache.ts`): drawn once per `version`, a hash of what
+ * the image shows, so a crawler going through every page draws each at most once. One row per page; a new version
+ * replaces it.
+ */
+export const previewImages = pgTable('preview_images', {
+  pageId: uuid('page_id')
+    .primaryKey()
+    .references(() => pages.id, { onDelete: 'cascade' }),
+  version: text('version').notNull(),
+  png: bytea('png').notNull(),
+  drawnAt: timestamp('drawn_at', { withTimezone: true }).notNull().defaultNow(),
+});
