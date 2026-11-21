@@ -6,6 +6,7 @@ import { pluginHostOf } from '@/lib/plugins/origin';
 import { serveDemo } from '@/server/demos/serve';
 import { servePlugin } from '@/server/plugins/serve';
 import { paperGate } from '@/server/paper-gate';
+import { openReviewAliasPath } from '@/lib/paper-ids';
 import { siteUrl } from '@/server/site';
 
 const PAPER_PATH = /^\/(abs|doi|openreview)(\/|$)/;
@@ -41,13 +42,17 @@ export async function proxy(req: NextRequest) {
     const to = `${siteUrl()}${pathname.replace(/\/+$/, '') || '/'}${req.nextUrl.search}`;
     return new NextResponse(null, { status: 308, headers: { Location: to } });
   }
-  if (!PAPER_PATH.test(req.nextUrl.pathname)) return NextResponse.next();
-  const gate = await paperGate(req.nextUrl.pathname);
+  // OpenReview's addresses on this domain lead to the paper's own, in one hop.
+  const alias = openReviewAliasPath(pathname, req.nextUrl.searchParams);
+  if (!alias && !PAPER_PATH.test(pathname)) return NextResponse.next();
+  const gate = await paperGate(alias ?? pathname);
   const to = req.nextUrl.clone();
   to.search = '';
   switch (gate.action) {
     case 'render':
-      return NextResponse.next();
+      if (!alias) return NextResponse.next();
+      to.pathname = alias;
+      return NextResponse.redirect(to, { status: 308, headers: { 'Cache-Control': 'no-store' } });
     case 'redirect':
       to.pathname = gate.to;
       return NextResponse.redirect(to, { status: 308, headers: { 'Cache-Control': 'no-store' } });

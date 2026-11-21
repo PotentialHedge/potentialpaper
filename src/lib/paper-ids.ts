@@ -77,6 +77,16 @@ export function paperPath({ scheme, value }: PaperId): string {
   return `${PATH_PREFIX[scheme]}/${value.split('/').map(encodeURIComponent).join('/')}`;
 }
 
+/**
+ * A paper's page for OpenReview's own addresses, so changing the domain in an OpenReview link works as it does for
+ * arXiv's: `/forum?id=abc` and `/pdf?id=abc` → `/openreview/abc`. `null` for any other path.
+ */
+export function openReviewAliasPath(pathname: string, search: URLSearchParams): string | null {
+  if (pathname !== '/forum' && pathname !== '/pdf') return null;
+  const id = parsePaperId('openreview', search.get('id') ?? '');
+  return id ? paperPath(id) : null;
+}
+
 const CANONICAL_ORDER: PaperScheme[] = ['arxiv', 'doi', 'openreview'];
 
 /** The identifier a paper is best known by, which its canonical address uses. */

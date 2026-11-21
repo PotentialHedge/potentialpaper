@@ -1,6 +1,14 @@
 import fc from 'fast-check';
 import { describe, expect, it } from 'vitest';
-import { canonicalPaperId, paperIdFromText, paperPath, parseDoi, parsePaperId, sourceName } from '@/lib/paper-ids';
+import {
+  canonicalPaperId,
+  openReviewAliasPath,
+  paperIdFromText,
+  paperPath,
+  parseDoi,
+  parsePaperId,
+  sourceName,
+} from '@/lib/paper-ids';
 
 describe('arXiv ids', () => {
   it('drops the version, since a page is for the work', () => {
@@ -84,5 +92,24 @@ describe('crediting a copy', () => {
     expect(sourceName('https://www.arxiv.org/abs/1706.03762')).toBe('arXiv');
     expect(sourceName('https://example.org/paper.pdf')).toBe('example.org');
     expect(sourceName('not a url')).toBe('the source');
+  });
+});
+
+describe("OpenReview's addresses", () => {
+  const alias = (path: string) => {
+    const url = new URL(path, 'https://example.org');
+    return openReviewAliasPath(url.pathname, url.searchParams);
+  };
+
+  it('lead to the paper, with the domain changed', () => {
+    expect(alias('/forum?id=dskf2Ppd9o')).toBe('/openreview/dskf2Ppd9o');
+    expect(alias('/forum?id=dskf2Ppd9o&noteId=x1')).toBe('/openreview/dskf2Ppd9o');
+    expect(alias('/pdf?id=dskf2Ppd9o')).toBe('/openreview/dskf2Ppd9o');
+  });
+
+  it('are nothing without a good id, or on other paths', () => {
+    expect(alias('/forum')).toBeNull();
+    expect(alias('/forum?id=../x')).toBeNull();
+    expect(alias('/group?id=ICLR.cc/2026/Conference')).toBeNull();
   });
 });
