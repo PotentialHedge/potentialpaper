@@ -1,15 +1,16 @@
 import { getDb, type Database } from '@/db';
 import { type ClaimPolicy, KINDS, type PageAddress } from '@/lib/kinds';
 import { toolPath } from '@/lib/page-tools';
-import { confirmedAuthors } from './claims';
 import { orgDomains } from './org-roles';
 import { pageClaimRoles } from './page-claims';
 import type { PageRow } from './pages/kinds';
+import { linkedAuthors } from './user-pages';
 
 /**
  * What a page shows about its owners (`lib/kinds.ts`, `KINDS[kind].owners`), the same way on every kind: who they are,
  * whether anyone is yet, and where to become one. Who may write is `pages/check.ts`'s `rolesOf`; this is only what
- * the page says, so it names owners only where that is public (a paper's confirmed authors, by the names on it).
+ * the page says, so it names owners only where that is public: a paper's confirmed authors, by the names on it, each
+ * linked to their page unless they turned that off (`linkedAuthors`).
  */
 export interface OwnersInfo {
   /** "the authors". */
@@ -17,8 +18,11 @@ export interface OwnersInfo {
   claim: ClaimPolicy;
   /** Whether anyone owns it yet; an org has owners once it has a domain to be a member at. */
   claimed: boolean;
-  /** The owners by name, where the page names them: a paper's confirmed authors. */
-  names: string[];
+  /**
+   * The owners by name, where the page names them: a paper's confirmed authors, each at its place in the paper's
+   * author list and with their page's address when they let the paper link to it.
+   */
+  people: { name: string; authorIndex: number; href: string | null }[];
   /** Where to claim it, or how to become one; `null` on a person's page. */
   claimPath: string | null;
 }
@@ -33,13 +37,17 @@ export async function ownersOf(
   const base = {
     title: owners.title,
     claim: owners.claim,
-    names: [] as string[],
+    people: [] as OwnersInfo['people'],
     claimPath: toolPath('claim', address),
   };
   switch (owners.claim) {
     case 'authors': {
-      const names = (await confirmedAuthors(page.id, database)).map((author) => author.authorName);
-      return { ...base, claimed: names.length > 0, names };
+      const people = (await linkedAuthors(page.id, database)).map((a) => ({
+        name: a.authorName,
+        authorIndex: a.authorIndex,
+        href: a.href,
+      }));
+      return { ...base, claimed: people.length > 0, people };
     }
     case 'organisers':
       return { ...base, claimed: (await pageClaimRoles(database, page, null)).claimed };

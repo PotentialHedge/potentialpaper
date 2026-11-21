@@ -10,13 +10,14 @@ import {
   pageRevisions,
   type Account,
 } from '@/db/schema';
+import { keyedPagePath } from '@/lib/kinds';
 import { LINKS_FILE } from '@/lib/labeled-links';
 import { parseSettings, resolveSettings } from '@/lib/settings';
 import { profileFileText, shownFromSettings, type UserShown, USER_SHOW_ITEMS } from '@/lib/user-pages';
 import type { PageSummary } from '@/lib/plugins/protocol';
 import { commitPage, SYSTEM_ACTOR } from './pages/commit';
 import { findKeyedPage, type PageRow } from './pages/kinds';
-import { refreshPages } from './pages/refresh';
+import { refreshPageIds, refreshPages } from './pages/refresh';
 import { readHead, type Reader } from './pages/repo';
 import { LAYOUT_VERSION, METADATA_PATH } from './pages/rules';
 import { pageSummaries } from './plugins/pages';
@@ -51,6 +52,50 @@ export async function accountOfUserPage(db: Reader, key: string): Promise<Accoun
 export async function shownFor(account: Pick<Account, 'id' | 'showInstitution'>): Promise<UserShown> {
   const { text } = await userSettingsRow(account.id);
   return shownFromSettings(resolveSettings({ user: parseSettings(text) }), account.showInstitution);
+}
+
+/**
+ * A paper's confirmed authors, in the paper's order, each with the address of their page when their account shows the
+ * papers it authored (`user.show.claimedPapers`, on unless they turned it off), else `null`: only then does the
+ * paper link their printed name to their handle.
+ */
+export async function linkedAuthors(
+  paperId: string,
+  database: Database = getDb(),
+): Promise<{ authorIndex: number; authorName: string; href: string | null }[]> {
+  const rows = await database
+    .select({
+      authorIndex: authorClaims.authorIndex,
+      authorName: authorClaims.authorName,
+      accountId: accounts.id,
+      handle: accounts.handle,
+      showInstitution: accounts.showInstitution,
+    })
+    .from(authorClaims)
+    .innerJoin(accounts, eq(accounts.id, authorClaims.accountId))
+    .where(and(eq(authorClaims.paperId, paperId), eq(authorClaims.status, 'confirmed')))
+    .orderBy(authorClaims.authorIndex);
+  return Promise.all(
+    rows.map(async (r) => ({
+      authorIndex: r.authorIndex,
+      authorName: r.authorName,
+      href: (await shownFor({ id: r.accountId, showInstitution: r.showInstitution })).claimedPapers
+        ? keyedPagePath('user', r.handle)
+        : null,
+    })),
+  );
+}
+
+/** Renders again the papers the account is a confirmed author of, whose author names link to its page or not. */
+async function refreshAuthoredPapers(accountId: string, database: Database): Promise<void> {
+  const rows = await database
+    .select({ paperId: authorClaims.paperId })
+    .from(authorClaims)
+    .where(and(eq(authorClaims.accountId, accountId), eq(authorClaims.status, 'confirmed')));
+  await refreshPageIds(
+    database,
+    rows.map((r) => r.paperId),
+  );
 }
 
 export interface ClaimedPaper {
@@ -305,6 +350,8 @@ export async function syncProfileFile(
   );
   if (result.status !== 'committed') return 'unchanged';
   await refreshPages({ kind: 'user', key: account.handle });
+  // Whether its papers link the author's name here may have changed.
+  await refreshAuthoredPapers(account.id, database);
   return 'committed';
 }
 
@@ -337,6 +384,9 @@ export async function afterHandleChange(oldHandle: string, newHandle: string, da
     }
     await refreshPages({ kind: 'user', key: oldHandle });
     await refreshPages({ kind: 'user', key: newHandle });
+    const [account] = await database.select({ id: accounts.id }).from(accounts).where(eq(accounts.handle, newHandle));
+    // Its papers link the author's name to the new address.
+    if (account) await refreshAuthoredPapers(account.id, database);
   } catch (err) {
     console.error(`moving the page of @${oldHandle} to @${newHandle} failed`, err);
   }

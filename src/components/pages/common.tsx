@@ -1,4 +1,4 @@
-import type { ComponentType, ReactNode } from 'react';
+import { type ComponentType, Fragment, type ReactNode } from 'react';
 import { AuthorPanels, CommunityPanels } from '@/components/plugins/NestedPanels';
 import { ui } from '@/components/ui';
 import { GENERIC_SLOTS, type GenericSlot, KINDS, type PageAddress, type PageKind } from '@/lib/kinds';
@@ -79,7 +79,14 @@ export function Sections({ kind, address, ownersHtml, communityHtml, owners }: P
             both && (
               <PartLabel>
                 From {owners.title}
-                {owners.names.length > 0 && `: ${owners.names.join(', ')}`} ·{' '}
+                {owners.people.length > 0 && ': '}
+                {owners.people.map((p, i) => (
+                  <Fragment key={p.authorIndex}>
+                    {i > 0 && ', '}
+                    {p.href ? <a href={p.href}>{p.name}</a> : p.name}
+                  </Fragment>
+                ))}{' '}
+                ·{' '}
                 <a href={EDIT} rel="nofollow">
                   edit
                 </a>

@@ -46,8 +46,8 @@ export const USER_SHOW: Record<UserShowItem, UserShowInfo> = {
   claimedPapers: {
     title: 'Papers you authored',
     description:
-      'List the papers you have confirmed authorship of on your page. Off by default: it ties your handle to the name printed on those papers, which nothing else on the site does.',
-    default: false,
+      'Link your name on the papers you are a confirmed author of to your page, and list them there. Turn it off to keep your handle apart from the name printed on those papers.',
+    default: true,
   },
   activity: {
     title: 'Activity',

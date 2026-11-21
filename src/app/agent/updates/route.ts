@@ -10,6 +10,10 @@ export const dynamic = 'force-dynamic';
 const UPDATES: { date: string; text: string }[] = [
   {
     date: '2026-11-21',
+    text: "A paper's confirmed authors' names (in its author list and its \"From the authors\") link to their pages, `/u/<handle>`. `user.show.claimedPapers` is now on by default and governs both that link and the list on their page; turning it off keeps their handle apart from the name on their papers.",
+  },
+  {
+    date: '2026-11-21',
     text: "The actions under a page's title are arranged in settings, for each kind of page: `<kind>.actions.order` and `<kind>.actions.hidden` (`edit`, `share`, `history`, on papers also `cite`, `follow` and `agents`, and plugins' actions as `<plugin id>.<action id>`). The first four shown are in the bar, the rest in its ⋯ menu. A plugin offers an action with `contributes.actions` in its manifest (see `/plugins.md`). A paper's abstract is now rendered as Markdown with TeX.",
   },
   {

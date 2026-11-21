@@ -14,7 +14,7 @@ import { readCommit, readFiles, readHead, readText } from '@/server/pages/repo';
 import { savePaper } from '@/server/papers';
 import { readPageForPlugins } from '@/server/plugins/pages';
 import { saveSiteSettings } from '@/server/settings';
-import { userPageView } from '@/server/user-pages';
+import { linkedAuthors, userPageView } from '@/server/user-pages';
 import { api, closePool, commitFiles, resetDatabase, signUp } from './helpers';
 
 /**
@@ -116,7 +116,7 @@ describe('user pages', () => {
     expect(await findPage(`user:${placeholder.handle}`)).toBeNull();
   });
 
-  it('shows by default only what ties nothing to a name or an author identity (DESIGN.md §5.3)', async () => {
+  it('shows by default no real name or institution, and the papers authored (DESIGN.md §5.3)', async () => {
     const paperId = await paper(PAPER);
     await paper(OTHER);
     const ada = await person('ada', { realName: 'Ada Lovelace' });
@@ -127,16 +127,22 @@ describe('user pages', () => {
       shown: DEFAULT_SHOWN,
       realName: null,
       institutions: null,
-      claimedPapers: null,
+      claimedPapers: [{ page: { identifier: 'arxiv:1706.03762' }, authorName: 'Ada Lovelace' }],
       activity: [],
       comments: [],
     });
-    // Plugins and the public routes see the same: no name, no institution, no papers.
+    // Plugins and the public routes see the same: no real name from the profile, no institution.
     const read = await readPageForPlugins('user:ada');
-    expect(read.kindFile).toEqual({ show: DEFAULT_SHOWN });
+    expect(read.kindFile).toMatchObject({ show: DEFAULT_SHOWN });
     const route = await api('GET', `/pages/${encodeURIComponent('user:ada')}/files`);
     expect(route.status).toBe(200);
-    expect(JSON.stringify(route.body)).not.toMatch(/Lovelace|ETH|1706\.03762/);
+    expect(JSON.stringify(route.body)).not.toMatch(/ETH/);
+    // The paper links her printed name to her page, until she turns that off.
+    expect(await linkedAuthors(paperId)).toEqual([{ authorIndex: 0, authorName: 'Ada Lovelace', href: '/u/ada' }]);
+    const off = '{ "user.show.claimedPapers": false }';
+    expect((await api('PUT', '/me/settings', { cookie: ada.cookie, text: off })).status).toBe(200);
+    expect(await linkedAuthors(paperId)).toEqual([{ authorIndex: 0, authorName: 'Ada Lovelace', href: null }]);
+    expect((await userPageView(await userPage('ada')))!.claimedPapers).toBeNull();
   });
 
   it('shows what the account turns on in its settings, and profile.json follows', async () => {
@@ -165,11 +171,12 @@ describe('user pages', () => {
     });
 
     // Turned off again: gone from the page, and the file says so; the name was never in a commit.
-    expect((await api('PUT', '/me/settings', { cookie: ada.cookie, text: '{}' })).status).toBe(200);
+    const off = '{ "user.show.claimedPapers": false }';
+    expect((await api('PUT', '/me/settings', { cookie: ada.cookie, text: off })).status).toBe(200);
     expect((await api('PATCH', '/me', { cookie: ada.cookie, body: { showInstitution: false } })).status).toBe(200);
     expect((await userPageView(page))!).toMatchObject({ realName: null, claimedPapers: null });
     const show = JSON.parse((await files(page.id))['profile.json']).show;
-    expect(show).toEqual(DEFAULT_SHOWN);
+    expect(show).toEqual({ ...DEFAULT_SHOWN, claimedPapers: false });
     expect(Object.values(await files(page.id)).join('\n')).not.toContain('Lovelace');
 
     // The account writes about/ and its links, but profile.json only through its settings.

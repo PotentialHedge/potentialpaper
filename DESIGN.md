@@ -697,8 +697,10 @@ that paper uses a separate per-claim author identity, shown with the name on the
 - links with that paper at either end
 - comments on that paper, where the anonymous option is unavailable
 
-Their handle never appears on that paper, so nothing publicly connects a pseudonymous handle to a real
-name. Stances on links touching your own paper don't count towards totals.
+Their actions on that paper never show their handle. Their printed name on the paper (in its author list and
+the author section's "From the authors") links to their page, though, unless they turn off "Papers you authored"
+(`user.show.claimedPapers`): decided 2026-11-21, so readers can find who an author is here. Turning it off keeps a
+pseudonymous handle apart from the real name. Stances on links touching your own paper don't count towards totals.
 
 **What a person's page shows** (`/u/<handle>`, §4.3; built in `handoffs/pages.md` Phase 3) is the account's choice,
 item by item, in its own settings.json (`user.show.*`, which the site layer can't set for everyone):
@@ -707,7 +709,7 @@ item by item, in its own settings.json (`user.show.*`, which the site layer can'
 | --------------------------------- | ------- | ------------------------------------------------------------------------------ |
 | Real name (`user.show.realName`)  | off     | Real names are optional; the handle need not say who someone is                |
 | Institution (`show_institution`)  | off     | At a small institution it can identify someone on its own                      |
-| Papers authored (`claimedPapers`) | off     | It ties the handle to the names on those papers, which nothing else does       |
+| Papers authored (`claimedPapers`) | on      | Also links the author's name on those papers here; off keeps the handle apart  |
 | Activity (`user.show.activity`)   | on      | Edits and links under the handle are public under it on each page already      |
 | Comments (`user.show.comments`)   | on      | The same; anonymous ones and those on the person's own papers are never listed |
 

@@ -1,7 +1,7 @@
 import 'katex/dist/katex.min.css';
 import { eq, sql } from 'drizzle-orm';
 import type { Metadata } from 'next';
-import { cache } from 'react';
+import { cache, Fragment } from 'react';
 import { buildPanels } from '@/components/pages/common';
 import { PageActions } from '@/components/pages/PageActions';
 import { PageHeader, PageView } from '@/components/pages/PageView';
@@ -148,7 +148,25 @@ export async function PaperRoute({ scheme, segments }: { scheme: PaperScheme; se
         <PageHeader title={paper.title}>
           <p className="mt-4 text-center">
             {paper.authors.length > 0 ? (
-              paper.authors.join(', ')
+              // A confirmed author's name links to their page, unless they turned that off.
+              paper.authors.map((name, i) => {
+                const href = owners?.people.find((p) => p.authorIndex === i)?.href;
+                return (
+                  <Fragment key={i}>
+                    {i > 0 && ', '}
+                    {href ? (
+                      <a
+                        href={href}
+                        className="text-ink underline decoration-rule-strong underline-offset-4 hover:decoration-ink"
+                      >
+                        {name}
+                      </a>
+                    ) : (
+                      name
+                    )}
+                  </Fragment>
+                );
+              })
             ) : (
               <span className="text-muted italic">Anonymous authors</span>
             )}

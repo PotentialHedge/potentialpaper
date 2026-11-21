@@ -6,11 +6,11 @@ import { profileFileSchema } from '@/lib/kinds';
 import { commentExcerpt } from '@/server/user-pages';
 
 describe('what a user page shows', () => {
-  it('defaults to nothing that ties the handle to a name or an author identity (DESIGN.md §5.3)', () => {
+  it('defaults to no real name or institution, but to the papers authored (DESIGN.md §5.3)', () => {
     expect(DEFAULT_SHOWN).toEqual({
       realName: false,
       institution: false,
-      claimedPapers: false,
+      claimedPapers: true,
       activity: true,
       comments: true,
     });
