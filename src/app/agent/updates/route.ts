@@ -10,7 +10,11 @@ export const dynamic = 'force-dynamic';
 const UPDATES: { date: string; text: string }[] = [
   {
     date: '2026-11-21',
-    text: "A paper's confirmed authors' names (in its author list and its \"From the authors\") link to their pages, `/u/<handle>`. `user.show.claimedPapers` is now on by default and governs both that link and the list on their page; turning it off keeps their handle apart from the name on their papers.",
+    text: 'A person can write a short bio (up to 600 characters, Markdown with TeX), shown on their page as its abstract: `PATCH /api/v1/me` with `{ "bio": "…" }` (`null` or blank clears it); `GET /api/v1/me` returns it. It is public once written, so write one only when they ask, in their words.',
+  },
+  {
+    date: '2026-11-21',
+    text: 'A paper\'s confirmed authors\' names (in its author list and its "From the authors") link to their pages, `/u/<handle>`. `user.show.claimedPapers` is now on by default and governs both that link and the list on their page; turning it off keeps their handle apart from the name on their papers.',
   },
   {
     date: '2026-11-21',

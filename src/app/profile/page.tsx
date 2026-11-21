@@ -2,6 +2,7 @@ import type { Metadata } from 'next';
 import { headers } from 'next/headers';
 import Link from 'next/link';
 import { redirect } from 'next/navigation';
+import { AbstractText } from '@/components/AbstractText';
 import { SignOut } from '@/components/SignOut';
 import { ui } from '@/components/ui';
 import { keyedPagePath } from '@/lib/kinds';
@@ -15,12 +16,19 @@ import { listTokens } from '@/server/tokens';
 import { ApiKeys } from './ApiKeys';
 import { Affiliations } from './Affiliations';
 import { MailSettings } from './MailSettings';
-import { ProfileForm } from './ProfileForm';
+import { EditProfile } from './ProfileForm';
 import { SshKeys } from './SshKeys';
 
 export const dynamic = 'force-dynamic';
 export const metadata: Metadata = { title: 'Profile · PotentialPaper' };
 
+const BUTTON = ui.btn({ ghost: true, inline: true, flush: true });
+
+/**
+ * The signed-in person's own account, opening as acceptodds' does: who they are set as a paper's title block (their
+ * name, then `@handle` and institutions as its author line, their bio as its abstract), with their public page, the
+ * profile editor and their page's settings beside it. Then what only they see: addresses, email, keys.
+ */
 export default async function Profile() {
   const viewer = await viewerFromHeaders(await headers());
   if (!viewer) redirect(authHref('/signin', '/profile'));
@@ -31,27 +39,57 @@ export default async function Profile() {
     listTokens(account.id),
     listSshKeys(account.id),
   ]);
+  const handle = `@${shownHandle(account.handle, account.isBot)}`;
   return (
     <main className={ui.page}>
-      <h1 className="mt-6 text-[26px] font-normal">@{shownHandle(account.handle, account.isBot)}</h1>
-      <p className={`${ui.fine} mb-4 font-sans`}>
-        Signed in as {viewer.email} · <SignOut className={ui.linkBtn} />
-      </p>
-      <h2 className={ui.groupHeading}>Public profile</h2>
-      <p className="mb-3 font-sans text-sm">
-        Your page is <a href={keyedPagePath('user', account.handle)}>{keyedPagePath('user', account.handle)}</a>. It
-        shows your handle, what you write in its <code className={ui.mono}>owners/</code>, and your links; your
-        institution only as you choose below; your real name, papers, activity and comments only as you choose under{' '}
-        <Link href="/settings/public-page">Settings, “Your public page”</Link>.
-      </p>
-      <ProfileForm
-        initial={{
-          handle: account.handle,
-          realName: account.realName ?? '',
-          showInstitution: account.showInstitution,
-        }}
-        institutions={account.institutions}
-      />
+      <header className="text-center">
+        <h1 className="mt-6 text-[26px] leading-tight font-normal">{account.realName ?? handle}</h1>
+        <p className="mt-4">
+          {account.realName && handle}
+          {account.institutions.map((name, i) => (
+            <span key={name}>
+              {i === 0 ? (account.realName ? ', ' : '') : '; '}
+              <i>{name}</i>
+            </span>
+          ))}
+        </p>
+        <p className="mt-2.5 font-mono text-xs text-faint">{viewer.email}</p>
+        <div className="mt-4 flex flex-wrap justify-center gap-2">
+          <a href={keyedPagePath('user', account.handle)} className={BUTTON} title="Your page as everyone sees it">
+            view public page
+          </a>
+          <EditProfile
+            className={BUTTON}
+            initial={{
+              handle: account.handle,
+              realName: account.realName ?? '',
+              bio: account.bio ?? '',
+              showInstitution: account.showInstitution,
+            }}
+            institutions={account.institutions}
+          />
+          <Link href="/settings/public-page" className={BUTTON} title="What your public page shows">
+            settings
+          </Link>
+        </div>
+      </header>
+      <div className="mx-auto mt-8 max-w-[720px]">
+        {account.bio ? (
+          <AbstractText text={account.bio} />
+        ) : (
+          <p>
+            <b>Abstract.</b>{' '}
+            <span className="text-muted italic">
+              No bio yet. Add a few lines about you and your research with “edit profile”: your page shows them as its
+              abstract.
+            </span>
+          </p>
+        )}
+        <p className={`${ui.fine} font-sans`}>
+          Your page shows your handle, bio and links; your institution and real name only as you choose; your papers,
+          activity and comments unless you turn them off in its settings.
+        </p>
+      </div>
       <h2 className={ui.groupHeading} id="affiliations">
         Affiliations
       </h2>
@@ -102,6 +140,10 @@ export default async function Profile() {
           lastUsedAt: k.lastUsedAt?.toISOString() ?? null,
         }))}
       />
+      <hr className="mt-10 mb-4 border-rule-soft" />
+      <div className="flex justify-end">
+        <SignOut className={BUTTON} />
+      </div>
     </main>
   );
 }

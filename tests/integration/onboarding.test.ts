@@ -139,6 +139,16 @@ describe('the public profile', () => {
     expect((await api('PATCH', '/me', { cookie, body: { realName: '   ' } })).body.realName).toBeNull();
   });
 
+  it('keeps a short bio, trimmed, and clears a blank one', async () => {
+    const cookie = await signUp('ada@ethz.ch');
+    await api('PATCH', '/me', { cookie, body: { handle: 'ada', showInstitution: false } });
+    const bio = 'I work on $O(n)$ attention.';
+    expect((await api('PATCH', '/me', { cookie, body: { bio: `  ${bio}\n` } })).body.bio).toBe(bio);
+    expect((await api('GET', '/me', { cookie })).body.bio).toBe(bio);
+    expect((await api('PATCH', '/me', { cookie, body: { bio: 'x'.repeat(601) } })).status).toBe(400);
+    expect((await api('PATCH', '/me', { cookie, body: { bio: '  ' } })).body.bio).toBeNull();
+  });
+
   it('refuses a reserved handle and a taken one', async () => {
     const ada = await signUp('ada@ethz.ch');
     const bob = await signUp('bob@ethz.ch');

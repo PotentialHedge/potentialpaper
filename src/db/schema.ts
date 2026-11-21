@@ -50,6 +50,8 @@ export const accounts = pgTable(
     /** Lower case; a placeholder `user-xxxxxx` until `profileCompletedAt`. */
     handle: text('handle').notNull(),
     realName: text('real_name'),
+    /** A few lines about the person, in Markdown with TeX, shown on their page as its abstract. Public when set. */
+    bio: text('bio'),
     /** Whether `institutions` is shown publicly. Asked explicitly in onboarding; false until then. */
     showInstitution: boolean('show_institution').notNull().default(false),
     /** When the person chose their handle and answered about their institution. */

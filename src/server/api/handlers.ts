@@ -123,6 +123,7 @@ function presentMe(a: Account) {
     id: a.id,
     handle: a.handle,
     realName: a.realName,
+    bio: a.bio,
     showInstitution: a.showInstitution,
     institutions: a.institutions,
     verified: a.verifiedAt !== null,

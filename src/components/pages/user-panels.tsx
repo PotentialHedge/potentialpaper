@@ -1,4 +1,5 @@
 import { ui } from '@/components/ui';
+import { AbstractText } from '@/components/AbstractText';
 import type { KindPanelProps } from './slots';
 
 /**
@@ -11,13 +12,18 @@ import type { KindPanelProps } from './slots';
 const day = (at: Date) =>
   at.toLocaleDateString('en', { day: 'numeric', month: 'short', year: 'numeric', timeZone: 'UTC' });
 
-/** The real name and institutions, under the handle, when the account shows them. */
+/** The real name and institutions, under the handle, when the account shows them; then its bio, as an abstract. */
 export function UserIdentity({ user }: KindPanelProps) {
   if (!user) return null;
   const parts = [user.realName, user.institutions?.join(', ')].filter((part): part is string => Boolean(part));
   if (user.bot) parts.push('A bot');
-  if (parts.length === 0) return null;
-  return <p className="text-center font-sans text-[15px] text-muted">{parts.join(' · ')}</p>;
+  if (parts.length === 0 && !user.bio) return null;
+  return (
+    <>
+      {parts.length > 0 && <p className="text-center font-sans text-[15px] text-muted">{parts.join(' · ')}</p>}
+      {user.bio && <AbstractText text={user.bio} className={parts.length > 0 ? 'mt-4' : ''} />}
+    </>
+  );
 }
 
 /** The papers the account is a confirmed author of, with the name it has on each. */

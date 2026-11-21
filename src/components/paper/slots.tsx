@@ -6,7 +6,7 @@ import { formatIdentifier, pagePath } from '@/lib/kinds';
 import { TOPIC_LABELS } from '@/lib/labeled-links';
 import { ui } from '@/components/ui';
 import type { PanelId } from '@/lib/panels';
-import { renderSourceText } from '@/server/comments/render';
+import { AbstractText } from '@/components/AbstractText';
 import type { Paper } from '@/db/schema';
 import { paperPath, sourceLinks, sourceName, type PaperId } from '@/lib/paper-ids';
 import { Comments } from './Comments';
@@ -46,14 +46,7 @@ function Abstract({ paper }: PanelProps) {
       </p>
     );
   }
-  const html = renderSourceText(paper.abstract);
-  const label = '<b>Abstract.</b> ';
-  return (
-    <div
-      className="md break-words"
-      dangerouslySetInnerHTML={{ __html: html.startsWith('<p>') ? `<p>${label}${html.slice(3)}` : label + html }}
-    />
-  );
+  return <AbstractText text={paper.abstract} />;
 }
 
 function ReadThePaper({ identifiers, pdf, picture }: PanelProps) {

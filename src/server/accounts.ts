@@ -90,6 +90,8 @@ export interface ProfileChange {
   handle?: string;
   /** `null` clears it. */
   realName?: string | null;
+  /** `null` or blank clears it. */
+  bio?: string | null;
   showInstitution?: boolean;
   mentionMail?: boolean;
   followMail?: boolean;
@@ -115,12 +117,14 @@ export async function updateProfile(
     if (problem) throw new ApiError(422, 'invalid_handle', problem);
   }
   const realName = change.realName === undefined ? undefined : change.realName?.trim() || null;
+  const bio = change.bio === undefined ? undefined : change.bio?.trim() || null;
   try {
     const [updated] = await database
       .update(accounts)
       .set({
         ...(change.handle !== undefined ? { handle: change.handle } : {}),
         ...(realName !== undefined ? { realName } : {}),
+        ...(bio !== undefined ? { bio } : {}),
         ...(change.showInstitution !== undefined ? { showInstitution: change.showInstitution } : {}),
         ...(change.mentionMail !== undefined ? { mentionMail: change.mentionMail } : {}),
         ...(change.followMail !== undefined ? { followMail: change.followMail } : {}),
@@ -134,7 +138,7 @@ export async function updateProfile(
     }
     // The trigger moved the page to the new handle and left a redirect from the old one.
     if (updated.handle !== account.handle) await afterHandleChange(account.handle, updated.handle, database);
-    // What the page shows may have changed (a real name), whether or not it shows it.
+    // What the page shows may have changed (a real name, the bio), whether or not it shows it.
     else await refreshPages({ kind: 'user', key: updated.handle }).catch(() => {});
     return updated;
   } catch (err) {

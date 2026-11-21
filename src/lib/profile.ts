@@ -49,3 +49,5 @@ export function handleProblem(handle: string): string | null {
 }
 
 export const REAL_NAME_MAX = 120;
+/** The longest bio: a few lines, as an abstract is a paragraph. */
+export const BIO_MAX = 600;

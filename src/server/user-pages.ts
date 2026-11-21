@@ -126,6 +126,8 @@ export interface UserPageView {
   handle: string;
   bot: boolean;
   shown: UserShown;
+  /** What the person wrote about themselves (Markdown with TeX), or `null`: public whenever they write one. */
+  bio: string | null;
   /** Each item only when shown, else `null`. */
   realName: string | null;
   institutions: string[] | null;
@@ -155,6 +157,7 @@ export async function userPageView(
     handle: account.handle,
     bot: account.isBot,
     shown,
+    bio: account.bio,
     realName: shown.realName ? account.realName : null,
     institutions: shown.institution ? account.institutions : null,
     claimedPapers,

@@ -8,7 +8,7 @@ import {
 } from '@/lib/agent-posts';
 import { MAX_EVIDENCE, MAX_EVIDENCE_URL } from '@/lib/evidence';
 import { TOKEN_SCOPES } from '@/db/schema';
-import { REAL_NAME_MAX } from '@/lib/profile';
+import { BIO_MAX, REAL_NAME_MAX } from '@/lib/profile';
 import { MAX_VERSIONS, VERSION_KINDS, VERSION_STATUSES } from '@/lib/versions';
 import { SEARCH_SORTS } from '@/lib/search';
 import { MAX_COMMENT_LENGTH } from '@/lib/comments';
@@ -35,6 +35,7 @@ export const Me = z.object({
   id: z.uuid(),
   handle: z.string(),
   realName: z.string().nullable(),
+  bio: z.string().nullable(),
   showInstitution: z.boolean(),
   institutions: z.array(z.string()),
   verified: z.boolean(),
@@ -47,6 +48,8 @@ export const MePatch = z
   .object({
     handle: z.string().min(1).max(64).optional(),
     realName: z.string().max(REAL_NAME_MAX).nullable().optional(),
+    /** A few lines about the person, Markdown with TeX, on their page; `null` or blank clears it. */
+    bio: z.string().max(BIO_MAX).nullable().optional(),
     showInstitution: z.boolean().optional(),
     /** Whether a `@` mention in a comment is mailed. */
     mentionMail: z.boolean().optional(),
