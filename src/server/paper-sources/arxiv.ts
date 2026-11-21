@@ -1,6 +1,14 @@
 import { XMLParser } from 'fast-xml-parser';
 import { normalizeArxivId, parseDoi, type PaperId } from '@/lib/paper-ids';
-import { CC0, fetchSource, SourceUnavailable, tidy, type PaperSource, type SourcePaper } from './types';
+import {
+  CC0,
+  fetchSource,
+  SourceUnavailable,
+  tidy,
+  type PaperSource,
+  type SourcePaper,
+  type SourceVersion,
+} from './types';
 
 const parser = new XMLParser({
   ignoreAttributes: true,
@@ -13,9 +21,28 @@ interface AtomEntry {
   title?: string;
   summary?: string;
   published?: string;
+  updated?: string;
   author?: { name?: string }[];
   'arxiv:doi'?: string;
   'arxiv:journal_ref'?: string;
+}
+
+/**
+ * The versions an entry tells of: v1 when it was published, and the newest when it was last updated. The feed
+ * dates no version in between, so those wait for whoever knows them (`import-versions`).
+ */
+function arxivVersions(entry: AtomEntry, id: string): SourceVersion[] {
+  const latest = Number(/v(\d+)$/.exec(entry.id ?? '')?.[1] ?? 1);
+  const day = (time?: string) => (time && /^\d{4}-\d{2}-\d{2}/.test(time) ? time.slice(0, 10) : undefined);
+  const version = (n: number, date?: string): SourceVersion => ({
+    label: `arXiv v${n}`,
+    kind: 'preprint',
+    date,
+    url: `https://arxiv.org/abs/${id}v${n}`,
+  });
+  const versions = [version(1, day(entry.published))];
+  if (latest > 1) versions.push(version(latest, day(entry.updated)));
+  return versions;
 }
 
 /** The entry for `id` in an Atom feed from arXiv's API, or `null` if the feed has none. */
@@ -46,6 +73,7 @@ export function parseArxivFeed(xml: string, id: string): SourcePaper | null {
     // arXiv's API terms: descriptive metadata, "title, abstract, authors, identifiers", is CC0.
     metadataLicense: CC0,
     abstractLicense: abstract ? CC0 : null,
+    versions: arxivVersions(entry, id),
   };
 }
 

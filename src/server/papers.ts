@@ -5,7 +5,9 @@ import type { PaperId, PaperScheme } from '@/lib/paper-ids';
 import { arxivSource } from './paper-sources/arxiv';
 import { openAlexSource } from './paper-sources/openalex';
 import { SourceUnavailable, type PaperSource, type SourcePaper } from './paper-sources/types';
+import { SYSTEM_ACTOR } from './pages/check';
 import { consume } from './ratelimit';
+import { setVersions, versionsAt } from './versions';
 
 /**
  * Finding a paper by identifier, and making its row on the first visit (DESIGN.md §3). A source is only
@@ -69,7 +71,7 @@ export async function findPaper(id: PaperId, database: Database = getDb()): Prom
  * The row for a paper a source described. If any of its identifiers is already known, it is the same
  * paper: that row gains the others, and its metadata stays.
  */
-export async function savePaper(source: SourcePaper, database: Database = getDb()): Promise<string> {
+export async function savePaper(source: Omit<SourcePaper, 'versions'>, database: Database = getDb()): Promise<string> {
   return database.transaction(async (tx) => {
     await tx.execute(sql`select pg_advisory_xact_lock(${CREATE_LOCK})`);
     let paperId: string | undefined;
@@ -152,7 +154,34 @@ async function askSource(id: PaperId, source: PaperSource, database: Database): 
   const saved = await findPaper(id, database);
   // A source that answers for an identifier but does not list it is a bug in its adapter.
   if (!saved) throw new Error(`source ${source.name} did not return ${id.scheme}:${id.value}`);
+  await startVersions(saved.paper.id, described, database);
   return { status: 'found', ...saved };
+}
+
+/**
+ * Gives a paper without versions the ones its source told of, as the system: a paper always has at least one
+ * (DESIGN.md §3). One that has some keeps them. Never fails the lookup, which has its paper by now.
+ */
+export async function startVersions(
+  paperId: string,
+  described: Pick<SourcePaper, 'versions'>,
+  database: Database = getDb(),
+): Promise<boolean> {
+  if (described.versions.length === 0) return false;
+  try {
+    const { head, versions } = await versionsAt(paperId, undefined, database);
+    if (versions.length > 0) return false;
+    await setVersions(
+      paperId,
+      SYSTEM_ACTOR,
+      { baseOid: head, versions: described.versions, summary: 'Add the versions its source lists' },
+      { database },
+    );
+    return true;
+  } catch (err) {
+    console.error(`could not start the versions of ${paperId}:`, err);
+    return false;
+  }
 }
 
 /** The paper for an identifier in normal form, asking its source if we have never seen it. */

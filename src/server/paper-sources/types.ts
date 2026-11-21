@@ -1,4 +1,5 @@
 import type { PaperId } from '@/lib/paper-ids';
+import type { VersionKind } from '@/lib/versions';
 import type { RateLimitConfig } from '../ratelimit';
 
 /** Where a paper's row came from. */
@@ -14,6 +15,14 @@ export type License = string;
 /** arXiv, OpenReview and OpenAlex each dedicate their metadata, abstracts included for the first two, to CC0. */
 export const CC0: License = 'CC0-1.0';
 
+/** A version as a source describes it, which the lookup commits as the paper's first versions. */
+export interface SourceVersion {
+  label: string;
+  kind: VersionKind;
+  date?: string;
+  url?: string;
+}
+
 /** A paper as a source describes it. `identifiers` includes the one asked for. */
 export interface SourcePaper {
   title: string;
@@ -27,6 +36,11 @@ export interface SourcePaper {
   metadataLicense: License;
   /** `null` exactly when there is no abstract. */
   abstractLicense: License | null;
+  /**
+   * The versions the source knows of, oldest first, which a paper new here starts with: a paper always has at
+   * least one. Whoever knows more (`import-versions`, an editor) adds the rest.
+   */
+  versions: SourceVersion[];
 }
 
 /** The source could not answer: try later, and do not remember this as a miss. */

@@ -2,17 +2,18 @@ import { normalizeArxivId, parseDoi, type PaperId } from '@/lib/paper-ids';
 import { CC0, fetchSource, tidy, type License, type PaperSource, type SourcePaper } from './types';
 
 const FIELDS =
-  'title,publication_year,doi,authorships,primary_location,best_oa_location,locations,abstract_inverted_index';
+  'title,publication_year,publication_date,doi,authorships,primary_location,best_oa_location,locations,abstract_inverted_index';
 
 interface Location {
   landing_page_url?: string | null;
   license?: string | null;
-  source?: { display_name?: string | null } | null;
+  source?: { display_name?: string | null; type?: string | null } | null;
 }
 
 interface Work {
   title?: string | null;
   publication_year?: number | null;
+  publication_date?: string | null;
   doi?: string | null;
   authorships?: { raw_author_name?: string | null; author?: { display_name?: string | null } }[];
   primary_location?: Location | null;
@@ -51,6 +52,8 @@ export function parseOpenAlexWork(work: Work, doi: string): SourcePaper | null {
     }
   }
   const license = openLicense(work);
+  const venue = work.primary_location?.source?.display_name ?? null;
+  const date = work.publication_date ?? (work.publication_year ? String(work.publication_year) : undefined);
   const abstract = work.abstract_inverted_index && license ? abstractText(work.abstract_inverted_index) || null : null;
   return {
     title: tidy(work.title),
@@ -59,11 +62,20 @@ export function parseOpenAlexWork(work: Work, doi: string): SourcePaper | null {
       .filter(Boolean),
     abstract,
     year: work.publication_year ?? null,
-    venue: work.primary_location?.source?.display_name ?? null,
+    venue,
     identifiers,
     source: 'openalex',
     metadataLicense: CC0,
     abstractLicense: abstract ? license : null,
+    // The version the DOI names: the one published there.
+    versions: [
+      {
+        label: venue ?? 'Published version',
+        kind: work.primary_location?.source?.type === 'journal' ? 'journal' : 'camera-ready',
+        date: date && /^\d{4}(-\d{2}-\d{2})?$/.test(date) ? date : undefined,
+        url: `https://doi.org/${doi}`,
+      },
+    ],
   };
 }
 

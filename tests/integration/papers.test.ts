@@ -8,7 +8,8 @@ import { pages, paperIdentifiers, papers } from '@/db/schema';
 import { importSubmissions } from '@/server/import-submissions';
 import { SourceUnavailable, type PaperSource, type SourcePaper } from '@/server/paper-sources/types';
 import { paperGate, shortGate } from '@/server/paper-gate';
-import { lookupPaper, savePaper } from '@/server/papers';
+import { lookupPaper, savePaper, startVersions } from '@/server/papers';
+import { currentVersions } from '@/server/versions';
 import { searchPapers, topVenues } from '@/server/search';
 import { closePool, ORIGIN, resetDatabase } from './helpers';
 
@@ -26,6 +27,10 @@ const ATTENTION: SourcePaper = {
   source: 'arxiv',
   metadataLicense: 'CC0-1.0',
   abstractLicense: 'CC0-1.0',
+  versions: [
+    { label: 'arXiv v1', kind: 'preprint', date: '2017-06-12', url: 'https://arxiv.org/abs/1706.03762v1' },
+    { label: 'arXiv v7', kind: 'preprint', date: '2023-08-02', url: 'https://arxiv.org/abs/1706.03762v7' },
+  ],
 };
 const ID = { scheme: 'arxiv', value: '1706.03762' } as const;
 
@@ -49,6 +54,20 @@ describe('looking up a paper', () => {
     expect(first.status === 'found' && first.paper.title).toBe(ATTENTION.title);
     await lookupPaper(ID, { sources: { arxiv } });
     expect(arxiv.calls()).toBe(1);
+  });
+
+  it('starts a new paper with the versions its source lists', async () => {
+    const arxiv = fakeSource(async () => ATTENTION);
+    const found = await lookupPaper(ID, { sources: { arxiv } });
+    if (found.status !== 'found') throw new Error(found.status);
+    const versions = await currentVersions(found.paper.id);
+    expect(versions.map((v) => [v.label, v.date])).toEqual([
+      ['arXiv v1', '2017-06-12'],
+      ['arXiv v7', '2023-08-02'],
+    ]);
+    // A paper that has versions keeps them.
+    expect(await startVersions(found.paper.id, { versions: [{ label: 'Other', kind: 'other' }] })).toBe(false);
+    expect(await currentVersions(found.paper.id)).toHaveLength(2);
   });
 
   it('remembers a miss', async () => {

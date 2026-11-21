@@ -16,6 +16,7 @@ const ENTRY = `<entry>
   <summary>  The dominant
     models.  </summary>
   <published>2017-06-12T17:57:34Z</published>
+  <updated>2023-08-02T00:41:18Z</updated>
   <arxiv:doi>10.1000/ABC</arxiv:doi>
   <arxiv:journal_ref>NeurIPS 2017</arxiv:journal_ref>
   <author><name>Ashish Vaswani</name></author>
@@ -37,6 +38,10 @@ describe('arXiv feed', () => {
       source: 'arxiv',
       metadataLicense: 'CC0-1.0',
       abstractLicense: 'CC0-1.0',
+      versions: [
+        { label: 'arXiv v1', kind: 'preprint', date: '2017-06-12', url: 'https://arxiv.org/abs/1706.03762v1' },
+        { label: 'arXiv v7', kind: 'preprint', date: '2023-08-02', url: 'https://arxiv.org/abs/1706.03762v7' },
+      ],
     });
   });
 
@@ -50,6 +55,10 @@ describe('arXiv feed', () => {
     expect(paper?.title).toBe('2024');
     expect(paper?.authors).toEqual(['A']);
     expect(paper?.abstractLicense).toBeNull();
+    // Only v1, so only one version, undated when the feed gives no date.
+    expect(paper?.versions).toEqual([
+      { label: 'arXiv v1', kind: 'preprint', date: undefined, url: 'https://arxiv.org/abs/2001.00001v1' },
+    ]);
   });
 
   it('no entry means no such paper', () => {
@@ -83,6 +92,14 @@ describe('OpenAlex work', () => {
     expect(paper?.identifiers).toEqual([
       { scheme: 'doi', value: '10.1145/3065386' },
       { scheme: 'arxiv', value: '1234.56789' },
+    ]);
+    expect(paper?.versions).toEqual([
+      {
+        label: 'Communications of the ACM',
+        kind: 'camera-ready',
+        date: '2017',
+        url: 'https://doi.org/10.1145/3065386',
+      },
     ]);
   });
 
