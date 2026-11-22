@@ -149,7 +149,29 @@ Every edit to a page takes \`evidence\`, up to 10 addresses (links, or \`url\`s 
 
 ## The person's account
 
-- \`GET ${api}/me\`: the account the token acts as: its \`handle\`, and whether it is \`verified\`.
+- \`GET ${api}/me\`: the account the token acts as: its \`handle\`, whether it is \`verified\`, and \`profileComplete\` (false: a new account with no handle yet; set one as [the setup checklist](${origin}${AGENT_SETUP_PATH}) says).
+- \`PATCH ${api}/me\`: change their profile when they ask: \`handle\`, \`realName\`, \`bio\`, \`homepage\`, \`orcid\`, \`scholar\`, \`showInstitution\`, and whether \`mentionMail\` and \`followMail\` are sent. What is on their page is public, so write it in their words.
+- \`GET ${api}/me/papers\`: papers they are an author of or have claimed (with co-authors \`waiting\` on a claim, and invitations), and papers they follow.
+- More institutional addresses: \`POST ${api}/me/affiliations\` with \`{ "email" }\` mails a code there; ask them for it, then \`POST ${api}/me/affiliations/<id>/verify\` with \`{ "code" }\`. An address on a paper lets them claim it at once.
+
+## Claim their papers
+
+A paper's confirmed authors write its author section. Claiming needs a verified account.
+
+1. Find them: \`GET ${api}/me/claim-suggestions\` lists papers they may have written, likeliest first (\`?q=<title words or a name>\` to search). Or take the papers they name.
+2. Read the paper's claim: \`GET ${api}/claims?scheme=<scheme>&value=<value>\` gives their own \`claim\` (if any), the \`authors\` as printed, the indices already \`taken\`, the addresses \`printed\` on its first page (\`authorOf\` says whose each is, where that is clear), and which of their own confirmed addresses are \`onPaper\`. Check with the person which author they are.
+3. Claim, in the first way that fits, with \`"paper": { "scheme", "value" }\` and the \`authorIndex\`:
+   - One of their addresses is \`onPaper\`: \`POST ${api}/claims\` with \`{ "paper", "authorIndex" }\`. Confirmed at once.
+   - Their address at the time is \`printed\` but not theirs on the site yet: \`POST ${api}/claims/code\` with \`{ "paper", "authorIndex", "email": "<the printed address>" }\` mails a code there; ask them for it, then \`POST ${api}/claims/code/confirm\` with \`{ "paper", "email", "code" }\`.
+   - The paper has confirmed co-authors: \`POST ${api}/claims/ask\` with \`{ "paper", "authorIndex", "evidence": "<a line for them>" }\` asks them to confirm it.
+   - Otherwise: \`POST ${api}/claims\` with \`{ "paper", "authorIndex", "evidence": "<links that show it is them>" }\`, and an admin decides.
+4. \`hidden: true\`: it is under review; only an author whose address is printed on it can claim it now.
+
+Once confirmed, they can add co-authors: \`GET ${api}/handles?q=<start of a handle>\` finds accounts, and \`POST ${api}/me/papers/co-authors\` with \`{ "paper", "handle", "authorIndex" }\` invites one (\`{ "paper", "claim": "<id>" }\` confirms a claim \`waiting\` in \`/me/papers\`; \`…/co-authors/deny\` refuses it). An invitation to them is answered with \`POST ${api}/me/papers/invitation\`, \`{ "paper", "accept": true }\`. Withdraw a claim with \`DELETE ${api}/claims?scheme=<scheme>&value=<value>\`. Do each of these only when the person says so.
+
+## What only the person can do
+
+A token can do everything on the site except what would let a leaked key give itself more: making or revoking API keys, adding SSH keys, setting a password, and approving a plugin's permissions. For those, send the person to the page: ${origin}/profile (keys, SSH keys, password) or the plugin's own prompt on the site.
 
 ## Errors
 

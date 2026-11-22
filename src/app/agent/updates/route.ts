@@ -9,6 +9,10 @@ export const dynamic = 'force-dynamic';
  */
 const UPDATES: { date: string; text: string }[] = [
   {
+    date: '2026-11-22',
+    text: "Two ways to do more for a person. Sign in through their browser: \`POST /api/v1/agent/link\` gives a \`url\` to open for them and a \`secret\` to poll \`POST /api/v1/agent/link/token\` with until they approve (see \`/agent/setup\`, step 1); someone new signs up on that page. And claim their papers: \`GET /api/v1/claims\` now gives what a claim needs (the authors as printed, who is taken, the addresses on the paper and which are theirs), and \`/agent/start\` says how to claim, choose a new account's handle and add co-authors. Only keys, SSH keys, passwords and plugin permissions stay the person's own to change.",
+  },
+  {
     date: '2026-11-21',
     text: "Setting up has one checklist: `/agent/setup`. Signing in moved there from `/agent/start` (unchanged), along with everything needed to edit pages' files with git: Git LFS, the page's identity, git credentials for HTTPS and an SSH key on the person's profile, and the editor extension. The Edit dialog on every page now offers a prompt that sends an agent there to check and set all of it up. The token may be sent to the site's git server as a password, not only to its API.",
   },
