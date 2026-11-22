@@ -192,7 +192,7 @@ export async function mailCommentFollowers(commentId: string, database: Database
  */
 export async function mailAddedCoAuthor(
   paperId: string,
-  added: { accountId: string; authorName: string },
+  added: { accountId: string; authorName: string; invited?: boolean },
   voucherHandle: string,
   database: Database = getDb(),
 ): Promise<boolean> {
@@ -213,6 +213,7 @@ export async function mailAddedCoAuthor(
       authorName: added.authorName,
       url: `${base}${paper.path}`,
       papersUrl: `${base}/papers`,
+      invited: added.invited,
     }),
   });
   return true;

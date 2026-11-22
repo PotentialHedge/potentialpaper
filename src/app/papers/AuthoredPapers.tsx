@@ -2,8 +2,9 @@
 
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
-import { useState, type FormEvent } from 'react';
+import { useState } from 'react';
 import { CopyField } from '@/components/CopyField';
+import { HandleCombobox, type HandleMatch } from '@/components/HandleCombobox';
 import { Modal } from '@/components/Modal';
 import { Select } from '@/components/Select';
 import { ui } from '@/components/ui';
@@ -70,10 +71,14 @@ export function AuthoredPapers({
                   </td>
                   <td className={ui.td}>
                     {row.mine.authorName}
-                    {!confirmed && (
-                      <Link href={claimPath(row.canonical)} className="hover:no-underline">
-                        <span className={ui.badge}>pending</span>
-                      </Link>
+                    {row.mine.status === 'invited' ? (
+                      <span className={`${ui.badge} whitespace-nowrap`}>invited by @{row.mine.invitedBy}</span>
+                    ) : (
+                      !confirmed && (
+                        <Link href={claimPath(row.canonical)} className="hover:no-underline">
+                          <span className={ui.badge}>pending</span>
+                        </Link>
+                      )
                     )}
                   </td>
                   <td className={ui.td}>
@@ -87,6 +92,7 @@ export function AuthoredPapers({
                     </span>
                   </td>
                   <td className={`${ui.td} text-right whitespace-nowrap`}>
+                    {row.mine.status === 'invited' && <Answer paper={row.canonical} />}
                     {confirmed && canVouch && (
                       <button
                         type="button"
@@ -127,11 +133,49 @@ export function AuthoredPapers({
   );
 }
 
+/** Accepting or declining an invitation to be a co-author (`POST /api/v1/me/papers/invitation`). */
+function Answer({ paper }: { paper: PaperId }) {
+  const router = useRouter();
+  const [busy, setBusy] = useState(false);
+  const [problem, setProblem] = useState<string | null>(null);
+  async function answer(accept: boolean) {
+    setBusy(true);
+    setProblem(null);
+    try {
+      const res = await fetch('/api/v1/me/papers/invitation', {
+        method: 'POST',
+        headers: { 'content-type': 'application/json' },
+        body: JSON.stringify({ paper, accept }),
+      });
+      if (!res.ok) return setProblem(await messageOf(res));
+      router.refresh();
+    } catch {
+      setProblem('Could not reach the server. Try again.');
+    } finally {
+      setBusy(false);
+    }
+  }
+  return (
+    <span className="inline-flex gap-3">
+      <button type="button" className={ui.linkBtn} disabled={busy} onClick={() => void answer(true)}>
+        accept
+      </button>
+      <button type="button" className={ui.linkBtn} disabled={busy} onClick={() => void answer(false)}>
+        decline
+      </button>
+      {problem && <span className={ui.note(false)}>{problem}</span>}
+    </span>
+  );
+}
+
 /** Confirm a co-author waiting on a claim, or add one by handle, on one paper. */
 function CoAuthors({ row }: { row: AuthoredRow }) {
   const router = useRouter();
   const [busy, setBusy] = useState(false);
   const [note, setNote] = useState<{ ok: boolean; text: string } | null>(null);
+  const [author, setAuthor] = useState('');
+  const [picked, setPicked] = useState<HandleMatch | null>(null);
+  const [confirming, setConfirming] = useState(false);
   const taken = new Set(row.confirmed.map((c) => c.authorIndex));
   const open = row.authors.map((name, index) => ({ name, index })).filter((a) => !taken.has(a.index));
 
@@ -148,8 +192,13 @@ function CoAuthors({ row }: { row: AuthoredRow }) {
         setNote({ ok: false, text: await messageOf(res) });
         return false;
       }
-      const added = (await res.json()) as { authorName: string };
-      setNote({ ok: true, text: `${added.authorName} is now a confirmed author.` });
+      const added = (await res.json()) as { authorName: string; invited: boolean };
+      setNote({
+        ok: true,
+        text: added.invited
+          ? `Invited them as ${added.authorName}. They are added once they accept.`
+          : `${added.authorName} is now a confirmed author.`,
+      });
       router.refresh();
       return true;
     } catch {
@@ -179,16 +228,13 @@ function CoAuthors({ row }: { row: AuthoredRow }) {
     }
   }
 
-  async function add(event: FormEvent<HTMLFormElement>) {
-    event.preventDefault();
-    const formEl = event.currentTarget;
-    const form = new FormData(formEl);
-    const handle = String(form.get('handle') ?? '').trim();
-    const authorIndex = Number(form.get('author'));
-    if (!handle || form.get('author') === null || !Number.isInteger(authorIndex)) {
-      return setNote({ ok: false, text: 'Choose which author they are, and give their handle.' });
+  async function invite() {
+    if (!picked || author === '') return;
+    if (await vouch({ handle: picked.handle, authorIndex: Number(author) })) {
+      setPicked(null);
+      setAuthor('');
     }
-    if (await vouch({ handle, authorIndex })) formEl.reset();
+    setConfirming(false);
   }
 
   return (
@@ -232,39 +278,62 @@ function CoAuthors({ row }: { row: AuthoredRow }) {
       {open.length === 0 ? (
         <p className="text-muted">Every author of this paper is confirmed.</p>
       ) : (
-        <form onSubmit={add}>
-          <div className="flex flex-wrap items-start gap-x-2 narrow:flex-col narrow:items-stretch">
-            <span className="min-w-0 flex-1">
-              <Select name="author" defaultValue="" aria-label="Which author they are" required data-autofocus>
-                <option value="" disabled>
-                  Which author they are…
-                </option>
-                {open.map((a) => (
-                  <option key={a.index} value={a.index}>
-                    {a.name}
-                  </option>
-                ))}
-              </Select>
-            </span>
-            <span className="min-w-0 flex-1">
-              <input
-                name="handle"
-                placeholder="Their handle, e.g. @ada"
-                aria-label="Their handle"
-                autoComplete="off"
-                className={ui.input}
-                maxLength={64}
-                required
-              />
-            </span>
+        <form
+          onSubmit={(e) => {
+            e.preventDefault();
+            if (author === '' || !picked)
+              return setNote({ ok: false, text: 'Choose the author, then pick their handle.' });
+            setNote(null);
+            setConfirming(true);
+          }}
+        >
+          <Select
+            value={author}
+            onChange={(e) => setAuthor(e.target.value)}
+            aria-label="Which author they are"
+            required
+            data-autofocus
+          >
+            <option value="" disabled>
+              Which author they are…
+            </option>
+            {open.map((a) => (
+              <option key={a.index} value={a.index}>
+                {a.name}
+              </option>
+            ))}
+          </Select>
+          <HandleCombobox value={picked} onChange={setPicked} />
+          {confirming && picked && author !== '' ? (
+            <div className={`${ui.box} mt-2`}>
+              <p>
+                Invite <b>@{picked.handle}</b> to be <b>{row.authors[Number(author)]}</b>? They are added once they
+                accept.
+              </p>
+              <div className="mt-2 flex gap-3">
+                <button
+                  type="button"
+                  className={ui.btn({ inline: true, flush: true })}
+                  disabled={busy}
+                  onClick={() => void invite()}
+                  autoFocus
+                >
+                  {busy ? 'Sending…' : 'Send invite'}
+                </button>
+                <button type="button" className={ui.linkBtn} onClick={() => setConfirming(false)}>
+                  Back
+                </button>
+              </div>
+            </div>
+          ) : (
             <button
               type="submit"
-              className={`${ui.btn({ inline: true, flush: true })} border border-transparent`}
-              disabled={busy}
+              className={`${ui.btn({ flush: true })} mt-2`}
+              disabled={busy || !picked || author === ''}
             >
-              {busy ? 'Adding…' : 'Add'}
+              Invite
             </button>
-          </div>
+          )}
         </form>
       )}
       {note && <p className={ui.note(note.ok)}>{note.text}</p>}
@@ -291,7 +360,7 @@ function Invite({ row, open }: { row: AuthoredRow; open: { name: string; index: 
       .replace(/\+/g, '%20')}`;
   return (
     <>
-      <h3 className={`${ui.boxHeading} mt-5`}>Or invite them</h3>
+      <h3 className={`${ui.boxHeading} mt-5`}>Not on PotentialPaper yet?</h3>
       <CopyField value={link} label="Invite link" />
       <p className="mt-2">
         Email{' '}

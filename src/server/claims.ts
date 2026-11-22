@@ -219,7 +219,7 @@ export async function requestClaim(
   }
 
   const existing = await ownClaim(paperId, account.id, database);
-  if (existing && existing.status !== 'pending' && existing.status !== 'declined') {
+  if (existing && existing.status !== 'pending' && existing.status !== 'declined' && existing.status !== 'invited') {
     throw new ApiError(409, 'claim_decided', `your claim was already ${existing.status}`);
   }
   const verification = await emailEvidence(paperId, account.id, database);
@@ -421,7 +421,7 @@ export async function addCoAuthor(
   voucher: Account,
   target: CoAuthorTarget,
   database: Database = getDb(),
-): Promise<{ accountId: string; authorIndex: number; authorName: string }> {
+): Promise<{ accountId: string; authorIndex: number; authorName: string; invited: boolean }> {
   const { owner } = await claimRoles(paperId, voucher.id, database);
   if (!owner) throw new ApiError(403, 'forbidden', 'only a confirmed author of the paper can add a co-author');
   const [paper] = await database.select({ authors: papers.authors }).from(papers).where(eq(papers.id, paperId));
@@ -466,14 +466,31 @@ export async function addCoAuthor(
   if (existing?.status === 'declined') {
     throw new ApiError(409, 'claim_decided', 'they stepped down from this paper; they can claim it again themselves');
   }
+  const [holder] = await database
+    .select({ accountId: authorClaims.accountId })
+    .from(authorClaims)
+    .where(
+      and(
+        eq(authorClaims.paperId, paperId),
+        eq(authorClaims.authorIndex, authorIndex),
+        eq(authorClaims.status, 'confirmed'),
+      ),
+    );
+  if (holder) throw new ApiError(409, 'claim_taken', `someone is already confirmed as ${authorName}`);
+  // Someone named by handle hasn't asked to be this author, so they are invited and accept themselves
+  // (`answerInvitation`); someone who asked for it, by a claim, is confirmed at once.
+  const invited = !('claimId' in target) && !(existing?.status === 'pending' && existing.authorIndex === authorIndex);
+  if (invited && existing?.status === 'invited' && existing.authorIndex === authorIndex) {
+    throw new ApiError(409, 'claim_decided', `they are already invited as ${authorName}`);
+  }
   const decision = {
     authorIndex,
     authorName,
-    status: 'confirmed' as const,
+    status: invited ? ('invited' as const) : ('confirmed' as const),
     method: 'vouch' as const,
     verification: null,
     decidedBy: voucher.id,
-    decidedAt: new Date(),
+    decidedAt: invited ? null : new Date(),
   };
   try {
     if (existing) {
@@ -484,7 +501,7 @@ export async function addCoAuthor(
           and(
             eq(authorClaims.paperId, paperId),
             eq(authorClaims.accountId, accountId),
-            eq(authorClaims.status, 'pending'),
+            inArray(authorClaims.status, ['pending', 'invited']),
           ),
         )
         .returning({ id: authorClaims.id });
@@ -498,9 +515,45 @@ export async function addCoAuthor(
     if (pgErrorCode(err) !== '23505') throw err;
     throw new ApiError(409, 'claim_taken', `someone is already confirmed as ${authorName}, or claimed meanwhile`);
   }
+  if (!invited) {
+    await followAsAuthor(paperId, accountId, database);
+    await refreshPaper(paperId, database);
+  }
+  return { accountId, authorIndex, authorName, invited };
+}
+
+/**
+ * The invited account accepts being the author a co-author invited it as (`addCoAuthor`), which confirms it, or
+ * declines, which removes the invitation. Accepting fails if someone was confirmed as that author meanwhile.
+ */
+export async function answerInvitation(
+  paperId: string,
+  accountId: string,
+  accept: boolean,
+  database: Database = getDb(),
+): Promise<OwnClaim | null> {
+  const mine = and(eq(authorClaims.paperId, paperId), eq(authorClaims.accountId, accountId));
+  const [invitation] = await database
+    .select({ id: authorClaims.id })
+    .from(authorClaims)
+    .where(and(mine, eq(authorClaims.status, 'invited')));
+  if (!invitation) throw new ApiError(404, 'not_found', 'no invitation to this paper');
+  if (!accept) {
+    await database.delete(authorClaims).where(eq(authorClaims.id, invitation.id));
+    return null;
+  }
+  try {
+    await database
+      .update(authorClaims)
+      .set({ status: 'confirmed', decidedAt: new Date() })
+      .where(eq(authorClaims.id, invitation.id));
+  } catch (err) {
+    if (pgErrorCode(err) !== '23505') throw err;
+    throw new ApiError(409, 'claim_taken', 'someone else was confirmed as that author meanwhile');
+  }
   await followAsAuthor(paperId, accountId, database);
   await refreshPaper(paperId, database);
-  return { accountId, authorIndex, authorName };
+  return ownClaim(paperId, accountId, database);
 }
 
 /** An admin's decision (`method: 'manual'`). Confirming fails if someone else is already confirmed as that author. */

@@ -150,3 +150,30 @@ export async function updateProfile(
     throw err;
   }
 }
+
+/**
+ * Accounts whose handle starts with `q`, shortest first, to pick a co-author from: only those who can be one, people
+ * with a confirmed institutional address. Shows what their page shows, the handle and the institution if it is shown.
+ */
+export async function searchHandles(
+  q: string,
+  exceptId: string,
+  database: Database = getDb(),
+): Promise<{ handle: string; institution: string | null }[]> {
+  const prefix = q
+    .trim()
+    .replace(/^@/, '')
+    .toLowerCase()
+    .replace(/[\\%_]/g, '\\$&');
+  if (!prefix) return [];
+  const rows = await database
+    .select({ handle: accounts.handle, institutions: accounts.institutions, show: accounts.showInstitution })
+    .from(accounts)
+    .where(
+      sql`${accounts.handle} like ${`${prefix}%`} and ${accounts.verifiedAt} is not null
+          and not ${accounts.isBot} and ${accounts.id} <> ${exceptId}`,
+    )
+    .orderBy(sql`length(${accounts.handle})`, accounts.handle)
+    .limit(8);
+  return rows.map((r) => ({ handle: r.handle, institution: r.show ? (r.institutions[0] ?? null) : null }));
+}

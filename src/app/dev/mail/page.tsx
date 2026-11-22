@@ -1,18 +1,24 @@
 import type { Metadata } from 'next';
 import { notFound } from 'next/navigation';
 import { ui } from '@/components/ui';
-import { devOutbox } from '@/server/mail';
+import { readFile } from 'node:fs/promises';
+import { DEV_MAIL_FILE, type Mail } from '@/server/mail';
 
 export const dynamic = 'force-dynamic';
 export const metadata: Metadata = { title: 'Dev mail · PotentialPaper', robots: { index: false, follow: false } };
 
 /**
  * The mail the site would have sent, newest first: in dev without `RESEND_API_KEY` nothing is sent (`server/mail.ts`).
- * Not there in production. Kept in memory, so a restart of the dev server empties it.
+ * Not there in production. Read from `.next/dev-mail.jsonl`, so it survives a restart until `.next` is cleared.
  */
-export default function DevMail() {
+export default async function DevMail() {
   if (process.env.NODE_ENV === 'production' || process.env.RESEND_API_KEY) notFound();
-  const mails = [...devOutbox()].reverse();
+  const lines = await readFile(DEV_MAIL_FILE, 'utf8').catch(() => '');
+  const mails = lines
+    .split('\n')
+    .filter(Boolean)
+    .map((line) => JSON.parse(line) as Mail)
+    .reverse();
   return (
     <main className={ui.page}>
       <h1 className="mt-6 text-[26px] font-normal">Dev mail</h1>

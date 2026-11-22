@@ -51,6 +51,8 @@ import * as myMentions from '@/app/api/v1/me/mentions/route';
 import * as myPapers from '@/app/api/v1/me/papers/route';
 import * as myCoAuthors from '@/app/api/v1/me/papers/co-authors/route';
 import * as myCoAuthorsDeny from '@/app/api/v1/me/papers/co-authors/deny/route';
+import * as myInvitation from '@/app/api/v1/me/papers/invitation/route';
+import * as handles from '@/app/api/v1/handles/route';
 import * as claimCode from '@/app/api/v1/claims/code/route';
 import * as claimCodeConfirm from '@/app/api/v1/claims/code/confirm/route';
 import * as claimAsk from '@/app/api/v1/claims/ask/route';
@@ -157,6 +159,8 @@ const ROUTES: [RegExp, any][] = [
   [/^\/me\/papers$/, myPapers],
   [/^\/me\/papers\/co-authors$/, myCoAuthors],
   [/^\/me\/papers\/co-authors\/deny$/, myCoAuthorsDeny],
+  [/^\/me\/papers\/invitation$/, myInvitation],
+  [/^\/handles(\?.*)?$/, handles],
   [/^\/follows(\?.*)?$/, follows],
   [/^\/views$/, views],
   [/^\/views\/time$/, viewTime],

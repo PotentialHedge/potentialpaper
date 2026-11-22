@@ -95,12 +95,28 @@ export interface CoAuthorMail {
   authorName: string;
   /** Absolute: the paper's page. */
   url: string;
-  /** Absolute: My papers, where they can step down. */
+  /** Absolute: My papers, where they accept, decline or step down. */
   papersUrl: string;
+  /** Invited by handle, so they accept on My papers; else they asked, and were confirmed. */
+  invited?: boolean;
 }
 
-/** A confirmed author added the recipient as a co-author (`addCoAuthor`), confirmed at once. */
+/** A confirmed author invited the recipient to be a co-author, or confirmed the claim they made (`addCoAuthor`). */
 export function renderCoAuthorMail(m: CoAuthorMail): RenderedMail {
+  if (m.invited) {
+    const lead = `${m.by} invited you to be ${m.authorName}, an author of`;
+    return renderMail({
+      siteUrl: new URL(m.url).origin,
+      subject: `${m.by} invited you as an author of “${short(m.title)}”`,
+      title: 'You were invited as an author',
+      byline: m.title,
+      blocks: [
+        { kind: 'p', text: `${lead} this paper:`, plain: `${lead}\n\n  ${m.title}` },
+        { kind: 'p', text: 'Accept or decline on My papers. Nothing changes until you accept.' },
+        { kind: 'link', label: 'Open My papers', url: m.papersUrl, plain: `Open My papers: ${m.papersUrl}` },
+      ],
+    });
+  }
   const lead = `${m.by} added you as ${m.authorName}, an author of`;
   return renderMail({
     siteUrl: new URL(m.url).origin,

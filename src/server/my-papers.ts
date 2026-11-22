@@ -1,4 +1,5 @@
 import { and, asc, eq, inArray, isNull, ne, sql } from 'drizzle-orm';
+import { alias } from 'drizzle-orm/pg-core';
 import { getDb, type Database } from '@/db';
 import {
   accounts,
@@ -46,7 +47,15 @@ export interface AuthoredPaper extends PaperSummary {
   /** Names as printed on the paper, in order. */
   authors: string[];
   /** The account's own claim: who it is on the paper, and whether that is confirmed yet. */
-  mine: { authorIndex: number; authorName: string; status: ClaimStatus; method: ClaimMethod; canStepDown: boolean };
+  mine: {
+    authorIndex: number;
+    authorName: string;
+    status: ClaimStatus;
+    method: ClaimMethod;
+    canStepDown: boolean;
+    /** For an invitation (`status: 'invited'`), the handle of the co-author who sent it. */
+    invitedBy: string | null;
+  };
   /** The paper's confirmed authors, the account among them when it is one, in the paper's order. */
   confirmed: { authorIndex: number; authorName: string }[];
   /** Claims by others waiting on an admin, which a confirmed author can confirm. Empty unless the account is one. */
@@ -89,6 +98,8 @@ export async function summaries(paperIds: readonly string[], database: Database)
  * The papers the account is an author of, or has asked to be: confirmed and pending claims, newest paper first.
  * **Private** to the account: it carries what others wrote to claim a co-authored paper.
  */
+const inviter = alias(accounts, 'inviter');
+
 export async function authoredPapers(accountId: string, database: Database = getDb()): Promise<AuthoredPaper[]> {
   const own = await database
     .select({
@@ -98,10 +109,14 @@ export async function authoredPapers(accountId: string, database: Database = get
       status: authorClaims.status,
       method: authorClaims.method,
       authors: papers.authors,
+      inviter: inviter.handle,
     })
     .from(authorClaims)
     .innerJoin(papers, eq(papers.id, authorClaims.paperId))
-    .where(and(eq(authorClaims.accountId, accountId), inArray(authorClaims.status, ['confirmed', 'pending'])));
+    .leftJoin(inviter, eq(inviter.id, authorClaims.decidedBy))
+    .where(
+      and(eq(authorClaims.accountId, accountId), inArray(authorClaims.status, ['confirmed', 'pending', 'invited'])),
+    );
   if (own.length === 0) return [];
   const paperIds = own.map((row) => row.paperId);
   const confirmedOn = own.filter((row) => row.status === 'confirmed').map((row) => row.paperId);
@@ -172,6 +187,7 @@ export async function authoredPapers(accountId: string, database: Database = get
         status: claim.status,
         method: claim.method,
         canStepDown: canStepDown(claim),
+        invitedBy: claim.status === 'invited' ? claim.inviter : null,
       },
       confirmed: confirmed
         .filter((c) => c.paperId === claim.paperId)

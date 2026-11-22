@@ -1,3 +1,5 @@
+import { appendFile } from 'node:fs/promises';
+import path from 'node:path';
 import { Resend } from 'resend';
 
 /**
@@ -5,7 +7,7 @@ import { Resend } from 'resend';
  * single origin IP is a losing battle.
  *
  * With `RESEND_API_KEY` unset, outside production, mail is not sent: it is
- * kept in an in-process outbox and printed to the server log, so sign-up and
+ * kept in an in-process outbox, printed to the server log and shown on `/dev/mail`, so sign-up and
  * institutional verification work in dev and in tests. In production a missing
  * key is an error, never a silent drop.
  */
@@ -18,13 +20,19 @@ export interface Mail {
   html: string;
 }
 
-// On `globalThis`, so pages and route handlers, which dev can load as separate module copies, share one outbox.
+// For tests, which read it in the process that sent it; `/dev/mail` reads `DEV_MAIL_FILE`.
 const outbox: Mail[] = ((globalThis as { __devOutbox?: Mail[] }).__devOutbox ??= []);
 
 /** Mail "sent" without Resend, newest last. Dev and tests only. */
 export function devOutbox(): readonly Mail[] {
   return outbox;
 }
+
+/**
+ * Dev mail is also appended here, as JSON lines, for `/dev/mail`: route handlers and pages can run in separate
+ * workers in dev, which share no memory, and a file also survives a restart.
+ */
+export const DEV_MAIL_FILE = path.join(process.cwd(), '.next', 'dev-mail.jsonl');
 
 export function clearDevOutbox(): void {
   outbox.length = 0;
@@ -40,6 +48,7 @@ export async function sendMail(mail: Mail): Promise<void> {
     }
     outbox.push(mail);
     if (process.env.NODE_ENV !== 'test' && !process.env.VITEST) {
+      await appendFile(DEV_MAIL_FILE, JSON.stringify(mail) + '\n').catch(() => {});
       console.info(`[mail:dev] to=${mail.to} subject=${JSON.stringify(mail.subject)}\n${mail.text}`);
     }
     return;

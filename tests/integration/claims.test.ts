@@ -5,7 +5,7 @@ import { accounts, authorClaims, commitIdentities, pageCurrent, pageObjects } fr
 import { decideClaim } from '@/server/claims';
 import { historyWithHandles } from '@/server/pages/edit';
 import { savePaper } from '@/server/papers';
-import { api, closePool, commitFiles, resetDatabase, signUp } from './helpers';
+import { api, closePool, commitFiles, lastMailTo, resetDatabase, signUp } from './helpers';
 
 const PAPER = { scheme: 'arxiv', value: '1706.03762' } as const;
 
@@ -174,9 +174,22 @@ describe('My papers and co-authors', () => {
       body: { paper: PAPER, handle: `@${noam.account.handle}`, authorIndex: 1 },
     });
     expect(added.status).toBe(201);
-    expect(added.body).toEqual({ authorIndex: 1, authorName: 'Noam Shazeer' });
+    expect(added.body).toEqual({ authorIndex: 1, authorName: 'Noam Shazeer', invited: true });
     const [claim] = await getDb().select().from(authorClaims).where(eq(authorClaims.accountId, noam.account.id));
-    expect(claim).toMatchObject({ status: 'confirmed', method: 'vouch', decidedBy: ashish.account.id });
+    expect(claim).toMatchObject({ status: 'invited', method: 'vouch', decidedBy: ashish.account.id });
+    // The mail goes out after the response.
+    await expect.poll(() => lastMailTo('noam@ethz.ch')?.subject).toContain('invited you');
+
+    // They see the invitation, and accept it.
+    const invited = await api('GET', '/me/papers', { cookie: noam.cookie });
+    expect(invited.body.authored[0].mine).toMatchObject({ status: 'invited', invitedBy: ashish.account.handle });
+    const accepted = await api('POST', '/me/papers/invitation', {
+      cookie: noam.cookie,
+      body: { paper: PAPER, accept: true },
+    });
+    expect(accepted.status).toBe(200);
+    const [after] = await getDb().select().from(authorClaims).where(eq(authorClaims.accountId, noam.account.id));
+    expect(after.status).toBe('confirmed');
 
     // They can step down, and aren't added again over that.
     expect((await api('DELETE', `/claims?scheme=arxiv&value=1706.03762`, { cookie: noam.cookie })).status).toBe(200);
@@ -210,6 +223,25 @@ describe('My papers and co-authors', () => {
     expect(confirmed.status).toBe(201);
     const after = await api('GET', '/me/papers', { cookie: noam.cookie });
     expect(after.body.authored[0].mine).toMatchObject({ status: 'confirmed', method: 'vouch', canStepDown: true });
+  });
+  it('finds accounts by handle, and a declined invitation is gone', async () => {
+    const paperId = await paper();
+    const ashish = await confirmedAshish(paperId);
+    const noam = await accountOf('noam@ethz.ch');
+
+    const found = await api('GET', `/handles?q=${noam.account.handle.slice(0, 3)}`, { cookie: ashish.cookie });
+    expect(found.body.accounts.map((a: { handle: string }) => a.handle)).toContain(noam.account.handle);
+
+    await api('POST', '/me/papers/co-authors', {
+      cookie: ashish.cookie,
+      body: { paper: PAPER, handle: noam.account.handle, authorIndex: 1 },
+    });
+    const declined = await api('POST', '/me/papers/invitation', {
+      cookie: noam.cookie,
+      body: { paper: PAPER, accept: false },
+    });
+    expect(declined.status).toBe(200);
+    expect(await getDb().select().from(authorClaims).where(eq(authorClaims.accountId, noam.account.id))).toEqual([]);
   });
 });
 

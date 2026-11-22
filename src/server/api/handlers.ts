@@ -1,7 +1,7 @@
 import { headers as nextHeaders } from 'next/headers';
 import type { z } from 'zod';
 import type { Account, Affiliation } from '@/db/schema';
-import { updateProfile } from '../accounts';
+import { searchHandles, updateProfile } from '../accounts';
 import { addAffiliation, listAffiliations, removeAffiliation, verifyAffiliation } from '../affiliations';
 import { authenticate, requireAuth, requireSession, requireVerified, viewerFromHeaders, type Principal } from '../auth';
 import { cloneAddresses } from '../pages/clone';
@@ -25,7 +25,7 @@ import { previewDemoSources } from '../demos/attach';
 import { snapshotDemo } from '../demos/snapshot';
 import { demoUrl } from '@/lib/demos';
 import { addressOfRef, formatIdentifier, keyedPagePath, pagePath, pageRefOf } from '@/lib/kinds';
-import { addCoAuthor, ownClaim, requestClaim, withdrawClaim } from '../claims';
+import { addCoAuthor, answerInvitation, ownClaim, requestClaim, withdrawClaim } from '../claims';
 import { authoredPapers } from '../my-papers';
 import { confirmClaimCode, sendClaimCode } from '../claim-addresses';
 import { askCoAuthors, claimSuggestions, denyClaim } from '../claim-requests';
@@ -567,9 +567,11 @@ export const postCoAuthor = route(async (req) => {
     principal.account,
     'claim' in body ? { claimId: body.claim } : { handle: body.handle, authorIndex: body.authorIndex },
   );
-  void mailAddedCoAuthor(paper.id, { accountId, authorName: added.authorName }, principal.account.handle).catch((err) =>
-    console.error('co-author mail failed', err),
-  );
+  void mailAddedCoAuthor(
+    paper.id,
+    { accountId, authorName: added.authorName, invited: added.invited },
+    principal.account.handle,
+  ).catch((err) => console.error('co-author mail failed', err));
   return respond(S.CoAuthorAdded, added, { status: 201, principal });
 });
 
@@ -1456,4 +1458,20 @@ export const getChanges = route(async (req) => {
     limit: query.limit,
   });
   return respond(S.Changes, presentChanges(changes, query.limit), { headers: PUBLIC_MINUTE });
+});
+
+/** Accounts to pick a co-author from, by the start of their handle (`accounts.ts` `searchHandles`). */
+export const getHandleSearch = route(async (req) => {
+  const principal = await requireVerified(req);
+  const { q } = parseQuery(req, S.HandleSearchQuery);
+  return respond(S.HandleMatches, { accounts: await searchHandles(q, principal.account.id) }, { principal });
+});
+
+/** The invited account accepts or declines being a co-author (`claims.ts` `answerInvitation`). */
+export const postInvitationAnswer = route(async (req) => {
+  const principal = await requireVerified(req);
+  const body = await parseBody(req, S.InvitationAnswerBody);
+  const { paper } = await knownPaper(body.paper.scheme, body.paper.value);
+  await answerInvitation(paper.id, principal.account.id, body.accept);
+  return respond(S.Ok, { status: 'ok' }, { principal });
 });

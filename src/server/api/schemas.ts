@@ -7,7 +7,7 @@ import {
   AGENT_POST_KINDS,
 } from '@/lib/agent-posts';
 import { MAX_EVIDENCE, MAX_EVIDENCE_URL } from '@/lib/evidence';
-import { TOKEN_SCOPES } from '@/db/schema';
+import { CLAIM_STATUSES, TOKEN_SCOPES } from '@/db/schema';
 import { BIO_MAX, REAL_NAME_MAX } from '@/lib/profile';
 import { MAX_SUBMISSIONS, MAX_VERSIONS, VERSION_KINDS } from '@/lib/versions';
 import { SUBMISSION_STATUSES } from '@/lib/submissions';
@@ -339,7 +339,7 @@ export const OwnClaim = z.object({
     .object({
       authorIndex: z.number().int(),
       authorName: z.string(),
-      status: z.enum(['pending', 'confirmed', 'rejected', 'declined']),
+      status: z.enum(CLAIM_STATUSES),
       /** How it was decided: `email` when an address of the claimant's on the paper confirmed it at once. */
       method: z.enum(['manual', 'email', 'vouch']),
       evidence: z.string(),
@@ -359,7 +359,15 @@ export const CoAuthorBody = z.union([
   }),
   z.object({ paper: PaperIdentifier, claim: z.uuid() }),
 ]);
-export const CoAuthorAdded = z.object({ authorIndex: z.number().int(), authorName: z.string() });
+/** `invited`: they were asked by handle and accept on My papers; otherwise they asked, and are now confirmed. */
+export const CoAuthorAdded = z.object({ authorIndex: z.number().int(), authorName: z.string(), invited: z.boolean() });
+/** The invited account's answer to an invitation (`addCoAuthor`). */
+export const InvitationAnswerBody = z.object({ paper: PaperIdentifier, accept: z.boolean() });
+/** Accounts whose handle starts with `q`, to pick a co-author from. */
+export const HandleSearchQuery = z.object({ q: z.string().trim().min(1).max(64) });
+export const HandleMatches = z.object({
+  accounts: z.array(z.object({ handle: z.string(), institution: z.string().nullable() })),
+});
 
 /** Claim as author `authorIndex` by a code sent to `email`, an address printed on the paper. */
 export const ClaimCodeBody = z.object({
@@ -449,9 +457,11 @@ export const MyPapers = z.object({
       mine: z.object({
         authorIndex: z.number().int(),
         authorName: z.string(),
-        status: z.enum(['pending', 'confirmed', 'rejected', 'declined']),
+        status: z.enum(CLAIM_STATUSES),
         method: z.enum(['manual', 'email', 'vouch']),
         canStepDown: z.boolean(),
+        /** For an invitation (`status: 'invited'`), the handle of the co-author who sent it. */
+        invitedBy: z.string().nullable(),
       }),
       confirmed: z.array(z.object({ authorIndex: z.number().int(), authorName: z.string() })),
       waiting: z.array(
