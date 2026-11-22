@@ -3,5 +3,5 @@ import { methodNotAllowed } from '@/server/api/http';
 
 export const dynamic = 'force-dynamic';
 
-export const POST = h.postPaperTopic;
+export const POST = h.postPageTopic;
 export const { GET, PUT, PATCH, DELETE } = methodNotAllowed('POST');

@@ -231,7 +231,7 @@ export interface FrameContext {
   /** The page the panel is on; `null` on a plugin's own page and on a list. */
   page: PageSummary | null;
   /**
-   * The pages above it: a paper's venues, topics and orgs; a topic's broader topics; an org's parents; an edition's
+   * The pages above it: a paper's venues, topics and orgs; an org's parents; an edition's
    * series.
    */
   scopes: PageSummary[];

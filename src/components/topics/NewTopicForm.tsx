@@ -3,13 +3,13 @@
 import { useRouter } from 'next/navigation';
 import { type FormEvent, useState } from 'react';
 import { ui } from '@/components/ui';
-import { parseAliases, topicSlug } from '@/lib/topics';
+import { topicSlug } from '@/lib/topics';
 import { failureOf, send } from './api';
 import { useTopicMatches } from './useTopicMatches';
 
 /**
- * The "New topic" form (`handoffs/pages.md` Phase 5): a name, its address, other names, broader topics and the
- * article's first words. As the name is typed it lists topics that are there already, the same name first, so a
+ * The "New topic" form (`handoffs/pages.md` Phase 5): a name, its address and the article's first words. The
+ * topics it is in are added afterwards from the bar at the foot of its page, as any page's are. As the name is typed it lists topics that are there already, the same name first, so a
  * duplicate isn't made by accident; the server refuses one anyway (`topic_exists`).
  */
 export function NewTopicForm({ initialName = '' }: { initialName?: string }) {
@@ -17,8 +17,6 @@ export function NewTopicForm({ initialName = '' }: { initialName?: string }) {
   const [name, setName] = useState(initialName);
   const [slug, setSlug] = useState('');
   const [slugTouched, setSlugTouched] = useState(false);
-  const [aliases, setAliases] = useState('');
-  const [broader, setBroader] = useState('');
   const [summary, setSummary] = useState('');
   const [busy, setBusy] = useState(false);
   const [problem, setProblem] = useState<{ message: string; link?: string } | null>(null);
@@ -34,11 +32,6 @@ export function NewTopicForm({ initialName = '' }: { initialName?: string }) {
       const res = await send('POST', '/topics', {
         name: name.trim(),
         slug: shownSlug,
-        aliases: parseAliases(aliases, name),
-        broader: broader
-          .split(/[\s,]+/)
-          .map((s) => s.trim().replace(/^topic:/, ''))
-          .filter(Boolean),
         ...(summary.trim() ? { summary: summary.trim() } : {}),
       });
       if (!res.ok) {
@@ -79,7 +72,6 @@ export function NewTopicForm({ initialName = '' }: { initialName?: string }) {
             {matches.map((m) => (
               <li key={m.key}>
                 <a href={`/t/${m.key}`}>{m.name}</a>
-                {m.matched !== m.name && <span className="text-faint"> (also called {m.matched})</span>}
               </li>
             ))}
           </ul>
@@ -96,24 +88,6 @@ export function NewTopicForm({ initialName = '' }: { initialName?: string }) {
           required
           maxLength={60}
           pattern="[a-z0-9]+(-[a-z0-9]+)*"
-          className={`${ui.input} mt-0.5`}
-        />
-      </label>
-      <label className="block text-[13px] text-muted">
-        Other names it goes by (optional, separated by commas)
-        <input
-          value={aliases}
-          onChange={(e) => setAliases(e.target.value)}
-          placeholder="Linearized attention, kernelized attention"
-          className={`${ui.input} mt-0.5`}
-        />
-      </label>
-      <label className="block text-[13px] text-muted">
-        Broader topics (optional, by address, separated by spaces)
-        <input
-          value={broader}
-          onChange={(e) => setBroader(e.target.value)}
-          placeholder="efficient-transformers"
           className={`${ui.input} mt-0.5`}
         />
       </label>

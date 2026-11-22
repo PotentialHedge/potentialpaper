@@ -3,7 +3,6 @@ import { membersConsumer, syncDueAffiliations } from '../page-members';
 import { reviewsConsumer } from '../review-projection';
 import { recomputeDueScopes, scopeStatsConsumer } from '../scope-stats';
 import { searchConsumer } from '../search-index';
-import { topicSuggestionsConsumer } from '../topic-suggestions';
 import type { Consumer } from './types';
 import type { WorkerTask } from './worker';
 
@@ -14,8 +13,7 @@ export type { Consumer, ConsumerContext } from './types';
  * (`search-index.ts`), the review projection (`review-projection.ts`), which fills the tables the Submissions
  * panel reads, the link index (`page-links.ts`, "what links here"), and membership of the pages above the paper
  * (`page-members.ts`), and score statistics of those pages (`scope-stats.ts`), whose consumer only marks scopes; the
- * reviews and members consumers mark them too, and `WORKER_TASKS` recomputes the marked ones; and the papers a topic
- * might have (`topic-suggestions.ts`). An org's papers also
+ * reviews and members consumers mark them too, and `WORKER_TASKS` recomputes the marked ones. An org's papers also
  * come from claims, addresses and PDFs, outside any repo; `WORKER_TASKS` brings those up to date too.
  */
 export const CONSUMERS: readonly Consumer[] = [
@@ -24,7 +22,6 @@ export const CONSUMERS: readonly Consumer[] = [
   linksConsumer,
   membersConsumer,
   scopeStatsConsumer,
-  topicSuggestionsConsumer,
 ];
 
 /** What the worker does after each pass of the consumers. */

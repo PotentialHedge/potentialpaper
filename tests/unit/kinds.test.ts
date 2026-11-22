@@ -72,14 +72,12 @@ describe('the kind registry', () => {
   it('finds parents and sources in the address and the kind file', () => {
     expect(parentsOf('venue', 'iclr/2027', null)).toEqual(['venue:iclr']);
     expect(parentsOf('venue', 'iclr', null)).toEqual([]);
-    expect(parentsOf('topic', 'linear-attention', { name: 'x', broader: ['efficient-transformers'] })).toEqual([
-      'topic:efficient-transformers',
-    ]);
+    // A topic's broader topics are its own links, which roll nothing up.
+    expect(parentsOf('topic', 'linear-attention', { name: 'x' })).toEqual([]);
     expect(parentsOf('org', 'eth/inf', { name: 'x', parents: ['ethz-domain'] }).sort()).toEqual([
       'org:eth',
       'org:ethz-domain',
     ]);
-    expect(parentsOf('topic', 'a', { name: 'x', broader: ['a'] })).toEqual([]);
     expect(sourcesOf('venue', { name: 'x', sources: ['openreview:ICLR.cc/2027/Conference'] })).toEqual([
       'openreview:ICLR.cc/2027/Conference',
     ]);
@@ -100,8 +98,10 @@ describe('labeled links', () => {
         { id: 'b', target: 'topic:x', targetKind: 'topic', line: 3 },
       ],
     });
-    expect(parseLabeledLinks('{"id":"a","to":"topic:x","label":"in-topic"}', 'venue')).toMatchObject({
-      problem: expect.stringContaining('from paper pages'),
+    // A page of any kind is put in a topic; only a topic is one to be in.
+    expect(parseLabeledLinks('{"id":"a","to":"topic:x","label":"in-topic"}', 'venue')).toMatchObject({ links: [{}] });
+    expect(parseLabeledLinks('{"id":"a","to":"venue:x","label":"in-topic"}', 'venue')).toMatchObject({
+      problem: expect.stringContaining('to topic pages'),
     });
     expect(parseLabeledLinks('{"id":"a","to":"topic:x","label":"related"}', 'topic')).toMatchObject({ links: [{}] });
     expect(parseLabeledLinks('{"id":"a","to":"topic:x","label":"plagiarizes"}', 'paper')).toMatchObject({
@@ -114,7 +114,7 @@ describe('labeled links', () => {
     expect(fileTypeOf('community/links.jsonl')).toBe('labeledLink');
     expect(fileTypeOf('owners/links.jsonl')).toBe('labeledLink');
     expect(indexFile('community/links.jsonl', '{"id":"a","to":"topic:x","label":"in-topic","note":"Why"}\n')).toEqual([
-      { kind: 'labeled-link', text: 'is about\ntopic:x\nWhy', fields: { label: 'in-topic', to: 'topic:x' } },
+      { kind: 'labeled-link', text: 'is in\ntopic:x\nWhy', fields: { label: 'in-topic', to: 'topic:x' } },
     ]);
     expect(indexFile('venue.json', '{ "name": "ICLR 2027" }')).toEqual([
       { kind: 'venue', text: 'ICLR 2027', fields: { name: 'ICLR 2027' } },
@@ -160,7 +160,7 @@ describe('path rules per kind', () => {
       contentProblem('venue.json', '{ "name": "ICLR 2027", "dates": { "start": "2027-04-23" } }', 'venue'),
     ).toBeNull();
     expect(contentProblem('venue.json', '{ "name": "" }', 'venue')).toMatch(/venue\.json/);
-    expect(contentProblem('topic.json', '{ "name": "X", "broader": ["Not A Slug"] }', 'topic')).toMatch(/broader/);
+    expect(contentProblem('topic.json', '{ "name": "X", "broader": ["x"] }', 'topic')).toMatch(/broader/);
     expect(contentProblem('.potentialpaper/metadata.json', '{ "kind": "topic" }', 'venue')).toMatch(/"kind": "venue"/);
     expect(grantProblem('venue.json', 'venue')).toBeNull();
     expect(grantProblem('org.json', 'org')).toBeNull();

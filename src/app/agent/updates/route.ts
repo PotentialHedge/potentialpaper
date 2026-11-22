@@ -10,6 +10,10 @@ export const dynamic = 'force-dynamic';
 const UPDATES: { date: string; text: string }[] = [
   {
     date: '2026-11-22',
+    text: 'Topics work as Wikipedia\'s categories do. A page of any kind (a paper, a venue, an organisation, a topic) is put in a topic with `POST /api/v1/pages/<identifier>/topics` `{ "topic" }` or `{ "name" }`, which adds an `in-topic` link to its `links.jsonl`; a topic in a topic is a subtopic there, and nothing rolls up. `GET …/topic` lists a topic\'s subtopics and its other pages by name. A topic\'s `topic.json` has only its `name`: aliases, `broader` and related topics are gone, as are the `introduces-topic` label, `…/topic-papers`, `…/suggestions` and `/changes?rollUp=`. An organisation\'s overview no longer lists topics.',
+  },
+  {
+    date: '2026-11-22',
     text: "Two ways to do more for a person. Sign in through their browser: \`POST /api/v1/agent/link\` gives a \`url\` to open for them and a \`secret\` to poll \`POST /api/v1/agent/link/token\` with until they approve (see \`/agent/setup\`, step 1); someone new signs up on that page. And claim their papers: \`GET /api/v1/claims\` now gives what a claim needs (the authors as printed, who is taken, and whether one of their addresses is on the paper), and \`/agent/start\` says how to claim, choose a new account's handle and add co-authors. Only keys, SSH keys, passwords and plugin permissions stay the person's own to change.",
   },
   {

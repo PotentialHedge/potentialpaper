@@ -97,22 +97,18 @@ export const LINK_LABELS = {
   'same-idea-as': { reads: 'same idea as', inverse: 'same idea as', group: 'discourse', ...PAPERS },
   /** Between pages of any kinds: topic to topic, paper to venue, … */
   related: { reads: 'related to', inverse: 'related to', group: 'discourse' },
-  /** A paper is in a topic (`handoffs/pages.md`): what makes it a member of the topic's page. */
-  'in-topic': { reads: 'is about', inverse: 'covered by', group: 'topic', from: ['paper'], to: ['topic'] },
-  'introduces-topic': {
-    reads: 'introduces',
-    inverse: 'introduced by',
-    group: 'topic',
-    from: ['paper'],
-    to: ['topic'],
-  },
+  /**
+   * A page is in a topic, as a Wikipedia page is in a category (`handoffs/pages.md`): from a page of any kind, a topic
+   * too, which makes it a subtopic.
+   */
+  'in-topic': { reads: 'is in', inverse: 'has', group: 'topic', to: ['topic'] },
 } as const satisfies Record<string, LinkLabel>;
 
 export type LinkLabelName = keyof typeof LINK_LABELS;
 export const LINK_LABEL_NAMES = Object.keys(LINK_LABELS) as LinkLabelName[];
 
-/** The labels that make a paper a member of the topic it links to (`page_members.via`). */
-export const TOPIC_LABELS: readonly LinkLabelName[] = ['in-topic', 'introduces-topic'];
+/** The label that puts a page in a topic: a paper's makes it a member of the topic (`page_members.via`). */
+export const TOPIC_LABEL = 'in-topic' satisfies LinkLabelName;
 
 const anchor = z.string().trim().min(1).max(MAX_ANCHOR);
 

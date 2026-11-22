@@ -139,7 +139,7 @@ export function openApiDocument(origin: string) {
       ),
       '/pages/{identifier}/members': get(
         "A scope's papers",
-        `A venue's, topic's or organisation's papers, paged, rolled up from the pages under it. ${CACHED}`,
+        `A venue's, topic's or organisation's papers, paged; a venue's and an organisation's rolled up from the pages under them (editions, departments and labs). ${CACHED}`,
         S.PageMembers,
         [
           identifier,
@@ -171,34 +171,13 @@ export function openApiDocument(origin: string) {
       ),
       '/pages/{identifier}/org': get(
         "An organisation's overview",
-        `The organisation above it, its departments and labs with their papers, the members who show it as their institution (by handle), and the venues and topics its papers are at, by count. ${CACHED}`,
+        `The organisation above it, its departments and labs with their papers, the members who show it as their institution (by handle), and the venues its papers are at, by count. ${CACHED}`,
         S.OrgOverview,
       ),
       '/pages/{identifier}/topic': get(
-        "A topic's overview",
-        `Its other names; its broader, narrower and related topics with their papers; the papers that introduced it; the venues and organisations its papers are at, by count; the first papers that might belong in it; the topics merged into it; and its protection. ${CACHED}`,
+        "A topic's pages",
+        `As a Wikipedia category lists them: its subtopics (topics in it) and its other pages, each by name, from their \`in-topic\` links; the topics merged into it; and its protection. Members are direct: nothing rolls up from subtopics. ${CACHED}`,
         S.TopicOverview,
-      ),
-      '/pages/{identifier}/topic-papers': get(
-        "A topic's papers",
-        `Rolled up from its narrower topics, each with the narrower topic it is in, whether it introduced the topic, and its submission (accepted first, else the latest) with the mean of its venue's first score field over its reviews. By score, papers are ordered by where that mean sits in the venue's range. ${CACHED}`,
-        S.TopicPapers,
-        [
-          identifier,
-          query('sort', 'The order.', { type: 'string', enum: ['date', 'venue', 'score'], default: 'date' }),
-          query('offset', 'Where to start.', { type: 'integer', minimum: 0, default: 0 }),
-          query('limit', 'How many.', { type: 'integer', minimum: 1, maximum: 200, default: 50 }),
-        ],
-      ),
-      '/pages/{identifier}/suggestions': get(
-        'Papers that might belong in a topic',
-        `Found by the topic's names in OpenReview keywords, titles and abstracts, best first; none a person dismissed. ${CACHED}`,
-        S.Suggestions,
-        [
-          identifier,
-          query('offset', 'Where to start.', { type: 'integer', minimum: 0, default: 0 }),
-          query('limit', 'How many.', { type: 'integer', minimum: 1, maximum: 200, default: 50 }),
-        ],
       ),
       '/pages/{identifier}/protection': get(
         "A page's protection",
@@ -207,23 +186,18 @@ export function openApiDocument(origin: string) {
       ),
       '/topics': get(
         'Topics by name',
-        `Topics whose name or an alias is like \`q\`, the same name (\`exact\`) first. ${CACHED}`,
+        `Topics whose name is like \`q\`, the same name (\`exact\`) first. ${CACHED}`,
         S.TopicMatches,
         [query('q', 'A name.', { type: 'string' })],
       ),
       '/changes': get(
         'Recent changes',
-        `Every commit to every page, newest first (the patrol feed). \`rollUp\` keeps the changes that move papers between topics: a topic's broader topics, merges and renames. ${CACHED}`,
+        `Every commit to every page, newest first (the patrol feed). ${CACHED}`,
         S.Changes,
         [
           query('kind', 'Only pages of this kind.', {
             type: 'string',
             enum: ['paper', 'venue', 'topic', 'org', 'user'],
-          }),
-          query('rollUp', 'Only changes that move papers between topics.', {
-            type: 'string',
-            enum: ['true', 'false'],
-            default: 'false',
           }),
           query('bots', "Bots' commits too.", { type: 'string', enum: ['true', 'false'], default: 'false' }),
           query('before', 'Older than this change (`next` of the previous page).', { type: 'integer' }),

@@ -20,9 +20,7 @@ import { PageActions } from './PageActions';
 import { UserByline } from './user-panels';
 import { PageHeader, PageView } from './PageView';
 import { KIND_PANELS, type KindPanelProps, presentPanel } from './slots';
-import type { TopicView } from './topic-panels';
 import { topicOverview } from '@/server/topic-pages';
-import { presentTopicPapers } from '@/server/topic-papers';
 import { previewMetadata, previewOfPage, shortIdOf, shortUrl } from '@/server/share';
 
 /**
@@ -70,11 +68,6 @@ const load = cache(async (kind: KeyedKind, segments: string[]): Promise<Loaded |
   return { page, key, current: current ?? null };
 });
 
-async function topicView(page: PageRow): Promise<TopicView> {
-  const [overview, papers] = await Promise.all([topicOverview(page), presentTopicPapers(page.id, { sort: 'date' })]);
-  return { overview, papers };
-}
-
 export async function keyedPageMetadata(kind: KeyedKind, segments: string[]): Promise<Metadata> {
   const found = await load(kind, segments);
   if (!found || 'redirect' in found) return {};
@@ -98,7 +91,7 @@ export async function KeyedPageRoute({ kind, segments }: { kind: KeyedKind; segm
     linksFrom(page.id),
     linksTo(page.id),
     scope ? scopeMemberCount(page.id) : Promise.resolve(0),
-    // A venue lists its submissions by status itself (`venue-panels.tsx`), a topic its papers sortable (`topic-panels.tsx`).
+    // A venue lists its submissions by status itself (`venue-panels.tsx`), a topic its pages by name (`topic-panels.tsx`).
     scope && kind !== 'venue' && kind !== 'topic' ? scopePapers(page.id) : Promise.resolve([]),
     pageSummaries([page.id]),
     scopesOfPage(page),
@@ -107,8 +100,8 @@ export async function KeyedPageRoute({ kind, segments }: { kind: KeyedKind; segm
     kind === 'user' ? userPageView(page) : Promise.resolve(null),
     // Its people are only those who show it as their institution (`orgPeople`).
     kind === 'org' ? orgOverview(page) : Promise.resolve(null),
-    // Its neighbours, papers and suggestions (`server/topic-pages.ts`).
-    kind === 'topic' ? topicView(page) : Promise.resolve(null),
+    // Its subtopics and other pages (`server/topic-pages.ts`).
+    kind === 'topic' ? topicOverview(page) : Promise.resolve(null),
     shortIdOf(page.id),
     ownersOf(page, address),
   ]);
@@ -153,7 +146,7 @@ export async function KeyedPageRoute({ kind, segments }: { kind: KeyedKind; segm
                   codePath: toolPath('code', address),
                   clone: cloneAddresses(address),
                   hasRepo: current !== null,
-                  // A topic's names, broader topics and article have a form of their own.
+                  // A topic's name and article have a form of their own.
                   form:
                     kind === 'topic'
                       ? { href: `${keyedPagePath('topic', key)}/edit`, label: 'Edit the topic' }

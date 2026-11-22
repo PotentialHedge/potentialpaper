@@ -1,9 +1,6 @@
 import type { ComponentType } from 'react';
-import { AddTopic } from '@/components/topics/AddTopic';
-import { Backlinks, type PageCommon, Sections } from '@/components/pages/common';
-import { LinksBox } from '@/components/pages/LinkLists';
-import { formatIdentifier, pagePath } from '@/lib/kinds';
-import { TOPIC_LABELS } from '@/lib/labeled-links';
+import { Backlinks, Links, type PageCommon, Sections, Topics } from '@/components/pages/common';
+import { pagePath } from '@/lib/kinds';
 import { ui } from '@/components/ui';
 import type { PanelId } from '@/lib/panels';
 import { AbstractText } from '@/components/AbstractText';
@@ -127,42 +124,6 @@ function VersionsAside({ versions, address }: PanelProps) {
 /** The discussion (DESIGN.md §9): a client island, since what it shows depends on who is reading. */
 function Discussion({ canonical }: PanelProps) {
   return <Comments paper={canonical} path={paperPath(canonical)} />;
-}
-
-/** Its labeled links, but for its topics, which the Topics box shows. */
-function Links({ linksFrom }: PanelProps) {
-  return <LinksBox links={linksFrom.filter((link) => !TOPIC_LABELS.includes(link.label))} direction="from" />;
-}
-
-/**
- * The topics it is in (its `in-topic` and `introduces-topic` links, `handoffs/pages.md` Phase 5), and "Add a topic",
- * which links it to one by name, making the topic if none has that name yet.
- */
-function Topics({ linksFrom, canonical }: PanelProps) {
-  const topics = linksFrom.filter((link) => TOPIC_LABELS.includes(link.label));
-  return (
-    <AddTopic identifier={`${canonical.scheme}:${canonical.value}`}>
-      {topics.length > 0 ? (
-        <ul className="space-y-1">
-          {topics.map((link, i) => (
-            <li key={i}>
-              {link.page.address ? (
-                <a href={pagePath(link.page.address)} className={link.page.name ? 'text-ink' : 'text-muted italic'}>
-                  {link.page.name ?? formatIdentifier(link.page.address)}
-                </a>
-              ) : (
-                link.page.name
-              )}
-              {link.label === 'introduces-topic' && <span className={ui.badge}>introduced it</span>}
-              {link.origin === 'owners' && <span className={ui.badge}>authors</span>}
-            </li>
-          ))}
-        </ul>
-      ) : (
-        <p className="text-xs text-muted">Not in a topic yet.</p>
-      )}
-    </AddTopic>
-  );
 }
 
 /** Each built-in panel, by its id in `lib/panels.ts`, which also gives its slot and its default order. */

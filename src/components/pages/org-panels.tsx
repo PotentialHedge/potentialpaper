@@ -6,8 +6,8 @@ import type { KindPanelProps } from './slots';
 
 /**
  * An organisation's own panels (`handoffs/pages.md` Phase 4), beside the generic ones in `slots.tsx`: what it is and
- * where it sits, its departments and labs, the people who show it as their institution, and the venues and topics its
- * papers are at, by count. What they show comes from `server/org-pages.ts`'s `orgOverview`, read once by the route
+ * where it sits, its departments and labs, the people who show it as their institution, and the venues its papers
+ * are at, by count. What they show comes from `server/org-pages.ts`'s `orgOverview`, read once by the route
  * (`page-route.tsx`); like every panel, they are the same HTML for every reader.
  */
 
@@ -90,16 +90,8 @@ export function OrgPeople({ org }: KindPanelProps) {
   );
 }
 
-/** Pages of a kind with a count each, most first: an org's venues and topics, a topic's venues and orgs. */
-export function CountBox({
-  title,
-  kind,
-  pages,
-}: {
-  title: string;
-  kind: 'venue' | 'topic' | 'org';
-  pages: OverlapPage[];
-}) {
+/** Pages of a kind with a count each, most first: an org's venues. */
+export function CountBox({ title, kind, pages }: { title: string; kind: 'venue' | 'org'; pages: OverlapPage[] }) {
   if (pages.length === 0) return null;
   return (
     <div className={ui.box}>
@@ -121,9 +113,4 @@ export function CountBox({
 /** The venues its papers went to, by how many of its papers each has. */
 export function OrgVenues({ org }: KindPanelProps) {
   return org ? <CountBox title="Venues" kind="venue" pages={org.venues} /> : null;
-}
-
-/** The topics its papers are in, by how many of its papers each has. */
-export function OrgTopics({ org }: KindPanelProps) {
-  return org ? <CountBox title="Topics" kind="topic" pages={org.topics} /> : null;
 }

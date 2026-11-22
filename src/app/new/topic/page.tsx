@@ -13,8 +13,8 @@ export const metadata: Metadata = { title: 'New topic · PotentialPaper', robots
 type Props = { searchParams: Promise<{ name?: string | string[] }> };
 
 /**
- * Making a topic (`handoffs/pages.md` Phase 5): a research idea at the size of a Wikipedia article, which the community
- * then writes. Anyone verified may; the form lists topics with names like the one typed, so duplicates stay few.
+ * Making a topic (`handoffs/pages.md` Phase 5): a research idea that works as a Wikipedia category, with an article
+ * the community then writes. Anyone verified may; the form lists topics with names like the one typed, so duplicates stay few.
  */
 export default async function NewTopicPage({ searchParams }: Props) {
   const { name } = await searchParams;
@@ -27,9 +27,9 @@ export default async function NewTopicPage({ searchParams }: Props) {
       <h1 className="mt-6 text-[26px] leading-tight font-normal">New topic</h1>
       <div className="mt-5 max-w-[640px] font-sans text-sm">
         <p>
-          A topic is a research idea at the size of a Wikipedia article: &ldquo;Linear attention&rdquo;,
-          &ldquo;State-space models&rdquo;, &ldquo;Mixture of experts&rdquo;, not a field such as machine learning. Its
-          page is an article anyone verified writes, and the papers on it, which people add from each paper&apos;s page.
+          A topic is a research idea, such as &ldquo;Linear attention&rdquo; or &ldquo;Mixture of experts&rdquo;. It
+          works like a Wikipedia category: pages are added to it from the bar at the foot of each page, a topic too,
+          which makes it a subtopic. Its page lists them, under an article anyone verified writes.
         </p>
         {viewer.account.verifiedAt !== null || viewer.isAdmin ? (
           <NewTopicForm initialName={initialName} />

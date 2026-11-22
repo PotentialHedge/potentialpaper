@@ -91,7 +91,7 @@ describe('path rules per kind', () => {
       topic.head,
       actor,
       [
-        { path: 'topic.json', content: '{ "name": "Linear attention", "aliases": ["Linear transformers"] }\n' },
+        { path: 'topic.json', content: '{ "name": "Linear attention" }\n' },
         { path: 'community/10-what-it-is.md', content: '# What it is\n\nAttention in linear time.\n' },
         {
           path: 'community/links.jsonl',

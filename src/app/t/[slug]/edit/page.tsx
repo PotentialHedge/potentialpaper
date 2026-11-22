@@ -7,12 +7,11 @@ import { ui } from '@/components/ui';
 import { getDb } from '@/db';
 import { pageCurrent } from '@/db/schema';
 import { keyedPagePath, keyProblem, type TopicFile } from '@/lib/kinds';
-import { LINKS_FILE, parseLabeledLinks } from '@/lib/labeled-links';
 import { authHref } from '@/lib/return-to';
 import { viewerFromHeaders } from '@/server/auth';
 import { protectionOf, protectionWords } from '@/server/page-protection';
 import { findPage } from '@/server/pages/kinds';
-import { readCommit, readFiles, readHead, readText } from '@/server/pages/repo';
+import { readCommit, readFiles, readHead } from '@/server/pages/repo';
 import { joinSections, readSections } from '@/server/pages/sections';
 
 export const dynamic = 'force-dynamic';
@@ -34,20 +33,12 @@ async function load(params: Props['params']) {
     .from(pageCurrent)
     .where(eq(pageCurrent.pageId, page.id));
   const file = (current?.kindFile ?? null) as TopicFile | null;
-  const links = parseLabeledLinks((await readText(db, page.id, files.get(`community/${LINKS_FILE}`))) ?? '', 'topic');
-  const related =
-    'links' in links
-      ? links.links
-          .filter((link) => link.label === 'related' && link.targetKind === 'topic')
-          .map((link) => link.target.slice('topic:'.length))
-      : [];
   return {
     page,
     head,
     name: current?.name ?? file?.name ?? page.key,
     file,
     article: joinSections(await readSections(db, page.id, files, 'community')),
-    related,
     protection: await protectionOf(db, page.id),
   };
 }
@@ -58,14 +49,13 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
 }
 
 /**
- * Editing a topic (`handoffs/pages.md` Phase 5): its name, other names, broader and related topics and its article,
- * in one commit; renaming it (a new address, with a redirect from the old) and merging it into another. Open to anyone
+ * Editing a topic (`handoffs/pages.md` Phase 5): its name and its article, in one commit; renaming it (a new address, with a redirect from the old) and merging it into another. Open to anyone
  * verified, as a Wikipedia article is, within the page's protection; every change shows in `/changes`. The same files
  * can be pushed with git.
  */
 export default async function EditTopicPage({ params }: Props) {
   const loaded = await load(params);
-  const { page, head, name, file, article, related, protection } = loaded;
+  const { page, head, name, file, article, protection } = loaded;
   const path = keyedPagePath('topic', page.key);
   const viewer = await viewerFromHeaders(await headers());
   if (!viewer) redirect(authHref('/signin', `${path}/edit`));
@@ -89,9 +79,6 @@ export default async function EditTopicPage({ params }: Props) {
           base={head}
           initial={{
             name: file?.name ?? name,
-            aliases: file?.aliases ?? [],
-            broader: file?.broader ?? [],
-            related,
             article: article || TEMPLATE,
           }}
         />

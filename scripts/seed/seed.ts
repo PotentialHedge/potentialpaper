@@ -18,7 +18,7 @@ import { mergePapers } from '@/server/merge-papers';
 import { ApiError } from '@/server/api/errors';
 import type { Actor } from '@/server/pages/check';
 import { findPage } from '@/server/pages/kinds';
-import { createTopic, linkPaperToTopic } from '@/server/topic-pages';
+import { createTopic, linkPageToTopic } from '@/server/topic-pages';
 import { syncVenuePages } from '@/server/venue-pages';
 import { FIXTURE_PATH, type Fixture } from './fixture';
 
@@ -200,7 +200,7 @@ async function topics(fixture: Fixture, actor: Actor) {
     const members = all.filter((p) => p.keywords.some((k) => topic.match.test(k))).slice(0, 6);
     for (const p of members) {
       const page = await findPage(`openreview:${p.id}`);
-      if (page) await unhurried(() => linkPaperToTopic(page, { topic: `topic:${topic.slug}` }, actor));
+      if (page) await unhurried(() => linkPageToTopic(page, { topic: `topic:${topic.slug}` }, actor));
     }
   }
 }

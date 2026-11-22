@@ -180,7 +180,7 @@ describe('the members consumer', () => {
     expect((await getDb().select().from(pageMembers)).toSorted(byKey)).toEqual(before.toSorted(byKey));
   });
 
-  it('makes papers members of topics they link to, rolled up through broader topics', async () => {
+  it('makes papers members of the topics they link to, directly: a topic in a topic rolls nothing up', async () => {
     const me = await person();
     const broad = await createPage('topic', 'efficient-transformers');
     const narrow = await createPage('topic', 'linear-attention');
@@ -188,38 +188,28 @@ describe('the members consumer', () => {
       narrow.id,
       narrow.head,
       me,
-      [{ path: 'topic.json', content: '{ "name": "Linear attention", "broader": ["efficient-transformers"] }\n' }],
-      'Broader',
+      [
+        { path: 'topic.json', content: '{ "name": "Linear attention" }\n' },
+        {
+          path: 'community/links.jsonl',
+          content: '{"id":"b","to":"topic:efficient-transformers","label":"in-topic"}\n',
+        },
+      ],
+      'In efficient transformers',
     );
     const p = await paper('2006.16236');
     await commitPage(
       p,
       null,
       me,
-      [
-        {
-          path: 'community/links.jsonl',
-          content: '{"id":"t","to":"topic:linear-attention","label":"introduces-topic"}\n',
-        },
-      ],
+      [{ path: 'community/links.jsonl', content: '{"id":"t","to":"topic:linear-attention","label":"in-topic"}\n' }],
       'Topic',
     );
     await catchUp();
-    expect(await scopeMembers(narrow.id)).toEqual([{ paperId: p, via: ['introduces-topic'] }]);
-    expect(await members(broad.id)).toEqual([p]);
-
-    // A cycle in broader topics stops where it started.
-    await commitPage(
-      broad.id,
-      broad.head,
-      me,
-      [{ path: 'topic.json', content: '{ "name": "Efficient transformers", "broader": ["linear-attention"] }\n' }],
-      'Cycle',
-    );
-    await catchUp();
-    const ancestors = await getDb().select().from(pageAncestors);
-    expect(ancestors).toHaveLength(2);
-    expect(await members(broad.id)).toEqual([p]);
+    expect(await scopeMembers(narrow.id)).toEqual([{ paperId: p, via: ['in-topic'] }]);
+    expect(await members(broad.id)).toEqual([]);
+    expect(await getDb().select().from(pageAncestors)).toEqual([]);
+    expect((await linksTo(broad.id)).map((l) => l.page.pageId)).toEqual([narrow.id]);
   });
 });
 

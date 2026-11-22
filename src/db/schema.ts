@@ -1520,49 +1520,6 @@ export const scopeState = pgTable(
 );
 
 /**
- * Papers that might belong in a topic (`handoffs/pages.md` Phase 5): machines only suggest, a person confirms. Kept by
- * the `topic-suggestions` consumer (`server/topic-suggestions.ts`) from OpenReview keywords and from the topic's name
- * and aliases in titles and abstracts. Confirming one links the paper (`in-topic`); **a dismissal is remembered**: a
- * row that isn't `open` is never rewritten, so the suggestion doesn't come back.
- */
-export const TOPIC_SUGGESTION_STATUSES = ['open', 'dismissed', 'confirmed'] as const;
-export const TOPIC_SUGGESTION_REASONS = ['keyword', 'title', 'abstract'] as const;
-
-export const topicSuggestions = pgTable(
-  'topic_suggestions',
-  {
-    topicPageId: uuid('topic_page_id')
-      .notNull()
-      .references(() => pages.id, { onDelete: 'cascade' }),
-    paperId: uuid('paper_id')
-      .notNull()
-      .references(() => pages.id, { onDelete: 'cascade' }),
-    status: text('status', { enum: TOPIC_SUGGESTION_STATUSES }).notNull().default('open'),
-    /** The strongest reason: one of its keywords is the topic's name, the name is in its title, or in its abstract. */
-    reason: text('reason', { enum: TOPIC_SUGGESTION_REASONS }).notNull(),
-    /** The name or alias that matched. */
-    matched: text('matched').notNull(),
-    score: doublePrecision('score').notNull(),
-    decidedBy: uuid('decided_by').references(() => accounts.id, { onDelete: 'set null' }),
-    decidedAt: timestamp('decided_at', { withTimezone: true, mode: 'date' }),
-    createdAt: createdAt(),
-  },
-  (t) => [
-    primaryKey({ columns: [t.topicPageId, t.paperId] }),
-    index('topic_suggestions_open_idx').on(t.topicPageId, t.status, t.score),
-    index('topic_suggestions_paper_idx').on(t.paperId),
-    check(
-      'topic_suggestions_status_check',
-      sql.raw(`status in (${TOPIC_SUGGESTION_STATUSES.map((s) => `'${s}'`).join(', ')})`),
-    ),
-    check(
-      'topic_suggestions_reason_check',
-      sql.raw(`reason in (${TOPIC_SUGGESTION_REASONS.map((s) => `'${s}'`).join(', ')})`),
-    ),
-  ],
-);
-
-/**
  * Page protection (DESIGN.md §7): who may still edit a page that is being fought over. `established`: accounts
  * verified for a while (`server/page-protection.ts`); `admins`: admins only. Owners (a paper's confirmed authors, a
  * venue's organisers, an org's members, a person), bots through their grants and the system are not held by it.

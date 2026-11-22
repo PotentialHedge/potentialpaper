@@ -4,18 +4,9 @@ import { type KeyedKind, pagePath } from '@/lib/kinds';
 import type { OrgOverview } from '@/server/org-pages';
 import type { ScopePaper } from '@/server/page-members';
 import type { UserPageView } from '@/server/user-pages';
-import { Backlinks, Links, type PageCommon, Sections } from './common';
-import { OrgAbout, OrgDepartments, OrgPeople, OrgTopics, OrgVenues } from './org-panels';
-import {
-  TopicAbout,
-  TopicIntroduced,
-  TopicNeighbours,
-  TopicOrgs,
-  TopicPapers,
-  TopicVenues,
-  TopicSuggested,
-  type TopicView,
-} from './topic-panels';
+import { Backlinks, Links, type PageCommon, Sections, Topics } from './common';
+import { OrgAbout, OrgDepartments, OrgPeople, OrgVenues } from './org-panels';
+import { TopicAbout, TopicMembers, type TopicView } from './topic-panels';
 import { UserActivity, UserComments, UserIdentity, UserPapers } from './user-panels';
 import { VenueAbout, VenueEditions, VenuePapers, VenueScores } from './venue-panels';
 
@@ -37,7 +28,7 @@ export interface KindPanelProps extends PageCommon {
   user: UserPageView | null;
   /** An org's page: where it sits, its people, venues and topics (`server/org-pages.ts`); `null` on other kinds. */
   org: OrgOverview | null;
-  /** A topic's page: its neighbours, papers and suggestions (`server/topic-pages.ts`); `null` on other kinds. */
+  /** A topic's page: its subtopics and other pages (`server/topic-pages.ts`); `null` on other kinds. */
   topic: TopicView | null;
 }
 
@@ -67,25 +58,16 @@ const COMMON: Record<string, ComponentType<KindPanelProps>> = {
   sections: Sections,
   links: Links,
   backlinks: Backlinks,
+  topics: Topics,
 };
 
 /** Each kind's panels by id: every kind's, and its own. */
 export const KIND_PANELS: Record<KeyedKind, Record<string, ComponentType<KindPanelProps>>> = {
   // Its editions, its review scores, its submissions by status.
   venue: { ...COMMON, about: VenueAbout, editions: VenueEditions, scores: VenueScores, papers: VenuePapers },
-  // Its names, the papers that introduced it, its neighbouring topics, venues and organisations, its papers
-  // (sortable) and what might belong here.
-  topic: {
-    ...COMMON,
-    about: TopicAbout,
-    introduced: TopicIntroduced,
-    topics: TopicNeighbours,
-    venues: TopicVenues,
-    orgs: TopicOrgs,
-    papers: TopicPapers,
-    suggestions: TopicSuggested,
-  },
-  // Where it sits, its departments and labs, the people who show it as their institution, its venues and topics, and
+  // Its article, then what is in it: its subtopics and its other pages, as a Wikipedia category lists them.
+  topic: { ...COMMON, about: TopicAbout, members: TopicMembers },
+  // Where it sits, its departments and labs, the people who show it as their institution, its venues, and
   // its papers, rolled up from its departments.
   org: {
     ...COMMON,
@@ -93,7 +75,6 @@ export const KIND_PANELS: Record<KeyedKind, Record<string, ComponentType<KindPan
     departments: OrgDepartments,
     people: OrgPeople,
     venues: OrgVenues,
-    topics: OrgTopics,
     papers: Papers,
   },
   // Only what the account chose to show (DESIGN.md §5.3), and its own words.

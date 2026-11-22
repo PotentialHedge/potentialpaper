@@ -11,7 +11,7 @@ import {
 } from '@/db/schema';
 import { formatIdentifier, KINDS, type PageAddress, parentsOf, sourcesOf } from '@/lib/kinds';
 import { canonicalPaperId } from '@/lib/paper-ids';
-import { TOPIC_LABELS } from '@/lib/labeled-links';
+import { TOPIC_LABEL } from '@/lib/labeled-links';
 import { parseReviewFile, parseReviewPath } from '@/lib/review-files';
 import type { Consumer } from './consumers/types';
 import { readPageLinks } from './page-links';
@@ -29,7 +29,7 @@ import { markPaperScopes, markScopes } from './scope-stats';
  *
  * - a **paper's** event writes what it says it belongs to, by public name (`page_member_sources`): each
  *   submission's venue, as `<source>:<venue id>` from `reviews/<source>/<submission>/submission.json`, and each
- *   topic it links to with `in-topic` or `introduces-topic`, from its `links.jsonl`;
+ *   topic it links to with `in-topic`, from its `links.jsonl`;
  * - a **scope's** event writes the names it answers to (`page_scope_names`: its identifier and its kind file's
  *   `sources`) and its parents (`page_parents`).
  *
@@ -121,7 +121,7 @@ async function paperSources(db: Reader, page: PageRow, files: ReadonlyMap<string
     out.set(`submission ${source}`, { via: 'submission', source });
   }
   for (const { link } of await readPageLinks(db, page, files)) {
-    if (!TOPIC_LABELS.includes(link.label)) continue;
+    if (link.label !== TOPIC_LABEL) continue;
     out.set(`${link.label} ${link.target}`, { via: link.label, source: link.target });
   }
   return [...out.values()];
@@ -155,7 +155,7 @@ async function joinScope(tx: Writer, scopeId: string): Promise<void> {
   `);
 }
 
-/** Deepest roll-up followed; a cycle in `broader` or `parents` stops at the page it came back to. */
+/** Deepest roll-up followed; a cycle in `parents` stops at the page it came back to. */
 const MAX_DEPTH = 16;
 
 /**
@@ -296,7 +296,7 @@ export async function syncDueAffiliations(options: { database?: Database; batch?
   }
 }
 
-/** A scope's pages: itself and every page it is an ancestor of (its editions, narrower topics, labs). */
+/** A scope's pages: itself and every page it is an ancestor of (its editions, labs). */
 export function rolledUp(scopeId: string) {
   return or(
     eq(pageMembers.scopePageId, scopeId),
@@ -414,11 +414,11 @@ export interface OverlapPage {
 
 /**
  * The pages of `kind` that a scope's papers (rolled up) are in directly, by how many of its papers each has, most
- * first: an org's venues (editions) and topics, a topic's venues and orgs.
+ * first: an org's venues (editions).
  */
 export async function scopeOverlap(
   scopeId: string,
-  kind: 'venue' | 'topic' | 'org',
+  kind: 'venue' | 'org',
   options: { limit?: number; database?: Database } = {},
 ): Promise<OverlapPage[]> {
   const { limit = 10, database = getDb() } = options;

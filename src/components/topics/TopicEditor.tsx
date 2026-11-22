@@ -3,29 +3,20 @@
 import { useRouter } from 'next/navigation';
 import { type FormEvent, useState } from 'react';
 import { ui } from '@/components/ui';
-import { parseAliases } from '@/lib/topics';
 import { failureOf, send } from './api';
 import { useTopicMatches } from './useTopicMatches';
 
 /**
- * A topic's editor (`handoffs/pages.md` Phase 5): its names, broader and related topics and its article in one commit
+ * A topic's editor (`handoffs/pages.md` Phase 5): its name and its article in one commit
  * (`PATCH /api/v1/pages/{identifier}/topic`, merged with whatever changed since the form loaded); renaming it
- * (`/rename`) and merging it into another (`/merge`), each leaving a redirect.
+ * (`/rename`) and merging it into another (`/merge`), each leaving a redirect. The topics it is in are added from the
+ * bar at the foot of its page, as any page's are.
  */
 
 interface Initial {
   name: string;
-  aliases: string[];
-  broader: string[];
-  related: string[];
   article: string;
 }
-
-const slugs = (text: string) =>
-  text
-    .split(/[\s,]+/)
-    .map((s) => s.trim().replace(/^topic:/, ''))
-    .filter(Boolean);
 
 export function TopicEditor({
   identifier,
@@ -41,9 +32,6 @@ export function TopicEditor({
   const router = useRouter();
   const path = `/pages/${encodeURIComponent(identifier)}`;
   const [name, setName] = useState(initial.name);
-  const [aliases, setAliases] = useState(initial.aliases.join(', '));
-  const [broader, setBroader] = useState(initial.broader.join(' '));
-  const [related, setRelated] = useState(initial.related.join(' '));
   const [article, setArticle] = useState(initial.article);
   const [summary, setSummary] = useState('');
   const [busy, setBusy] = useState(false);
@@ -57,9 +45,6 @@ export function TopicEditor({
       const res = await send('PATCH', `${path}/topic`, {
         base,
         name: name.trim(),
-        aliases: parseAliases(aliases, name),
-        broader: slugs(broader),
-        related: slugs(related),
         article,
         summary: summary.trim() || undefined,
       });
@@ -86,24 +71,6 @@ export function TopicEditor({
             maxLength={120}
             className={`${ui.input} mt-0.5`}
           />
-        </label>
-        <label className="block text-[13px] text-muted">
-          Other names it goes by (separated by commas)
-          <input value={aliases} onChange={(e) => setAliases(e.target.value)} className={`${ui.input} mt-0.5`} />
-        </label>
-        <label className="block text-[13px] text-muted">
-          Broader topics, by address (separated by spaces). Changing them moves papers between topics, and shows in the
-          patrol feed.
-          <input
-            value={broader}
-            onChange={(e) => setBroader(e.target.value)}
-            placeholder="efficient-transformers"
-            className={`${ui.input} mt-0.5`}
-          />
-        </label>
-        <label className="block text-[13px] text-muted">
-          Related topics, by address (separated by spaces)
-          <input value={related} onChange={(e) => setRelated(e.target.value)} className={`${ui.input} mt-0.5`} />
         </label>
         <label className="block text-[13px] text-muted">
           Article (Markdown, a <code>#</code> heading per section; a heading with nothing under it is left out)
@@ -164,7 +131,7 @@ function Rename({ path, slug, name }: { path: string; slug: string; name: string
     <form onSubmit={submit} className="mt-10 space-y-3">
       <h2 className={ui.sectionHeading}>Rename</h2>
       <p className="text-[13px] text-muted">
-        A new address and name. The old address and the old name keep leading here: links that name it still count.
+        A new address and name. The old address keeps leading here: links that name it still count.
       </p>
       <label className="block text-[13px] text-muted">
         Name
@@ -222,7 +189,7 @@ function Merge({ path, slug }: { path: string; slug: string }) {
     <form onSubmit={submit} className="mt-10 space-y-3">
       <h2 className={ui.sectionHeading}>Merge into another topic</h2>
       <p className="text-[13px] text-muted">
-        When this topic is the same idea as another: its names, sections and links move there, its papers count there,
+        When this topic is the same idea as another: its sections and links move there, what is in it is in that one,
         and its address leads there. Its history stays.
       </p>
       <input

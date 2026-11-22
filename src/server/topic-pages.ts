@@ -1,20 +1,19 @@
-import { and, eq, inArray, sql } from 'drizzle-orm';
+import { eq, inArray, sql } from 'drizzle-orm';
 import { getDb, type Database } from '@/db';
-import { pageMembers, pageRedirects, pages, topicSuggestions } from '@/db/schema';
-import { formatIdentifier, keyedPagePath, keyProblem, KINDS, type TopicFile, topicFileSchema } from '@/lib/kinds';
+import { pageRedirects, pages } from '@/db/schema';
+import { formatIdentifier, keyProblem, KINDS, pagePath, partsOf, type TopicFile, topicFileSchema } from '@/lib/kinds';
 import {
   encodeLabeledLink,
   type LabeledLinkLine,
   LINKS_FILE,
   newLinkId,
   parseLabeledLinks,
-  TOPIC_LABELS,
+  TOPIC_LABEL,
 } from '@/lib/labeled-links';
-import type { PageSummary } from '@/lib/plugins/protocol';
-import { topicNameKey, topicSlug, type TopicLinkLabel } from '@/lib/topics';
+import { topicNameKey, topicSlug } from '@/lib/topics';
 import { ApiError } from './api/errors';
-import { linksFrom, linksTo } from './page-links';
-import { indexMembers, type OverlapPage, scopeOverlap } from './page-members';
+import { linksTo, type PageLink } from './page-links';
+import { indexMembers } from './page-members';
 import { checkProtection, type Protection, protectionOf } from './page-protection';
 import { rolesOf } from './pages/check';
 import { type Actor, commitPage, createPage, type FileChange } from './pages/commit';
@@ -25,33 +24,31 @@ import { lockPage } from './pages/projections';
 import { refreshPageIds, refreshPages } from './pages/refresh';
 import { readCommit, readFiles, readHead, readText, type Reader } from './pages/repo';
 import { LAYOUT_VERSION, METADATA_PATH, sectionName } from './pages/rules';
-import { pageSummaries } from './plugins/pages';
 
 /**
- * Topic pages (`handoffs/pages.md` Phase 5): research ideas at the size of a Wikipedia article, which anyone verified
- * makes and the community writes, like a Wikipedia article: there is no seeded list and no bot writes them.
+ * Topic pages (`handoffs/pages.md` Phase 5): research ideas that work as Wikipedia's categories do, each with an
+ * article the community writes. Anyone verified makes one; there is no seeded list and no bot writes them.
  *
- * - **Making one** (`createTopic`): from the "New topic" form, or from "Add a topic" on a paper (`linkPaperToTopic`),
- *   which links the paper and makes the topic if no topic of that name or alias exists yet. Names and aliases are
- *   checked first (`topicsNamed`, `similarTopics`), to keep duplicates down.
- * - **A paper in a topic** is a labeled link from the paper (`in-topic`, `introduces-topic`), in its `community/` or,
- *   from one of its confirmed authors, its `owners/` links; membership (`page-members.ts`) follows from it, rolled up
- *   from narrower topics through `broader`.
- * - **Editing** (`editTopic`: name, aliases, broader topics, the article's sections, related topics), **renaming**
- *   (`renameTopic`, a new address with a redirect from the old) and **merging** (`mergeTopic`, the duplicate folded
- *   into the survivor and redirected there) are open to the community, through the path rules and page protection
- *   (`page-protection.ts`), and show in the patrol feed (`changes.ts`).
+ * - **In a topic**: a page of any kind is in a topic through its own `in-topic` link (`linkPageToTopic`), in its
+ *   `community/links.jsonl`, or its owners' `links.jsonl` when one of them adds it. A topic in another topic is a
+ *   subtopic there. Membership is direct: nothing rolls up from subtopics. A paper's link also makes it a member of
+ *   the topic's scope (`page-members.ts`), for its statistics.
+ * - **The topic page** lists its subtopics and its other pages, by name (`topicOverview`), from "what links here".
+ * - **Making one** (`createTopic`): from the "New topic" form, or by name from "Add to a topic", which makes the
+ *   topic if no topic has that name yet (`topicsNamed`, `similarTopics` check names first, to keep duplicates down).
+ * - **Editing** (`editTopic`: name and article), **renaming** (`renameTopic`, a new address with a redirect from the
+ *   old) and **merging** (`mergeTopic`, the duplicate folded into the survivor and redirected there) are open to the
+ *   community, through the path rules and page protection (`page-protection.ts`), and show in the patrol feed.
  */
 
-/** A topic as its names are: its key, name and aliases. */
+/** A topic as its name is: its key and name. */
 export interface TopicNames {
   pageId: string;
   key: string;
   name: string;
-  aliases: string[];
 }
 
-/** Every topic that isn't merged into another, with its names. */
+/** Every topic that isn't merged into another, with its name. */
 export async function allTopicNames(database: Reader = getDb()): Promise<TopicNames[]> {
   const { rows } = await database.execute<{ id: string; key: string; kind_file: TopicFile | null }>(sql`
     select p.id, p.key, c.kind_file
@@ -59,33 +56,19 @@ export async function allTopicNames(database: Reader = getDb()): Promise<TopicNa
       left join page_current c on c.page_id = p.id
      where p.kind = 'topic' and p.merged_into is null
   `);
-  return rows.map((row) => ({
-    pageId: row.id,
-    key: row.key,
-    name: row.kind_file?.name ?? row.key,
-    aliases: row.kind_file?.aliases ?? [],
-  }));
+  return rows.map((row) => ({ pageId: row.id, key: row.key, name: row.kind_file?.name ?? row.key }));
 }
 
-/** A topic that answers to a name, and which of its names it was. */
-export interface NamedTopic extends TopicNames {
-  matched: string;
-}
-
-/** The topics one of whose names (name or alias) is one of these, as duplicates are told (`topicNameKey`). */
+/** The topics called one of these names, as duplicates are told (`topicNameKey`). */
 export async function topicsNamed(
   names: readonly string[],
   options: { except?: string; database?: Reader } = {},
-): Promise<NamedTopic[]> {
+): Promise<TopicNames[]> {
   const wanted = new Set(names.map(topicNameKey).filter(Boolean));
   if (wanted.size === 0) return [];
-  const out: NamedTopic[] = [];
-  for (const topic of await allTopicNames(options.database)) {
-    if (topic.pageId === options.except) continue;
-    const matched = [topic.name, ...topic.aliases].find((name) => wanted.has(topicNameKey(name)));
-    if (matched) out.push({ ...topic, matched });
-  }
-  return out;
+  return (await allTopicNames(options.database)).filter(
+    (topic) => topic.pageId !== options.except && wanted.has(topicNameKey(topic.name)),
+  );
 }
 
 /** A topic a form offers for a name typed into it. */
@@ -93,16 +76,13 @@ export interface TopicMatch {
   identifier: string;
   key: string;
   name: string;
-  aliases: string[];
-  /** The name or alias that matched. */
-  matched: string;
   /** It is the same name: making another topic of it would be a duplicate. */
   exact: boolean;
 }
 
 /**
- * Topics whose name or an alias is like `q`: the same name first (`exact`), then by trigram similarity and words in
- * common. What the "New topic" and "Add a topic" forms show as one types.
+ * Topics whose name is like `q`: the same name first (`exact`), then by trigram similarity and words in common. What
+ * the "New topic" and "Add to a topic" forms show as one types.
  */
 export async function similarTopics(
   q: string,
@@ -111,100 +91,41 @@ export async function similarTopics(
   const { limit = 10, database = getDb() } = options;
   const text = q.replace(/\s+/g, ' ').trim().slice(0, 120);
   if (text.length < 2) return [];
-  const { rows } = await database.execute<{
-    key: string;
-    name: string;
-    aliases: string[];
-    alias: string;
-    sim: number;
-  }>(sql`
-    select p.key, coalesce(c.kind_file ->> 'name', p.key) as name,
-           array(select jsonb_array_elements_text(coalesce(c.kind_file -> 'aliases', '[]'::jsonb))) as aliases,
-           n.alias, similarity(lower(n.alias), lower(${text})) as sim
+  const { rows } = await database.execute<{ key: string; name: string; sim: number }>(sql`
+    select p.key, c.name, similarity(lower(c.name), lower(${text})) as sim
       from pages p
       join page_current c on c.page_id = p.id
-      cross join lateral (
-        select c.kind_file ->> 'name' as alias
-        union
-        select jsonb_array_elements_text(coalesce(c.kind_file -> 'aliases', '[]'::jsonb))
-      ) n
-     where p.kind = 'topic' and p.merged_into is null and n.alias is not null
-       and (n.alias ilike ${`%${text.replace(/[\\%_]/g, (c) => `\\${c}`)}%`}
-            or lower(${text}) like '%' || lower(n.alias) || '%'
-            or similarity(lower(n.alias), lower(${text})) > 0.3)
+     where p.kind = 'topic' and p.merged_into is null and c.name is not null
+       and (c.name ilike ${`%${text.replace(/[\\%_]/g, (c) => `\\${c}`)}%`}
+            or lower(${text}) like '%' || lower(c.name) || '%'
+            or similarity(lower(c.name), lower(${text})) > 0.3)
      order by sim desc
      limit 100
   `);
-  const exact = await topicsNamed([text], { database });
-  const byKey = new Map<string, TopicMatch & { sim: number }>();
-  for (const topic of exact) {
-    byKey.set(topic.key, { ...presentNames(topic), matched: topic.matched, exact: true, sim: 2 });
-  }
-  for (const row of rows) {
-    if (byKey.has(row.key)) continue;
-    byKey.set(row.key, {
-      ...presentNames({ key: row.key, name: row.name, aliases: row.aliases }),
-      matched: row.alias,
-      exact: false,
-      sim: Number(row.sim),
-    });
-  }
-  return [...byKey.values()]
+  const exact = new Set((await topicsNamed([text], { database })).map((topic) => topic.key));
+  return rows
+    .map((row) => ({
+      identifier: formatIdentifier({ kind: 'topic', key: row.key }),
+      key: row.key,
+      name: row.name,
+      exact: exact.has(row.key),
+      sim: exact.has(row.key) ? 2 : Number(row.sim),
+    }))
     .sort((a, b) => b.sim - a.sim || a.name.localeCompare(b.name))
     .slice(0, limit)
-    .map((match) => ({
-      identifier: match.identifier,
-      key: match.key,
-      name: match.name,
-      aliases: match.aliases,
-      matched: match.matched,
-      exact: match.exact,
-    }));
+    .map((match) => ({ identifier: match.identifier, key: match.key, name: match.name, exact: match.exact }));
 }
 
-function presentNames(topic: { key: string; name: string; aliases: string[] }) {
-  return {
-    identifier: formatIdentifier({ kind: 'topic', key: topic.key }),
-    key: topic.key,
+function exists(topic: TopicNames): ApiError {
+  const identifier = formatIdentifier({ kind: 'topic', key: topic.key });
+  return new ApiError(409, 'topic_exists', `${identifier} is called “${topic.name}” already`, {
+    identifier,
     name: topic.name,
-    aliases: topic.aliases,
-  };
-}
-
-function exists(topic: NamedTopic): ApiError {
-  return new ApiError(
-    409,
-    'topic_exists',
-    `topic:${topic.key} (“${topic.name}”) is called ${topic.matched === topic.name ? 'that' : `“${topic.matched}”`} already`,
-    { identifier: formatIdentifier({ kind: 'topic', key: topic.key }), name: topic.name, matched: topic.matched },
-  );
-}
-
-/** A topic's slug as a `broader` names it now: following renames and merges. Refuses one that is no topic. */
-async function currentTopicKey(db: Reader, slug: string): Promise<string> {
-  const page = await findPage(`topic:${slug}`, db as Database);
-  if (!page || page.kind !== 'topic') {
-    throw new ApiError(422, 'validation_error', `broader: there is no topic:${slug}; make it first`);
-  }
-  return page.key;
-}
-
-/** `broader` as given, each a topic that exists, by its current slug, once, never the topic itself. */
-async function checkBroader(db: Reader, broader: readonly string[], self: string | null): Promise<string[]> {
-  const out: string[] = [];
-  for (const slug of broader) {
-    const key = await currentTopicKey(db, slug.trim().toLowerCase());
-    if (key === self) throw new ApiError(422, 'validation_error', 'broader: a topic is not broader than itself');
-    if (!out.includes(key)) out.push(key);
-  }
-  return out;
+  });
 }
 
 function encodeTopicFile(file: TopicFile): string {
-  const out: TopicFile = { name: file.name };
-  if (file.aliases && file.aliases.length > 0) out.aliases = file.aliases;
-  if (file.broader && file.broader.length > 0) out.broader = file.broader;
-  return `${JSON.stringify(out, null, 2)}\n`;
+  return `${JSON.stringify({ name: file.name }, null, 2)}\n`;
 }
 
 /** `topic.json` checked as the schema says, or a 422 naming the field. */
@@ -219,9 +140,6 @@ function parseTopicFile(input: unknown): TopicFile {
 
 export interface NewTopic {
   name: string;
-  aliases?: string[];
-  /** Broader topics, by slug. */
-  broader?: string[];
   /** Its address; made from the name when absent. */
   slug?: string;
   /** The article's first words, "What it is", in Markdown. */
@@ -233,24 +151,18 @@ const SUMMARY_PATH = 'community/10-what-it-is.md';
 
 /**
  * Makes a topic: its page, and its `topic.json` (and the article's first section, if given) committed by whoever makes
- * it, so the path rules check it as any edit. Refuses a name or alias another topic has (`topic_exists`), and an
- * address that is taken. Anyone verified may (`rules.ts`).
+ * it, so the path rules check it as any edit. Refuses a name another topic has (`topic_exists`), and an address that
+ * is taken. Anyone verified may (`rules.ts`).
  */
 export async function createTopic(input: NewTopic, actor: Actor, database: Database = getDb()): Promise<PageRow> {
   if (actor.kind !== 'account') throw new ApiError(403, 'forbidden', 'sign in first');
   const name = input.name.replace(/\s+/g, ' ').trim();
-  const aliases = (input.aliases ?? []).map((a) => a.replace(/\s+/g, ' ').trim()).filter(Boolean);
   const slug = (input.slug?.trim().toLowerCase() || topicSlug(name)) ?? '';
   if (!slug) throw new ApiError(422, 'validation_error', 'slug: give the topic an address in Latin letters or digits');
   const problem = keyProblem('topic', slug);
   if (problem) throw new ApiError(422, 'validation_error', `slug: topic:${slug} ${problem}`);
-  const broader = await checkBroader(database, input.broader ?? [], slug);
-  const file = parseTopicFile({
-    name,
-    ...(aliases.length > 0 ? { aliases } : {}),
-    ...(broader.length > 0 ? { broader } : {}),
-  });
-  const [taken] = await topicsNamed([file.name, ...(file.aliases ?? [])], { database });
+  const file = parseTopicFile({ name });
+  const [taken] = await topicsNamed([file.name], { database });
   if (taken) throw exists(taken);
   if (await findKeyedPage(database, 'topic', slug)) {
     throw new ApiError(409, 'page_exists', `topic:${slug} is there already; choose another address`, {
@@ -272,7 +184,7 @@ export async function createTopic(input: NewTopic, actor: Actor, database: Datab
   return page;
 }
 
-/** A topic by identifier (`topic:linear-attention`, following renames and merges) or by one of its names. */
+/** A topic by identifier (`topic:linear-attention`, following renames and merges) or by its name. */
 async function findTopic(ref: { topic?: string; name?: string }, database: Database): Promise<PageRow | null> {
   if (ref.topic) {
     const page = await findPage(ref.topic.startsWith('topic:') ? ref.topic : `topic:${ref.topic}`, database);
@@ -283,19 +195,18 @@ async function findTopic(ref: { topic?: string; name?: string }, database: Datab
   return named ? mustPage(database, named.pageId) : null;
 }
 
-export interface PaperTopicInput {
-  /** The topic by identifier; or else by `name`, which makes it if no topic has that name or alias. */
+export interface PageTopicInput {
+  /** The topic by identifier; or else by `name`, which makes it if no topic has that name. */
   topic?: string;
   name?: string;
-  label?: TopicLinkLabel;
   note?: string;
 }
 
-export interface PaperTopicResult {
+export interface PageTopicResult {
   topic: PageRow;
   /** The topic was made for this. */
   created: boolean;
-  /** `exists`: the paper was in it already, by this label. */
+  /** `exists`: the page was in it already. */
   status: 'linked' | 'exists';
 }
 
@@ -313,21 +224,19 @@ function appendLine(text: string, line: string): string {
 }
 
 /**
- * Puts a paper in a topic: a labeled link from the paper (`in-topic` unless `introduces-topic` is asked) in its
- * `community/links.jsonl`, or its `owners/links.jsonl` when one of its confirmed authors adds it, so the authors
- * assert it as authors (DESIGN.md §8). By name, the topic is made if no topic has that name or alias. A suggestion
- * of the paper for the topic becomes confirmed.
+ * Puts a page of any kind in a topic, as a Wikipedia page is put in a category: an `in-topic` link from the page in
+ * its `community/links.jsonl`, or its owners' `links.jsonl` when one of its owners adds it, so they assert it as
+ * owners (DESIGN.md §8). By name, the topic is made if no topic has that name. A topic put in another is a subtopic.
  */
-export async function linkPaperToTopic(
-  paper: PageRow,
-  input: PaperTopicInput,
+export async function linkPageToTopic(
+  page: PageRow,
+  input: PageTopicInput,
   actor: Actor,
   database: Database = getDb(),
-): Promise<PaperTopicResult> {
-  if (paper.kind !== 'paper') throw new ApiError(422, 'validation_error', 'only a paper is put in a topic');
+): Promise<PageTopicResult> {
   if (actor.kind !== 'account') throw new ApiError(403, 'forbidden', 'sign in first');
-  const label = input.label ?? 'in-topic';
-  if (!TOPIC_LABELS.includes(label)) throw new ApiError(422, 'validation_error', `label: not a topic label`);
+  const parts = partsOf(page.kind);
+  if (parts.length === 0) throw new ApiError(422, 'validation_error', `a ${page.kind} page is put in no topic`);
   let topic = await findTopic(input, database);
   let created = false;
   if (!topic) {
@@ -335,45 +244,35 @@ export async function linkPaperToTopic(
     topic = await createTopic({ name: input.name }, actor, database);
     created = true;
   }
+  if (topic.id === page.id) throw new ApiError(422, 'validation_error', 'a topic is not in itself');
   const target = formatIdentifier({ kind: 'topic', key: topic.key });
-  const roles = await rolesOf(database, actor, paper.id);
-  const part = roles.owner ? 'owners' : 'community';
+  const roles = await rolesOf(database, actor, page.id);
+  const owners = KINDS[page.kind].owners;
+  const part = roles.owner && owners ? owners.dir : parts[parts.length - 1];
   const path = `${part}/${LINKS_FILE}`;
-  const head = await readHead(database, paper.id);
-  // In either part already, by this label: nothing to add.
-  for (const each of ['owners', 'community']) {
-    const parsed = parseLabeledLinks(await textAt(database, paper.id, head, `${each}/${LINKS_FILE}`), 'paper');
+  const head = await readHead(database, page.id);
+  // In any part already: nothing to add.
+  for (const each of parts) {
+    const parsed = parseLabeledLinks(await textAt(database, page.id, head, `${each}/${LINKS_FILE}`), page.kind);
     const links = 'links' in parsed ? parsed.links : [];
-    if (links.some((link) => link.label === label && (link.target === target || sameTopic(link.target, topic!)))) {
-      await markSuggestion(database, topic.id, paper.id, 'confirmed', actor);
+    if (links.some((link) => link.label === TOPIC_LABEL && link.target === target)) {
       return { topic, created, status: 'exists' };
     }
   }
   const line: LabeledLinkLine = {
     id: newLinkId(),
     to: target,
-    label,
+    label: TOPIC_LABEL,
     ...(input.note?.trim() ? { note: input.note.trim() } : {}),
   };
-  const content = appendLine(await textAt(database, paper.id, head, path), encodeLabeledLink(line));
+  const content = appendLine(await textAt(database, page.id, head, path), encodeLabeledLink(line));
   const name = (await topicName(database, topic)) ?? topic.key;
-  const result = await commitPage(
-    paper.id,
-    head,
-    actor,
-    [{ path, content }],
-    label === 'introduces-topic' ? `Introduces the topic ${name}` : `About the topic ${name}`,
-    { database },
-  );
+  const result = await commitPage(page.id, head, actor, [{ path, content }], `Add to the topic ${name}`, {
+    database,
+  });
   if (result.status !== 'committed') throw new ApiError(409, 'page_busy', 'the page changed meanwhile; try again');
-  await markSuggestion(database, topic.id, paper.id, 'confirmed', actor);
-  await refreshPageIds(database, [paper.id, topic.id]);
+  await refreshPageIds(database, [page.id, topic.id]);
   return { topic, created, status: 'linked' };
-}
-
-/** Whether a link's target is this topic by an old slug (a rename's redirect). */
-function sameTopic(target: string, topic: PageRow): boolean {
-  return target === `topic:${topic.key}`;
 }
 
 async function topicName(db: Reader, topic: PageRow): Promise<string | null> {
@@ -383,256 +282,52 @@ async function topicName(db: Reader, topic: PageRow): Promise<string | null> {
   return rows[0]?.name ?? null;
 }
 
-/** Records a person's decision on a suggestion (made for the occasion if the machine never suggested it). */
-async function markSuggestion(
-  db: Database,
-  topicId: string,
-  paperId: string,
-  status: 'confirmed' | 'dismissed',
-  actor: Actor,
-): Promise<void> {
-  const decidedBy = actor.kind === 'account' ? actor.accountId : null;
-  const decided = { status, decidedBy, decidedAt: new Date() };
-  if (status === 'confirmed') {
-    await db
-      .update(topicSuggestions)
-      .set(decided)
-      .where(and(eq(topicSuggestions.topicPageId, topicId), eq(topicSuggestions.paperId, paperId)));
-    return;
-  }
-  await db
-    .insert(topicSuggestions)
-    .values({ topicPageId: topicId, paperId, reason: 'title', matched: '', score: 0, ...decided })
-    .onConflictDoUpdate({ target: [topicSuggestions.topicPageId, topicSuggestions.paperId], set: decided });
-}
-
-/**
- * Decides a suggestion: `confirm` puts the paper in the topic (`linkPaperToTopic`, `in-topic` unless asked), `dismiss`
- * remembers that it isn't, so the suggestion doesn't come back. Anyone verified may; dismissing is checked against
- * the topic's protection, as an edit to it would be.
- */
-export async function decideSuggestion(
-  topic: PageRow,
-  paper: PageRow,
-  decision: { action: 'confirm' | 'dismiss'; label?: TopicLinkLabel },
-  actor: Actor,
-  database: Database = getDb(),
-): Promise<void> {
-  if (topic.kind !== 'topic') throw new ApiError(422, 'validation_error', 'only a topic has suggestions');
-  if (paper.kind !== 'paper') throw new ApiError(422, 'validation_error', 'a suggestion is of a paper');
-  if (decision.action === 'confirm') {
-    await linkPaperToTopic(paper, { topic: `topic:${topic.key}`, label: decision.label }, actor, database);
-    return;
-  }
-  const roles = await rolesOf(database, actor, topic.id);
-  if (!roles.verified && !roles.admin)
-    throw new ApiError(403, 'forbidden', 'confirm an institutional email address first');
-  await checkProtection(database, topic.id, roles, [KINDS.topic.kindFile]);
-  await markSuggestion(database, topic.id, paper.id, 'dismissed', actor);
-  await refreshPageIds(database, [topic.id]);
-}
-
-/** A paper as a topic's lists show it. */
-export interface TopicPaperRow {
-  page: PageSummary;
-  year: number | null;
-}
-
-/** A topic page one step away (broader, narrower, related), with its rolled-up paper count. */
-export interface TopicNeighbour {
-  key: string;
-  name: string;
-  papers: number;
-}
-
-export interface TopicSuggestionRow {
-  page: PageSummary;
-  year: number | null;
-  reason: 'keyword' | 'title' | 'abstract';
-  matched: string;
-}
-
+/** What a topic page lists besides its article: its subtopics and its other pages, as a Wikipedia category does. */
 export interface TopicOverview {
-  aliases: string[];
-  /** Broader topics; a slug no topic has (any more) as `{ key, name: key, papers: 0, missing: true }`. */
-  broader: (TopicNeighbour & { missing?: boolean })[];
-  narrower: TopicNeighbour[];
-  related: TopicNeighbour[];
-  /** The papers that introduced it, directly (not its narrower topics'). */
-  introducedBy: TopicPaperRow[];
-  venues: OverlapPage[];
-  orgs: OverlapPage[];
-  /** "Might belong here": open suggestions, best first. */
-  suggestions: TopicSuggestionRow[];
-  suggestionCount: number;
+  /** The topics in it, by name. */
+  subtopics: PageLink[];
+  /** The pages of other kinds in it, by name. */
+  pages: PageLink[];
   /** The topics merged into it, by their old slugs. */
   mergedFrom: string[];
   protection: Protection | null;
 }
 
-/** Rolled-up paper counts of topic pages. */
-async function topicPaperCounts(db: Reader, ids: readonly string[]): Promise<Map<string, number>> {
-  if (ids.length === 0) return new Map();
-  const list = sql.join(
-    ids.map((id) => sql`${id}::uuid`),
-    sql`, `,
-  );
-  const { rows } = await db.execute<{ id: string; n: number }>(sql`
-    select t.id, count(distinct m.paper_id)::int as n
-      from pages t
-      join page_members m on m.scope_page_id = t.id
-                          or m.scope_page_id in (select page_id from page_ancestors where ancestor_id = t.id)
-     where t.id in (${list})
-     group by t.id
-  `);
-  return new Map(rows.map((row) => [row.id, row.n]));
-}
+const byName = (a: PageLink, b: PageLink) => (a.page.name ?? '').localeCompare(b.page.name ?? '');
 
-async function neighbours(db: Reader, ids: readonly string[]): Promise<TopicNeighbour[]> {
-  const unique = [...new Set(ids)];
-  if (unique.length === 0) return [];
-  const [found, counts] = await Promise.all([
-    db
-      .select({
-        id: pages.id,
-        key: pages.key,
-        name: sql<string | null>`(select name from page_current where page_id = ${pages.id})`,
-      })
-      .from(pages)
-      .where(inArray(pages.id, unique)),
-    topicPaperCounts(db, unique),
-  ]);
-  return found
-    .map((row) => ({ key: row.key, name: row.name ?? row.key, papers: counts.get(row.id) ?? 0 }))
-    .sort((a, b) => a.name.localeCompare(b.name));
-}
-
-const SUGGESTIONS_SHOWN = 20;
-
-/** What a topic page lists besides its article and its papers. */
+/** A topic's members (the pages whose `in-topic` links name it, under any of its names) and its merges. */
 export async function topicOverview(page: PageRow, database: Database = getDb()): Promise<TopicOverview> {
-  const [current] = (
-    await database.execute<{ kind_file: TopicFile | null }>(
-      sql`select kind_file from page_current where page_id = ${page.id}`,
-    )
-  ).rows;
-  const file = current?.kind_file ?? null;
-  const broaderKeys = file?.broader ?? [];
-  const broaderPages = await Promise.all(broaderKeys.map((key) => findPage(`topic:${key}`, database)));
-  const { rows: narrowerRows } = await database.execute<{ id: string }>(sql`
-    select a.page_id as id from page_ancestors a join pages p on p.id = a.page_id
-     where a.ancestor_id = ${page.id} and a.depth = 1 and p.kind = 'topic' and p.merged_into is null
-  `);
-  const [from, to] = await Promise.all([linksFrom(page.id, database), linksTo(page.id, database)]);
-  const relatedIds = [...from, ...to]
-    .filter((link) => link.label === 'related' && link.page.kind === 'topic' && link.page.pageId)
-    .map((link) => link.page.pageId!)
-    .filter((id) => id !== page.id);
-  const [broaderFound, narrower, related] = await Promise.all([
-    neighbours(
-      database,
-      broaderPages.flatMap((p) => (p ? [p.id] : [])),
-    ),
-    neighbours(
-      database,
-      narrowerRows.map((row) => row.id),
-    ),
-    neighbours(database, relatedIds),
-  ]);
-  const missing = broaderKeys
-    .filter((_, i) => !broaderPages[i])
-    .map((key) => ({ key, name: key, papers: 0, missing: true }));
-
-  const introducing = await database
-    .select({ paperId: pageMembers.paperId })
-    .from(pageMembers)
-    .where(and(eq(pageMembers.scopePageId, page.id), eq(pageMembers.via, 'introduces-topic')));
-  const { rows: suggestionRows } = await database.execute<{
-    paper_id: string;
-    reason: TopicSuggestionRow['reason'];
-    matched: string;
-    total: number;
-  }>(sql`
-    select s.paper_id, s.reason, s.matched, (count(*) over ())::int as total
-      from topic_suggestions s
-     where s.topic_page_id = ${page.id} and s.status = 'open'
-     order by s.score desc, s.created_at, s.paper_id
-     limit ${SUGGESTIONS_SHOWN}
-  `);
-  const paperIds = [...introducing.map((row) => row.paperId), ...suggestionRows.map((row) => row.paper_id)];
-  const [summaries, years, venues, orgs, protection, merged] = await Promise.all([
-    pageSummaries(paperIds, database),
-    paperYears(database, paperIds),
-    scopeOverlap(page.id, 'venue', { database }),
-    scopeOverlap(page.id, 'org', { database }),
+  const [links, protection, merged] = await Promise.all([
+    linksTo(page.id, database),
     protectionOf(database, page.id),
     database.select({ key: pages.key }).from(pages).where(eq(pages.mergedInto, page.id)),
   ]);
-  const paperRow = (id: string) => {
-    const summary = summaries.get(id);
-    return summary ? { page: summary, year: years.get(id) ?? null } : null;
-  };
+  const seen = new Set<string>();
+  const members = links.filter((link) => {
+    const id = link.page.pageId;
+    if (link.label !== TOPIC_LABEL || !id || seen.has(id)) return false;
+    seen.add(id);
+    return true;
+  });
   return {
-    aliases: file?.aliases ?? [],
-    broader: [...broaderFound, ...missing],
-    narrower,
-    related,
-    introducedBy: introducing
-      .flatMap((row) => paperRow(row.paperId) ?? [])
-      .sort((a, b) => (a.year ?? 9999) - (b.year ?? 9999)),
-    venues,
-    orgs,
-    suggestions: suggestionRows.flatMap((row) => {
-      const found = paperRow(row.paper_id);
-      return found ? [{ ...found, reason: row.reason, matched: row.matched }] : [];
-    }),
-    suggestionCount: suggestionRows[0]?.total ?? 0,
+    subtopics: members.filter((link) => link.page.kind === 'topic').sort(byName),
+    pages: members.filter((link) => link.page.kind !== 'topic').sort(byName),
     mergedFrom: merged.map((row) => row.key).sort(),
     protection,
   };
 }
 
-async function paperYears(db: Reader, ids: readonly string[]): Promise<Map<string, number | null>> {
-  if (ids.length === 0) return new Map();
-  const { rows } = await db.execute<{ id: string; year: number | null }>(
-    sql`select id, year from papers where id in (${sql.join(
-      ids.map((id) => sql`${id}::uuid`),
-      sql`, `,
-    )})`,
-  );
-  return new Map(rows.map((row) => [row.id, row.year]));
-}
-
 /** The overview as the API gives it (`GET /pages/{identifier}/topic`), with identifiers and addresses. */
 export function presentTopicOverview(overview: TopicOverview, origin: string) {
-  const topic = (t: TopicNeighbour & { missing?: boolean }) => ({
-    identifier: formatIdentifier({ kind: 'topic', key: t.key }),
-    url: t.missing ? null : `${origin}${keyedPagePath('topic', t.key)}`,
-    name: t.name,
-    papers: t.papers,
-  });
-  const scope = (kind: 'venue' | 'org') => (p: OverlapPage) => ({
-    identifier: formatIdentifier({ kind, key: p.key }),
-    url: `${origin}${keyedPagePath(kind, p.key)}`,
-    name: p.name,
-    papers: p.papers,
-  });
-  const paper = (row: TopicPaperRow) => ({
-    identifier: row.page.identifier,
-    url: row.page.url,
-    title: row.page.name,
-    year: row.year,
+  const member = (link: PageLink) => ({
+    identifier: link.page.address ? formatIdentifier(link.page.address) : null,
+    url: link.page.address ? `${origin}${pagePath(link.page.address)}` : null,
+    kind: link.page.kind,
+    name: link.page.name,
   });
   return {
-    aliases: overview.aliases,
-    broader: overview.broader.map(topic),
-    narrower: overview.narrower.map(topic),
-    related: overview.related.map(topic),
-    introducedBy: overview.introducedBy.map(paper),
-    venues: overview.venues.map(scope('venue')),
-    orgs: overview.orgs.map(scope('org')),
-    suggestions: overview.suggestions.map((row) => ({ ...paper(row), reason: row.reason, matched: row.matched })),
-    suggestionCount: overview.suggestionCount,
+    subtopics: overview.subtopics.map(member),
+    pages: overview.pages.map(member),
     mergedFrom: overview.mergedFrom.map((key) => formatIdentifier({ kind: 'topic', key })),
     protection: overview.protection
       ? {
@@ -649,20 +344,15 @@ export interface TopicEdit {
   /** The commit the form loaded, so a change made meanwhile is merged rather than lost. */
   base: string | null;
   name?: string;
-  aliases?: string[];
-  /** Broader topics, by slug. */
-  broader?: string[];
   /** The whole article (`community/`) as one Markdown text, a `#` heading per section. */
   article?: string;
-  /** Related topics, by slug: the page's `related` links to topics, in `community/links.jsonl`. */
-  related?: string[];
   summary?: string;
 }
 
 /**
- * Edits a topic in one commit: its `topic.json` (name, aliases, broader topics), its article's sections and its
- * related topics. Goes through `commitPage`, so the path rules and page protection hold, a push could do the same, and
- * a change made since `base` is merged.
+ * Edits a topic in one commit: its name (`topic.json`) and its article's sections. Goes through `commitPage`, so the
+ * path rules and page protection hold, a push could do the same, and a change made since `base` is merged. The
+ * topics it is in are its links, added like any page's.
  */
 export async function editTopic(page: PageRow, edit: TopicEdit, actor: Actor, database: Database = getDb()) {
   if (page.kind !== 'topic') throw new ApiError(422, 'validation_error', 'only a topic page is edited here');
@@ -671,25 +361,14 @@ export async function editTopic(page: PageRow, edit: TopicEdit, actor: Actor, da
   const files = commit ? await readFiles(database, page.id, commit.tree) : new Map<string, string>();
   const changes: FileChange[] = [];
 
-  if (edit.name !== undefined || edit.aliases !== undefined || edit.broader !== undefined) {
-    let current: Partial<TopicFile> = {};
-    try {
-      current = JSON.parse((await readText(database, page.id, files.get(KINDS.topic.kindFile))) ?? '{}');
-    } catch {
-      // A file that doesn't parse is replaced whole.
-    }
-    const name = (edit.name ?? current.name ?? '').replace(/\s+/g, ' ').trim();
-    const aliases = (edit.aliases ?? current.aliases ?? []).map((a) => a.replace(/\s+/g, ' ').trim()).filter(Boolean);
-    const broader =
-      edit.broader !== undefined ? await checkBroader(database, edit.broader, page.key) : (current.broader ?? []);
-    const file = parseTopicFile({
-      name,
-      ...(aliases.length > 0 ? { aliases } : {}),
-      ...(broader.length > 0 ? { broader } : {}),
-    });
-    const [taken] = await topicsNamed([file.name, ...(file.aliases ?? [])], { except: page.id, database });
+  if (edit.name !== undefined) {
+    const file = parseTopicFile({ name: edit.name.replace(/\s+/g, ' ').trim() });
+    const [taken] = await topicsNamed([file.name], { except: page.id, database });
     if (taken) throw exists(taken);
-    changes.push({ path: KINDS.topic.kindFile, content: encodeTopicFile(file) });
+    const content = encodeTopicFile(file);
+    if (content !== (await readText(database, page.id, files.get(KINDS.topic.kindFile)))) {
+      changes.push({ path: KINDS.topic.kindFile, content });
+    }
   }
 
   if (edit.article !== undefined) {
@@ -699,33 +378,6 @@ export async function editTopic(page: PageRow, edit: TopicEdit, actor: Actor, da
       (part) => part.text.replace(/^#[^\n]*\n?/, '').trim() !== '',
     );
     changes.push(...planSections(sections, 'community', 0, sections.length, parts));
-  }
-
-  if (edit.related !== undefined) {
-    const path = `community/${LINKS_FILE}`;
-    const parsed = parseLabeledLinks((await readText(database, page.id, files.get(path))) ?? '', 'topic');
-    if (!('links' in parsed)) throw new ApiError(422, 'validation_error', `${path} ${parsed.problem}; fix it first`);
-    const wanted: string[] = [];
-    for (const slug of edit.related) {
-      const key = await currentTopicKey(database, slug.trim().toLowerCase());
-      if (key !== page.key && !wanted.includes(key)) wanted.push(key);
-    }
-    const kept = parsed.links.filter((link) => !(link.label === 'related' && link.targetKind === 'topic'));
-    const had = parsed.links.filter((link) => link.label === 'related' && link.targetKind === 'topic');
-    const lines = [
-      ...kept,
-      ...wanted.map(
-        (key) =>
-          had.find((link) => link.target === `topic:${key}`) ?? {
-            id: newLinkId(),
-            to: `topic:${key}`,
-            label: 'related' as const,
-          },
-      ),
-    ].map((link) => encodeLabeledLink(link));
-    const content = lines.length > 0 ? `${lines.join('\n')}\n` : null;
-    const before = (await readText(database, page.id, files.get(path))) ?? null;
-    if (content !== before && (content !== null || files.has(path))) changes.push({ path, content });
   }
 
   if (changes.length === 0) return { status: 'unchanged' as const, oid: base };
@@ -776,9 +428,9 @@ async function handleOf(db: Reader, actor: Actor): Promise<string> {
 
 /**
  * Gives a topic a new address: `topic:<slug>` and `/t/<slug>`, with a redirect from the old one (`page_redirects`),
- * so links, `broader` lists and bookmarks that name the old slug still find it (`page-members.ts` counts the old
- * name among the page's). The page's metadata commit says who moved it. With `name`, the name changes too, in the same
- * person's commit, and the old name stays as an alias.
+ * so links and bookmarks that name the old slug still find it (`page-members.ts` counts the old name among the
+ * page's). The page's metadata commit says who moved it. With `name`, the name changes too, in the same person's
+ * commit.
  */
 export async function renameTopic(
   page: PageRow,
@@ -819,15 +471,8 @@ export async function renameTopic(
   const name = input.name?.replace(/\s+/g, ' ').trim();
   if (name) {
     const { head, files } = await textsAt(database, page.id);
-    const file = topicFileOf(files);
-    if (file && file.name !== name) {
-      const aliases = [file.name, ...(file.aliases ?? [])].filter((a) => topicNameKey(a) !== topicNameKey(name));
-      await editTopic(
-        moved,
-        { base: head, name, aliases: aliases.slice(0, 20), summary: `Rename to ${name}` },
-        actor,
-        database,
-      );
+    if (topicFileOf(files)?.name !== name) {
+      await editTopic(moved, { base: head, name, summary: `Rename to ${name}` }, actor, database);
     }
   }
   await refreshPages({ kind: 'topic', key: old });
@@ -835,15 +480,11 @@ export async function renameTopic(
   return moved;
 }
 
-const MAX_ALIASES = 20;
-const MAX_BROADER = 20;
-
 /**
- * Merges a duplicate topic into another: the survivor gains the duplicate's name and aliases as aliases, its broader
- * topics, its article's sections (each saying where it came from) and its links, in one commit by whoever merges;
- * the duplicate's page is marked merged (`pages.merged_into`), so its address, its identifier and its old slugs lead
- * to the survivor, papers in it are in the survivor (`page-members.ts`), and nobody commits to it again. Its history
- * stays. Dismissed suggestions move along, so they don't come back on the survivor.
+ * Merges a duplicate topic into another: the survivor gains the duplicate's article's sections (each saying where it
+ * came from) and its links, in one commit by whoever merges; the duplicate's page is marked merged
+ * (`pages.merged_into`), so its address, its identifier and its old slugs lead to the survivor, pages in it are in the
+ * survivor (`linksTo` and `page-members.ts` follow merges), and nobody commits to it again. Its history stays.
  */
 export async function mergeTopic(
   duplicate: PageRow,
@@ -883,14 +524,6 @@ export async function mergeTopic(
     // Its old slugs, and anything merged into it before, lead to the survivor now.
     await tx.update(pageRedirects).set({ pageId: survivor.id }).where(eq(pageRedirects.pageId, duplicate.id));
     await tx.update(pages).set({ mergedInto: survivor.id }).where(eq(pages.mergedInto, duplicate.id));
-    // What people decided about its suggestions holds for the survivor; the machine's open ones are made again there.
-    await tx.execute(sql`
-      insert into topic_suggestions (topic_page_id, paper_id, status, reason, matched, score, decided_by, decided_at, created_at)
-      select ${survivor.id}, paper_id, status, reason, matched, score, decided_by, decided_at, created_at
-        from topic_suggestions where topic_page_id = ${duplicate.id} and status <> 'open'
-      on conflict (topic_page_id, paper_id) do nothing
-    `);
-    await tx.delete(topicSuggestions).where(eq(topicSuggestions.topicPageId, duplicate.id));
     // It is no scope any more: the survivor answers to its name (`page-members.ts`). Its own event says so too, if
     // the consumer reads one later.
     await tx.execute(sql`delete from page_scope_names where page_id = ${duplicate.id}`);
@@ -915,24 +548,6 @@ export function foldTopics(
   into: string,
 ): FileChange[] {
   const changes: FileChange[] = [];
-  const ours = topicFileOf(survivor);
-  const theirs = topicFileOf(duplicate);
-  if (ours && theirs) {
-    const keys = new Set([topicNameKey(ours.name), ...(ours.aliases ?? []).map(topicNameKey)]);
-    const aliases = [...(ours.aliases ?? [])];
-    for (const name of [theirs.name, ...(theirs.aliases ?? [])]) {
-      const key = topicNameKey(name);
-      if (keys.has(key) || aliases.length >= MAX_ALIASES) continue;
-      keys.add(key);
-      aliases.push(name);
-    }
-    const broader = [...(ours.broader ?? [])];
-    for (const key of theirs.broader ?? []) {
-      if (key !== into && key !== from && !broader.includes(key) && broader.length < MAX_BROADER) broader.push(key);
-    }
-    const next = encodeTopicFile({ name: ours.name, aliases, broader });
-    if (next !== survivor.get(KINDS.topic.kindFile)) changes.push({ path: KINDS.topic.kindFile, content: next });
-  }
 
   const sectionsOf = (files: ReadonlyMap<string, string>): SectionFile[] =>
     sectionPaths(files.keys(), 'community').map((path) => ({
@@ -974,46 +589,4 @@ export function foldTopics(
     if (lines.length > ourLinks.links.length) changes.push({ path, content: `${lines.join('\n')}\n` });
   }
   return changes;
-}
-
-/** A topic's open suggestions, best first, a page at a time (`GET /pages/{identifier}/suggestions`). */
-export async function topicSuggestionList(
-  topicId: string,
-  options: { offset?: number; limit?: number; database?: Database } = {},
-) {
-  const { offset = 0, limit = 50, database = getDb() } = options;
-  const { rows } = await database.execute<{
-    paper_id: string;
-    reason: string;
-    matched: string;
-    score: number;
-    total: number;
-  }>(sql`
-    select paper_id, reason, matched, score, (count(*) over ())::int as total
-      from topic_suggestions
-     where topic_page_id = ${topicId} and status = 'open'
-     order by score desc, created_at, paper_id
-     limit ${limit} offset ${offset}
-  `);
-  const ids = rows.map((row) => row.paper_id);
-  const [summaries, years] = await Promise.all([pageSummaries(ids, database), paperYears(database, ids)]);
-  return {
-    total: rows[0]?.total ?? 0,
-    suggestions: rows.flatMap((row) => {
-      const page = summaries.get(row.paper_id);
-      return page
-        ? [
-            {
-              identifier: page.identifier,
-              url: page.url,
-              title: page.name,
-              year: years.get(row.paper_id) ?? null,
-              reason: row.reason,
-              matched: row.matched,
-              score: Number(row.score),
-            },
-          ]
-        : [];
-    }),
-  };
 }

@@ -90,9 +90,7 @@ import * as topicsRoute from '@/app/api/v1/topics/route';
 import * as changesRoute from '@/app/api/v1/changes/route';
 import * as eventsRoute from '@/app/api/v1/events/route';
 import * as topicRoute from '@/app/api/v1/pages/[identifier]/topic/route';
-import * as paperTopicsRoute from '@/app/api/v1/pages/[identifier]/topics/route';
-import * as topicPapersRoute from '@/app/api/v1/pages/[identifier]/topic-papers/route';
-import * as suggestionsRoute from '@/app/api/v1/pages/[identifier]/suggestions/route';
+import * as pageTopicsRoute from '@/app/api/v1/pages/[identifier]/topics/route';
 import * as renameRoute from '@/app/api/v1/pages/[identifier]/rename/route';
 import * as mergeRoute from '@/app/api/v1/pages/[identifier]/merge/route';
 import * as protectionRoute from '@/app/api/v1/pages/[identifier]/protection/route';
@@ -106,7 +104,7 @@ export const ORIGIN = 'http://test.local';
 
 export async function resetDatabase(): Promise<void> {
   await getDb().execute(sql`
-    truncate table page_daily_counts, page_institution_counts, page_month_visitors, signal_values, signal_labels, signals, signal_sets, page_views, page_transitions, page_transition_visits, identity_keys, topic_suggestions, page_protection, org_members_due, page_redirects, scope_stats, scope_state, page_claims, plugin_refs, plugin_snapshots, user_plugin_grants, user_plugin_storage, site_settings, user_settings, page_links, page_members, page_member_sources, page_scope_names, page_parents, page_ancestors, pages, paper_follows, search_docs, bot_grants, comment_mentions, comment_aliases, comments, lfs_objects, ssh_keys, evidence_files, agent_posts, agent_files, api_tokens, agent_codes, author_claims, demo_pins, demo_snapshots, submission_notes, submissions, venues, pdf_documents, consumer_cursors, page_events, page_current, page_revisions, page_refs, page_objects, commit_identities, paper_lookup_misses, paper_identifiers, papers, institution_domains, affiliations, accounts, rate_limit_buckets, announcements,
+    truncate table page_daily_counts, page_institution_counts, page_month_visitors, signal_values, signal_labels, signals, signal_sets, page_views, page_transitions, page_transition_visits, identity_keys, page_protection, org_members_due, page_redirects, scope_stats, scope_state, page_claims, plugin_refs, plugin_snapshots, user_plugin_grants, user_plugin_storage, site_settings, user_settings, page_links, page_members, page_member_sources, page_scope_names, page_parents, page_ancestors, pages, paper_follows, search_docs, bot_grants, comment_mentions, comment_aliases, comments, lfs_objects, ssh_keys, evidence_files, agent_posts, agent_files, api_tokens, agent_codes, author_claims, demo_pins, demo_snapshots, submission_notes, submissions, venues, pdf_documents, consumer_cursors, page_events, page_current, page_revisions, page_refs, page_objects, commit_identities, paper_lookup_misses, paper_identifiers, papers, institution_domains, affiliations, accounts, rate_limit_buckets, announcements,
       session, account, verification, "user"
     restart identity cascade
   `);
@@ -200,9 +198,7 @@ const ROUTES: [RegExp, any][] = [
   [/^\/signal-sets\/(?<owner>[^/?]+)\/(?<name>[^/?]+)\/generations\/(?<generation>\d+)\/publish$/, signalPublishRoute],
   [/^\/signal-sets\/(?<owner>[^/?]+)\/(?<name>[^/?]+)$/, signalSetRoute],
   [/^\/pages\/(?<identifier>[^/?]+)\/topic$/, topicRoute],
-  [/^\/pages\/(?<identifier>[^/?]+)\/topics$/, paperTopicsRoute],
-  [/^\/pages\/(?<identifier>[^/?]+)\/topic-papers(\?.*)?$/, topicPapersRoute],
-  [/^\/pages\/(?<identifier>[^/?]+)\/suggestions(\?.*)?$/, suggestionsRoute],
+  [/^\/pages\/(?<identifier>[^/?]+)\/topics$/, pageTopicsRoute],
   [/^\/pages\/(?<identifier>[^/?]+)\/rename$/, renameRoute],
   [/^\/pages\/(?<identifier>[^/?]+)\/merge$/, mergeRoute],
   [/^\/pages\/(?<identifier>[^/?]+)\/protection$/, protectionRoute],

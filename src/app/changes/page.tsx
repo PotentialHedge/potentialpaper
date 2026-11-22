@@ -24,21 +24,19 @@ function delta(bytes: number) {
 
 /**
  * The patrol feed (DESIGN.md §7, `server/changes.ts`): every commit to every page, newest first, for the people who
- * keep pages honest. Filters by kind of page; "moves papers" picks out the changes to topics' broader topics, merges
- * and renames, which move papers between roll-ups (`handoffs/pages.md` Phase 5). Bots are hidden unless asked for.
+ * keep pages honest. Filters by kind of page. Bots are hidden unless asked for.
  */
 export default async function ChangesPage({ searchParams }: Props) {
   const query = await searchParams;
   const kindText = one(query.kind);
   const kind: PageKind | undefined = kindText && isPageKind(kindText) ? kindText : undefined;
   const bots = one(query.bots) === 'true';
-  const rollUp = one(query.rollUp) === 'true';
   const beforeText = Number.parseInt(one(query.before) ?? '', 10);
   const before = Number.isSafeInteger(beforeText) && beforeText > 0 ? beforeText : undefined;
-  const changes = await recentChanges({ kind, bots, rollUp, before, limit: PAGE_SIZE });
+  const changes = await recentChanges({ kind, bots, before, limit: PAGE_SIZE });
   const href = (over: Record<string, string | undefined>) => {
     const params = new URLSearchParams();
-    const next = { kind, bots: bots ? 'true' : undefined, rollUp: rollUp ? 'true' : undefined, ...over };
+    const next = { kind, bots: bots ? 'true' : undefined, ...over };
     for (const [key, value] of Object.entries(next)) if (value) params.set(key, value);
     const text = params.toString();
     return `/changes${text ? `?${text}` : ''}`;
@@ -61,9 +59,6 @@ export default async function ChangesPage({ searchParams }: Props) {
         ))}
       </p>
       <p className="mt-1 flex flex-wrap gap-x-3 font-sans text-sm">
-        <a href={href({ rollUp: rollUp ? undefined : 'true', before: undefined })} className={rollUp ? ui.on : ''}>
-          {rollUp ? '✓ ' : ''}Only changes that move papers between topics
-        </a>
         <a href={href({ bots: bots ? undefined : 'true', before: undefined })} className={bots ? ui.on : ''}>
           {bots ? '✓ ' : ''}Show bots
         </a>
@@ -105,7 +100,6 @@ export default async function ChangesPage({ searchParams }: Props) {
                   <td className={ui.td}>
                     {change.summary}
                     {change.kind !== 'edit' && <span className={ui.badge}>{change.kind}</span>}
-                    {change.rollUp && <span className={ui.badge}>moves papers</span>}
                     {change.links && <span className={ui.badge}>links</span>}
                     <span className={`block ${ui.fine} font-mono`}>{change.paths.join(', ')}</span>
                   </td>

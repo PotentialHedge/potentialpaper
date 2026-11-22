@@ -1,8 +1,8 @@
 import { SLUG } from './kinds';
 
 /**
- * Topics (`handoffs/pages.md` Phase 5): research ideas at the size of a Wikipedia article ("Linear attention"), which
- * anyone verified makes and the community writes. What the server and the browser share about them: a topic's
+ * Topics (`handoffs/pages.md` Phase 5): research ideas ("Linear attention") that work as Wikipedia's categories do,
+ * each with an article the community writes. Anyone verified makes one. What the server and the browser share about them: a topic's
  * address from its name, and when two names are the same name, so that the form can say "that topic is there
  * already" before a duplicate is made.
  *
@@ -50,20 +50,3 @@ export function topicNameKey(name: string): string {
     .map(singular)
     .join(' ');
 }
-
-/** Aliases as a form gives them, one a line or separated by commas: trimmed, each once, none that is the name. */
-export function parseAliases(text: string, name = ''): string[] {
-  const seen = new Set([topicNameKey(name)]);
-  const out: string[] = [];
-  for (const raw of text.split(/[\n,;]/)) {
-    const alias = raw.replace(/\s+/g, ' ').trim();
-    const key = topicNameKey(alias);
-    if (!alias || !key || seen.has(key)) continue;
-    seen.add(key);
-    out.push(alias);
-  }
-  return out;
-}
-
-/** The labels a paper is in a topic by: about it, or the paper that introduced it. */
-export type TopicLinkLabel = 'in-topic' | 'introduces-topic';

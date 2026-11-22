@@ -32,8 +32,6 @@ export interface TopicMatch {
   identifier: string;
   key: string;
   name: string;
-  aliases: string[];
-  matched: string;
   exact: boolean;
 }
 

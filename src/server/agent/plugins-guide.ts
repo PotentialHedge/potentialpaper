@@ -44,7 +44,7 @@ export const METHOD_DOCS: Record<keyof typeof HOST_METHODS, { call: string; does
   },
   'page.members': {
     call: 'pp.page.members([identifier], { offset, limit, rollUp })',
-    does: "A venue's, topic's or organisation's papers, paged, rolled up from the pages under it.",
+    does: "A venue's, topic's or organisation's papers, paged; a venue's and an organisation's rolled up from the pages under them.",
   },
   'page.resolve': {
     call: 'pp.page.resolve(identifier)',

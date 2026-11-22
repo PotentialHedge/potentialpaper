@@ -1,8 +1,18 @@
 import { type ComponentType, Fragment, type ReactNode } from 'react';
 import { AddMissing } from '@/components/paper/AddMissing';
+import { AddTopic } from '@/components/topics/AddTopic';
 import { AuthorPanels, CommunityPanels } from '@/components/plugins/NestedPanels';
 import { ui } from '@/components/ui';
-import { GENERIC_SLOTS, type GenericSlot, KINDS, pagePath, type PageAddress, type PageKind } from '@/lib/kinds';
+import {
+  formatIdentifier,
+  GENERIC_SLOTS,
+  type GenericSlot,
+  KINDS,
+  pagePath,
+  type PageAddress,
+  type PageKind,
+} from '@/lib/kinds';
+import { TOPIC_LABEL } from '@/lib/labeled-links';
 import { toolPath } from '@/lib/page-tools';
 import { type PanelKind, slotPanels } from '@/lib/panels';
 import type { OwnersInfo } from '@/server/owners';
@@ -166,12 +176,50 @@ export function Sections({ kind, address, ownersHtml, communityHtml, owners }: P
   );
 }
 
+/** Its labeled links, but for the topics it is in, which the topics bar shows. */
 export function Links({ linksFrom }: PageCommon) {
-  return <LinksBox links={linksFrom} direction="from" />;
+  return <LinksBox links={linksFrom.filter((link) => link.label !== TOPIC_LABEL)} direction="from" />;
 }
 
-export function Backlinks({ linksTo }: PageCommon) {
-  return <LinksBox links={linksTo} direction="to" />;
+/** What links here, but for a topic's members, which its own lists show. */
+export function Backlinks({ kind, linksTo }: PageCommon) {
+  const links = kind === 'topic' ? linksTo.filter((link) => link.label !== TOPIC_LABEL) : linksTo;
+  return <LinksBox links={links} direction="to" />;
+}
+
+/**
+ * The topics it is in, at the foot of the page, as Wikipedia lists a page's categories: its own `in-topic` links,
+ * and "Add" (`AddTopic`), which puts it in one by name, making the topic if none has that name yet.
+ */
+export function Topics({ address, linksFrom }: PageCommon) {
+  const topics = linksFrom.filter((link) => link.label === TOPIC_LABEL);
+  const identifier = formatIdentifier(address);
+  if (topics.length === 0) {
+    return (
+      <div className={`${ui.fine} mt-8 font-sans`}>
+        <AddTopic identifier={identifier} label="Add to a topic" />
+      </div>
+    );
+  }
+  return (
+    <div className="mt-8 border border-rule px-3 py-2 font-sans text-[13px]">
+      <span className="text-muted">Topics: </span>
+      {topics.map((link, i) => (
+        <Fragment key={i}>
+          {i > 0 && <span className="text-faint"> · </span>}
+          {link.page.address ? (
+            <a href={pagePath(link.page.address)} className={link.page.name ? undefined : 'text-muted italic'}>
+              {link.page.name ?? formatIdentifier(link.page.address)}
+            </a>
+          ) : (
+            link.page.name
+          )}
+        </Fragment>
+      ))}
+      <span className="text-faint"> · </span>
+      <AddTopic identifier={identifier} label="Add" />
+    </div>
+  );
 }
 
 export interface BuiltPanel {

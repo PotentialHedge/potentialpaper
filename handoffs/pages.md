@@ -38,7 +38,7 @@ show. A plugin written once can then add a panel to a paper, a venue, a topic, a
 | ----- | ----------------------------------------------------------------------------- | ------------------ | -------------------------------------------------------------------------------- |
 | paper | `/abs/…` as today                                                             | `arxiv:…`, `doi:…` | `.potentialpaper/metadata.json`                                                  |
 | venue | `/v/iclr` (series), `/v/iclr/2027` (edition), deeper for tracks and workshops | `venue:iclr/2027`  | `venue.json`: name, dates, URL, `sources` (`openreview:ICLR.cc/2027/Conference`) |
-| topic | `/t/<slug>`                                                                   | `topic:<slug>`     | `topic.json`: name, aliases, `broader` topics (optional, a DAG)                  |
+| topic | `/t/<slug>`                                                                   | `topic:<slug>`     | `topic.json`: name; a topic is in topics through its own `in-topic` links        |
 | org   | `/o/<slug>`, `/o/<slug>/<child>` for departments and labs                     | `org:<slug>`       | `org.json`: name, `domains`, `parents`, ROR id                                   |
 | user  | `/u/<handle>`                                                                 | `user:<handle>`    | `profile.json`: what the person chose to show                                    |
 
@@ -59,19 +59,15 @@ show. A plugin written once can then add a panel to a paper, a venue, a topic, a
       page shows "Organise this venue? Claim it".
     - The kind file and `sources`: the `venues` bot, organisers and admins.
   - Topic: community-run, like a Wikipedia article. Any verified account can make a topic and edit any topic's
-    `community/`, `topic.json` (name, aliases, broader topics) and links, subject to page protection. Changes to
-    `broader` show in the patrol feed, since they move papers between roll-ups. No bot writes topic pages.
+    `community/`, `topic.json` (its name) and links, subject to page protection. No bot writes topic pages.
   - Org: `members/` for verified members (an affiliation whose domain is one of the org's `domains`), `community/`
     for any verified account, and the kind file for members and admins.
   - User: only the account itself, its agents' tokens, and admins.
 - **Membership is links and projections.**
   - A paper is at a venue through its submissions: the projection that already exists.
-  - A paper is in a topic through a labeled link from the paper to `topic:<slug>`, asserted by the community or by
-    an author: `in-topic` ("is about" / "covered by") or `introduces-topic` ("introduces" / "introduced by"), so a
-    topic page can list where the idea started apart from the work on it. Machines only suggest
-    (`topic_suggestions`, not links): OpenReview keywords, title and abstract matches on a topic's name and aliases,
-    and later the map's nearest neighbours of the papers already in it. A suggestion becomes a link when a person
-    confirms it.
+  - A page of any kind is in a topic through a labeled link from the page to `topic:<slug>`, `in-topic` ("is in" /
+    "has"), asserted by the community or by its owners, as a Wikipedia page is in a category (Phase 5, changed
+    2026-11-22). A paper's makes it a member of the topic's scope, for its statistics.
   - A paper is from an org through confirmed author claims of verified members who chose to show their
     institution, and through the domains printed on page 1 (`pdf_documents.emails`).
   - One consumer keeps `page_members(scope_page_id, paper_id, via, weight)` from all of these. Every list, count,
@@ -79,9 +75,9 @@ show. A plugin written once can then add a panel to a paper, a venue, a topic, a
 - **Topics are concepts, not a taxonomy** (decided 2026-11-16). A topic is a research idea at the size of a
   Wikipedia article ("Linear attention", "State space models", "Mixture of experts"), not a field such as `cs.LG`.
   The page is an article the community writes, plus the papers on it. There is no seeded list: topics exist because
-  someone made them. `broader` is optional and loose ("Linear attention" under "Efficient transformers").
-  Topic-to-topic links (`related-to`) carry everything else.
-- **Hierarchies roll up.** A topic's papers include those of the topics it is broader than. A series' papers are its editions'. An org's
+  someone made them. A topic is in broader topics as any page is, by its own `in-topic` links ("Linear attention" in
+  "Efficient transformers"), as a subtopic.
+- **Hierarchies roll up**, but for topics, which list only what is in them directly. A series' papers are its editions'. An org's
   papers are its children's. The consumer keeps the closure (`page_ancestors`), so a roll-up is one join.
 - **Every account has a public page at `/u/<handle>`** (decided 2026-11-16). It is made with the account, so a
   handle always resolves to a page. What it shows is the account's choice, through `profile.json` and the `user.*`
@@ -130,21 +126,22 @@ show. A plugin written once can then add a panel to a paper, a venue, a topic, a
 
 - An `orgs` bot seeds pages from `config/institution-domains.json` and `institution_domains`, with ROR ids where we
   have them. Departments and labs are child pages that verified members make.
-- Shows members who chose to show their institution, the org's papers (rolled up from its children), and venues and
-  topics by count.
+- Shows members who chose to show their institution, the org's papers (rolled up from its children), and venues by
+  count.
 
 ### Phase 5: topic pages
 
-- No seeding. Anyone verified can make a topic: a "New topic" form, or "Add a topic" on a paper's page, which links
-  the paper and makes the topic if no topic of that name or alias exists yet. The form checks names and aliases
-  first, to keep duplicates down.
-- The page reads as an article: the community's sections first (what it is, key ideas, history, open problems), then
-  the papers that introduced it, the papers on it (rolled up from narrower topics, sortable by date, venue and
-  score), narrower, broader and related topics, the venues where it is common, and the orgs active in it.
-- "Might belong here": `topic_suggestions` for the topic, each with confirm and dismiss. A dismissal is remembered,
-  so the suggestion doesn't come back.
-- Editing a topic (name, aliases, broader topics, sections, links), merging and renaming is open to the community,
-  with page protection and the patrol feed. A merge or rename leaves a redirect, as paper merges do.
+**Changed 2026-11-22: topics work as Wikipedia's categories do.** What was built first (aliases, `broader`, related
+topics, "introduced by", roll-up, sortable papers, venues and orgs boxes, "might belong here" suggestions) is gone:
+
+- A page of any kind is in a topic through its own `in-topic` link in its `links.jsonl`, shown in a bar at the foot
+  of every page ("Topics: A · B · Add"), where "Add" puts it in one by name, making the topic if none has that name.
+  A topic in a topic is a subtopic there. Membership is direct: nothing rolls up.
+- A topic's page is its article (`community/`), then its subtopics and its other pages, by name. `topic.json` is the
+  name only.
+- Anyone verified makes, edits (name, article), renames and merges topics, with page protection and the patrol feed;
+  a merge or rename leaves a redirect, as paper merges do.
+- Typed facts ("introduced by", "uses dataset") come later, as an infobox-like step after categories.
 
 ### Later (not this plan)
 
@@ -181,7 +178,7 @@ Built:
   `page_current`, `page_events`, `search_docs` and `demo_pins` are renamed `paper_id` → `page_id` in place and
   reference `pages`. `bot_grants` gains `kind` (default `paper`; key `(account, kind, pattern)`).
 - **The kind registry, `src/lib/kinds.ts`**: per kind its route, identifier form (`venue:iclr/2027`), kind file
-  and zod schema (`venue.json`: name, dates, url, sources; `topic.json`: name, aliases, broader; `org.json`: name,
+  and zod schema (`venue.json`: name, dates, url, sources; `topic.json`: name; `org.json`: name,
   domains, parents, ror; `profile.json`), parts (owners' and `community/`), slots, file types, plugin context
   keys, whether it is a scope, and key depth. Also `parseIdentifier`/`formatIdentifier`, `pagePath`,
   `parentsOf`, `sourcesOf`. `server/pages/schemas.ts` gained `labeledLink` (JSONL), `venue`, `topic`, `org` and

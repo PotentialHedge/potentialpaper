@@ -94,18 +94,15 @@ import { scopeChangedAt, scopePaperChunk, scopeScoreField, scopeScoreList, scope
 import { rolesOf } from '../pages/check';
 import { presentChanges, recentChanges } from '../changes';
 import { protectionOf, setProtection } from '../page-protection';
-import { presentTopicPapers } from '../topic-papers';
 import {
   createTopic,
-  decideSuggestion,
   editTopic,
-  linkPaperToTopic,
+  linkPageToTopic,
   mergeTopic,
   presentTopicOverview,
   renameTopic,
   similarTopics,
   topicOverview,
-  topicSuggestionList,
 } from '../topic-pages';
 import { countTransition, countView, MIN_SHOWN_VIEWS, transitionCounts } from '../view-counter';
 import { countInstitution, countTime, pageAnalytics } from '../page-analytics';
@@ -1378,7 +1375,7 @@ async function topicPage(params: Record<string, string | string[]>) {
   return page;
 }
 
-/** Topics whose name or an alias is like `q`, the same name first: what the forms check before making one. Public. */
+/** Topics whose name is like `q`, the same name first: what the forms check before making one. Public. */
 export const getTopics = route(async (req) => {
   const { q } = parseQuery(req, S.TopicSearchQuery);
   const origin = siteUrl();
@@ -1386,7 +1383,7 @@ export const getTopics = route(async (req) => {
   return respond(S.TopicMatches, { topics }, { headers: PUBLIC_MINUTE });
 });
 
-/** Makes a topic. Anyone verified may; a name or alias another topic has is refused (`topic_exists`). */
+/** Makes a topic. Anyone verified may; a name another topic has is refused (`topic_exists`). */
 export const postTopic = route(async (req) => {
   const principal = await requireVerified(req);
   const body = await parseBody(req, S.NewTopicBody);
@@ -1397,21 +1394,21 @@ export const postTopic = route(async (req) => {
   });
 });
 
-/** Puts a paper in a topic (a labeled link from the paper), making the topic if it is named and doesn't exist. */
-export const postPaperTopic = route(async (req, params) => {
+/** Puts a page of any kind in a topic (an `in-topic` link from it), making the topic if it is named and doesn't exist. */
+export const postPageTopic = route(async (req, params) => {
   const principal = await requireVerified(req);
-  const paper = await mustFindPage(identifierParam(params));
-  const body = await parseBody(req, S.PaperTopicBody);
-  const result = await linkPaperToTopic(paper, body, actorOf(principal));
+  const page = await mustFindPage(identifierParam(params));
+  const body = await parseBody(req, S.PageTopicBody);
+  const result = await linkPageToTopic(page, body, actorOf(principal));
   const summary = (await pageSummaries([result.topic.id])).get(result.topic.id)!;
   return respond(
-    S.PaperTopicResult,
+    S.PageTopicResult,
     { topic: summary, created: result.created, status: result.status },
     { status: result.status === 'linked' ? 201 : 200, principal },
   );
 });
 
-/** A topic's broader, narrower and related topics, the papers that introduced it, its venues and orgs. Public. */
+/** A topic's subtopics and other pages, by name, its merges and its protection. Public. */
 export const getTopicOverview = route(async (_req, params) => {
   const page = await topicPage(params);
   return respond(S.TopicOverview, presentTopicOverview(await topicOverview(page), siteUrl()), {
@@ -1419,20 +1416,13 @@ export const getTopicOverview = route(async (_req, params) => {
   });
 });
 
-/** Edits a topic: its name, aliases, broader topics, article and related topics, in one commit. */
+/** Edits a topic: its name and article, in one commit. */
 export const patchTopic = route(async (req, params) => {
   const principal = await requireVerified(req);
   const page = await topicPage(params);
   const body = await parseBody(req, S.TopicEditBody);
   const result = await editTopic(page, body, actorOf(principal));
   return respond(S.TopicEdited, { head: result.oid, changed: result.status === 'committed' }, { principal });
-});
-
-/** A topic's papers, rolled up from its narrower topics, sorted by date, venue or score. Public. */
-export const getTopicPapers = route(async (req, params) => {
-  const page = await topicPage(params);
-  const query = parseQuery(req, S.TopicPapersQuery);
-  return respond(S.TopicPapers, await presentTopicPapers(page.id, query), { headers: PUBLIC_MINUTE });
 });
 
 /** Gives a topic a new address (and name), leaving a redirect from the old. */
@@ -1456,22 +1446,6 @@ export const postMerge = route(async (req, params) => {
   return respond(S.PageResponse, await resolvePage(formatIdentifier({ kind: 'topic', key: survivor.key })), {
     principal,
   });
-});
-
-/** Papers that might belong in a topic, best first. Public. */
-export const getSuggestions = route(async (req, params) => {
-  const page = await topicPage(params);
-  const { offset, limit } = parseQuery(req, S.SuggestionsQuery);
-  return respond(S.Suggestions, await topicSuggestionList(page.id, { offset, limit }), { headers: PUBLIC_MINUTE });
-});
-
-/** Confirms (links the paper) or dismisses (remembered, so it doesn't come back) a suggestion. */
-export const postSuggestion = route(async (req, params) => {
-  const principal = await requireVerified(req);
-  const page = await topicPage(params);
-  const { paper, action, label } = await parseBody(req, S.SuggestionBody);
-  await decideSuggestion(page, await mustFindPage(paper), { action, label }, actorOf(principal));
-  return respond(S.Suggestions, await topicSuggestionList(page.id, {}), { principal });
 });
 
 function presentProtection(protection: Awaited<ReturnType<typeof protectionOf>>) {
@@ -1509,7 +1483,6 @@ export const getChanges = route(async (req) => {
   const changes = await recentChanges({
     kind: query.kind,
     bots: query.bots === 'true',
-    rollUp: query.rollUp === 'true',
     before: query.before,
     limit: query.limit,
   });

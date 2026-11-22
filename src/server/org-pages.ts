@@ -450,24 +450,22 @@ export interface OrgOverview {
   children: OrgChild[];
   people: { handles: string[]; count: number };
   venues: OverlapPage[];
-  topics: OverlapPage[];
 }
 
-/** What an org page lists besides its sections and papers: where it sits, its people, and its venues and topics by count. */
+/** What an org page lists besides its sections and papers: where it sits, its people, and its venues by count. */
 export async function orgOverview(page: PageRow, database: Database = getDb()): Promise<OrgOverview> {
-  const [parent, children, people, venues, topics] = await Promise.all([
+  const [parent, children, people, venues] = await Promise.all([
     orgParent(page, database),
     orgChildren(page, database),
     orgPeople(page.id, {}, database),
     scopeOverlap(page.id, 'venue', { database }),
-    scopeOverlap(page.id, 'topic', { database }),
   ]);
-  return { parent, children, people, venues, topics };
+  return { parent, children, people, venues };
 }
 
 /** The overview as the API gives it (`GET /pages/{identifier}/org`), with identifiers and addresses. */
 export function presentOrgOverview(overview: OrgOverview, origin: string) {
-  const page = (kind: 'org' | 'venue' | 'topic', key: string) => ({
+  const page = (kind: 'org' | 'venue', key: string) => ({
     identifier: formatIdentifier({ kind, key }),
     url: `${origin}${keyedPagePath(kind, key)}`,
   });
@@ -477,6 +475,5 @@ export function presentOrgOverview(overview: OrgOverview, origin: string) {
     people: overview.people.handles.map((handle) => ({ handle, url: `${origin}${keyedPagePath('user', handle)}` })),
     peopleCount: overview.people.count,
     venues: overview.venues.map((v) => ({ ...page('venue', v.key), name: v.name, papers: v.papers })),
-    topics: overview.topics.map((t) => ({ ...page('topic', t.key), name: t.name, papers: t.papers })),
   };
 }

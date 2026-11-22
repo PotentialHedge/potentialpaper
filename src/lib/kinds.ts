@@ -82,18 +82,15 @@ export const venueFileSchema = z
     description: "A venue page's venue.json: what the venue is, and where its papers come from.",
   });
 
-/** A `topic.json`: a research idea at the size of a Wikipedia article, not a field. */
+/**
+ * A `topic.json`: a topic's name. A topic works as a Wikipedia category does: pages are in it through their own
+ * `in-topic` links, a topic in another one included, which makes it a subtopic there.
+ */
 export const topicFileSchema = z
   .strictObject({
     name: shortText(120).meta({ description: 'The topic\'s name: "Linear attention".' }),
-    aliases: z
-      .array(shortText(120))
-      .max(20)
-      .optional()
-      .meta({ description: 'Other names it goes by, which search and suggestions match too.' }),
-    broader: slugList('Broader topics, by slug: "efficient-transformers". Optional and loose, a DAG.'),
   })
-  .meta({ title: 'Topic', description: "A topic page's topic.json: its name, aliases and broader topics." });
+  .meta({ title: 'Topic', description: "A topic page's topic.json: its name." });
 
 /** An `org.json`: an institution, or a department or lab under one. */
 export const orgFileSchema = z
@@ -395,16 +392,12 @@ export function paperAddress(ids: readonly PaperId[]): PageAddress | null {
 
 /**
  * The parents a keyed page has, as identifiers: by its address (an edition's series, a lab's institution) and by
- * its kind file (a topic's `broader`, an org's `parents`). Roll-ups follow these (`page_ancestors`).
+ * its kind file (an org's `parents`). Roll-ups follow these (`page_ancestors`).
  */
 export function parentsOf(kind: KeyedKind, key: string, kindFile: unknown): string[] {
   const out = new Set<string>();
   const at = key.lastIndexOf('/');
   if (at > 0 && (kind === 'venue' || kind === 'org')) out.add(`${kind}:${key.slice(0, at)}`);
-  if (kind === 'topic') {
-    const parsed = topicFileSchema.safeParse(kindFile);
-    for (const slug of parsed.success ? (parsed.data.broader ?? []) : []) out.add(`topic:${slug}`);
-  }
   if (kind === 'org') {
     const parsed = orgFileSchema.safeParse(kindFile);
     for (const parent of parsed.success ? (parsed.data.parents ?? []) : []) out.add(`org:${parent}`);

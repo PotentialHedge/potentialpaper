@@ -1,17 +1,18 @@
 'use client';
 
-import { type FormEvent, type ReactNode, useState } from 'react';
+import { type FormEvent, useState } from 'react';
 import { Modal } from '@/components/Modal';
 import { ui } from '@/components/ui';
 import { failureOf, send } from './api';
 import { useTopicMatches } from './useTopicMatches';
 
 /**
- * "Add a topic" on a paper's page (`handoffs/pages.md` Phase 5): a topic by name, offered from the topics there are
- * as one types; one no topic has is made. Adds an `in-topic` link from the paper, as
- * the reader's own edit of the paper's links (`POST /api/v1/pages/{identifier}/topics`).
+ * "Add to a topic", in the topics bar at the foot of every page (`components/pages/common.tsx`): a topic by name,
+ * offered from the topics there are as one types; one no topic has is made. Adds an `in-topic` link from the page, as
+ * the reader's own edit of its links (`POST /api/v1/pages/{identifier}/topics`), as a Wikipedia page is put in a
+ * category.
  */
-export function AddTopic({ identifier, children }: { identifier: string; children: ReactNode }) {
+export function AddTopic({ identifier, label }: { identifier: string; label: string }) {
   const [open, setOpen] = useState(false);
   const [name, setName] = useState('');
   const [chosen, setChosen] = useState<string | null>(null);
@@ -37,7 +38,7 @@ export function AddTopic({ identifier, children }: { identifier: string; childre
           body.status === 'exists'
             ? `It is in ${body.topic.name} already.`
             : body.created
-              ? `Made the topic ${body.topic.name} and added the paper. It shows here within a few minutes.`
+              ? `Made the topic ${body.topic.name} and added this page to it. It shows here within a few minutes.`
               : `Added to ${body.topic.name}. It shows here within a few minutes.`,
         link: body.topic.address,
       });
@@ -51,26 +52,21 @@ export function AddTopic({ identifier, children }: { identifier: string; childre
   }
 
   return (
-    <div className={ui.box}>
-      <div className={ui.boxHeadingRow}>
-        <h2 className={ui.runIn}>Topics</h2>
-        <button
-          type="button"
-          className={ui.boxAction}
-          onClick={() => {
-            setNote(null);
-            setOpen(true);
-          }}
-          title="Add a topic"
-        >
-          Add
-        </button>
-      </div>
-      {children}
-      <Modal open={open} onClose={() => setOpen(false)} title="Add a topic">
+    <>
+      <button
+        type="button"
+        className={ui.linkBtn}
+        onClick={() => {
+          setNote(null);
+          setOpen(true);
+        }}
+      >
+        {label}
+      </button>
+      <Modal open={open} onClose={() => setOpen(false)} title="Add to a topic">
         {form()}
       </Modal>
-    </div>
+    </>
   );
 
   function form() {
@@ -103,7 +99,6 @@ export function AddTopic({ identifier, children }: { identifier: string; childre
                 >
                   {m.name}
                 </button>
-                {m.matched !== m.name && <span className="text-faint"> ({m.matched})</span>}
               </li>
             ))}
           </ul>
