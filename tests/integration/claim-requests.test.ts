@@ -1,9 +1,10 @@
 import { and, eq } from 'drizzle-orm';
 import { afterAll, beforeEach, describe, expect, it } from 'vitest';
 import { getDb } from '@/db';
-import { accountEmails, accounts, authorClaims, pageCurrent, pdfDocuments } from '@/db/schema';
+import { accountEmails, accounts, authorClaims, pageCurrent, pdfDocuments, submissions, venues } from '@/db/schema';
 import { commitPage } from '@/server/pages/commit';
 import { savePaper } from '@/server/papers';
+import { linkedAuthors } from '@/server/user-pages';
 import { api, closePool, lastMailTo, resetDatabase, signUp } from './helpers';
 
 const PAPER = { scheme: 'arxiv', value: '1706.03762' } as const;
@@ -169,5 +170,40 @@ describe('claim suggestions', () => {
     ]);
     expect(mine.body.papers[0]).toMatchObject({ byEmail: false, likely: 2, mine: null });
     expect(mine.body.papers[1]).toMatchObject({ byEmail: true, mine: { status: 'confirmed' } });
+  });
+});
+
+describe('a paper under review', () => {
+  async function underReview(paperId: string) {
+    await getDb().insert(venues).values({ id: 'openreview:ICLR.cc/2027/Conference', name: 'ICLR 2027' });
+    await getDb().insert(submissions).values({
+      paperId,
+      venueId: 'openreview:ICLR.cc/2027/Conference',
+      externalId: 'abc',
+      status: 'under_review',
+      fetchedAt: new Date(),
+    });
+  }
+
+  it('is claimed only by an address on it, hides the names, and links no one', async () => {
+    const paperId = await paper(['ashish@ethz.ch', 'niki.parmar@gmail.com'], 'Ashish Vaswani\nashish@ethz.ch\n');
+    await underReview(paperId);
+
+    const niki = await accountOf('niki@ethz.ch');
+    for (const [path, body] of [
+      ['/claims', { paper: PAPER, authorIndex: 2, evidence: '' }],
+      ['/claims/ask', { paper: PAPER, authorIndex: 2 }],
+      ['/claims/code', { paper: PAPER, authorIndex: 2, email: 'niki.parmar@gmail.com' }],
+    ] as const) {
+      expect((await api('POST', path, { cookie: niki.cookie, body })).status).toBe(403);
+    }
+    const searched = await api('GET', '/me/claim-suggestions?q=vaswani', { cookie: niki.cookie });
+    expect(searched.body.papers).toEqual([]);
+
+    const ashish = await accountOf('ashish@ethz.ch');
+    expect((await claimOf(paperId, ashish.id))?.status).toBe('confirmed');
+    const mine = await api('GET', '/me/claim-suggestions', { cookie: ashish.cookie });
+    expect(mine.body.papers[0]).toMatchObject({ underReview: true, authors: ['Ashish Vaswani', '', ''] });
+    expect((await linkedAuthors(paperId)).map((a) => a.href)).toEqual([null]);
   });
 });

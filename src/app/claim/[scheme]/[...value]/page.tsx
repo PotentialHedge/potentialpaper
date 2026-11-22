@@ -1,6 +1,7 @@
 import type { Metadata } from 'next';
 import { headers } from 'next/headers';
 import { notFound, redirect } from 'next/navigation';
+import { InfoTip } from '@/components/InfoTip';
 import { ToolHeader, toolPage, type ToolPage, type ToolParams } from '@/components/pages/page-tools';
 import { ui } from '@/components/ui';
 import { getDb } from '@/db';
@@ -13,6 +14,7 @@ import { orgDomains, isOrgMember } from '@/server/org-roles';
 import { paperAddresses } from '@/server/claim-requests';
 import { ownPageClaim } from '@/server/page-claims';
 import { siteUrl } from '@/server/site';
+import { underReview } from '@/server/under-review';
 import { ClaimForm, StepDown } from './ClaimForm';
 import { OrganiserClaimForm } from './OrganiserClaimForm';
 
@@ -42,43 +44,50 @@ export default async function ClaimPage({ params }: Props) {
   if (found.address.kind !== 'paper') notFound();
   const id = found.address.id;
   const paperId = found.page.id;
-  const [mine, confirmed, addresses, printed] = await Promise.all([
+  const [mine, confirmed, addresses, printed, hidden] = await Promise.all([
     ownClaim(paperId, viewer.account.id),
     confirmedAuthors(paperId),
     ownAddressesOnPaper(paperId, viewer.account.id),
     paperAddresses(paperId),
+    underReview(paperId),
   ]);
-  const taken = confirmed.map((c) => c.authorIndex);
-  const editPath = toolPath('code', found.address);
+  const title = found.paper?.paper.title ?? found.name;
   return (
     <main className={ui.page}>
-      <ToolHeader page={found} tool="claim" title="Claim this paper" />
-      <div className="mt-5 max-w-[640px] font-sans text-sm">
-        <p>
-          {confirmed.length > 0
-            ? `Claimed by ${confirmed.map((c) => c.authorName).join(', ')}.`
-            : 'Nobody has claimed this paper yet.'}{' '}
-          Its confirmed authors write its authors&apos; sections and choose its picture and links.
-        </p>
-        <p className={ui.fine}>
-          On a paper you&apos;ve claimed you always appear under the name printed on it, never your handle, so nothing
-          public ties the two together. What you did here before the claim keeps your handle.
+      <header className="mt-6">
+        <h1 className="text-[26px] leading-tight font-normal">
+          Claim{' '}
+          <a
+            href={found.path}
+            className="text-ink underline decoration-rule-strong underline-offset-4 hover:decoration-ink"
+          >
+            {title}
+          </a>
+        </h1>
+      </header>
+      <div className="mt-4 max-w-[640px] font-sans text-sm">
+        <p className="text-subtle">
+          {hidden
+            ? 'This paper is under review, so its authors are hidden here.'
+            : confirmed.length > 0
+              ? `Claimed by ${confirmed.map((c) => c.authorName).join(', ')}.`
+              : 'Nobody has claimed it yet.'}
+          <InfoTip>
+            Confirmed authors write the paper&apos;s author section and choose its picture and links. On it you appear
+            under the name printed on the paper, never your handle.
+            {hidden &&
+              ' While it is under review, nothing shows who claimed it, and only an author whose address is printed on it can claim it.'}
+          </InfoTip>
         </p>
         {!verified ? (
-          <p className="mt-4">
-            Claiming needs a confirmed institutional address.{' '}
-            <a href="/profile#affiliations">Add one on your profile</a>.
-          </p>
+          <NotVerified />
         ) : mine?.status === 'confirmed' ? (
           <div className="mt-4">
             <p>
-              You are a confirmed author of this paper, as {mine.authorName}
-              {mine.method === 'email' &&
-                (addresses.onPaper.length > 0
-                  ? `, because your address ${addresses.onPaper.join(' and ')} is printed on its first page`
-                  : ', from an address of yours printed on its first page')}
-              {mine.method === 'vouch' && ', added by a co-author'}.{' '}
-              <a href={editPath}>Write the authors&apos; sections</a> (in <code>owners/</code>), or{' '}
+              You are its author {mine.authorName}
+              {mine.method === 'email' && addresses.onPaper.length > 0 && `, by ${addresses.onPaper.join(' and ')}`}
+              {mine.method === 'vouch' && ', confirmed by a co-author'}.{' '}
+              <a href={toolPath('code', found.address)}>Write the author section</a> or{' '}
               <a href="/papers">add your co-authors</a>.
             </p>
             {canStepDown(mine) && (
@@ -90,30 +99,20 @@ export default async function ClaimPage({ params }: Props) {
         ) : mine?.status === 'rejected' ? (
           <p className="mt-4">Your claim to be {mine.authorName} was not confirmed.</p>
         ) : (
-          <>
-            {mine?.status === 'declined' && (
-              <p className="mt-4">You stepped down as {mine.authorName}. You can claim the paper again below.</p>
-            )}
-            {addresses.onPaper.length > 0 && (
-              <p className={`${ui.box} mt-4`}>
-                Your address {addresses.onPaper.join(' and ')} is printed on this paper&apos;s first page, so your claim
-                is confirmed as soon as you send it.
-              </p>
-            )}
-            <ClaimForm
-              paper={id}
-              pagePath={found.path}
-              title={found.paper?.paper.title ?? ''}
-              authors={found.paper?.paper.authors ?? []}
-              taken={taken}
-              pending={mine?.status === 'pending' ? mine : null}
-              instant={addresses.onPaper.length > 0}
-              printed={printed}
-              ownAddresses={addresses.own}
-              confirmedNames={confirmed.map((c) => c.authorName)}
-              inviteUrl={`${siteUrl()}/welcome?next=${encodeURIComponent('/papers')}`}
-            />
-          </>
+          <ClaimForm
+            paper={id}
+            title={title}
+            authors={found.paper?.paper.authors ?? []}
+            taken={confirmed.map((c) => c.authorIndex)}
+            pending={mine?.status === 'pending' ? mine : null}
+            declined={mine?.status === 'declined' ? mine.authorName : null}
+            onPaper={addresses.onPaper}
+            hidden={hidden}
+            printed={printed}
+            ownAddresses={addresses.own}
+            confirmedNames={hidden ? [] : confirmed.map((c) => c.authorName)}
+            inviteUrl={`${siteUrl()}/welcome?next=${encodeURIComponent('/papers')}`}
+          />
         )}
       </div>
     </main>

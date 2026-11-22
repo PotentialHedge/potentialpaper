@@ -10,6 +10,7 @@ import { summaries, type PaperSummary } from './my-papers';
 import { authorsForEmails } from './pdfs/authors';
 import { consume, rateLimitHeaders, type RateLimitConfig } from './ratelimit';
 import { siteUrl } from './site';
+import { UNDER_REVIEW } from './under-review';
 
 /**
  * Claiming without an address of one's own on the paper (DESIGN.md §6): asking its confirmed co-authors, who are
@@ -195,6 +196,8 @@ export interface ClaimSuggestion extends PaperSummary {
   likely: number | null;
   /** Authors someone is confirmed as. */
   taken: number[];
+  /** Under review (`under-review.ts`): every name in `authors` but the account's own is blank. */
+  underReview: boolean;
   /** The account's own claim, if any. */
   mine: { authorIndex: number; status: string } | null;
 }
@@ -234,6 +237,7 @@ export async function claimSuggestions(
     mine_index: number | null;
     mine_status: string | null;
     taken: number[];
+    under_review: boolean;
   }>(sql`
     with cand as (${candidates})
     select p.id, p.authors,
@@ -241,12 +245,15 @@ export async function claimSuggestions(
            d.emails, d.first_page_raw,
            mine.author_index as mine_index, mine.status as mine_status,
            coalesce((select array_agg(t.author_index) from author_claims t
-                      where t.paper_id = p.id and t.status = 'confirmed'), '{}') as taken
+                      where t.paper_id = p.id and t.status = 'confirmed'), '{}') as taken,
+           ${UNDER_REVIEW(sql`p.id`)} as under_review
       from cand join papers p on p.id = cand.id
       left join page_current c on c.page_id = p.id
       left join pdf_documents d on d.sha256 = c.pdf ->> 'sha256'
       left join author_claims mine on mine.paper_id = p.id and mine.account_id = ${accountId}
      where p.merged_into is null and jsonb_array_length(p.authors) > 0
+       -- One under review is found only by an address of the account's on it, and its names aren't shown.
+       and (coalesce(d.emails && coalesce(${own}, '{}'), false) or not ${UNDER_REVIEW(sql`p.id`)})
      order by (mine.status = 'confirmed') nulls first,
               by_email desc,
               (cardinality(${namesArray}) > 0 and p.authors ?| ${namesArray}) desc,
@@ -275,9 +282,11 @@ export async function claimSuggestions(
       const index = row.authors.findIndex((a) => names.includes(a));
       if (index >= 0) likely = index;
     }
+    const yours = row.mine_status ? row.mine_index : likely;
     out.push({
       ...summary,
-      authors: row.authors,
+      authors: row.under_review ? row.authors.map((name, i) => (i === yours ? name : '')) : row.authors,
+      underReview: row.under_review,
       byEmail: row.by_email,
       likely,
       taken: row.taken,

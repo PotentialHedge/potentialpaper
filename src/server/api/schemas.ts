@@ -391,6 +391,8 @@ export const ClaimSuggestions = z.object({
       byEmail: z.boolean(),
       likely: z.number().int().nullable(),
       taken: z.array(z.number().int()),
+      /** Under anonymous review: every name but the viewer's own is blank. */
+      underReview: z.boolean(),
       mine: z.object({ authorIndex: z.number().int(), status: z.string() }).nullable(),
     }),
   ),

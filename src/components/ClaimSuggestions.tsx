@@ -15,6 +15,8 @@ interface Suggestion {
   byEmail: boolean;
   likely: number | null;
   taken: number[];
+  /** Under anonymous review: every name but the viewer's own is blank. */
+  underReview: boolean;
   mine: { authorIndex: number; status: string } | null;
 }
 
@@ -98,14 +100,18 @@ export function ClaimSuggestions({ autoFocus = false }: { autoFocus?: boolean })
                     {row.title}
                   </a>
                   <div className="text-xs text-muted">
-                    {row.authors.map((name, i) => (
-                      <span key={i}>
-                        {i > 0 && ', '}
-                        <span className={i === (row.mine?.authorIndex ?? row.likely) ? 'font-semibold text-ink' : ''}>
-                          {name}
-                        </span>
-                      </span>
-                    ))}
+                    {row.underReview
+                      ? 'Under review, so its authors are hidden'
+                      : row.authors.map((name, i) => (
+                          <span key={i}>
+                            {i > 0 && ', '}
+                            <span
+                              className={i === (row.mine?.authorIndex ?? row.likely) ? 'font-semibold text-ink' : ''}
+                            >
+                              {name}
+                            </span>
+                          </span>
+                        ))}
                     {(row.venue || row.year) && (
                       <span className="text-faint">
                         {' '}

@@ -1,4 +1,4 @@
-import { and, desc, eq, isNull, sql } from 'drizzle-orm';
+import { and, desc, eq, isNull, not, sql } from 'drizzle-orm';
 import { getDb, type Database } from '@/db';
 import {
   accounts,
@@ -21,6 +21,7 @@ import type { Reader } from './pages/repo';
 import { pageSummaries } from './plugins/pages';
 import { summaries } from './my-papers';
 import { userSettingsRow } from './settings';
+import { UNDER_REVIEW, underReview } from './under-review';
 
 /**
  * A person's page, `/u/<handle>` (`handoffs/pages.md` Phase 3): what it shows the public, and keeping it with its
@@ -55,7 +56,7 @@ export async function shownFor(account: Pick<Account, 'id' | 'showInstitution'>)
 /**
  * A paper's confirmed authors, in the paper's order, each with the address of their page when their account shows the
  * papers it authored (`user.show.claimedPapers`, on unless they turned it off), else `null`: only then does the
- * paper link their printed name to their handle.
+ * paper link their printed name to their handle. Never while the paper is under review (`under-review.ts`).
  */
 export async function linkedAuthors(
   paperId: string,
@@ -73,6 +74,9 @@ export async function linkedAuthors(
     .innerJoin(accounts, eq(accounts.id, authorClaims.accountId))
     .where(and(eq(authorClaims.paperId, paperId), eq(authorClaims.status, 'confirmed')))
     .orderBy(authorClaims.authorIndex);
+  if (rows.length > 0 && (await underReview(paperId, database))) {
+    return rows.map((r) => ({ authorIndex: r.authorIndex, authorName: r.authorName, href: null }));
+  }
   return Promise.all(
     rows.map(async (r) => ({
       authorIndex: r.authorIndex,
@@ -204,7 +208,13 @@ async function claimedPapersOf(accountId: string, database: Database): Promise<C
   const claims = await database
     .select({ paperId: authorClaims.paperId, authorName: authorClaims.authorName })
     .from(authorClaims)
-    .where(and(eq(authorClaims.accountId, accountId), eq(authorClaims.status, 'confirmed')));
+    .where(
+      and(
+        eq(authorClaims.accountId, accountId),
+        eq(authorClaims.status, 'confirmed'),
+        not(UNDER_REVIEW(sql`${authorClaims.paperId}`)),
+      ),
+    );
   const [found, papers] = await Promise.all([
     pageSummaries(
       claims.map((c) => c.paperId),

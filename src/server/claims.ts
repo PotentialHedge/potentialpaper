@@ -13,6 +13,7 @@ import {
   type ClaimStatus,
   type ClaimVerification,
 } from '@/db/schema';
+import { underReview } from './under-review';
 import { ApiError } from './api/errors';
 import { newIdentity } from './pages/commit';
 import { refreshPaperPages } from './pages/refresh';
@@ -222,6 +223,13 @@ export async function requestClaim(
     throw new ApiError(409, 'claim_decided', `your claim was already ${existing.status}`);
   }
   const verification = await emailEvidence(paperId, account.id, database);
+  if (!verification && (await underReview(paperId, database))) {
+    throw new ApiError(
+      403,
+      'forbidden',
+      'while the paper is under review, only an author whose address is printed on it can claim it',
+    );
+  }
   const decision = verification
     ? { status: 'confirmed' as const, method: 'email' as const, verification, decidedAt: new Date() }
     : { status: 'pending' as const, method: 'manual' as const, verification: null, decidedAt: null };

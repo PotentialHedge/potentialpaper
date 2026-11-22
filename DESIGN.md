@@ -655,6 +655,9 @@ in production:
   (`affiliations`). They also serve as evidence for author claims (section 6). An address printed on a paper
   that isn't institutional can be confirmed by a code to claim that paper (`account_emails`): it proves the
   claim but no institution.
+- **A paper under review** (a submission still `under_review`) shows nobody who claimed it: claimed names don't
+  link to accounts, and it isn't listed on their pages. Only an author whose confirmed address is printed on it
+  can claim it then, and the claim page and `/claim` don't show its names (`server/under-review.ts`).
 - **Onboarding** asks only for a handle (the institution is shown; both change on the profile), then offers
   the person's likely papers to claim (`/claim`), then a password.
 - **Unconfirmed sign-ups** are pruned weekly.
