@@ -28,6 +28,8 @@ interface Props {
   confirmedNames: string[];
   /** Where an invited co-author signs up. */
   inviteUrl: string;
+  /** Mail isn't sent but kept for `/dev/mail` (dev without Resend), so the code is read there. */
+  devMail: boolean;
 }
 
 async function messageOf(res: Response | null): Promise<string> {
@@ -248,10 +250,22 @@ function OpenClaim(props: Props) {
         <>
           {candidates.length > 0 && (
             <section className="mt-5">
-              <h3 className={ui.boxHeading}>Confirm with your email</h3>
+              <h3 className={ui.boxHeading}>Confirm your email:</h3>
               {sentTo ? (
                 <form onSubmit={confirmCode} className="flex flex-wrap items-start gap-2">
-                  <span className="w-full text-subtle">We sent a code to {sentTo}. It works for an hour.</span>
+                  <span className="w-full text-subtle">
+                    We sent a code to {sentTo}. It works for an hour.
+                    {props.devMail && (
+                      <>
+                        {' '}
+                        Dev: read it at{' '}
+                        <a href="/dev/mail" target="_blank" rel="noreferrer">
+                          /dev/mail
+                        </a>
+                        .
+                      </>
+                    )}
+                  </span>
                   <input
                     value={code}
                     onChange={(e) => setCode(e.target.value)}

@@ -112,6 +112,7 @@ export default async function ClaimPage({ params }: Props) {
             ownAddresses={addresses.own}
             confirmedNames={hidden ? [] : confirmed.map((c) => c.authorName)}
             inviteUrl={`${siteUrl()}/welcome?next=${encodeURIComponent('/papers')}`}
+            devMail={process.env.NODE_ENV !== 'production' && !process.env.RESEND_API_KEY}
           />
         )}
       </div>
