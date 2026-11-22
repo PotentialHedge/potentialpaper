@@ -3,6 +3,7 @@
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { useState, type FormEvent } from 'react';
+import { CopyField } from '@/components/CopyField';
 import { Modal } from '@/components/Modal';
 import { Select } from '@/components/Select';
 import { ui } from '@/components/ui';
@@ -63,7 +64,7 @@ export function AuthoredPapers({
                     <Link href={row.path}>{row.title}</Link>
                     {(row.year || row.venue) && (
                       <div className="font-sans text-xs text-faint">
-                        {[row.venue, row.year].filter(Boolean).join(' ')}
+                        {[row.venue, row.venue?.includes(String(row.year)) ? null : row.year].filter(Boolean).join(' ')}
                       </div>
                     )}
                   </td>
@@ -271,6 +272,44 @@ function CoAuthors({ row }: { row: AuthoredRow }) {
         </form>
       )}
       {note && <p className={ui.note(note.ok)}>{note.text}</p>}
+      {open.length > 0 && <Invite row={row} open={open} />}
     </div>
+  );
+}
+
+/**
+ * For a co-author not here yet: a link that signs them up and opens the paper's claim page, to copy or to send from
+ * one's own mail. Their claim then asks the confirmed authors, so it shows up here as waiting.
+ */
+function Invite({ row, open }: { row: AuthoredRow; open: { name: string; index: number }[] }) {
+  // Only rendered once the modal opens, in the browser.
+  const link = `${window.location.origin}/welcome?next=${encodeURIComponent(claimPath(row.canonical))}`;
+  const text = (name: string) =>
+    `Hi ${name.split(' ')[0]},\n\n` +
+    `I've claimed our paper “${row.title}” on PotentialPaper, where authors write a short section about their paper. ` +
+    `Join me as ${name}: sign up with your institutional address and claim your name, and I'll confirm you.\n\n` +
+    `${link}\n\nThanks!`;
+  const mailto = (name: string) =>
+    `mailto:?${new URLSearchParams({ subject: `Join me on “${row.title}”`, body: text(name) })
+      .toString()
+      .replace(/\+/g, '%20')}`;
+  return (
+    <>
+      <h3 className={`${ui.boxHeading} mt-5`}>Not on PotentialPaper yet?</h3>
+      <p className="mb-2 text-subtle">
+        Send them this link. Once they sign up and claim their name, they show up here for you to confirm.
+      </p>
+      <CopyField value={link} label="Invite link" />
+      <p className="mt-2">
+        Or email{' '}
+        {open.map((a, i) => (
+          <span key={a.index}>
+            {i > 0 && ', '}
+            <a href={mailto(a.name)}>{a.name}</a>
+          </span>
+        ))}{' '}
+        from your own mail.
+      </p>
+    </>
   );
 }
