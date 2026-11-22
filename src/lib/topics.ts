@@ -65,9 +65,5 @@ export function parseAliases(text: string, name = ''): string[] {
   return out;
 }
 
-/** The labels a paper is in a topic by, as a form offers them. */
-export const TOPIC_LINK_CHOICES = [
-  { label: 'in-topic', words: 'is about it' },
-  { label: 'introduces-topic', words: 'introduced it' },
-] as const;
-export type TopicLinkLabel = (typeof TOPIC_LINK_CHOICES)[number]['label'];
+/** The labels a paper is in a topic by: about it, or the paper that introduced it. */
+export type TopicLinkLabel = 'in-topic' | 'introduces-topic';

@@ -3,20 +3,18 @@
 import { type FormEvent, type ReactNode, useState } from 'react';
 import { Modal } from '@/components/Modal';
 import { ui } from '@/components/ui';
-import { TOPIC_LINK_CHOICES, type TopicLinkLabel } from '@/lib/topics';
 import { failureOf, send } from './api';
 import { useTopicMatches } from './useTopicMatches';
 
 /**
  * "Add a topic" on a paper's page (`handoffs/pages.md` Phase 5): a topic by name, offered from the topics there are
- * as one types; one no topic has is made. Adds a labeled link from the paper (`in-topic` or `introduces-topic`), as
+ * as one types; one no topic has is made. Adds an `in-topic` link from the paper, as
  * the reader's own edit of the paper's links (`POST /api/v1/pages/{identifier}/topics`).
  */
 export function AddTopic({ identifier, children }: { identifier: string; children: ReactNode }) {
   const [open, setOpen] = useState(false);
   const [name, setName] = useState('');
   const [chosen, setChosen] = useState<string | null>(null);
-  const [label, setLabel] = useState<TopicLinkLabel>('in-topic');
   const [busy, setBusy] = useState(false);
   const [note, setNote] = useState<{ ok: boolean; text: string; link?: string } | null>(null);
   const matches = useTopicMatches(chosen ? '' : name);
@@ -30,7 +28,6 @@ export function AddTopic({ identifier, children }: { identifier: string; childre
       const topic = chosen ?? exact?.identifier;
       const res = await send('POST', `/pages/${encodeURIComponent(identifier)}/topics`, {
         ...(topic ? { topic } : { name: name.trim() }),
-        label,
       });
       if (!res.ok) return setNote({ ok: false, text: (await failureOf(res)).message });
       const body = (await res.json()) as { topic: { name: string; address: string }; created: boolean; status: string };
@@ -114,20 +111,6 @@ export function AddTopic({ identifier, children }: { identifier: string; childre
         {name.trim().length > 1 && !chosen && !exact && (
           <p className="mb-2 text-xs text-muted">No topic is called that yet: adding makes it.</p>
         )}
-        <fieldset className="mb-2 flex flex-wrap gap-x-3">
-          <legend className="sr-only">How the paper is in it</legend>
-          {TOPIC_LINK_CHOICES.map((choice) => (
-            <label key={choice.label} className="flex items-center gap-1">
-              <input
-                type="radio"
-                name="label"
-                checked={label === choice.label}
-                onChange={() => setLabel(choice.label)}
-              />
-              The paper {choice.words}
-            </label>
-          ))}
-        </fieldset>
         <button className={ui.btn({ inline: true })} disabled={busy || !name.trim()}>
           Add
         </button>
