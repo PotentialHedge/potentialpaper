@@ -16,6 +16,7 @@ export const API_ERROR_CODES = [
   'already_affiliated',
   'too_many_pending',
   'invalid_code',
+  'link_closed',
   'affiliation_taken',
   'primary_affiliation',
   'password_already_set',

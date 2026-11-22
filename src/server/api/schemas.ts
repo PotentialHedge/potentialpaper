@@ -348,6 +348,23 @@ export const OwnClaim = z.object({
 });
 
 /**
+ * `GET /claims`: the viewer's claim, and what they need to make one, as the claim page shows it. `authors` as printed
+ * (pick an `authorIndex` from it); `taken`, the indices someone is already confirmed as; `printed`, the addresses on
+ * the paper's first page and whose each is where that is clear; `onPaper`, the viewer's own confirmed addresses among
+ * them (a claim with one confirms at once). `hidden`: under review, so nothing says who claimed it and only an author
+ * with an address on it may claim.
+ */
+export const ClaimContext = OwnClaim.extend({
+  authors: z.array(z.string()),
+  taken: z.array(z.number().int()),
+  confirmedNames: z.array(z.string()),
+  hidden: z.boolean(),
+  printed: z.object({ emails: z.array(z.string()), authorOf: z.record(z.string(), z.number().int()) }),
+  onPaper: z.array(z.string()),
+  ownAddresses: z.array(z.string()),
+});
+
+/**
  * A confirmed author adds a co-author: an account by `handle` and which printed author (`authorIndex`) it is, or a
  * `claim` someone made and is waiting on (`GET /me/papers`'s `waiting`).
  */
@@ -493,6 +510,19 @@ export const AgentToken = z.object({
 });
 /** A code for the signed-in person's own agent prompt. */
 export const MyAgentCode = z.object({ code: z.string(), expiresAt: z.string() });
+
+/** `POST /agent/link`: what the agent says it is, shown to the person on the page they approve it on. */
+export const AgentLinkBody = z.object({ agent: z.string().max(120).optional() });
+export const AgentLinkStarted = z.object({
+  /** The page the person opens, signs in on and approves. */
+  url: z.string(),
+  /** Only the agent's: poll `POST /agent/link/token` with it. */
+  secret: z.string(),
+  expiresAt: z.string(),
+});
+export const AgentLinkPollBody = z.object({ secret: z.string().trim().min(1).max(100) });
+export const AgentLinkPending = z.object({ status: z.literal('pending'), expiresAt: z.string() });
+export const AgentLinkAnswerBody = z.object({ id: z.string().trim().min(1).max(20), approve: z.boolean() });
 
 /** A key the signed-in person makes by hand on their profile, for a script or an agent of their own. */
 export const CreateTokenBody = z.object({

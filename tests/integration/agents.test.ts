@@ -132,6 +132,70 @@ describe('agent sign-in', () => {
   });
 });
 
+describe('agent sign-in through the browser', () => {
+  it('the person approves a link and the agent gets its token, once', async () => {
+    const started = await api('POST', '/agent/link', { body: { agent: 'Claude Code' } });
+    expect(started.status).toBe(201);
+    expect(started.body.url).toMatch(/^http:\/\/test\.local\/agent\/connect\/[0-9A-Z]{4}-[0-9A-Z]{4}$/);
+    const { secret } = started.body;
+    const id = started.body.url.split('/').pop();
+    const pending = await api('POST', '/agent/link/token', { body: { secret } });
+    expect(pending.status).toBe(202);
+    expect(pending.body.status).toBe('pending');
+
+    const cookie = await signUp('ada@ethz.ch');
+    // An agent's own token cannot approve: only the person's browser can.
+    const other = await tokenByMail('alan@ethz.ch');
+    expect((await api('POST', '/agent/link/answer', { token: other, body: { id, approve: true } })).status).toBe(403);
+    expect((await api('POST', '/agent/link/answer', { cookie, body: { id, approve: true } })).status).toBe(200);
+    expect((await api('POST', '/agent/link/answer', { cookie, body: { id, approve: true } })).status).toBe(410);
+
+    const minted = await api('POST', '/agent/link/token', { body: { secret } });
+    expect(minted.status).toBe(201);
+    expect(minted.body.name).toBe('ai-agent');
+    const me = await api('GET', '/me', { token: minted.body.token });
+    expect(me.status).toBe(200);
+    const again = await api('POST', '/agent/link/token', { body: { secret } });
+    expect(again.status).toBe(410);
+    expect(again.body.error.code).toBe('link_closed');
+  });
+
+  it('a declined link gives no token', async () => {
+    const { secret, url } = (await api('POST', '/agent/link', { body: {} })).body;
+    const cookie = await signUp('ada@ethz.ch');
+    const id = url.split('/').pop();
+    expect((await api('POST', '/agent/link/answer', { cookie, body: { id, approve: false } })).status).toBe(200);
+    expect((await api('POST', '/agent/link/token', { body: { secret } })).status).toBe(410);
+  });
+
+  it('a wrong secret is refused', async () => {
+    expect((await api('POST', '/agent/link/token', { body: { secret: 'ppl_nope' } })).status).toBe(410);
+  });
+});
+
+describe('agent onboarding and claiming', () => {
+  it('a new account chooses its handle and sees what it needs to claim a paper, all by token', async () => {
+    await paper();
+    const token = await tokenByMail('ada@ethz.ch');
+    const named = await api('PATCH', '/me', { token, body: { handle: 'ada', showInstitution: true } });
+    expect(named.status).toBe(200);
+    expect(named.body.handle).toBe('ada');
+    const context = await api('GET', '/claims?scheme=arxiv&value=1706.03762', { token });
+    expect(context.status).toBe(200);
+    expect(context.body).toMatchObject({
+      claim: null,
+      authors: ['Ashish Vaswani', 'Noam Shazeer'],
+      taken: [],
+      hidden: false,
+      onPaper: [],
+      ownAddresses: ['ada@ethz.ch'],
+    });
+    const claimed = await api('POST', '/claims', { token, body: { paper: PAPER, authorIndex: 1 } });
+    expect(claimed.status).toBe(201);
+    expect(claimed.body.claim.authorName).toBe('Noam Shazeer');
+  });
+});
+
 describe('agent posts', () => {
   it('an agent posts a result and a reply, and both show on the agent page', async () => {
     await paper();

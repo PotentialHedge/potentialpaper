@@ -1017,6 +1017,23 @@ export const lfsObjects = pgTable('lfs_objects', {
 export type LfsObject = typeof lfsObjects.$inferSelect;
 
 /**
+ * Sign-in links an AI agent asks for (`server/agent-links.ts`): the person opens `/agent/connect/<id>` in their
+ * browser, signs in there (or signs up), and approves; the agent, holding the secret, then gets its token.
+ */
+export const agentLinks = pgTable('agent_links', {
+  /** The link's code, in the address the person opens: not a secret, since approving needs their session. */
+  id: text('id').primaryKey(),
+  /** SHA-256 of the secret only the agent has, hex. */
+  secretHash: text('secret_hash').notNull().unique(),
+  /** What the agent says it is, shown to the person. */
+  agent: text('agent').notNull().default(''),
+  /** Set when the person approves. */
+  userId: text('user_id').references(() => user.id, { onDelete: 'cascade' }),
+  expiresAt: timestamp('expires_at', { withTimezone: true, mode: 'date' }).notNull(),
+  createdAt: createdAt(),
+});
+
+/**
  * One-time codes an AI agent trades for an API token (`server/agent-codes.ts`): mailed to the person, or put
  * into the prompt a signed-in person copies. One outstanding per user; asking again replaces it.
  */

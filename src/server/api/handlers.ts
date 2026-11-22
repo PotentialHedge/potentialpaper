@@ -7,6 +7,7 @@ import { authenticate, requireAuth, requireSession, requireVerified, viewerFromH
 import { cloneAddresses } from '../pages/clone';
 import { commitWorkspace, readBlob, readWorkspace, rebaseWorkspace, storeWorkspaceFile } from '../workspace';
 import { issueAgentCode, redeemAgentCode, requestAgentCode } from '../agent-codes';
+import { answerAgentLink, pollAgentLink, startAgentLink } from '../agent-links';
 import { uploadAgentFile } from '../agent-files';
 import { agentPostsOf, createAgentPost, removeAgentPost, type PresentedAgentPost } from '../agent-posts';
 import {
@@ -25,10 +26,19 @@ import { previewDemoSources } from '../demos/attach';
 import { snapshotDemo } from '../demos/snapshot';
 import { demoUrl } from '@/lib/demos';
 import { addressOfRef, formatIdentifier, keyedPagePath, pagePath, pageRefOf } from '@/lib/kinds';
-import { addCoAuthor, answerInvitation, ownClaim, requestClaim, withdrawClaim } from '../claims';
+import {
+  addCoAuthor,
+  answerInvitation,
+  confirmedAuthors,
+  ownAddressesOnPaper,
+  ownClaim,
+  requestClaim,
+  withdrawClaim,
+} from '../claims';
+import { underReview } from '../under-review';
 import { authoredPapers } from '../my-papers';
 import { confirmClaimCode, sendClaimCode } from '../claim-addresses';
-import { askCoAuthors, claimSuggestions, denyClaim } from '../claim-requests';
+import { askCoAuthors, claimSuggestions, denyClaim, paperAddresses } from '../claim-requests';
 import {
   followedPapers,
   followPaper,
@@ -463,7 +473,27 @@ export const getClaim = route(async (req) => {
   const principal = await requireAuth(req);
   const { scheme, value } = parseQuery(req, S.PaperQuery);
   const { paper } = await knownPaper(scheme, value);
-  return respond(S.OwnClaim, { claim: await ownClaim(paper.id, principal.account.id) }, { principal });
+  const [claim, confirmed, addresses, printed, hidden] = await Promise.all([
+    ownClaim(paper.id, principal.account.id),
+    confirmedAuthors(paper.id),
+    ownAddressesOnPaper(paper.id, principal.account.id),
+    paperAddresses(paper.id),
+    underReview(paper.id),
+  ]);
+  return respond(
+    S.ClaimContext,
+    {
+      claim,
+      authors: paper.authors,
+      taken: confirmed.map((c) => c.authorIndex),
+      confirmedNames: hidden ? [] : confirmed.map((c) => c.authorName),
+      hidden,
+      printed,
+      onPaper: addresses.onPaper,
+      ownAddresses: addresses.own,
+    },
+    { principal },
+  );
 });
 
 /** Asks to be confirmed as one of the paper's authors. An admin decides, for now. */
@@ -678,6 +708,33 @@ export const postAgentToken = route(async (req) => {
     { token: minted.token, id: minted.id, name: minted.name, scopes: minted.scopes },
     { status: 201 },
   );
+});
+
+/** An agent asks for a link the person opens in their browser to sign it in. Anonymous. */
+export const postAgentLink = route(async (req) => {
+  const started = await startAgentLink(await parseBody(req, S.AgentLinkBody), req);
+  return respond(S.AgentLinkStarted, { ...started, expiresAt: toIso(started.expiresAt) }, { status: 201 });
+});
+
+/** The agent polls its link: 202 while the person hasn't approved it, then the token, once. */
+export const postAgentLinkToken = route(async (req) => {
+  const result = await pollAgentLink(await parseBody(req, S.AgentLinkPollBody), req);
+  if (result.status === 'pending') {
+    return respond(S.AgentLinkPending, { status: 'pending', expiresAt: toIso(result.expiresAt) }, { status: 202 });
+  }
+  return respond(
+    S.AgentToken,
+    { token: result.token, id: result.id, name: result.name, scopes: result.scopes },
+    { status: 201 },
+  );
+});
+
+/** The person approves or declines an agent's sign-in link. A browser session only: it is what proves them. */
+export const postAgentLinkAnswer = route(async (req) => {
+  const principal = await requireSession(req);
+  const { id, approve } = await parseBody(req, S.AgentLinkAnswerBody);
+  await answerAgentLink(id, principal.account, approve);
+  return respond(S.Ok, { status: 'ok' }, { principal });
 });
 
 /** A code for the signed-in person's own agent prompt. A browser session only: a token cannot make tokens. */

@@ -27,6 +27,9 @@ import * as workspaceFiles from '@/app/api/v1/workspace/files/route';
 import * as claims from '@/app/api/v1/claims/route';
 import * as agentCode from '@/app/api/v1/agent/code/route';
 import * as agentToken from '@/app/api/v1/agent/token/route';
+import * as agentLink from '@/app/api/v1/agent/link/route';
+import * as agentLinkToken from '@/app/api/v1/agent/link/token/route';
+import * as agentLinkAnswer from '@/app/api/v1/agent/link/answer/route';
 import * as myAgentCode from '@/app/api/v1/me/agent-code/route';
 import * as myTokens from '@/app/api/v1/me/tokens/route';
 import * as myToken from '@/app/api/v1/me/tokens/[id]/route';
@@ -135,6 +138,9 @@ const ROUTES: [RegExp, any][] = [
   [/^\/me\/claim-suggestions(\?.*)?$/, claimSuggestions],
   [/^\/agent\/code$/, agentCode],
   [/^\/agent\/token$/, agentToken],
+  [/^\/agent\/link$/, agentLink],
+  [/^\/agent\/link\/token$/, agentLinkToken],
+  [/^\/agent\/link\/answer$/, agentLinkAnswer],
   [/^\/me\/agent-code$/, myAgentCode],
   [/^\/me\/tokens$/, myTokens],
   [/^\/me\/tokens\/(?<id>[^/]+)$/, myToken],

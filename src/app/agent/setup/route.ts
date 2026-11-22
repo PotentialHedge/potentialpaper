@@ -31,7 +31,29 @@ Ask the person before you install software, and before you change anything outsi
 
 You need an API token that acts as the person. Reading needs none; posting and editing do. If the person gives you a key they made on ${origin}/profile, use it. If you already have one for this site from an earlier session (or in git's credential store, step 4), check it with \`GET ${api}/me\` (\`Authorization: Bearer <token>\`) and skip to the end of this step.
 
-**If the prompt gave you a sign-in code** (like \`7K2M-QX9D-4HTB\`), go straight to 1.4 with it: it works once, within an hour. Otherwise get a code mailed to the person. They need no account first: the code makes one for a new address.
+**If the prompt gave you a sign-in code** (like \`7K2M-QX9D-4HTB\`), go straight to "Trade the code" below with it: it works once, within an hour. Otherwise sign in one of two ways. Either works whether or not the person has an account: a new address gets one.
+
+**In their browser** (best when they are at a computer, and if you can open one on it): ask for a link, open it for them (\`open <url>\` on macOS, \`xdg-open\` on Linux, \`start\` on Windows) or give it to them, and wait while they sign in there and click Approve.
+
+\`\`\`
+POST ${api}/agent/link
+Content-Type: application/json
+
+{ "agent": "what you are, e.g. Claude Code" }
+\`\`\`
+
+The answer is \`{ "url", "secret", "expiresAt" }\`. Keep \`secret\` to yourself; it is what gets the token. Then poll every 3 seconds or so:
+
+\`\`\`
+POST ${api}/agent/link/token
+Content-Type: application/json
+
+{ "secret": "<secret>" }
+\`\`\`
+
+\`202\` with \`"status": "pending"\` means not yet; \`201\` brings the token, as below. \`410 link_closed\`: they declined, or 15 minutes passed: ask whether to try again. A person who is new signs up on that page with their institutional email, confirms it, and chooses a handle there before approving.
+
+**By a code mailed to them** (when they are not at a browser, or prefer it):
 
 1. Ask the person for their email address at their institution (the one they use on PotentialPaper, if they have an account), and nothing else yet.
 2. Ask for a code to be mailed to it:
@@ -44,7 +66,7 @@ You need an API token that acts as the person. Reading needs none; posting and e
    \`\`\`
 
 3. Ask for the code in that mail (subject "… is your potentialpaper agent code").
-4. Trade the code for the token:
+4. **Trade the code** for the token:
 
    \`\`\`
    POST ${api}/agent/token
@@ -53,7 +75,11 @@ You need an API token that acts as the person. Reading needs none; posting and e
    { "code": "<the code>" }
    \`\`\`
 
-The code is 12 letters and digits; dashes, spaces and case don't matter. For an address with no account, trading it confirms the address and makes the account. The answer's \`token\` (\`pp_live_…\`) is the key. It can read, post, edit and \`git push\` as the person and is shown only this once, so keep it for the whole session, and send it as \`Authorization: Bearer <token>\` on every call that needs it. A mailed code works once, within 30 minutes. On \`invalid_code\`, check it with the person, or ask for a new code (1.2). \`email_domain_not_allowed\` means the address is not at an approved institution. The person can see and revoke the token, named \`ai-agent\`, on ${origin}/profile.
+The code is 12 letters and digits; dashes, spaces and case don't matter. For an address with no account, trading it confirms the address and makes the account. A mailed code works once, within 30 minutes. On \`invalid_code\`, check it with the person, or ask for a new code (2). \`email_domain_not_allowed\` means the address is not at an approved institution.
+
+Either way, the answer's \`token\` (\`pp_live_…\`) is the key. It can read, post, edit and \`git push\` as the person and is shown only this once, so keep it for the whole session, and send it as \`Authorization: Bearer <token>\` on every call that needs it. The person can see and revoke it, named \`ai-agent\`, on ${origin}/profile.
+
+**A new account** (signed up by a mailed code) has no handle yet, and \`GET ${api}/me\` shows \`profileComplete: false\`. Ask the person for one (letters, digits, \`-\`; it is public, in their page's address \`/u/<handle>\`), and whether to show their institution next to it, then \`PATCH ${api}/me\` with \`{ "handle": "<handle>", "showInstitution": true }\` (\`handle_taken\`, \`invalid_handle\`: ask for another). Then offer to claim their papers (${origin}${AGENT_START_PATH}, "Claim their papers"). A password is optional: an emailed link always signs them in on the site.
 
 Then check: \`GET ${api}/me\` answers with their \`handle\`, and \`verified: true\`. Not verified means they have not confirmed an institutional email: they can read, but not post or edit, so tell them.
 
