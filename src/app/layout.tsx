@@ -3,6 +3,7 @@ import Link from 'next/link';
 import { Analytics } from '@/components/Analytics';
 import { LogoMark, Wordmark } from '@/components/Logo';
 import { NavUser } from '@/components/NavUser';
+import { ReportProblem } from '@/components/ReportProblem';
 import { siteUrl } from '@/server/site';
 import './globals.css';
 
@@ -51,6 +52,7 @@ export default function RootLayout({ children }: Readonly<{ children: React.Reac
               {label}
             </a>
           ))}
+          <ReportProblem className="text-faint hover:text-ink" />
         </footer>
         <Analytics />
       </body>

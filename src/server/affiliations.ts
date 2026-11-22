@@ -8,6 +8,7 @@ import { claimByEmail } from './claims';
 import { institutionForEmail } from './institution-domains';
 import { ensureOrgPageFor } from './org-pages';
 import { affiliationCodeMail, affiliationTakenMail } from '@/lib/auth-mails';
+import type { RenderedMail } from '@/lib/mail-html';
 import { sendMail } from './mail';
 import { consume, rateLimitHeaders, type RateLimitConfig } from './ratelimit';
 import { siteUrl } from './site';
@@ -52,11 +53,11 @@ export function normalizeEmail(email: string): string {
   return email.trim().toLowerCase();
 }
 
-function hashCode(code: string): string {
+export function hashCode(code: string): string {
   return createHash('sha256').update(code).digest('hex');
 }
 
-function newCode(): string {
+export function newCode(): string {
   return randomInt(0, 1_000_000).toString().padStart(6, '0');
 }
 
@@ -110,6 +111,8 @@ async function lockAccount(tx: Tx, accountId: string): Promise<Account> {
 export async function addAffiliation(
   input: { account: Pick<Account, 'id' | 'handle'>; email: string },
   database: Database = getDb(),
+  /** The mail carrying the code, when it isn't the profile's (claiming a paper: `server/claim-addresses.ts`). */
+  codeMail?: (code: string) => RenderedMail,
 ): Promise<Affiliation> {
   const email = normalizeEmail(input.email);
   const institution = await institutionForEmail(email, database);
@@ -182,7 +185,8 @@ export async function addAffiliation(
   } else {
     await sendMail({
       to: email,
-      ...affiliationCodeMail(input.account.handle, institution.name, code, `${siteUrl()}/profile#affiliations`),
+      ...(codeMail?.(code) ??
+        affiliationCodeMail(input.account.handle, institution.name, code, `${siteUrl()}/profile#affiliations`)),
     });
   }
   return row;

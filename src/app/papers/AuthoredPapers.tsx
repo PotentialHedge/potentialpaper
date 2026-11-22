@@ -6,7 +6,7 @@ import { useState, type FormEvent } from 'react';
 import { Modal } from '@/components/Modal';
 import { Select } from '@/components/Select';
 import { ui } from '@/components/ui';
-import type { PaperId } from '@/lib/paper-ids';
+import { paperPath, type PaperId } from '@/lib/paper-ids';
 import type { AuthoredPaper, WaitingClaim } from '@/server/my-papers';
 
 /** `server/my-papers.ts`'s rows, with dates as strings to cross to the client. */
@@ -21,7 +21,7 @@ async function messageOf(res: Response): Promise<string> {
   return body?.error?.message ?? `Something went wrong (${res.status}).`;
 }
 
-const claimPath = (path: string) => `/claim${path}`;
+const claimPath = (paper: PaperId) => `/claim${paperPath(paper)}`;
 
 /**
  * The papers the viewer is an author of, or has claimed, as Table `n`. A confirmed author opens a modal from a paper's
@@ -70,7 +70,7 @@ export function AuthoredPapers({
                   <td className={ui.td}>
                     {row.mine.authorName}
                     {!confirmed && (
-                      <Link href={claimPath(row.path)} className="hover:no-underline">
+                      <Link href={claimPath(row.canonical)} className="hover:no-underline">
                         <span className={ui.badge}>pending</span>
                       </Link>
                     )}
@@ -96,7 +96,17 @@ export function AuthoredPapers({
                         add co-author
                       </button>
                     )}
-                    {row.waiting.length > 0 && <div className="text-xs text-down">{row.waiting.length} waiting</div>}
+                    {row.waiting.length > 0 && (
+                      <div>
+                        <button
+                          type="button"
+                          className={`${ui.linkBtn} text-xs text-down`}
+                          onClick={() => setOpen(row.paperId)}
+                        >
+                          {row.waiting.length} waiting on you
+                        </button>
+                      </div>
+                    )}
                   </td>
                 </tr>
               );
@@ -149,6 +159,25 @@ function CoAuthors({ row }: { row: AuthoredRow }) {
     }
   }
 
+  async function deny(claim: string) {
+    setBusy(true);
+    setNote(null);
+    try {
+      const res = await fetch('/api/v1/me/papers/co-authors/deny', {
+        method: 'POST',
+        headers: { 'content-type': 'application/json' },
+        body: JSON.stringify({ paper: row.canonical satisfies PaperId, claim }),
+      });
+      if (!res.ok) return setNote({ ok: false, text: await messageOf(res) });
+      setNote({ ok: true, text: 'Their claim was turned down. They are told.' });
+      router.refresh();
+    } catch {
+      setNote({ ok: false, text: 'Could not reach the server. Try again.' });
+    } finally {
+      setBusy(false);
+    }
+  }
+
   async function add(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
     const formEl = event.currentTarget;
@@ -171,22 +200,27 @@ function CoAuthors({ row }: { row: AuthoredRow }) {
             {row.waiting.map((w) => (
               <li key={w.claimId} className="mb-2">
                 <b className="font-semibold">{w.authorName}</b>
-                {(w.realName || w.institutions.length > 0) && (
+                {(w.realName || w.addresses.length > 0 || w.institutions.length > 0) && (
                   <span className="text-muted">
                     {' '}
-                    · {[w.realName, w.institutions.join(', ')].filter(Boolean).join(', ')}
+                    · {[w.realName, w.addresses.join(', ') || w.institutions.join(', ')].filter(Boolean).join(', ')}
                   </span>
                 )}{' '}
                 <span className="text-xs text-faint">claimed {w.createdAt.slice(0, 10)}</span>
                 {w.evidence && <p className="mt-0.5 whitespace-pre-wrap text-subtle">{w.evidence}</p>}
-                <button
-                  type="button"
-                  className={ui.linkBtn}
-                  disabled={busy}
-                  onClick={() => void vouch({ claim: w.claimId })}
-                >
-                  Confirm them as {w.authorName}
-                </button>
+                <div className="flex gap-4">
+                  <button
+                    type="button"
+                    className={ui.linkBtn}
+                    disabled={busy}
+                    onClick={() => void vouch({ claim: w.claimId })}
+                  >
+                    Confirm them as {w.authorName}
+                  </button>
+                  <button type="button" className={ui.linkBtn} disabled={busy} onClick={() => void deny(w.claimId)}>
+                    Not them
+                  </button>
+                </div>
               </li>
             ))}
           </ul>

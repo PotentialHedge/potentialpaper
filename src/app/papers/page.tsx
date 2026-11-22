@@ -33,20 +33,22 @@ export default async function MyPapers() {
       </h2>
       {authored.length === 0 ? (
         <p className="font-sans text-sm text-subtle">
-          You aren&apos;t an author of any paper here yet. Find one of yours with the search on the{' '}
-          <Link href="/">home page</Link>, and claim it from its page. A claim is confirmed at once when one of your
-          confirmed addresses is printed on the paper; adding them on your{' '}
-          <Link href="/profile#affiliations">profile</Link> claims those papers for you.
+          You aren&apos;t an author of any paper here yet. <Link href="/claim">Claim your papers</Link>.
         </p>
       ) : (
-        <AuthoredPapers
-          n={1}
-          canVouch={canVouch}
-          initial={authored.map(({ waiting, ...row }) => ({
-            ...row,
-            waiting: waiting.map((w) => ({ ...w, createdAt: w.createdAt.toISOString() })),
-          }))}
-        />
+        <>
+          <AuthoredPapers
+            n={1}
+            canVouch={canVouch}
+            initial={authored.map(({ waiting, ...row }) => ({
+              ...row,
+              waiting: waiting.map((w) => ({ ...w, createdAt: w.createdAt.toISOString() })),
+            }))}
+          />
+          <p className={`${ui.fine} font-sans`}>
+            <Link href="/claim">Claim more of your papers</Link>
+          </p>
+        </>
       )}
       <h2 className={ui.groupHeading} id="following">
         Following

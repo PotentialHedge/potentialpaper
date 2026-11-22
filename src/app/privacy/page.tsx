@@ -66,8 +66,10 @@ export default function PrivacyPage() {
           </li>
         </ul>
         <p>
-          To confirm a claim of authorship we read the email addresses printed on the paper&apos;s first page. They are
-          kept privately and never shown.
+          To confirm a claim of authorship we read the email addresses printed on the paper&apos;s first page. We show
+          them only to a signed-in, verified person claiming that paper, who can have a code sent to one. An address
+          they confirm that way is kept with their account. When you ask your co-authors to confirm your claim, they see
+          your confirmed addresses and your note.
         </p>
         <p>
           The legal basis is the contract you enter by signing up (GDPR Art. 6(1)(b)). It is kept while your account

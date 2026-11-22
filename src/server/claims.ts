@@ -30,10 +30,13 @@ import { authorsForEmails } from './pdfs/authors';
  *   claims, picking the author, and is confirmed at once. `claimByEmail` does both, when an account is
  *   created, when it confirms an address, and when ingest reads a PDF. An automatic author can take it
  *   back (`withdrawClaim`), which leaves the claim `declined` so it isn't made again.
- * - **`manual`:** everything else waits for an admin (`scripts/decide-claim.ts`).
+ * - **An address on the paper they haven't confirmed:** a code to it confirms it, which confirms the claim as
+ *   `email` (`server/claim-addresses.ts`).
  * - **`vouch`:** a confirmed author adds a co-author (`addCoAuthor`, from My papers): names their account by
- *   handle and which printed author they are, or confirms a claim they are waiting on. It is confirmed at
- *   once, and they can step down from it as from an automatic one.
+ *   handle and which printed author they are, or confirms a claim they are waiting on, or denies it
+ *   (`denyClaim`, `rejected`). The claimant asks them by mail (`server/claim-requests.ts`); the first answer
+ *   decides. A confirmed one can be stepped down from as from an automatic one.
+ * - **`manual`:** whatever no co-author answers, an admin can (`scripts/decide-claim.ts`).
  *
  * **The PDF's emails are private.** Nothing here returns them, or says which address matched, to anyone but
  * the account itself, and only its own addresses (`ownAddressesOnPaper`).
@@ -53,6 +56,9 @@ async function refreshPaper(paperId: string, database: Database): Promise<void> 
 /** Authors follow their own papers (`server/follows.ts`): called wherever a claim becomes confirmed. */
 async function followAsAuthor(paperId: string, accountId: string, database: Database): Promise<void> {
   await database.insert(paperFollows).values({ paperId, accountId }).onConflictDoNothing();
+  // And hears of co-authors waiting on them (imported here: `claim-requests.ts` imports this module).
+  const { notifyWaitingClaims } = await import('./claim-requests');
+  await notifyWaitingClaims(paperId, accountId, database);
 }
 
 /** A paper's confirmed authors, by their printed names, in the paper's order. **Public:** no account ids. */
@@ -95,6 +101,27 @@ export async function ownClaim(
 }
 
 /**
+ * Every account's confirmed addresses, as `(account_id, email)`, lower-cased: its affiliations, its other addresses
+ * (`account_emails`, confirmed to claim a paper) and the address it signed up with. **Private.**
+ */
+export const CONFIRMED_ADDRESSES = sql`
+  select f.account_id, f.email from affiliations f where f.verified_at is not null
+  union
+  select e.account_id, e.email from account_emails e where e.verified_at is not null
+  union
+  select a.id as account_id, lower(u.email) as email from accounts a join "user" u on u.id = a.user_id
+   where u.email_verified
+`;
+
+/** The account's confirmed addresses, sorted. **Private** to the account. */
+export async function confirmedAddresses(accountId: string, database: Database = getDb()): Promise<string[]> {
+  const { rows } = await database.execute<{ email: string }>(
+    sql`select distinct o.email from (${CONFIRMED_ADDRESSES}) o where o.account_id = ${accountId} order by o.email`,
+  );
+  return rows.map((r) => r.email);
+}
+
+/**
  * Each pair of an account and a paper, among those `where` selects, with a confirmed address of the
  * account printed on the first page of the paper's current PDF: the address and the PDF. `where` sees
  * `ac.account_id`, `ac.paper_id` and `d.sha256`, through the `pairs` it is given.
@@ -106,11 +133,8 @@ function addressMatches(pairs: SQL, where: SQL = sql`true`): SQL {
     join page_current c on c.page_id = ac.paper_id
     join pdf_documents d on d.sha256 = c.pdf ->> 'sha256'
     cross join lateral (
-      select f.email from affiliations f
-       where f.account_id = ac.account_id and f.verified_at is not null and f.email = any(d.emails)
-      union all
-      select lower(u.email) from accounts a join "user" u on u.id = a.user_id
-       where a.id = ac.account_id and u.email_verified and lower(u.email) = any(d.emails)
+      select o.email from (${CONFIRMED_ADDRESSES}) o
+       where o.account_id = ac.account_id and o.email = any(d.emails)
     ) m
     where ${where}
     order by ac.account_id, ac.paper_id, m.email
@@ -143,10 +167,7 @@ export async function ownAddressesOnPaper(
       select d.emails from page_current c join pdf_documents d on d.sha256 = c.pdf ->> 'sha256'
        where c.page_id = ${paperId}
     ), own as (
-      select f.email from affiliations f where f.account_id = ${accountId} and f.verified_at is not null
-      union
-      select lower(u.email) from accounts a join "user" u on u.id = a.user_id
-       where a.id = ${accountId} and u.email_verified
+      select o.email from (${CONFIRMED_ADDRESSES}) o where o.account_id = ${accountId}
     )
     select own.email,
            coalesce(own.email = any(pdf.emails), false) as on_paper,
@@ -310,11 +331,7 @@ export async function claimByEmail(
   }>(sql`
     select distinct on (a.id, c.page_id, own.email)
            a.id as account_id, c.page_id as paper_id, own.email, d.sha256, d.emails, d.first_page_raw, p.authors
-    from (
-      select f.account_id, f.email from affiliations f where f.verified_at is not null
-      union
-      select a.id, lower(u.email) from accounts a join "user" u on u.id = a.user_id where u.email_verified
-    ) own
+    from (${CONFIRMED_ADDRESSES}) own
     join accounts a on a.id = own.account_id and a.verified_at is not null and not a.is_bot
     join pdf_documents d on own.email = any(d.emails)
     join page_current c on c.pdf ->> 'sha256' = d.sha256

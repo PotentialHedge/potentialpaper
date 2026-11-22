@@ -144,6 +144,36 @@ export const affiliations = pgTable(
 
 export type Affiliation = typeof affiliations.$inferSelect;
 
+/**
+ * An account's other addresses: ones printed on a paper's first page that are not on the institution allowlist
+ * (a Gmail, a former employer's), confirmed with a code to claim the paper (`server/claim-addresses.ts`). They prove
+ * authorship like any confirmed address, but never an institution, so they don't verify the account. **Private.**
+ */
+export const accountEmails = pgTable(
+  'account_emails',
+  {
+    id: uuid('id').primaryKey().defaultRandom(),
+    accountId: uuid('account_id')
+      .notNull()
+      .references(() => accounts.id, { onDelete: 'cascade' }),
+    /** Lower-cased. */
+    email: text('email').notNull(),
+    codeHash: text('code_hash'),
+    codeExpiresAt: timestamp('code_expires_at', { withTimezone: true, mode: 'date' }),
+    codeAttempts: integer('code_attempts').notNull().default(0),
+    verifiedAt: timestamp('verified_at', { withTimezone: true, mode: 'date' }),
+    createdAt: createdAt(),
+  },
+  (t) => [
+    uniqueIndex('account_emails_account_email_key').on(t.accountId, t.email),
+    uniqueIndex('account_emails_verified_email_key')
+      .on(t.email)
+      .where(sql`verified_at is not null`),
+  ],
+);
+
+export type AccountEmail = typeof accountEmails.$inferSelect;
+
 export const rateLimitBuckets = pgTable('rate_limit_buckets', {
   key: text('key').primaryKey(),
   tokens: doublePrecision('tokens').notNull(),
@@ -197,6 +227,8 @@ export const papers = pgTable(
   (t) => [
     index('papers_search_idx').using('gin', t.search),
     index('papers_title_trgm_idx').using('gin', t.title.op('gin_trgm_ops')),
+    /** `authors ?| names`: the papers printing a name, for claim suggestions (`server/claim-requests.ts`). */
+    index('papers_authors_idx').using('gin', t.authors),
     index('papers_merged_into_idx').on(t.mergedInto),
     check('papers_source_check', sql`${t.source} in ('arxiv', 'openalex', 'openreview')`),
   ],
@@ -823,7 +855,7 @@ export type ClaimVerification = { email: string; sha256: string };
  * An account's claim to be one of a paper's authors (DESIGN.md §6). A paper with a confirmed claim is
  * claimed, and its confirmed authors own its author section, picture and links. **Private:** `identity_id`
  * is the `a_` id the author's commits on this paper carry, and nothing public may tie it to `account_id`.
- * How a claim gets confirmed is still open: for now an admin decides (`scripts/decide-claim.ts`).
+ * How a claim gets confirmed: `server/claims.ts`.
  */
 export const authorClaims = pgTable(
   'author_claims',

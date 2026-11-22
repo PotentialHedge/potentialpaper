@@ -27,6 +27,8 @@ import { demoUrl } from '@/lib/demos';
 import { addressOfRef, formatIdentifier, keyedPagePath, pagePath, pageRefOf } from '@/lib/kinds';
 import { addCoAuthor, ownClaim, requestClaim, withdrawClaim } from '../claims';
 import { authoredPapers } from '../my-papers';
+import { confirmClaimCode, sendClaimCode } from '../claim-addresses';
+import { askCoAuthors, claimSuggestions, denyClaim } from '../claim-requests';
 import {
   followedPapers,
   followPaper,
@@ -479,6 +481,54 @@ export const deleteClaim = route(async (req) => {
   const { paper } = await knownPaper(scheme, value);
   await withdrawClaim(paper.id, principal.account.id);
   return respond(S.OwnClaim, { claim: null }, { principal });
+});
+
+/** Claims to be one of the paper's authors, and sends a code to their address printed on it. */
+export const postClaimCode = route(async (req) => {
+  const principal = await requireVerified(req);
+  const { paper: id, authorIndex, email } = await parseBody(req, S.ClaimCodeBody);
+  const { paper } = await knownPaper(id.scheme, id.value);
+  const result = await sendClaimCode(paper.id, principal.account, { authorIndex, email });
+  return respond(S.ClaimCodeSent, result, { status: 201, principal });
+});
+
+/** Confirms the address a claim's code went to, which confirms the claim. */
+export const postClaimCodeConfirm = route(async (req) => {
+  const principal = await requireVerified(req);
+  const { paper: id, email, code } = await parseBody(req, S.ClaimCodeConfirmBody);
+  const { paper } = await knownPaper(id.scheme, id.value);
+  await confirmClaimCode(principal.account.id, { email, code });
+  return respond(S.OwnClaim, { claim: await ownClaim(paper.id, principal.account.id) }, { principal });
+});
+
+/** Claims to be one of the paper's authors, and asks its confirmed co-authors to confirm it. */
+export const postClaimAsk = route(async (req) => {
+  const principal = await requireVerified(req);
+  const { paper: id, authorIndex, evidence } = await parseBody(req, S.ClaimAskBody);
+  const { paper } = await knownPaper(id.scheme, id.value);
+  const result = await askCoAuthors(paper.id, principal.account, { authorIndex, evidence });
+  return respond(S.ClaimAsked, result, { status: 201, principal });
+});
+
+/** Papers the viewer may have written, most likely first (`/claim`). */
+export const getClaimSuggestions = route(async (req) => {
+  const principal = await requireAuth(req);
+  const { q } = parseQuery(req, S.ClaimSuggestionsQuery);
+  const rows = await claimSuggestions(principal.account.id, q ?? null);
+  return respond(
+    S.ClaimSuggestions,
+    { papers: rows.map(({ canonical, ...row }) => ({ ...row, paper: canonical })) },
+    { principal },
+  );
+});
+
+/** A confirmed author denies a claim waiting on their paper. */
+export const postCoAuthorDeny = route(async (req) => {
+  const principal = await requireVerified(req);
+  const body = await parseBody(req, S.CoAuthorDenyBody);
+  const { paper } = await knownPaper(body.paper.scheme, body.paper.value);
+  await denyClaim(paper.id, principal.account, body.claim);
+  return respond(S.Ok, { status: 'ok' }, { principal });
 });
 
 /** The papers the viewer is an author of, or has claimed (`/papers`). */

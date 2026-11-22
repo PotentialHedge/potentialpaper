@@ -652,7 +652,11 @@ in production:
 - **Refusal is a `422 EMAIL_DOMAIN_NOT_ALLOWED`, not a 403.** Better Auth answers a 403 from user
   creation with a fake success, so the person would wait for a mail that never comes.
 - **Several affiliations:** extra addresses are added from `/profile`, each confirmed by its own code
-  (`affiliations`). They also serve as evidence for author claims (section 6).
+  (`affiliations`). They also serve as evidence for author claims (section 6). An address printed on a paper
+  that isn't institutional can be confirmed by a code to claim that paper (`account_emails`): it proves the
+  claim but no institution.
+- **Onboarding** asks only for a handle (the institution is shown; both change on the profile), then offers
+  the person's likely papers to claim (`/claim`), then a password.
 - **Unconfirmed sign-ups** are pruned weekly.
 
 acceptodds built ORCID sign-in and removed it, so **ORCID is not a way to join here**. It is used only
@@ -761,7 +765,14 @@ author_claims(paper_id, author_index, account_id, method, evidence jsonb, status
   building this.
 - People change institutions. Any confirmed affiliation counts for the email route, and when an old
   mailbox has gone, ORCID or a co-author vouch still works.
-- Confirmed co-authors are notified of each new claim and can dispute it, which sends it to the queue.
+- **How it works (built 2026-11-22, `server/claims.ts`, `claim-addresses.ts`, `claim-requests.ts`):**
+  `/claim` lists likely papers (your addresses on the first page, then names you've claimed under) with a
+  search. On a paper's claim page you pick the printed author, then: an address of yours on the page
+  confirms at once; an address printed for that author (shown to the claimant, since it's on the public
+  PDF) can be sent a code; or you ask the confirmed co-authors, who are emailed with your confirmed
+  addresses and note and confirm or deny on My papers, the first answer deciding. With no co-author here
+  yet, the claim waits, the first to be confirmed later is emailed about it, and the claimant can invite
+  co-authors with their own email from a template. Unanswered claims stay pending for an admin.
 - **Double-blind review.** Claiming a paper still under anonymous review, such as an ICLR submission,
   would reveal its authors. Claims stay allowed, since arXiv preprints are often public anyway, but the
   claim flow warns about this. A claim can stay private until the author publishes it, but while private

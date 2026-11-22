@@ -10,7 +10,9 @@ import { authHref } from '@/lib/return-to';
 import { viewerFromHeaders } from '@/server/auth';
 import { canStepDown, confirmedAuthors, ownAddressesOnPaper, ownClaim } from '@/server/claims';
 import { orgDomains, isOrgMember } from '@/server/org-roles';
+import { paperAddresses } from '@/server/claim-requests';
 import { ownPageClaim } from '@/server/page-claims';
+import { siteUrl } from '@/server/site';
 import { ClaimForm, StepDown } from './ClaimForm';
 import { OrganiserClaimForm } from './OrganiserClaimForm';
 
@@ -40,10 +42,11 @@ export default async function ClaimPage({ params }: Props) {
   if (found.address.kind !== 'paper') notFound();
   const id = found.address.id;
   const paperId = found.page.id;
-  const [mine, confirmed, addresses] = await Promise.all([
+  const [mine, confirmed, addresses, printed] = await Promise.all([
     ownClaim(paperId, viewer.account.id),
     confirmedAuthors(paperId),
     ownAddressesOnPaper(paperId, viewer.account.id),
+    paperAddresses(paperId),
   ]);
   const taken = confirmed.map((c) => c.authorIndex);
   const editPath = toolPath('code', found.address);
@@ -91,30 +94,24 @@ export default async function ClaimPage({ params }: Props) {
             {mine?.status === 'declined' && (
               <p className="mt-4">You stepped down as {mine.authorName}. You can claim the paper again below.</p>
             )}
-            {addresses.onPaper.length > 0 ? (
+            {addresses.onPaper.length > 0 && (
               <p className={`${ui.box} mt-4`}>
                 Your address {addresses.onPaper.join(' and ')} is printed on this paper&apos;s first page, so your claim
                 is confirmed as soon as you send it.
-              </p>
-            ) : (
-              <p className="mt-4">
-                A claim is confirmed at once when one of your confirmed addresses is printed on the paper&apos;s first
-                page.{' '}
-                {addresses.own.length > 0
-                  ? `None of yours (${addresses.own.join(', ')}) is on this one`
-                  : 'You have none'}
-                {addresses.hasPdfEmails ? '' : ', and as far as we can read it lists no addresses'}. If it lists one you
-                own, <a href="/profile#affiliations">add it to your profile</a>; otherwise your claim is checked by
-                hand.
               </p>
             )}
             <ClaimForm
               paper={id}
               pagePath={found.path}
+              title={found.paper?.paper.title ?? ''}
               authors={found.paper?.paper.authors ?? []}
               taken={taken}
               pending={mine?.status === 'pending' ? mine : null}
               instant={addresses.onPaper.length > 0}
+              printed={printed}
+              ownAddresses={addresses.own}
+              confirmedNames={confirmed.map((c) => c.authorName)}
+              inviteUrl={`${siteUrl()}/welcome?next=${encodeURIComponent('/papers')}`}
             />
           </>
         )}

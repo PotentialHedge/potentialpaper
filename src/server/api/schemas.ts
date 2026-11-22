@@ -361,6 +361,41 @@ export const CoAuthorBody = z.union([
 ]);
 export const CoAuthorAdded = z.object({ authorIndex: z.number().int(), authorName: z.string() });
 
+/** Claim as author `authorIndex` by a code sent to `email`, an address printed on the paper. */
+export const ClaimCodeBody = z.object({
+  paper: PaperIdentifier,
+  authorIndex: z.number().int().min(0).max(10_000),
+  email: z.string().trim().min(3).max(320),
+});
+export const ClaimCodeSent = OwnClaim.extend({ sent: z.boolean() });
+export const ClaimCodeConfirmBody = z.object({
+  paper: PaperIdentifier,
+  email: z.string().trim().min(3).max(320),
+  code: z.string().trim().min(1).max(20),
+});
+/** Claim as author `authorIndex`, and ask the paper's confirmed co-authors to confirm it. */
+export const ClaimAskBody = ClaimBody;
+export const ClaimAsked = OwnClaim.extend({ asked: z.array(z.string()) });
+/** A confirmed author denies a claim waiting on their paper. */
+export const CoAuthorDenyBody = z.object({ paper: PaperIdentifier, claim: z.uuid() });
+export const ClaimSuggestionsQuery = z.object({ q: z.string().max(200).optional() });
+export const ClaimSuggestions = z.object({
+  papers: z.array(
+    z.object({
+      paper: PaperIdentifier,
+      path: z.string(),
+      title: z.string(),
+      year: z.number().int().nullable(),
+      venue: z.string().nullable(),
+      authors: z.array(z.string()),
+      byEmail: z.boolean(),
+      likely: z.number().int().nullable(),
+      taken: z.array(z.number().int()),
+      mine: z.object({ authorIndex: z.number().int(), status: z.string() }).nullable(),
+    }),
+  ),
+});
+
 /** Whether the viewer follows a paper (`null` when nobody is signed in), and how many do. */
 export const FollowState = z.object({ following: z.boolean().nullable(), followers: z.number().int() });
 export const FollowBody = z.object({ paper: PaperIdentifier });
@@ -425,6 +460,8 @@ export const MyPapers = z.object({
           evidence: z.string(),
           realName: z.string().nullable(),
           institutions: z.array(z.string()),
+          /** The claimant's confirmed addresses, which they agreed to show by asking. */
+          addresses: z.array(z.string()),
           createdAt: z.string(),
         }),
       ),

@@ -50,6 +50,11 @@ import * as commentPreview from '@/app/api/v1/comments/preview/route';
 import * as myMentions from '@/app/api/v1/me/mentions/route';
 import * as myPapers from '@/app/api/v1/me/papers/route';
 import * as myCoAuthors from '@/app/api/v1/me/papers/co-authors/route';
+import * as myCoAuthorsDeny from '@/app/api/v1/me/papers/co-authors/deny/route';
+import * as claimCode from '@/app/api/v1/claims/code/route';
+import * as claimCodeConfirm from '@/app/api/v1/claims/code/confirm/route';
+import * as claimAsk from '@/app/api/v1/claims/ask/route';
+import * as claimSuggestions from '@/app/api/v1/me/claim-suggestions/route';
 import * as follows from '@/app/api/v1/follows/route';
 import * as views from '@/app/api/v1/views/route';
 import * as viewTime from '@/app/api/v1/views/time/route';
@@ -122,6 +127,10 @@ const ROUTES: [RegExp, any][] = [
   [/^\/workspace\/rebase$/, workspaceRebase],
   [/^\/workspace\/files$/, workspaceFiles],
   [/^\/claims(\?.*)?$/, claims],
+  [/^\/claims\/code$/, claimCode],
+  [/^\/claims\/code\/confirm$/, claimCodeConfirm],
+  [/^\/claims\/ask$/, claimAsk],
+  [/^\/me\/claim-suggestions(\?.*)?$/, claimSuggestions],
   [/^\/agent\/code$/, agentCode],
   [/^\/agent\/token$/, agentToken],
   [/^\/me\/agent-code$/, myAgentCode],
@@ -147,6 +156,7 @@ const ROUTES: [RegExp, any][] = [
   [/^\/me\/mentions(\?.*)?$/, myMentions],
   [/^\/me\/papers$/, myPapers],
   [/^\/me\/papers\/co-authors$/, myCoAuthors],
+  [/^\/me\/papers\/co-authors\/deny$/, myCoAuthorsDeny],
   [/^\/follows(\?.*)?$/, follows],
   [/^\/views$/, views],
   [/^\/views\/time$/, viewTime],

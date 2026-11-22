@@ -1,15 +1,16 @@
 'use client';
 
+import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { useState } from 'react';
+import { ClaimSuggestions } from '@/components/ClaimSuggestions';
 import { OnboardingCard } from '@/components/OnboardingCard';
 import { ProfileFields, profileRefusal, type ProfileValues } from '@/components/ProfileFields';
 import { ui } from '@/components/ui';
 
 /**
- * What a confirmed account still lacks, one question at a time: its public profile, then a password.
- * The password can be skipped, since a sign-in link works too; the profile cannot, because nothing is
- * assumed about what someone shows publicly (DESIGN.md §5.3).
+ * What a confirmed account still lacks, one question at a time: a handle (its institution is shown; both
+ * change on the profile), then the papers it wrote, then a password. Papers and the password can be skipped.
  */
 export function Finish({
   email,
@@ -23,8 +24,8 @@ export function Finish({
   next: string;
 }) {
   const router = useRouter();
-  const [profileDone, setProfileDone] = useState(!needsProfile);
-  const [profile, setProfile] = useState<ProfileValues>({ handle: '', realName: '', showInstitution: null });
+  const [step, setStep] = useState<'profile' | 'papers' | 'password'>(needsProfile ? 'profile' : 'password');
+  const [profile, setProfile] = useState<ProfileValues>({ handle: '', realName: '', showInstitution: true });
   const [password, setPassword] = useState('');
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -43,14 +44,12 @@ export function Finish({
       headers: { 'content-type': 'application/json' },
       body: JSON.stringify({
         handle: profile.handle.trim(),
-        realName: profile.realName.trim() || null,
-        showInstitution: profile.showInstitution,
+        showInstitution: true,
       }),
     }).catch(() => null);
     setBusy(false);
     if (!res?.ok) return setError(await profileRefusal(res));
-    if (needsPassword) setProfileDone(true);
-    else finish();
+    setStep('papers');
   }
 
   async function savePassword(e: React.FormEvent) {
@@ -73,16 +72,31 @@ export function Finish({
     setError(code === 'validation_error' ? 'At least 12 characters.' : 'Could not save your password.');
   }
 
-  if (!profileDone) {
+  if (step === 'profile') {
     return (
-      <OnboardingCard title="How should you appear?" eyebrow="Confirmed. Welcome to PotentialPaper.">
+      <OnboardingCard title="Choose a handle" eyebrow="Confirmed. Welcome to PotentialPaper.">
         <form onSubmit={saveProfile}>
-          <ProfileFields values={profile} onChange={setProfile} />
-          <button className={ui.btn()} disabled={busy || !profile.handle.trim() || profile.showInstitution === null}>
+          <ProfileFields values={profile} onChange={setProfile} handleOnly />
+          <p className={ui.fine}>Your institution shows next to it. You can change both on your profile.</p>
+          <button className={ui.btn()} disabled={busy || !profile.handle.trim()}>
             {busy ? 'Saving…' : 'Continue'}
           </button>
           {error && <div className={ui.note(false)}>{error}</div>}
         </form>
+      </OnboardingCard>
+    );
+  }
+
+  if (step === 'papers') {
+    return (
+      <OnboardingCard title="Have you written any papers?" eyebrow="Claim them to write their author section.">
+        <ClaimSuggestions />
+        <button type="button" className={ui.btn()} onClick={() => (needsPassword ? setStep('password') : finish())}>
+          Continue
+        </button>
+        <p className={ui.fine}>
+          You can find more any time under <Link href="/claim">Claim your papers</Link>.
+        </p>
       </OnboardingCard>
     );
   }

@@ -9,6 +9,8 @@ import { keyedPagePath } from '@/lib/kinds';
 import { shownHandle } from '@/lib/profile';
 import { authHref, VERIFY_EMAIL } from '@/lib/return-to';
 import { listAffiliations } from '@/server/affiliations';
+import { otherAddresses } from '@/server/claim-addresses';
+import { claimedNames } from '@/server/claim-requests';
 import { viewerFromHeaders } from '@/server/auth';
 import { gitSshUrl } from '@/server/site';
 import { listSshKeys } from '@/server/ssh-keys';
@@ -35,8 +37,10 @@ export default async function Profile() {
   if (!viewer) redirect(authHref('/signin', '/profile'));
   const { account } = viewer;
   if (!account.profileCompletedAt) redirect(authHref(VERIFY_EMAIL, '/profile'));
-  const [rows, tokens, keys] = await Promise.all([
+  const [rows, others, names, tokens, keys] = await Promise.all([
     listAffiliations(account.id),
+    otherAddresses(account.id),
+    claimedNames(account.id),
     listTokens(account.id),
     listSshKeys(account.id),
   ]);
@@ -110,6 +114,26 @@ export default async function Profile() {
           createdAt: r.createdAt.toISOString(),
         }))}
       />
+      {(others.some((o) => o.verifiedAt) || names.length > 0) && (
+        <div className="mt-3 space-y-1 font-sans text-sm">
+          {others.some((o) => o.verifiedAt) && (
+            <p>
+              <span className="text-muted">Other addresses, confirmed to claim papers: </span>
+              {others
+                .filter((o) => o.verifiedAt)
+                .map((o) => o.email)
+                .join(', ')}
+            </p>
+          )}
+          {names.length > 0 && (
+            <p>
+              <span className="text-muted">Names you are an author under: </span>
+              {names.join(', ')}
+            </p>
+          )}
+          <p className={ui.fine}>Only you see these.</p>
+        </div>
+      )}
       <h2 className={ui.groupHeading} id="email">
         Email
       </h2>

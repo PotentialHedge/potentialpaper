@@ -1,4 +1,4 @@
-import { and, asc, eq, inArray, isNull, ne } from 'drizzle-orm';
+import { and, asc, eq, inArray, isNull, ne, sql } from 'drizzle-orm';
 import { getDb, type Database } from '@/db';
 import {
   accounts,
@@ -10,7 +10,7 @@ import {
   type ClaimStatus,
 } from '@/db/schema';
 import { canonicalPaperId, shortPath, type PaperId } from '@/lib/paper-ids';
-import { canStepDown } from './claims';
+import { canStepDown, CONFIRMED_ADDRESSES } from './claims';
 
 /**
  * The papers on an account's "My papers" page (`app/papers`). Each list is of {@link PaperSummary} plus what ties
@@ -37,6 +37,8 @@ export interface WaitingClaim {
   /** Who they are, as they let the public see it: never their handle, which nothing ties to the paper. */
   realName: string | null;
   institutions: string[];
+  /** Their confirmed addresses: asking co-authors shows them, so they can tell who it is. */
+  addresses: string[];
   createdAt: Date;
 }
 
@@ -121,6 +123,7 @@ export async function authoredPapers(accountId: string, database: Database = get
           .select({
             paperId: authorClaims.paperId,
             claimId: authorClaims.id,
+            accountId: authorClaims.accountId,
             authorIndex: authorClaims.authorIndex,
             authorName: authorClaims.authorName,
             evidence: authorClaims.evidence,
@@ -140,6 +143,21 @@ export async function authoredPapers(accountId: string, database: Database = get
           )
           .orderBy(asc(authorClaims.createdAt)),
   ]);
+
+  const claimants = [...new Set(waiting.map((w) => w.accountId))];
+  const addressesOf = new Map<string, string[]>();
+  if (claimants.length > 0) {
+    const { rows: found } = await database.execute<{ account_id: string; emails: string[] }>(sql`
+      select o.account_id, array_agg(distinct o.email order by o.email) as emails
+        from (${CONFIRMED_ADDRESSES}) o
+       where o.account_id in (${sql.join(
+         claimants.map((id) => sql`${id}::uuid`),
+         sql`, `,
+       )})
+       group by o.account_id
+    `);
+    for (const row of found) addressesOf.set(row.account_id, row.emails);
+  }
 
   const rows: AuthoredPaper[] = [];
   for (const claim of own) {
@@ -167,6 +185,7 @@ export async function authoredPapers(accountId: string, database: Database = get
           evidence: w.evidence,
           realName: w.realName,
           institutions: w.showInstitution ? w.institutions : [],
+          addresses: addressesOf.get(w.accountId) ?? [],
           createdAt: w.createdAt,
         })),
     });
