@@ -179,6 +179,25 @@ Demo files are in R2, through the `R2_*` keys in `.env.production`: an account t
 storing it on the container's disk. A page's rendered HTML names its demos' addresses, so after moving the
 domain run `dc run --rm tools npm run pages:rebuild`.
 
+## Mail
+
+Set up 2026-11-22, outside this repo. Mail goes out through Resend (`src/server/mail.ts`) from
+`PotentialPaper <noreply@potentialpaper.com>` (`MAIL_FROM`), with `RESEND_API_KEY` a **sending-only key limited to
+potentialpaper.com** (Resend domain `b88adeb8…`, region eu-west-1, open and click tracking off). A missing key is an
+error in production, never a silent drop.
+
+DNS in the `potentialpaper.com` zone, all DNS-only:
+
+- **Resend:** DKIM `resend._domainkey`; the bounce domain `send` (MX to SES, SPF `include:amazonses.com`), which is
+  the envelope sender, so SPF aligns with DMARC relaxed; `rsend` CNAME.
+- **DMARC:** `v=DMARC1; p=quarantine; adkim=r; aspf=r; rua=mailto:dmarc@potentialpaper.com`. Only Resend sends as
+  this domain; anything else that tries goes to spam. Once a few weeks of reports show only Resend, `p=reject`.
+- **Inbound:** Cloudflare Email Routing (its MX, apex SPF and DKIM records), a catch-all forwarding to the owner's
+  Gmail, as for acceptodds.com. So replies to noreply@, postmaster@, abuse@ and the DMARC reports reach a person.
+
+Another sender (a newsletter tool, say) needs its own DKIM, and an include in `send`'s or the apex SPF, before
+it sends, or DMARC quarantines it.
+
 ## Postgres 19
 
 Production runs `postgres:19.0` since 2026-11-22, on the volume `pgdata19` mounted at `/var/lib/postgresql` (since
