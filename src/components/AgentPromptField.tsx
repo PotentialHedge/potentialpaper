@@ -4,7 +4,7 @@ import { useState } from 'react';
 import { ui } from './ui';
 
 /**
- * A prompt for the reader's AI agent, to copy: a terminal line on a white card, with a "Copy" button
+ * A prompt for the reader's AI agent, to copy: a terminal line on a white card, `›` in front, with a "Copy" button
  * under it that says "Copied" for a moment. Clicking the text copies it too. The text wraps and can be selected by
  * hand where there is no clipboard.
  */
@@ -29,8 +29,11 @@ export function AgentPromptField({ prompt, label = 'Paste into your AI agent:' }
           type="button"
           onClick={() => void copy()}
           title="Copy"
-          className="flex w-full cursor-pointer px-3 pt-2.5 pb-2 text-left"
+          className="flex w-full gap-2 px-3 pt-2.5 pb-2 text-left"
         >
+          <span aria-hidden className={`${ui.mono} text-accent select-none`}>
+            ›
+          </span>
           <code
             aria-label="Prompt for your AI agent"
             className={`${ui.mono} min-w-0 flex-1 leading-relaxed break-words whitespace-pre-wrap text-ink select-all`}
