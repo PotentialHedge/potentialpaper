@@ -28,15 +28,17 @@ x-logging: &logging
 
 services:
   postgres:
-    image: postgres:16
+    image: postgres:19.0
     restart: unless-stopped
     logging: *logging
+    command: ['postgres', '-c', 'autovacuum_max_parallel_workers=2']
     environment:
       POSTGRES_USER: ${POSTGRES_USER}
       POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
       POSTGRES_DB: ${POSTGRES_DB}
     volumes:
-      - pgdata:/var/lib/postgresql/data
+      # Since 18 the image keeps data in /var/lib/postgresql/<major>/docker, so the volume mounts one level up.
+      - pgdata19:/var/lib/postgresql
     healthcheck:
       test: ['CMD-SHELL', 'pg_isready -U $${POSTGRES_USER} -d $${POSTGRES_DB}']
       interval: 30s
@@ -182,7 +184,9 @@ services:
         condition: service_healthy
 
 volumes:
+  # Postgres 16's data, kept unmounted until it is no longer needed (DEPLOY.md, "Postgres 19").
   pgdata:
+  pgdata19:
 
 networks:
   web:
