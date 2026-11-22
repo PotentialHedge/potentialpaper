@@ -276,7 +276,7 @@ it as their institution (by handle; §5.3), the venues its papers are at by coun
 **Categories** (built in `handoffs/pages.md` Phase 5; topics until 2026-11-22) work as Wikipedia's categories do. A
 category (`/c/linear-attention`, `category:linear-attention`) is a research idea with an article, not a field. There
 is no seeded list and no bot writes them: anyone verified makes one (`/new/category`, `POST /api/v1/categories`), or
-from "Add" in the categories bar at the foot of any page, which puts the page in it and makes the category if none
+from "Add" in the Categories box in any page's sidebar, which puts the page in it and makes the category if none
 has that name. Names are checked first: two names are the same when they differ only in case, accents, punctuation
 and plurals (`lib/categories.ts`), and a taken name is refused (`category_exists`). Its `category.json` holds only its
 name; its article is `community/`. **A page of any kind is in a category** through its own labeled link,

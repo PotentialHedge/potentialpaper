@@ -7,12 +7,20 @@ import { failureOf, send } from './api';
 import { useCategoryMatches } from './useCategoryMatches';
 
 /**
- * "Add to a category", in the categories bar at the foot of every page (`components/pages/common.tsx`): a category by name,
+ * "Add to a category", in the Categories box in every page's sidebar (`components/pages/common.tsx`): a category by name,
  * offered from the categories there are as one types; one no category has is made. Adds an `in-category` link from the page, as
  * the reader's own edit of its links (`POST /api/v1/pages/{identifier}/categories`), as a Wikipedia page is put in a
  * category.
  */
-export function AddCategory({ identifier, label }: { identifier: string; label: string }) {
+export function AddCategory({
+  identifier,
+  label,
+  className = ui.linkBtn,
+}: {
+  identifier: string;
+  label: string;
+  className?: string;
+}) {
   const [open, setOpen] = useState(false);
   const [name, setName] = useState('');
   const [chosen, setChosen] = useState<string | null>(null);
@@ -59,7 +67,7 @@ export function AddCategory({ identifier, label }: { identifier: string; label: 
     <>
       <button
         type="button"
-        className={ui.linkBtn}
+        className={className}
         onClick={() => {
           setNote(null);
           setOpen(true);

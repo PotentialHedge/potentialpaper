@@ -9,7 +9,7 @@ import { useCategoryMatches } from './useCategoryMatches';
 
 /**
  * The "New category" form (`handoffs/pages.md` Phase 5): a name, its address and the article's first words. The
- * categories it is in are added afterwards from the bar at the foot of its page, as any page's are. As the name is typed it lists categories that are there already, the same name first, so a
+ * categories it is in are added afterwards from the Categories box on its page, as any page's are. As the name is typed it lists categories that are there already, the same name first, so a
  * duplicate isn't made by accident; the server refuses one anyway (`category_exists`).
  */
 export function NewCategoryForm({ initialName = '' }: { initialName?: string }) {

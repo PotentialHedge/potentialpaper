@@ -28,7 +28,7 @@ export default async function NewCategoryPage({ searchParams }: Props) {
       <div className="mt-5 max-w-[640px] font-sans text-sm">
         <p>
           A category is a research idea, such as &ldquo;Linear attention&rdquo; or &ldquo;Mixture of experts&rdquo;. It
-          works like a Wikipedia category: pages are added to it from the bar at the foot of each page, a category too,
+          works like a Wikipedia category: pages are added to it from the Categories box on each page, a category too,
           which makes it a subcategory. Its page lists them, under an article anyone verified writes.
         </p>
         {viewer.account.verifiedAt !== null || viewer.isAdmin ? (

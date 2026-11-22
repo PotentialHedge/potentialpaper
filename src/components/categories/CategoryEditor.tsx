@@ -10,7 +10,7 @@ import { useCategoryMatches } from './useCategoryMatches';
  * A category's editor (`handoffs/pages.md` Phase 5): its name and its article in one commit
  * (`PATCH /api/v1/pages/{identifier}/category`, merged with whatever changed since the form loaded); renaming it
  * (`/rename`) and merging it into another (`/merge`), each leaving a redirect. The categories it is in are added from the
- * bar at the foot of its page, as any page's are.
+ * Categories box on its page, as any page's are.
  */
 
 interface Initial {

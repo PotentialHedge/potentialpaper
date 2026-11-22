@@ -176,7 +176,7 @@ export function Sections({ kind, address, ownersHtml, communityHtml, owners }: P
   );
 }
 
-/** Its labeled links, but for the categories it is in, which the categories bar shows. */
+/** Its labeled links, but for the categories it is in, which the Categories box shows. */
 export function Links({ linksFrom }: PageCommon) {
   return <LinksBox links={linksFrom.filter((link) => link.label !== CATEGORY_LABEL)} direction="from" />;
 }
@@ -188,36 +188,34 @@ export function Backlinks({ kind, linksTo }: PageCommon) {
 }
 
 /**
- * The categories it is in, at the foot of the page, as Wikipedia lists a page's categories: its own `in-category` links,
+ * The categories it is in, a box in the sidebar, as Wikipedia lists a page's categories: its own `in-category` links,
  * and "Add" (`AddCategory`), which puts it in one by name, making the category if none has that name yet.
  */
 export function Categories({ address, linksFrom }: PageCommon) {
   const categories = linksFrom.filter((link) => link.label === CATEGORY_LABEL);
-  const identifier = formatIdentifier(address);
-  if (categories.length === 0) {
-    return (
-      <div className={`${ui.fine} mt-8 font-sans`}>
-        <AddCategory identifier={identifier} label="Add to a category" />
-      </div>
-    );
-  }
   return (
-    <div className="mt-8 border border-rule px-3 py-2 font-sans text-[13px]">
-      <span className="text-muted">Categories: </span>
-      {categories.map((link, i) => (
-        <Fragment key={i}>
-          {i > 0 && <span className="text-faint"> · </span>}
-          {link.page.address ? (
-            <a href={pagePath(link.page.address)} className={link.page.name ? undefined : 'text-muted italic'}>
-              {link.page.name ?? formatIdentifier(link.page.address)}
-            </a>
-          ) : (
-            link.page.name
-          )}
-        </Fragment>
-      ))}
-      <span className="text-faint"> · </span>
-      <AddCategory identifier={identifier} label="Add" />
+    <div className={ui.box}>
+      <div className={ui.boxHeadingRow}>
+        <h2 className={ui.runIn}>Categories</h2>
+        <AddCategory identifier={formatIdentifier(address)} label="Add" className={ui.boxAction} />
+      </div>
+      {categories.length > 0 ? (
+        <ul className="space-y-1">
+          {categories.map((link, i) => (
+            <li key={i}>
+              {link.page.address ? (
+                <a href={pagePath(link.page.address)} className={link.page.name ? 'text-ink' : 'text-muted italic'}>
+                  {link.page.name ?? formatIdentifier(link.page.address)}
+                </a>
+              ) : (
+                link.page.name
+              )}
+            </li>
+          ))}
+        </ul>
+      ) : (
+        <p className="text-xs text-muted">Not in a category yet.</p>
+      )}
     </div>
   );
 }
