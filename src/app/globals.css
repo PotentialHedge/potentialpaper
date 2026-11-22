@@ -156,8 +156,11 @@
   .md img {
     @apply max-w-full;
   }
-  /* The reader's "Justify text" (`text.justify`, `TextSettings`): paragraphs and list items, not headings or code. */
-  .justify-text .md :is(p, li) {
+  /*
+   * Paragraphs and list items are justified, not headings or code, unless the reader turns off "Justify text"
+   * (`text.justify`, `TextSettings`), which sets `ragged-text`. The default is in the CSS, so it never flashes.
+   */
+  :root:not(.ragged-text) .md :is(p, li) {
     text-align: justify;
     hyphens: auto;
   }

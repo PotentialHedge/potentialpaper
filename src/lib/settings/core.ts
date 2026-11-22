@@ -173,6 +173,7 @@ function navList(
     what = 'link',
     of = 'page',
     items = NAV_ITEMS as { id: string; title: string; locked?: boolean }[],
+    initial = [] as string[],
   } = {},
 ): CoreSetting<string[]> {
   const known = (id: unknown): id is string =>
@@ -186,7 +187,7 @@ function navList(
         ]),
       )
       .refine((list) => new Set(list).size === list.length, `must not name a ${what} twice`),
-    default: [],
+    default: initial,
     title,
     description,
     group,
@@ -207,7 +208,8 @@ const NAV_SETTINGS: Record<string, CoreSetting> = {
     HIDEABLE_NAV_IDS,
     'toggles',
     'Hidden navbar links',
-    `Links to leave out of the navbar, by id (${HIDEABLE_NAV_IDS.join(', ')}, or a plugin's page as <plugin id>.<page id>). Settings always shows.`,
+    `Links to leave out of the navbar, by id (${HIDEABLE_NAV_IDS.join(', ')}, or a plugin's page as <plugin id>.<page id>). Settings always shows; changes is hidden until you show it.`,
+    { initial: ['changes'] },
   ) as CoreSetting,
 };
 
@@ -328,7 +330,7 @@ const USER_SETTINGS: Record<string, CoreSetting> = Object.fromEntries(
 const TEXT_SETTINGS: Record<string, CoreSetting> = {
   'text.justify': {
     schema: z.boolean() as z.ZodType,
-    default: false,
+    default: true,
     title: 'Justify text',
     description: "Set pages' text flush with both edges, as a printed paper is, hyphenating long words.",
     group: 'Text',
