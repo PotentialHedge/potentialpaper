@@ -1,22 +1,51 @@
 'use client';
 
-import { useState } from 'react';
+import { type ReactNode, useState } from 'react';
 import { Modal } from '@/components/Modal';
 import { AgentPromptField } from '@/components/AgentPromptField';
 import { addPrompt } from '@/lib/agent-prompt';
 import { ui } from '@/components/ui';
 
 /**
- * A small "Missing a version? Add it" under the paper's versions. It opens a choice: a prompt for the reader's AI
+ * A small "Missing a version? Add it" under the paper's versions (and "Want an interactive demo?" under its community
+ * sections). It opens a choice: a prompt for the reader's AI
  * agent, which finds what is missing with evidence and asks before saving (`/agent/start` says how), or editing
  * the page's files themselves, in the Edit dialog (`EditDialog`).
  */
 
-type Missing = 'version' | 'submission';
+type Missing = 'version' | 'submission' | 'demo';
 
-const ASK: Record<Missing, { question: string; title: string }> = {
-  version: { question: 'Missing a version?', title: 'Add a missing version' },
-  submission: { question: 'Missing a submission?', title: 'Add a missing submission' },
+const ASK: Record<Missing, { question: string; action: string; title: string; files: ReactNode }> = {
+  version: {
+    question: 'Missing a version?',
+    action: 'Add it',
+    title: 'Add a missing version',
+    files: (
+      <>
+        Each version is a file in the page&apos;s <code>versions/</code>.
+      </>
+    ),
+  },
+  submission: {
+    question: 'Missing a submission?',
+    action: 'Add it',
+    title: 'Add a missing submission',
+    files: (
+      <>
+        Each version is a file in the page&apos;s <code>versions/</code>.
+      </>
+    ),
+  },
+  demo: {
+    question: 'Want an interactive demo of this paper?',
+    action: 'Build one with your AI agent',
+    title: 'Build an interactive demo',
+    files: (
+      <>
+        A demo is a folder in the page&apos;s <code>demos/</code>.
+      </>
+    ),
+  },
 };
 
 export function AddMissing({
@@ -57,7 +86,7 @@ export function AddMissing({
         <span className="text-faint">
           {ask.question}{' '}
           <button type="button" className={ui.linkBtn} onClick={() => void show()}>
-            Add it
+            {ask.action}
           </button>
         </span>
       )}
@@ -75,9 +104,7 @@ export function AddMissing({
           >
             Edit myself
           </button>
-          <span className={ui.fine}>
-            Each version is a file in the page&apos;s <code>versions/</code>.
-          </span>
+          <span className={ui.fine}>{ask.files}</span>
         </div>
       </Modal>
     </>

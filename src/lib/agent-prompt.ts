@@ -36,7 +36,7 @@ export function agentPrompt(origin: string, code?: string): string {
 }
 
 /** The prompt a paper's "Add" buttons give (`AddMissing`): the task's page, `/agent/add/<what>`, for the paper's path. */
-export function addPrompt(origin: string, what: 'version' | 'submission', paperPath: string, code?: string): string {
+export function addPrompt(origin: string, what: 'version' | 'submission' | 'demo', paperPath: string, code?: string): string {
   return followPrompt(origin, `/agent/add/${what}`, { target: onSite(origin, paperPath), code });
 }
 
