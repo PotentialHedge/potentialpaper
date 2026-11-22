@@ -38,7 +38,7 @@
         "potentialpaper.origin": {
           "type": "string",
           "default": "",
-          "description": "The site's address, such as https://papers.potentialhedge.com. Set by the site in the browser; on the desktop it is read from the clone's git remote, and this overrides it."
+          "description": "The site's address, such as https://potentialpaper.com. Set by the site in the browser; on the desktop it is read from the clone's git remote, and this overrides it."
         },
         "potentialpaper.webviews": {
           "type": "boolean",

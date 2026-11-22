@@ -8,7 +8,7 @@ import { HOME_LIST_PARAMS } from './private-paths';
 export const UMAMI_SCRIPT = 'https://analytics.potentialhedge.com/script.js';
 export const UMAMI_WEBSITE_ID = 'd992302e-f47b-4ff8-9024-f2f5faf6b0fa';
 /** Only hits from this host count, so `npm run dev` and staging load the script and record nothing. */
-export const UMAMI_DOMAIN = 'papers.potentialhedge.com';
+export const UMAMI_DOMAIN = 'potentialpaper.com';
 
 /**
  * What analytics may learn about a URL. Umami records the full URL and referrer of every hit, and some of

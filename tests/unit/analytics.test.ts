@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { analyticsUrl } from '@/lib/analytics';
 
-const origin = 'https://papers.potentialhedge.com';
+const origin = 'https://potentialpaper.com';
 
 describe('analyticsUrl', () => {
   it('keeps the home page list parameters and drops the rest', () => {

@@ -3,18 +3,18 @@ import { originOfRemote, sectionFormat } from '../../editors/vscode/extension/sr
 
 describe('the VS Code extension on a clone', () => {
   it('finds the site from the git remote', () => {
-    expect(originOfRemote('https://papers.potentialhedge.com/git/arxiv/1706.03762.git')).toBe(
-      'https://papers.potentialhedge.com',
+    expect(originOfRemote('https://potentialpaper.com/git/arxiv/1706.03762.git')).toBe(
+      'https://potentialpaper.com',
     );
     expect(originOfRemote('https://me:pp_live_x@papers.example.com/git/openreview/abc.git')).toBe(
       'https://papers.example.com',
     );
     expect(originOfRemote('http://localhost:3000/git/doi/10.1/x.git')).toBe('http://localhost:3000');
-    expect(originOfRemote('ssh://git@git.papers.potentialhedge.com:2222/abs/1706.03762.git')).toBe(
-      'https://papers.potentialhedge.com',
+    expect(originOfRemote('ssh://git@git.potentialpaper.com:2222/abs/1706.03762.git')).toBe(
+      'https://potentialpaper.com',
     );
-    expect(originOfRemote('git@git.papers.potentialhedge.com:abs/1706.03762.git')).toBe(
-      'https://papers.potentialhedge.com',
+    expect(originOfRemote('git@git.potentialpaper.com:abs/1706.03762.git')).toBe(
+      'https://potentialpaper.com',
     );
     expect(originOfRemote('git@github.com:someone/repo.git')).toBeNull();
     expect(originOfRemote('https://github.com/someone/repo.git')).toBeNull();

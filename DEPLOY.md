@@ -1,6 +1,6 @@
 # Deploying
 
-**The site is not in production yet.** papers.potentialhedge.com has no real users, so downtime, a failed
+**The site is not in production yet.** potentialpaper.com has no real users, so downtime, a failed
 deploy or a reset database costs nothing. Deploy straight from `main` on this host, with no staging step, no
 maintenance window and no rollback plan. Just fix forward. This changes once the owner says we have launched.
 
@@ -26,7 +26,7 @@ scripts/purge-edge-cache.sh       # required, see below
 ```
 
 Check it: `docker inspect potentialpaper-app-1 --format '{{.Config.Image}}'` names the new commit, and
-https://papers.potentialhedge.com loads.
+https://potentialpaper.com loads.
 
 ## Why each step is there
 
@@ -77,7 +77,7 @@ The consumers are:
 Imports run outside the platform, from the `potentialpaper-tools` repo, through the import API
 (`/agent/imports`, `src/server/api/imports.ts`), as the `openreview` bot. Give the tool a token once:
 `dc --profile tools run --rm tools npm run bots:token -- openreview "import tool"` (printed once; revoke it as any
-token). Then, from a machine with the scrape, `PP_URL=https://papers.potentialhedge.com PP_TOKEN=… npm run
+token). Then, from a machine with the scrape, `PP_URL=https://potentialpaper.com PP_TOKEN=… npm run
 import-reviews -- <scrape.sqlite> ICLR.cc/2027/Conference "ICLR 2027" [--from <forum id>]` commits each submission's
 files as the bot, one commit per submission that changed (with `IMPORT_RATE_LIMIT`, not the people's limit).
 Re-running commits only what changed, so a stopped run is resumed by running it again. Once the worker has caught up
@@ -121,18 +121,18 @@ key attempts a connection, 20 s to sign in, 10 minutes a connection, 4 git comma
 command counts against the account's API bucket.
 
 **DNS.** Cloudflare doesn't proxy SSH on our plan, so git needs a DNS-only (grey-cloud) name pointing at this host,
-e.g. an A record `git.papers` → `77.244.248.196` in `potentialhedge.com`. It shows the origin's address, which
+e.g. an A record `git` → `77.244.248.196` in `potentialpaper.com`. It shows the origin's address, which
 the proxied names hide; Traefik admits only Cloudflare's addresses on 80/443, so the web stays behind the edge.
 
 **Port.** The host's own sshd holds 22. The options:
 
 1. **2222 (recommended to start).** `GIT_SSH_PUBLISH=2222`,
-   `GIT_SSH_URL=ssh://git@git.papers.potentialhedge.com:2222`. Nothing on the host changes. Addresses need the
+   `GIT_SSH_URL=ssh://git@git.potentialpaper.com:2222`. Nothing on the host changes. Addresses need the
    `ssh://` form with the port, or a `Host` entry with `Port 2222` in `~/.ssh/config` for the short form. Some
    networks block ports other than 22 and 443.
 2. **22 for git, the host's sshd moved** (to another port, or to Tailscale only, since we deploy over Tailscale
-   anyway). `GIT_SSH_PUBLISH=22`, `GIT_SSH_URL=ssh://git@git.papers.potentialhedge.com`, and the short form
-   `git@git.papers.potentialhedge.com:abs/1706.03762.git` works, as on GitHub. Risk: locking ourselves out while
+   anyway). `GIT_SSH_PUBLISH=22`, `GIT_SSH_URL=ssh://git@git.potentialpaper.com`, and the short form
+   `git@git.potentialpaper.com:abs/1706.03762.git` works, as on GitHub. Risk: locking ourselves out while
    moving sshd; do it from a Tailscale session with the new port tested before the old one closes.
 3. **22 on a second IPv4 address** for the git name only, if the provider sells one: GitHub's shape with no change to
    the host's sshd, at a monthly cost.
@@ -146,13 +146,13 @@ client's address on published ports (iptables, not the userland proxy), which th
 refuse to connect with a warning about an attack. Back the file up with `.env.production`.
 
 ```sh
-mkdir -p secrets && ssh-keygen -t ed25519 -N '' -C git.papers.potentialhedge.com -f secrets/ssh_host_ed25519_key
+mkdir -p secrets && ssh-keygen -t ed25519 -N '' -C git.potentialpaper.com -f secrets/ssh_host_ed25519_key
 ssh-keygen -lf secrets/ssh_host_ed25519_key.pub   # the fingerprint: put it in docs/git.md
 ```
 
 The compose file mounts `secrets/ssh_host_ed25519_key` read-only at `/run/secrets/ssh_host_key`
 (`GIT_SSH_HOST_KEY_FILE`); `GIT_SSH_HOST_KEY` with the key's text also works. The service logs the fingerprint it
-serves at start (`dc logs ssh`). Check it from outside: `ssh -T -p 2222 git@git.papers.potentialhedge.com` prints
+serves at start (`dc logs ssh`). Check it from outside: `ssh -T -p 2222 git@git.potentialpaper.com` prints
 "Hi <handle>! You've authenticated, …" once a key is on your profile.
 
 ## User content

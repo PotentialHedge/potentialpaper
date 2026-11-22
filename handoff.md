@@ -8,7 +8,7 @@ papers are the central feature. Page history is real git objects stored in Postg
 GitHub repos come later.
 
 - Repo: https://github.com/PotentialHedge/potentialpaper (private, `main`)
-- Live: https://papers.potentialhedge.com
+- Live: https://potentialpaper.com (papers.potentialhedge.com redirects there)
 - Read first: `DESIGN.md`, `IMPLEMENTATION.md` (both partly stale, see below), and `TODO.md` for what is
   waiting on the user.
 - Reference for stack and style: https://github.com/PotentialHedge/acceptodds. Its `AGENTS.md` explains why
@@ -372,7 +372,9 @@ the rest. `README.md` doesn't exist.
   needs `--profile tools`, or migrate silently applies nothing new. Migrations get ten minutes per statement.
 - After every deploy, run `scripts/purge-edge-cache.sh`, because cached pages name the old build's scripts.
 - Routing is through Docker labels on the app container, behind the host's shared Traefik. DNS is a proxied
-  A record, `papers`, in the `potentialhedge.com` zone, with SSL mode Full.
+  A record for the apex of the `potentialpaper.com` zone (and `www`, redirected to it), SSL Full (strict) with an
+  Origin CA certificate (`~/proxy/certs/potentialpaper.com.*`). `papers.potentialhedge.com` 301s to it, a redirect
+  rule in the `potentialhedge.com` zone.
 
 ## Good to know
 

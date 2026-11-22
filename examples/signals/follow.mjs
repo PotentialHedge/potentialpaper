@@ -1,6 +1,6 @@
 // Keeping a signal set current from the events feed: a publisher's backend in one file. Node 18+, no dependencies.
 //
-//   SITE=https://papers.potentialhedge.com SET=<owner>/<name> PP_TOKEN=<publisher's API key> node follow.mjs
+//   SITE=https://potentialpaper.com SET=<owner>/<name> PP_TOKEN=<publisher's API key> node follow.mjs
 //
 // It reads every commit to every paper, oldest first (`GET /api/v1/events`), and recomputes its signal for each paper
 // that is new, merged into, or whose metadata changed, writing the values in batches. The cursor is kept in

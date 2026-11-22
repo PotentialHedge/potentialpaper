@@ -9,9 +9,9 @@ Anyone can clone a page, with no account and no key. The address is the paper's 
 `.git` at the end:
 
 ```sh
-git clone https://papers.potentialhedge.com/git/arxiv/1706.03762.git
-git clone https://papers.potentialhedge.com/git/doi/10.1000/xyz123.git
-git clone https://papers.potentialhedge.com/git/openreview/dskf2Ppd9o.git
+git clone https://potentialpaper.com/git/arxiv/1706.03762.git
+git clone https://potentialpaper.com/git/doi/10.1000/xyz123.git
+git clone https://potentialpaper.com/git/openreview/dskf2Ppd9o.git
 ```
 
 Install [Git LFS](https://git-lfs.com) first (`brew install git-lfs`, `apt install git-lfs`; Git for Windows and
@@ -25,7 +25,7 @@ first edit on the site to start one.
 Or over SSH, with a key on your profile ([below](#over-ssh)):
 
 ```sh
-git clone ssh://git@git.papers.potentialhedge.com:2222/abs/1706.03762.git
+git clone ssh://git@git.potentialpaper.com:2222/abs/1706.03762.git
 ```
 
 ## What's in a page
@@ -75,7 +75,7 @@ A PDF or picture committed without Git LFS installed is refused with a `remote:`
 
 ## Make an API key that may push
 
-On your [profile page](https://papers.potentialhedge.com/profile), under API keys, make a key with **Allow
+On your [profile page](https://potentialpaper.com/profile), under API keys, make a key with **Allow
 `git push` to papers' pages** ticked. Untick "Allow posting…" if the key is only for git: that key can then
 push and nothing else. The key is shown once; copy it.
 
@@ -115,7 +115,7 @@ prek install
 ```
 
 Then each `git commit` checks the JSON files (syntax, and each against its schema at
-`https://papers.potentialhedge.com/schemas/<link|version|thumbnail>.json`), formats the sections with Prettier and
+`https://potentialpaper.com/schemas/<link|version|thumbnail>.json`), formats the sections with Prettier and
 the JSON as the site writes it, and fixes whitespace. A hook that changes a file stops the commit: `git add` the
 change and commit again. The site checks every push anyway; the hooks catch mistakes sooner. Editors that read
 JSON Schema (VS Code: `json.schemas`) can use the same addresses for completion as you type.
@@ -157,9 +157,9 @@ Instead of an API key, you can push (and clone) with an SSH key, as on GitHub.
 
 1. If you have no key yet, make one: `ssh-keygen -t ed25519`. Ed25519, ECDSA and RSA keys of at least 3072 bits
    work; DSA and shorter RSA keys don't.
-2. On your [profile page](https://papers.potentialhedge.com/profile), under SSH keys, paste the public half
+2. On your [profile page](https://potentialpaper.com/profile), under SSH keys, paste the public half
    (`~/.ssh/id_ed25519.pub`, one line starting `ssh-ed25519`). A key can be on one account only.
-3. Check it: `ssh -T -p 2222 git@git.papers.potentialhedge.com` answers "Hi <your handle>! You've authenticated,
+3. Check it: `ssh -T -p 2222 git@git.potentialpaper.com` answers "Hi <your handle>! You've authenticated,
    but PotentialPaper does not provide shell access."
 
 The first time, ssh shows the server's key and asks whether to trust it. Say yes only if the fingerprint is this
@@ -171,18 +171,18 @@ ED25519 key fingerprint is SHA256:<to be filled in when the server's key is made
 
 The user is always `git`; your key says who you are. A page's SSH address is the page's own path (`abs/…`,
 `doi/…`, `openreview/…`), with or without `.git`; the `arxiv/…` form of the HTTPS address works too. To use the
-short form `git@git.papers.potentialhedge.com:abs/1706.03762.git`, which has no room for a port, tell ssh the port
+short form `git@git.potentialpaper.com:abs/1706.03762.git`, which has no room for a port, tell ssh the port
 once, in `~/.ssh/config`:
 
 ```
-Host git.papers.potentialhedge.com
+Host git.potentialpaper.com
   Port 2222
 ```
 
 To push over SSH from a clone made over HTTPS, change its push address:
-`git remote set-url --push origin ssh://git@git.papers.potentialhedge.com:2222/abs/1706.03762.git`. Everything
+`git remote set-url --push origin ssh://git@git.potentialpaper.com:2222/abs/1706.03762.git`. Everything
 else is as over HTTPS: the same identity, the same rules, and a confirmed institutional address to push. Removing a
 key on your profile stops it working at once.
 
 Git LFS doesn't work over SSH yet. In a clone made over SSH, point it at the HTTPS address once, and it uses your API
-key for PDFs and pictures: `git config lfs.url https://papers.potentialhedge.com/git/arxiv/1706.03762.git/info/lfs`.
+key for PDFs and pictures: `git config lfs.url https://potentialpaper.com/git/arxiv/1706.03762.git/info/lfs`.

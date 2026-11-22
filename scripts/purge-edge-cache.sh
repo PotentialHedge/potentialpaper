@@ -9,8 +9,8 @@ if [ -z "${CLOUDFLARE_API_TOKEN:-}" ]; then
   set -u
 fi
 : "${CLOUDFLARE_API_TOKEN:?no Cloudflare token: see ~/.config/cloudflare/env}"
-host=${1:-papers.potentialhedge.com}
-zone=${CLOUDFLARE_ZONE_ID:-b55a62f4aca6fc00040b49f67641d6de}
+host=${1:-potentialpaper.com}
+zone=${CLOUDFLARE_ZONE_ID:-a691c3e92745bcc679a9785c6958118e}
 response=$(curl -sS -X POST "https://api.cloudflare.com/client/v4/zones/$zone/purge_cache" \
   -H "Authorization: Bearer $CLOUDFLARE_API_TOKEN" -H 'Content-Type: application/json' \
   --data "{\"hosts\":[\"$host\"]}")
