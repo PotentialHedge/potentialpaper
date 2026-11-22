@@ -7,7 +7,8 @@ import { DEMO_HEIGHT_MESSAGE, demoOfHost, MAX_DEMO_HEIGHT, MIN_DEMO_HEIGHT } fro
  * Runs the demos in rendered Markdown (`server/pages/markdown.ts` writes each as a frame without a `src`).
  * Each is loaded once it is about to come on screen, and kept from then on: the browser's own
  * `loading="lazy"` starts a frame more than a screen away, which is every demo on a short page. Each
- * frame then takes the height its page reports, and the caption's button puts it full screen.
+ * frame then takes the height its page reports (growing at once, shrinking once the reader lets go of it), and the
+ * caption's button puts it full screen.
  */
 export function DemoFrames() {
   useEffect(() => {
@@ -27,36 +28,95 @@ export function DemoFrames() {
     );
     for (const frame of frames) observer.observe(frame);
 
-    // A page sized by its frame (`height: 80vh`) answers each resize with another, by the same ratio, and
-    // would shrink or grow for ever. Two steps the same way by the same ratio are that: the first step was
-    // its height, so the frame goes back to it and stops following.
-    const state = new Map<HTMLIFrameElement, { last: { from: number; to: number } | null; frozen: boolean }>();
+    // Each frame grows to its page's height at once, but shrinks only once the pointer has left it and the page
+    // has stayed shorter for a moment: a demo that shows and hides results as its controls change would otherwise
+    // move everything below it on each click.
+    //
+    // A page sized by its frame (`height: 80vh`) answers each resize with another, by the same ratio, and would grow
+    // for ever. Two steps the same way by the same ratio, the second reported right after the first was made, are
+    // that: the first step was its height, so the frame goes back to it and stops following. A report seconds after
+    // a resize is the reader using the demo.
+    const SHRINK_DELAY = 800;
+    const LOOP_WINDOW = 400;
+    interface FrameState {
+      last: { from: number; to: number; at: number } | null;
+      frozen: boolean;
+      /** The height the page last reported, and whether it came right after the frame's last resize. */
+      wanted: number;
+      quick: boolean;
+      hovered: boolean;
+      timer: ReturnType<typeof setTimeout> | undefined;
+    }
+    const state = new Map<HTMLIFrameElement, FrameState>();
+    const stateOf = (frame: HTMLIFrameElement) => {
+      let s = state.get(frame);
+      if (!s) {
+        s = { last: null, frozen: false, wanted: 0, quick: false, hovered: false, timer: undefined };
+        state.set(frame, s);
+      }
+      return s;
+    };
+
+    function setHeight(frame: HTMLIFrameElement, s: FrameState, next: number) {
+      const current = frame.getBoundingClientRect().height;
+      if (current === 0 || Math.abs(next - current) < 2) return;
+      if (s.last && s.quick && Math.abs(s.last.to - current) < 2) {
+        const sameWay = next > current === s.last.to > s.last.from;
+        if (sameWay && Math.abs(next / current - s.last.to / s.last.from) < 0.02) {
+          s.frozen = true;
+          frame.style.height = `${s.last.to}px`;
+          return;
+        }
+      }
+      s.last = { from: current, to: next, at: performance.now() };
+      frame.style.height = `${next}px`;
+      frame.classList.add('demo-sized');
+    }
+
+    /** Shrinks the frame to its page's height once the reader has let go of it. */
+    function settle(frame: HTMLIFrameElement, s: FrameState) {
+      clearTimeout(s.timer);
+      s.timer = undefined;
+      if (s.frozen || s.hovered || s.wanted === 0) return;
+      if (s.wanted < frame.getBoundingClientRect().height) {
+        s.timer = setTimeout(() => {
+          s.timer = undefined;
+          if (!s.hovered && !s.frozen) setHeight(frame, s, s.wanted);
+        }, SHRINK_DELAY);
+      }
+    }
+
     function onMessage(event: MessageEvent) {
       // From the frame's own demo: each has a host of its own (`lib/demos.ts`).
       const frame = frames.find((f) => f.contentWindow === event.source);
       if (!frame || !demoOfHost(URL.parse(event.origin)?.hostname ?? '') || !frame.src.startsWith(`${event.origin}/`))
         return;
-      const s = state.get(frame) ?? { last: null, frozen: false };
-      state.set(frame, s);
+      const s = stateOf(frame);
       const data = event.data as { type?: unknown; height?: unknown } | null;
       if (s.frozen || data?.type !== DEMO_HEIGHT_MESSAGE) return;
       if (typeof data.height !== 'number' || !Number.isFinite(data.height)) return;
       const next = Math.round(Math.min(MAX_DEMO_HEIGHT, data.height));
       if (next < MIN_DEMO_HEIGHT) return;
-      const current = frame.getBoundingClientRect().height;
-      if (current === 0 || Math.abs(next - current) < 2) return;
-      if (s.last && Math.abs(s.last.to - current) < 2) {
-        const sameWay = next > current === s.last.to > s.last.from;
-        if (sameWay && Math.abs(next / current - s.last.to / s.last.from) < 0.02) {
-          s.frozen = true;
-          frame.style.height = `${s.last.to}px`;
-          frame.classList.add('demo-sized');
-          return;
-        }
+      s.wanted = next;
+      s.quick = s.last !== null && performance.now() - s.last.at < LOOP_WINDOW;
+      // The first height, and any growth, at once; a shrink waits (`settle`).
+      if (!frame.classList.contains('demo-sized') || next > frame.getBoundingClientRect().height) {
+        clearTimeout(s.timer);
+        s.timer = undefined;
+        setHeight(frame, s, next);
+      } else {
+        settle(frame, s);
       }
-      s.last = { from: current, to: next };
-      frame.style.height = `${next}px`;
-      frame.classList.add('demo-sized');
+    }
+    const hover = (event: Event) => {
+      const frame = event.currentTarget as HTMLIFrameElement;
+      const s = stateOf(frame);
+      s.hovered = event.type === 'pointerenter';
+      settle(frame, s);
+    };
+    for (const frame of frames) {
+      frame.addEventListener('pointerenter', hover);
+      frame.addEventListener('pointerleave', hover);
     }
     window.addEventListener('message', onMessage);
 
@@ -73,6 +133,11 @@ export function DemoFrames() {
     return () => {
       observer.disconnect();
       window.removeEventListener('message', onMessage);
+      for (const frame of frames) {
+        frame.removeEventListener('pointerenter', hover);
+        frame.removeEventListener('pointerleave', hover);
+        clearTimeout(state.get(frame)?.timer);
+      }
       document.removeEventListener('click', onClick);
     };
   }, []);
