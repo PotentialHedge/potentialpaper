@@ -179,33 +179,30 @@ Demo files are in R2, through the `R2_*` keys in `.env.production`: an account t
 storing it on the container's disk. A page's rendered HTML names its demos' addresses, so after moving the
 domain run `dc run --rm tools npm run pages:rebuild`.
 
-## Postgres 19 (not done in production yet)
+## Postgres 19
 
-Dev runs `postgres:19rc2` since 2026-11-16 (`docker-compose.dev.yml`); production stays on 16 until 19.0 is
-tagged (due 2026-11-19). Then, once:
+Production runs `postgres:19.0` since 2026-11-22, on the volume `pgdata19` mounted at `/var/lib/postgresql` (since
+18 the image keeps data in `/var/lib/postgresql/<major>/docker`, so not `.../data`), with
+`autovacuum_max_parallel_workers=2`. It started empty: the move was also the reset below. Postgres 16's volume,
+`potentialpaper_pgdata`, is kept unmounted, and its last dump is `~/backups/potentialpaper/prod-pg16-20261122.dump`.
+Remove both once nothing from them is missed.
 
-1. In `docker-compose.prod.yml`, pin the image to the exact tag (`postgres:19.0`), add
-   `command: ['postgres', '-c', 'autovacuum_max_parallel_workers=2']`, and mount a **new** volume
-   `pgdata19:/var/lib/postgresql` (not `.../data`: since 18 the image keeps data in
-   `/var/lib/postgresql/<major>/docker`, and the old path would quietly leave it in the container). Keep the
-   `pgdata` volume declared but unmounted.
-2. `dc stop app ingest worker ssh`, then dump the old cluster:
-   `docker exec potentialpaper-postgres-1 pg_dumpall -U "$POSTGRES_USER" > data/pg19/prod-pg16.sql`.
-3. `dc up -d postgres` (now 19, empty), restore with
-   `docker exec -i potentialpaper-postgres-1 psql -U "$POSTGRES_USER" -d postgres < data/pg19/prod-pg16.sql`
-   (the "role already exists" error is expected), then `analyze`. The restore rebuilds the full-text and
-   `pg_trgm` indexes, as 19's release notes ask.
-4. Continue the recipe from `dc run --rm tools`, and check the site. Remove the old `potentialpaper_pgdata`
-   volume only after it checks out.
-
-Checked on dev: `max_locks_per_transaction` is 128 by default now (enough), and nothing uses JIT (off by
-default now). The dev volume went the same way: `potentialpaper-dev_pgdata` (16) is kept beside
-`potentialpaper-dev_pgdata19`.
+Dev runs `postgres:19rc2` (`docker-compose.dev.yml`). Checked on dev: `max_locks_per_transaction` is 128 by default
+now (enough), and nothing uses JIT (off by default now).
 
 ## When it goes wrong
 
 Read `dc logs -f app`, fix the problem, commit and run the recipe again. If the database is beyond saving,
-resetting it is fine for now: `dc down -v` deletes the volume, and the next `up` and migrate start fresh. You'd
-have to re-import papers afterwards (the `papers:*` scripts in `package.json`). The last reset, on
-2026-11-07, was scripted in `~/backups/reimport.sh` on this host: it mounts the scrapes into the tools
-container and runs the imports in order.
+resetting it is fine for now. The last reset, on 2026-11-22:
+
+1. Stop `app ingest worker ssh`; dump everything (`pg_dump -Fc`), and separately the data of `pdf_documents` and
+   `lfs_objects`, which hold every stored PDF's address, size and ingest results (text, emails, cover). Nothing
+   else in them points at other tables but `lfs_objects.account_id`.
+2. Start Postgres on a new, empty volume (or `dc down -v`), run the recipe from `dc run --rm tools`, and
+   `pg_restore --data-only --disable-triggers` those two tables; set `lfs_objects.account_id` to null.
+3. Give the `openreview` bot a token (`bots:token`) and run the imports from `potentialpaper-tools` against
+   `http://app:3000` on the compose network: `~/backups/potentialpaper/reimport-2026-11-22.sh` on this host does it
+   all, as the user unit `pp-reimport` (log `reimport.log` next to it). PDFs in R2 are named by their SHA-256, so
+   `attach-pdfs` attaches the ones R2 has without uploading them again, and the ingest has nothing to redo.
+4. Restart the acceptodds map's copy with `--force` (`~/projects/potentialpaper-acceptodds-map`), since the site's
+   signals went with the database, then `scripts/purge-edge-cache.sh`.
