@@ -30,11 +30,14 @@ export interface RateLimitResult {
   retryAfterSeconds: number;
 }
 
-/** A signed-in account's bucket. */
-export function rateLimitConfig(): RateLimitConfig {
-  const prefix = 'API_RATE_LIMIT';
-  const burst = Number(process.env[`${prefix}_BURST`] ?? 60);
-  const perSecond = Number(process.env[`${prefix}_PER_SECOND`] ?? 2);
+/**
+ * A signed-in account's bucket. `trusted`, for admins and bots (accounts only we make), is far larger, so our own
+ * imports and scripts are never held to a person's pace: `API_RATE_LIMIT_TRUSTED_*`.
+ */
+export function rateLimitConfig(trusted = false): RateLimitConfig {
+  const prefix = trusted ? 'API_RATE_LIMIT_TRUSTED' : 'API_RATE_LIMIT';
+  const burst = Number(process.env[`${prefix}_BURST`] ?? (trusted ? 2_000 : 60));
+  const perSecond = Number(process.env[`${prefix}_PER_SECOND`] ?? (trusted ? 200 : 2));
   if (!(burst >= 1) || !(perSecond > 0)) {
     throw new Error(`${prefix}_BURST must be >= 1 and ${prefix}_PER_SECOND > 0`);
   }
