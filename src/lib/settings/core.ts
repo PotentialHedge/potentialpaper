@@ -324,8 +324,21 @@ const USER_SETTINGS: Record<string, CoreSetting> = Object.fromEntries(
   ]),
 );
 
+/** How pages' text is set, for every kind of page (`TextSettings`). */
+const TEXT_SETTINGS: Record<string, CoreSetting> = {
+  'text.justify': {
+    schema: z.boolean() as z.ZodType,
+    default: false,
+    title: 'Justify text',
+    description: "Set pages' text flush with both edges, as a printed paper is, hyphenating long words.",
+    group: 'Text',
+    widget: 'switch',
+  },
+};
+
 export const CORE_SETTINGS: Record<string, CoreSetting> = {
   ...NAV_SETTINGS,
+  ...TEXT_SETTINGS,
   ...Object.fromEntries(PANEL_KINDS.flatMap((kind) => Object.entries(kindSettings(kind)))),
   ...USER_SETTINGS,
   ...PLUGIN_SETTINGS,

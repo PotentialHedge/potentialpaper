@@ -156,6 +156,18 @@
   .md img {
     @apply max-w-full;
   }
+  /* The reader's "Justify text" (`text.justify`, `TextSettings`): paragraphs and list items, not headings or code. */
+  .justify-text .md :is(p, li) {
+    text-align: justify;
+    hyphens: auto;
+  }
+  /*
+   * Beside a page's floating sidebar (`PageView`) text wraps round it; what draws a box (a demo, a rule, a plugin's
+   * panel) narrows beside it instead of running under it.
+   */
+  .md > :is(figure, hr, div) {
+    display: flow-root;
+  }
   /* A comment (`server/comments/render.ts`): body text, its headings bold paragraphs, its only images GIFs. */
   .comment-md > * + * {
     margin-top: 0.5em;

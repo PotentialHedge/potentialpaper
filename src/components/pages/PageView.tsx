@@ -8,7 +8,7 @@ import type { BuiltPanel } from './common';
 
 /**
  * Every kind of page, laid out the same way (`lib/kinds.ts`): its header and the actions under it, then the page
- * itself, `<kind>.main` beside `<kind>.aside` with `<kind>.body` below both, as the first tab, and `<kind>.tabs`
+ * itself, `<kind>.main` round `<kind>.aside` (floating) with `<kind>.body` below both, as the first tab, and `<kind>.tabs`
  * panels as tabs beside it. A kind brings only its header and its panels (`paper-route.tsx`, `page-route.tsx`).
  * Rendered once and cached, so the same for every reader: which panels show, and in what order, is the reader's
  * settings', decided in the browser (`ArrangedPanels`, `ArrangedTabs`).
@@ -48,13 +48,15 @@ export function PageView({
               title: KINDS[kind].title,
               node: (
                 <>
-                  <div className="grid grid-cols-[minmax(0,1fr)_300px] items-start gap-8 narrow:grid-cols-1">
+                  {/* The sidebar floats, so what is below it in the main column takes the full width; on a phone
+                      it goes under the main column. */}
+                  <div className="flow-root narrow:flex narrow:flex-col">
+                    <aside className="float-right mb-4 ml-8 w-[300px] space-y-3 narrow:order-last narrow:float-none narrow:mt-8 narrow:ml-0 narrow:w-auto">
+                      <ArrangedPanels kind={kind} slot={slot('aside')} panels={panels.aside} />
+                    </aside>
                     <div>
                       <ArrangedPanels kind={kind} slot={slot('main')} panels={panels.main} />
                     </div>
-                    <aside className="space-y-3">
-                      <ArrangedPanels kind={kind} slot={slot('aside')} panels={panels.aside} />
-                    </aside>
                   </div>
                   <ArrangedPanels kind={kind} slot={slot('body')} panels={panels.body} />
                 </>

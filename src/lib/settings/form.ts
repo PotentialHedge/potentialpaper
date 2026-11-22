@@ -107,6 +107,12 @@ export const CATEGORIES: Category[] = [
     description: 'Which links the bar at the top shows, and in what order.',
     section: 'Pages',
   },
+  {
+    id: 'text',
+    title: 'Text',
+    description: "How pages' text is set.",
+    section: 'Pages',
+  },
   ...PANEL_KINDS.map((kind): Category => ({
     id: KIND_CATEGORY[kind],
     title: kind === 'user' ? "People's pages" : `${KINDS[kind].title} pages`,
@@ -131,6 +137,7 @@ function coreCategory(key: string, setting: CoreSetting): string | null {
   if (setting.siteOnly || setting.group === 'Plugins') return null;
   if (setting.group === USER_PAGE_GROUP) return 'public-page';
   if (key.startsWith('navbar.')) return 'navbar';
+  if (key.startsWith('text.')) return 'text';
   const kind = key.split('.')[0] as PanelKind;
   return PANEL_KINDS.includes(kind) ? KIND_CATEGORY[kind] : null;
 }

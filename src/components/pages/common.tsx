@@ -119,7 +119,11 @@ export function Sections({ kind, address, ownersHtml, communityHtml, owners }: P
             both && owners.claimed && <p className={`${ui.fine} font-sans`}>Nothing yet.</p>
           )}
           {/* The plugins' panels a paper's authors let in (`paper.author`, `owners/plugins.json`). */}
-          {kind === 'paper' && <AuthorPanels />}
+          {kind === 'paper' && (
+            <div className="flow-root">
+              <AuthorPanels />
+            </div>
+          )}
         </div>
       )}
       {community && (
@@ -150,7 +154,11 @@ export function Sections({ kind, address, ownersHtml, communityHtml, owners }: P
             </div>
           )}
           {/* Plugins' panels in the community's sections (`paper.community`): the paper map's minimap. */}
-          {kind === 'paper' && <CommunityPanels />}
+          {kind === 'paper' && (
+            <div className="flow-root">
+              <CommunityPanels />
+            </div>
+          )}
         </div>
       )}
     </section>
