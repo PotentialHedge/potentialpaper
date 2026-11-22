@@ -30,7 +30,7 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
 /**
  * Becoming one of a page's owners, who write its `owners/` (`lib/kinds.ts`, `KINDS[kind].owners.claim`): a paper's
  * authors claim it, a venue's organisers ask an admin, an org's members are whoever has a confirmed address at its
- * domains. A person's page is its account's, and a topic has no owners, so neither is claimed.
+ * domains. A person's page is its account's, and a category has no owners, so neither is claimed.
  */
 export default async function ClaimPage({ params }: Props) {
   const found = await toolPage('claim', params);

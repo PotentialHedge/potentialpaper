@@ -20,11 +20,11 @@ import { PageActions } from './PageActions';
 import { UserByline } from './user-panels';
 import { PageHeader, PageView } from './PageView';
 import { KIND_PANELS, type KindPanelProps, presentPanel } from './slots';
-import { topicOverview } from '@/server/topic-pages';
+import { categoryOverview } from '@/server/category-pages';
 import { previewMetadata, previewOfPage, shortIdOf, shortUrl } from '@/server/share';
 
 /**
- * What the routes of the kinds other than a paper share (`/v/…`, `/t/…`, `/o/…`, `/u/…`, `lib/kinds.ts`): the page
+ * What the routes of the kinds other than a paper share (`/v/…`, `/c/…`, `/o/…`, `/u/…`, `lib/kinds.ts`): the page
  * at a key, assembled from its kind's slots. Rendered once and cached, as a paper's page is, so nothing here may
  * read the request; a page that doesn't exist is a 404 until it is made (`createPage` refreshes its address).
  */
@@ -48,12 +48,12 @@ const load = cache(async (kind: KeyedKind, segments: string[]): Promise<Loaded |
   if (keyProblem(kind, key)) return null;
   const page = await findKeyedPage(getDb(), kind, key);
   if (!page) {
-    // An old handle or a renamed topic's old slug leads to the page's new address (`page_redirects`).
+    // An old handle or a renamed category's old slug leads to the page's new address (`page_redirects`).
     const moved = await redirectedPage(getDb(), kind, key);
     const there = moved && (await survivorOf(getDb(), moved));
     return there ? { redirect: keyedPagePath(kind, there.key) } : null;
   }
-  // A topic merged into another leads there; its history stays at its own address's tools.
+  // A category merged into another leads there; its history stays at its own address's tools.
   const survivor = await survivorOf(getDb(), page);
   if (survivor.id !== page.id) return { redirect: keyedPagePath(kind, survivor.key) };
   const [current] = await getDb()
@@ -87,12 +87,12 @@ export async function KeyedPageRoute({ kind, segments }: { kind: KeyedKind; segm
   const { page, key, current } = found;
   const address = { kind, key };
   const scope = KINDS[kind].scope;
-  const [from, to, count, list, summaries, scopes, facts, user, org, topic, shortId, owners] = await Promise.all([
+  const [from, to, count, list, summaries, scopes, facts, user, org, category, shortId, owners] = await Promise.all([
     linksFrom(page.id),
     linksTo(page.id),
     scope ? scopeMemberCount(page.id) : Promise.resolve(0),
-    // A venue lists its submissions by status itself (`venue-panels.tsx`), a topic its pages by name (`topic-panels.tsx`).
-    scope && kind !== 'venue' && kind !== 'topic' ? scopePapers(page.id) : Promise.resolve([]),
+    // A venue lists its submissions by status itself (`venue-panels.tsx`), a category its pages by name (`category-panels.tsx`).
+    scope && kind !== 'venue' && kind !== 'category' ? scopePapers(page.id) : Promise.resolve([]),
     pageSummaries([page.id]),
     scopesOfPage(page),
     pageFacts(page),
@@ -100,8 +100,8 @@ export async function KeyedPageRoute({ kind, segments }: { kind: KeyedKind; segm
     kind === 'user' ? userPageView(page) : Promise.resolve(null),
     // Its people are only those who show it as their institution (`orgPeople`).
     kind === 'org' ? orgOverview(page) : Promise.resolve(null),
-    // Its subtopics and other pages (`server/topic-pages.ts`).
-    kind === 'topic' ? topicOverview(page) : Promise.resolve(null),
+    // Its subcategories and other pages (`server/category-pages.ts`).
+    kind === 'category' ? categoryOverview(page) : Promise.resolve(null),
     shortIdOf(page.id),
     ownersOf(page, address),
   ]);
@@ -121,7 +121,7 @@ export async function KeyedPageRoute({ kind, segments }: { kind: KeyedKind; segm
     papers: scope ? { count, list } : null,
     user,
     org,
-    topic,
+    category,
   };
   return (
     <PageView
@@ -146,10 +146,10 @@ export async function KeyedPageRoute({ kind, segments }: { kind: KeyedKind; segm
                   codePath: toolPath('code', address),
                   clone: cloneAddresses(address),
                   hasRepo: current !== null,
-                  // A topic's name and article have a form of their own.
+                  // A category's name and article have a form of their own.
                   form:
-                    kind === 'topic'
-                      ? { href: `${keyedPagePath('topic', key)}/edit`, label: 'Edit the topic' }
+                    kind === 'category'
+                      ? { href: `${keyedPagePath('category', key)}/edit`, label: 'Edit the category' }
                       : undefined,
                 }
               : undefined

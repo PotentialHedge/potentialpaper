@@ -6,10 +6,10 @@ import { siteUrl } from '@/server/site';
 
 const USAGE = `Makes a page of a kind other than a paper (handoffs/pages.md), with its repo started, or says where the
 one there is lives. Admins only, on the server; each kind gets its own way to be made with its phase (the venues
-bot, sign-up, the "New topic" form). What the page says is then written by clone and push, under its path rules.
+bot, sign-up, the "New category" form). What the page says is then written by clone and push, under its path rules.
 
   npm run pages:create -- venue iclr/2027
-  npm run pages:create -- topic linear-attention
+  npm run pages:create -- category linear-attention
   npm run pages:create -- org eth/inf
   npm run pages:create -- user <handle>`;
 

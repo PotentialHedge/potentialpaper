@@ -144,7 +144,7 @@ Limits: 20 signals a set, 2048 dims, a writes rate limit, and a total per set th
   connection a process (`listen` from `consumers/worker.ts`) and looks again every 5 s. Never cached.
 - Each event: the page with a paper's every identifier, `seq`, `oid`, `parent`, `paths`, `summary`, `bot`, `created`
   (first commit) and `merged` (the merge commit now names the paper folded in: `mergedFrom` in its payload, set by
-  `mergePapers`). Papers are never deleted; topic and org pages that are deleted take their events with them.
+  `mergePapers`). Papers are never deleted; category and org pages that are deleted take their events with them.
 - `examples/signals/follow.mjs`: a follower that keeps a cursor file and writes values in batches. OpenAPI and the
   Signals section of `/plugins.md` describe it.
 - **Next:** staleness (`inputs` on a signal, the commit a value was computed at, `GET …/stale`), pgvector on

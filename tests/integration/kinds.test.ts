@@ -77,48 +77,48 @@ describe('pages', () => {
     expect(Object.keys(tree).sort()).toEqual(['.gitattributes', '.potentialpaper/metadata.json', 'prek.toml']);
     expect(JSON.parse(tree['.potentialpaper/metadata.json'])).toEqual({ layout: 5, kind: 'venue', key: 'iclr/2027' });
     await expect(createPage('venue', 'ICLR 2027')).rejects.toThrow(/slugs/);
-    await expect(createPage('topic', 'a/b')).rejects.toThrow(/more than 1 part/);
+    await expect(createPage('category', 'a/b')).rejects.toThrow(/more than 1 part/);
     await expect(createPage('user', 'x')).rejects.toThrow(/handle/);
   });
 });
 
 describe('path rules per kind', () => {
-  it('lets anyone verified write a topic, and nobody unverified', async () => {
-    const topic = await createPage('topic', 'linear-attention');
+  it('lets anyone verified write a category, and nobody unverified', async () => {
+    const category = await createPage('category', 'linear-attention');
     const { actor } = await person();
     const result = await commitPage(
-      topic.id,
-      topic.head,
+      category.id,
+      category.head,
       actor,
       [
-        { path: 'topic.json', content: '{ "name": "Linear attention" }\n' },
+        { path: 'category.json', content: '{ "name": "Linear attention" }\n' },
         { path: 'community/10-what-it-is.md', content: '# What it is\n\nAttention in linear time.\n' },
         {
           path: 'community/links.jsonl',
-          content: '{"id":"l1","to":"topic:efficient-transformers","label":"related"}\n',
+          content: '{"id":"l1","to":"category:efficient-transformers","label":"related"}\n',
         },
       ],
-      'Start the topic',
+      'Start the category',
     );
     expect(result.status).toBe('committed');
-    const [current] = await getDb().select().from(pageCurrent).where(eq(pageCurrent.pageId, topic.id));
+    const [current] = await getDb().select().from(pageCurrent).where(eq(pageCurrent.pageId, category.id));
     expect(current.communityHtml).toContain('Attention in linear time.');
     expect(current.authorHtml).toBeNull();
 
     const { actor: unverified } = await person({ verifiedAt: null });
     await expect(
-      commitPage(topic.id, null, unverified, [{ path: 'community/20-x.md', content: 'x\n' }], 'x'),
+      commitPage(category.id, null, unverified, [{ path: 'community/20-x.md', content: 'x\n' }], 'x'),
     ).rejects.toMatchObject({ status: 403 });
-    // A topic has no owners' part, and no paper's files.
+    // A category has no owners' part, and no paper's files.
     await expect(
-      commitPage(topic.id, null, actor, [{ path: 'owners/10-x.md', content: 'x\n' }], 'x'),
-    ).rejects.toMatchObject({ status: 403 });
-    await expect(
-      commitPage(topic.id, null, actor, [{ path: 'versions/v_k3x9q2ab.json', content: '{}' }], 'x'),
+      commitPage(category.id, null, actor, [{ path: 'owners/10-x.md', content: 'x\n' }], 'x'),
     ).rejects.toMatchObject({ status: 403 });
     await expect(
-      commitPage(topic.id, null, actor, [{ path: 'topic.json', content: '{ "title": "x" }' }], 'x'),
-    ).rejects.toMatchObject({ status: 422, message: expect.stringContaining('topic.json') });
+      commitPage(category.id, null, actor, [{ path: 'versions/v_k3x9q2ab.json', content: '{}' }], 'x'),
+    ).rejects.toMatchObject({ status: 403 });
+    await expect(
+      commitPage(category.id, null, actor, [{ path: 'category.json', content: '{ "title": "x" }' }], 'x'),
+    ).rejects.toMatchObject({ status: 422, message: expect.stringContaining('category.json') });
   });
 
   it("keeps a venue's organisers' part and kind file to its owners and the bot granted it", async () => {
@@ -176,12 +176,12 @@ describe('path rules per kind', () => {
     });
     const write = (content: string) =>
       commitPage(paperId, null, actor, [{ path: 'community/links.jsonl', content }], 'Links');
-    await expect(write('{"id":"a","to":"topic:linear-attention","label":"in-topic"}\n')).resolves.toMatchObject({
+    await expect(write('{"id":"a","to":"category:linear-attention","label":"in-category"}\n')).resolves.toMatchObject({
       status: 'committed',
     });
-    await expect(write('{"id":"a","to":"arxiv:1706.03762","label":"in-topic"}\n')).rejects.toMatchObject({
+    await expect(write('{"id":"a","to":"arxiv:1706.03762","label":"in-category"}\n')).rejects.toMatchObject({
       status: 422,
-      message: expect.stringContaining('goes to topic pages'),
+      message: expect.stringContaining('goes to category pages'),
     });
     await expect(write('{"id":"a","to":"arxiv:1706.03762","label":"contradicts"}\n')).rejects.toMatchObject({
       message: expect.stringContaining('needs a note'),

@@ -71,7 +71,7 @@ Most of the risk is here, so it comes before the editor.
 - Citation import and the "How does this connect?" prompt.
 
 Built ahead of the rest of this milestone (2026-11-16, `handoffs/pages.md` Phase 1): `links.jsonl` in each part,
-the label table with `in-topic`, `page_links` and "what links here" on pages of every kind. The "add a link" form,
+the label table with `in-category`, `page_links` and "what links here" on pages of every kind. The "add a link" form,
 grouped display, stances and the graph are still to come.
 
 ## 5. Authors
@@ -140,7 +140,7 @@ grouped display, stances and the graph are still to come.
 
 ## Pages above the paper
 
-Planned in `handoffs/pages.md`: venues, topics, organisations and people as pages of their own, built like a
+Planned in `handoffs/pages.md`: venues, categories, organisations and people as pages of their own, built like a
 paper's. Phase 1 (the page model) is built: `pages`, the page store keyed by `page_id`, the kind registry
 (`lib/kinds.ts`), path rules, commits, clone and push per kind, `page_members` and `page_ancestors`, and generic
 routes and slots (`/v`, `/t`, `/o`, `/u`). Phase 2 (venue pages) is built: the `venues` bot (`npm run venues:sync`),
@@ -154,14 +154,13 @@ addresses and ingest passes) makes institutions' pages from the allowlist with R
 `npm run institutions:build -- --ror-only`); members by confirmed address own `members/` and `org.json` and make
 departments and labs (`/new/org/<key>`); an org's papers (`page_members` `via` `affiliation`) come from members'
 claims when they show their institution and from domains printed on page 1, kept up by the worker's `org-members`
-task, and roll up from departments; the page lists people who show it, and venues and topics by count
+task, and roll up from departments; the page lists people who show it, and venues by count
 (`GET /api/v1/pages/{identifier}/org`). `show_institution` is now the one institution switch (no
-`user.show.institution`). Phase 5 (topic pages) is built: anyone verified makes a topic (`/new/topic`,
-`POST /api/v1/topics`, names and aliases checked for duplicates first) or makes it from a paper's "Add a topic", which
-links the paper (`in-topic`, `introduces-topic`); the page reads as an article with where it started, its broader,
-narrower and related topics, venues and organisations, its papers sortable by date, venue and score, and "might
-belong here" (`topic_suggestions`, from OpenReview keywords, titles and abstracts; dismissals remembered); editing,
-renaming (`page_redirects`) and merging (`pages.merged_into`) are open to the community at `/t/<slug>/edit`.
+`user.show.institution`). Phase 5 is built, as categories (topics until 2026-11-22) that work as Wikipedia's do: anyone verified makes a
+category (`/new/category`, `POST /api/v1/categories`, the name checked for duplicates first) or makes it from "Add" in
+the categories bar at the foot of any page, which puts that page in it (`in-category`); a category in a category is a
+subcategory, and nothing rolls up. The page reads as its article, then its subcategories and other pages by name;
+editing, renaming (`page_redirects`) and merging (`pages.merged_into`) are open to the community at `/c/<slug>/edit`.
 
 ## Main risks
 

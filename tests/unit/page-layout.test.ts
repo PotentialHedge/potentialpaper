@@ -347,9 +347,9 @@ describe('the move to owners/', () => {
       'owners/links.jsonl',
       '.potentialpaper/metadata.json',
     ]);
-    // A topic has no owners' part, but still says its layout; a page that says 4 is left alone.
+    // A category has no owners' part, but still says its layout; a page that says 4 is left alone.
     expect(
-      planOwners('topic', new Map([['.potentialpaper/metadata.json', '{"layout":3}']])).map((c) => c.path),
+      planOwners('category', new Map([['.potentialpaper/metadata.json', '{"layout":3}']])).map((c) => c.path),
     ).toEqual(['.potentialpaper/metadata.json']);
     expect(planOwners('paper', new Map([['.potentialpaper/metadata.json', '{"layout":4}']]))).toEqual([]);
   });

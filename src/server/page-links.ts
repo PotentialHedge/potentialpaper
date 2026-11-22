@@ -208,7 +208,7 @@ export async function linksFrom(pageId: string, database: Database = getDb()): P
 /** The identifiers a page answers to: a paper's every identifier, another kind's `<kind>:<key>`. */
 async function identifiersOf(db: Reader, page: PageRow): Promise<string[]> {
   if (page.kind !== 'paper') {
-    // Its old keys too: a renamed topic's, those of topics merged into it, a person's old handles.
+    // Its old keys too: a renamed category's, those of categories merged into it, a person's old handles.
     const kind = page.kind;
     return [page.key, ...(await formerKeys(db, page))].map((key) => formatIdentifier({ kind, key }));
   }

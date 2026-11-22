@@ -298,7 +298,7 @@ export const scopeStatsConsumer: Consumer = {
 export interface ScoreSummary {
   /**
    * The venue, and its own page when it has one (the edition whose `venue.json` lists it as a source): that page's
-   * statistics of the venue are the whole venue's, where a topic's or an org's are only its own papers'.
+   * statistics of the venue are the whole venue's, where a category's or an org's are only its own papers'.
    */
   venue: { id: string; name: string; page: PageSummary | null };
   field: string;
@@ -520,7 +520,7 @@ export async function scopeChangedAt(scopeId: string, database: Database = getDb
   return row?.changedAt ?? null;
 }
 
-/** Whether a scope has any score statistics: `page.hasScores` on a venue, topic or org. */
+/** Whether a scope has any score statistics: `page.hasScores` on a venue, category or org. */
 export async function scopeHasScores(scopeId: string, database: Reader = getDb()): Promise<boolean> {
   const { rows } = await database.execute<{ found: boolean }>(
     sql`select exists (select 1 from scope_stats where scope_page_id = ${scopeId} and count > 0) as found`,

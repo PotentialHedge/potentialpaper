@@ -66,7 +66,7 @@ describe('when conditions', () => {
   it('parses and evaluates VS Code-style clauses', () => {
     expect(whenHolds('page.kind == venue && signedIn', venue)).toBe(true);
     expect(whenHolds('page.hasScores || !signedIn', venue)).toBe(false);
-    expect(whenHolds('(page.hasScores || signedIn) && page.kind != "topic"', venue)).toBe(true);
+    expect(whenHolds('(page.hasScores || signedIn) && page.kind != "category"', venue)).toBe(true);
     // A key the page's kind doesn't offer reads as unset.
     expect(evalWhen(parseWhen('viewer.isOwner'), venue)).toBe(false);
     expect(whenHolds(undefined, venue)).toBe(true);
@@ -80,8 +80,8 @@ describe('when conditions', () => {
   });
 
   it("offers each kind's own keys only", () => {
-    const topic = pageWhenContext('topic', { hasScores: true, signedIn: false, isOwner: false });
-    expect(topic).not.toHaveProperty('page.hasScores');
+    const category = pageWhenContext('category', { hasScores: true, signedIn: false, isOwner: false });
+    expect(category).not.toHaveProperty('page.hasScores');
     expect(pageWhenContext('paper', { hasScores: true, signedIn: true, isOwner: true })).toMatchObject({
       'page.kind': 'paper',
       'page.hasScores': true,
@@ -113,7 +113,7 @@ describe('plugin manifests', () => {
       contributes: {
         panels: [
           { id: 'main', title: 'A', kinds: ['paper', 'venue'], slot: { paper: 'aside' }, when: 'page.colour' },
-          { id: 'main', title: 'B', kinds: ['topic'], slot: 'tab' },
+          { id: 'main', title: 'B', kinds: ['category'], slot: 'tab' },
         ],
         settings: { view: { type: 'enum', values: ['a', 'b'], default: 'c' } },
       },
@@ -133,7 +133,7 @@ describe('plugin manifests', () => {
       contributes: {
         panels: [
           { id: 'one', title: 'A', kinds: ['paper', 'venue'], slot: { paper: 'aside' }, when: 'page.colour' },
-          { id: 'one', title: 'B', kinds: ['topic'], slot: 'tab', when: 'page.hasScores', extra: 1 },
+          { id: 'one', title: 'B', kinds: ['category'], slot: 'tab', when: 'page.hasScores', extra: 1 },
         ],
         settings: { view: { type: 'enum', values: ['a', 'b'], default: 'c' } },
       },
@@ -149,7 +149,7 @@ describe('plugin manifests', () => {
     expect(report.warnings).toEqual(
       expect.arrayContaining([
         'contributes.panels[1].extra: not a field this site knows; ignored',
-        "contributes.panels[1].when: topic pages don't offer page.hasScores, which read as false there",
+        "contributes.panels[1].when: category pages don't offer page.hasScores, which read as false there",
       ]),
     );
   });

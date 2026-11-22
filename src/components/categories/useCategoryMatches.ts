@@ -1,15 +1,15 @@
 'use client';
 
 import { useEffect, useState } from 'react';
-import { findTopics, type TopicMatch } from './api';
+import { findCategories, type CategoryMatch } from './api';
 
-/** The topics like `q` (`GET /api/v1/topics?q=`), asked a moment after typing stops. */
-export function useTopicMatches(q: string): TopicMatch[] {
-  const [matches, setMatches] = useState<TopicMatch[]>([]);
+/** The categories like `q` (`GET /api/v1/categories?q=`), asked a moment after typing stops. */
+export function useCategoryMatches(q: string): CategoryMatch[] {
+  const [matches, setMatches] = useState<CategoryMatch[]>([]);
   useEffect(() => {
     const controller = new AbortController();
     const timer = setTimeout(() => {
-      findTopics(q, controller.signal)
+      findCategories(q, controller.signal)
         .then(setMatches)
         .catch(() => {});
     }, 250);

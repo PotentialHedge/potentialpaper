@@ -94,7 +94,7 @@ Every page is a git repository; a page's PDFs and picture are kept with Git LFS.
 
 ## 3. Clone the page
 
-The prompt usually names the page by its path on ${origin}. A paper's agent page (its path with \`/agent\` in front: \`${origin}/agent/s/42\`) gives its clone address. Otherwise a page's HTTPS address is its path under \`${origin}/git/\` with \`.git\` at the end (\`${origin}/abs/1706.03762\` → \`${origin}/git/arxiv/1706.03762.git\`; a venue, topic or organisation: \`${origin}/git/<kind>/<key>.git\`)${
+The prompt usually names the page by its path on ${origin}. A paper's agent page (its path with \`/agent\` in front: \`${origin}/agent/s/42\`) gives its clone address. Otherwise a page's HTTPS address is its path under \`${origin}/git/\` with \`.git\` at the end (\`${origin}/abs/1706.03762\` → \`${origin}/git/arxiv/1706.03762.git\`; a venue, category or organisation: \`${origin}/git/<kind>/<key>.git\`)${
     ssh
       ? `; over SSH it is the same path after \`${ssh}/\` (\`${ssh}/abs/1706.03762.git\`, the paper's own address; \`${ssh}/<kind>/<key>.git\` otherwise)`
       : ''

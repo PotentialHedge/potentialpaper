@@ -24,7 +24,7 @@ server's log.
   papers from acceptodds. 5 of the NeurIPS papers and 5 of the ICLR 2027 ones were rejected or withdrawn at ICLR
   2026 first (`--resubmissions`); the seed merges each such pair into one paper. The fixture is built from scrapes
   by the `potentialpaper-tools` repo (`npm run seed:export`, `seed:export-acceptodds`, `seed:acceptodds-reviews` there).
-- `scripts/seed/seed.ts`: people, topics and comments. Edit the lists at the top to add more.
+- `scripts/seed/seed.ts`: people, categories and comments. Edit the lists at the top to add more.
 
 The seed runs the background consumers itself, so search, venue pages and score stats are ready. To keep them
 current while you edit pages, run the worker too: `npm run consumers:work`.

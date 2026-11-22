@@ -44,7 +44,7 @@ export const METHOD_DOCS: Record<keyof typeof HOST_METHODS, { call: string; does
   },
   'page.members': {
     call: 'pp.page.members([identifier], { offset, limit, rollUp })',
-    does: "A venue's, topic's or organisation's papers, paged; a venue's and an organisation's rolled up from the pages under them.",
+    does: "A venue's, category's or organisation's papers, paged; a venue's and an organisation's rolled up from the pages under them.",
   },
   'page.resolve': {
     call: 'pp.page.resolve(identifier)',
@@ -116,7 +116,7 @@ export function pluginsGuide(origin: string): string {
 
 > ${pluginPrompt(origin)}
 
-A PotentialPaper plugin adds panels to pages on ${origin}: a paper, a venue, a topic, an organisation or a person.
+A PotentialPaper plugin adds panels to pages on ${origin}: a paper, a venue, a category, an organisation or a person.
 It is an HTML page plus a manifest, \`${MANIFEST_FILE}\`, in a public GitHub repo. Readers find it under
 Settings → Plugins (${origin}/settings/plugins), install it pinned to a commit, and approve what it may read before it
 runs. Like a VS Code extension, a plugin never edits the site's own interface: it *declares* what it adds (panels,
@@ -405,9 +405,9 @@ switches between light and dark: ${THEME_TOKENS.map((t) => `\`--pp-${t}\``).join
 **Size.** The SDK sizes your frame to your \`body\`; make the page work at phone width. Frames start when they come
 within 200px of the screen.
 
-**Identifiers.** Pages are named by identifier: \`arxiv:1706.03762\`, \`doi:…\`, \`venue:iclr/2027\`, \`topic:<slug>\`,
+**Identifiers.** Pages are named by identifier: \`arxiv:1706.03762\`, \`doi:…\`, \`venue:iclr/2027\`, \`category:<slug>\`,
 \`org:<slug>\`, \`user:<handle>\`. \`pp.context.page.identifier\` is the current one, and \`pp.context.scopes\` the pages
-above it (a paper's venues, topics and organisations).
+above it (a paper's venues, categories and organisations).
 
 ## Data routes
 
@@ -426,7 +426,7 @@ segment (\`venue%3Aiclr%2F2027\`). Each answer is cached a minute.
   bins, and the same split by outcome (\`accepted\`, \`rejected\`, \`withdrawn\`, \`pending\`). \`?marks=true\` adds
   \`marks\`: the scope's own submissions there, each with its paper (\`identifier\`, \`address\`, \`title\`), mean and
   outcome, ascending (\`null\` above 1,000). Every venue in these answers carries \`venue.page\`, the venue's own page
-  (or \`null\`): on a topic or an org the numbers are only its papers', so draw the whole venue from
+  (or \`null\`): on a category or an org the numbers are only its papers', so draw the whole venue from
   \`venue.page\`'s statistics and mark the scope's papers on it, as score standing's org view does
 - \`GET ${origin}/api/v1/pages/<identifier>/papers?fields=submissions,scores,status&limit=&after=\`: a scope's papers
   as NDJSON, one a line, with every submission, its status and each review's score vector (\`scope.papers\`). Without

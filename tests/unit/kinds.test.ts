@@ -44,7 +44,7 @@ describe('the kind registry', () => {
     }
     expect(partsOf('paper')).toEqual(['owners', 'community']);
     expect(partsOf('venue')).toEqual(['owners', 'community']);
-    expect(partsOf('topic')).toEqual(['community']);
+    expect(partsOf('category')).toEqual(['community']);
     expect(partsOf('user')).toEqual([]);
     expect(kindsOfFileType('labeledLink')).toEqual(PAGE_KINDS.filter((kind) => kind !== 'user'));
     expect(kindsOfFileType('venue')).toEqual(['venue']);
@@ -57,9 +57,9 @@ describe('the kind registry', () => {
       id: { scheme: 'arxiv', value: '1706.03762' },
     });
     expect(parseIdentifier('venue:iclr/2027')).toEqual({ kind: 'venue', key: 'iclr/2027' });
-    expect(parseIdentifier('topic:linear-attention')).toEqual({ kind: 'topic', key: 'linear-attention' });
+    expect(parseIdentifier('category:linear-attention')).toEqual({ kind: 'category', key: 'linear-attention' });
     expect(parseIdentifier('user:Alice')).toEqual({ kind: 'user', key: 'alice' });
-    for (const bad of ['venue:ICLR', 'topic:a/b', 'paper:x', 'org:', 'nowhere:x', 'iclr', 'venue:a/b/c/d/e']) {
+    for (const bad of ['venue:ICLR', 'category:a/b', 'paper:x', 'org:', 'nowhere:x', 'iclr', 'venue:a/b/c/d/e']) {
       expect(parseIdentifier(bad), bad).toBeNull();
     }
     expect(formatIdentifier(parseIdentifier('arxiv:1706.03762v5')!)).toBe('arxiv:1706.03762');
@@ -72,8 +72,8 @@ describe('the kind registry', () => {
   it('finds parents and sources in the address and the kind file', () => {
     expect(parentsOf('venue', 'iclr/2027', null)).toEqual(['venue:iclr']);
     expect(parentsOf('venue', 'iclr', null)).toEqual([]);
-    // A topic's broader topics are its own links, which roll nothing up.
-    expect(parentsOf('topic', 'linear-attention', { name: 'x' })).toEqual([]);
+    // A category's broader categories are its own links, which roll nothing up.
+    expect(parentsOf('category', 'linear-attention', { name: 'x' })).toEqual([]);
     expect(parentsOf('org', 'eth/inf', { name: 'x', parents: ['ethz-domain'] }).sort()).toEqual([
       'org:eth',
       'org:ethz-domain',
@@ -89,22 +89,26 @@ describe('labeled links', () => {
   it('checks each line against the label, the kinds and the file', () => {
     expect(parseLabeledLinks('', 'paper')).toEqual({ links: [] });
     const ok = parseLabeledLinks(
-      '{"id":"a","to":"arxiv:1706.03762v2","label":"extends"}\n\n{"id":"b","to":"topic:x","label":"in-topic"}\n',
+      '{"id":"a","to":"arxiv:1706.03762v2","label":"extends"}\n\n{"id":"b","to":"category:x","label":"in-category"}\n',
       'paper',
     );
     expect(ok).toMatchObject({
       links: [
         { id: 'a', target: 'arxiv:1706.03762', targetKind: 'paper', line: 1 },
-        { id: 'b', target: 'topic:x', targetKind: 'topic', line: 3 },
+        { id: 'b', target: 'category:x', targetKind: 'category', line: 3 },
       ],
     });
-    // A page of any kind is put in a topic; only a topic is one to be in.
-    expect(parseLabeledLinks('{"id":"a","to":"topic:x","label":"in-topic"}', 'venue')).toMatchObject({ links: [{}] });
-    expect(parseLabeledLinks('{"id":"a","to":"venue:x","label":"in-topic"}', 'venue')).toMatchObject({
-      problem: expect.stringContaining('to topic pages'),
+    // A page of any kind is put in a category; only a category is one to be in.
+    expect(parseLabeledLinks('{"id":"a","to":"category:x","label":"in-category"}', 'venue')).toMatchObject({
+      links: [{}],
     });
-    expect(parseLabeledLinks('{"id":"a","to":"topic:x","label":"related"}', 'topic')).toMatchObject({ links: [{}] });
-    expect(parseLabeledLinks('{"id":"a","to":"topic:x","label":"plagiarizes"}', 'paper')).toMatchObject({
+    expect(parseLabeledLinks('{"id":"a","to":"venue:x","label":"in-category"}', 'venue')).toMatchObject({
+      problem: expect.stringContaining('to category pages'),
+    });
+    expect(parseLabeledLinks('{"id":"a","to":"category:x","label":"related"}', 'category')).toMatchObject({
+      links: [{}],
+    });
+    expect(parseLabeledLinks('{"id":"a","to":"category:x","label":"plagiarizes"}', 'paper')).toMatchObject({
       problem: expect.stringContaining('line 1'),
     });
     expect(parseLabeledLinks('not json', 'paper')).toMatchObject({ problem: expect.stringContaining('not JSON') });
@@ -113,8 +117,10 @@ describe('labeled links', () => {
   it('is a file type searched by its words', () => {
     expect(fileTypeOf('community/links.jsonl')).toBe('labeledLink');
     expect(fileTypeOf('owners/links.jsonl')).toBe('labeledLink');
-    expect(indexFile('community/links.jsonl', '{"id":"a","to":"topic:x","label":"in-topic","note":"Why"}\n')).toEqual([
-      { kind: 'labeled-link', text: 'is in\ntopic:x\nWhy', fields: { label: 'in-topic', to: 'topic:x' } },
+    expect(
+      indexFile('community/links.jsonl', '{"id":"a","to":"category:x","label":"in-category","note":"Why"}\n'),
+    ).toEqual([
+      { kind: 'labeled-link', text: 'is in\ncategory:x\nWhy', fields: { label: 'in-category', to: 'category:x' } },
     ]);
     expect(indexFile('venue.json', '{ "name": "ICLR 2027" }')).toEqual([
       { kind: 'venue', text: 'ICLR 2027', fields: { name: 'ICLR 2027' } },
@@ -130,16 +136,16 @@ describe('path rules per kind', () => {
     expect(layoutProblem('community/links.jsonl', 'paper')).toBeNull();
     expect(layoutProblem('owners/links.jsonl', 'paper')).toBeNull();
     expect(layoutProblem('versions/v_k3x9q2ab.json', 'venue')).toMatch(/venue pages hold/);
-    expect(layoutProblem('topic.json', 'venue')).toMatch(/venue pages hold/);
+    expect(layoutProblem('category.json', 'venue')).toMatch(/venue pages hold/);
     expect(layoutProblem('community/10-x.md', 'user')).toMatch(/no files/);
-    expect(layoutProblem('community/links.json', 'topic')).toMatch(/links\.jsonl/);
+    expect(layoutProblem('community/links.json', 'category')).toMatch(/links\.jsonl/);
     expect(layoutProblem('venue.json', 'paper')).not.toBeNull();
   });
 
   it('says who may write what', () => {
-    expect(pathDenied('community/10-x.md', roles(), 'topic')).toBeNull();
-    expect(pathDenied('topic.json', roles(), 'topic')).toBeNull();
-    expect(pathDenied('topic.json', roles({ verified: false }), 'topic')).toMatch(/confirm/);
+    expect(pathDenied('community/10-x.md', roles(), 'category')).toBeNull();
+    expect(pathDenied('category.json', roles(), 'category')).toBeNull();
+    expect(pathDenied('category.json', roles({ verified: false }), 'category')).toMatch(/confirm/);
     expect(pathDenied('owners/10-x.md', roles(), 'venue')).toMatch(/organisers/);
     expect(pathDenied('owners/10-x.md', roles({ owner: true }), 'venue')).toBeNull();
     expect(pathDenied('venue.json', roles(), 'venue')).toMatch(/organisers/);
@@ -150,7 +156,7 @@ describe('path rules per kind', () => {
       expect(pathDenied(path, roles({ owner: true }), 'user')).toMatch(/no files/);
       expect(pathDenied(path, { ...roles({ admin: true }), system: true }, 'user')).toMatch(/no files/);
     }
-    expect(pathDenied('extensions/x/a.json', roles({ admin: true }), 'topic')).toMatch(/reserved/);
+    expect(pathDenied('extensions/x/a.json', roles({ admin: true }), 'category')).toMatch(/reserved/);
     expect(pathDenied('community/links.jsonl', roles(), 'paper')).toBeNull();
     expect(pathDenied('owners/links.jsonl', roles(), 'paper')).toMatch(/authors/);
   });
@@ -160,11 +166,13 @@ describe('path rules per kind', () => {
       contentProblem('venue.json', '{ "name": "ICLR 2027", "dates": { "start": "2027-04-23" } }', 'venue'),
     ).toBeNull();
     expect(contentProblem('venue.json', '{ "name": "" }', 'venue')).toMatch(/venue\.json/);
-    expect(contentProblem('topic.json', '{ "name": "X", "broader": ["x"] }', 'topic')).toMatch(/broader/);
-    expect(contentProblem('.potentialpaper/metadata.json', '{ "kind": "topic" }', 'venue')).toMatch(/"kind": "venue"/);
+    expect(contentProblem('category.json', '{ "name": "X", "broader": ["x"] }', 'category')).toMatch(/broader/);
+    expect(contentProblem('.potentialpaper/metadata.json', '{ "kind": "category" }', 'venue')).toMatch(
+      /"kind": "venue"/,
+    );
     expect(grantProblem('venue.json', 'venue')).toBeNull();
     expect(grantProblem('org.json', 'org')).toBeNull();
-    expect(grantProblem('topic.json', 'topic')).toMatch(/no bot/);
+    expect(grantProblem('category.json', 'category')).toMatch(/no bot/);
     expect(grantProblem('venue.json')).not.toBeNull();
     expect(grantProblem('reviews/openreview/**')).toBeNull();
   });
@@ -206,7 +214,7 @@ describe('page addresses', () => {
       expect(pathDenied('owners/10-a.md', roles(), kind)).not.toBeNull();
       expect(pathDenied('owners/10-a.md', roles({ owner: true }), kind)).toBeNull();
     }
-    expect(layoutProblem('owners/10-a.md', 'topic')).not.toBeNull();
+    expect(layoutProblem('owners/10-a.md', 'category')).not.toBeNull();
     expect(layoutProblem('author/10-a.md', 'paper')).not.toBeNull();
   });
 });

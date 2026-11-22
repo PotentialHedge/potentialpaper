@@ -12,7 +12,7 @@ import {
 import { HANDLE_PATTERN } from './profile';
 
 /**
- * The kinds of page (`handoffs/pages.md`): a paper, a venue, a topic, an organisation or a person. Every kind is a
+ * The kinds of page (`handoffs/pages.md`): a paper, a venue, a category, an organisation or a person. Every kind is a
  * page repo built the same way (DESIGN.md §4): small files under path rules, derived data from outbox consumers,
  * named slots, and file types that bots write and plugins show. A kind is an entry here, plus its routes; the page
  * store, the path rules (`server/pages/rules.ts`), clone and push, and the consumers read what it declares.
@@ -27,7 +27,7 @@ import { HANDLE_PATTERN } from './profile';
  *   venue's organisers, an org's members, a person) and `community/`, each also holding that part's `links.jsonl`.
  *   Who may write which is in `rules.ts`;
  * - **how its owners are confirmed** (`claim`): by an author claim, an organiser claim, an address at its domains,
- *   or being the account; a topic has none;
+ *   or being the account; a category has none;
  * - **its slots**: every kind has `<kind>.main`, `<kind>.aside`, `<kind>.body` and `<kind>.tabs`, and a kind may add
  *   its own;
  * - **which file types it allows** (`server/pages/schemas.ts`);
@@ -38,14 +38,14 @@ import { HANDLE_PATTERN } from './profile';
  * Pure, and shared by the server and the browser.
  */
 
-export const PAGE_KINDS = ['paper', 'venue', 'topic', 'org', 'user'] as const;
+export const PAGE_KINDS = ['paper', 'venue', 'category', 'org', 'user'] as const;
 export type PageKind = (typeof PAGE_KINDS)[number];
 
 export function isPageKind(value: string): value is PageKind {
   return (PAGE_KINDS as readonly string[]).includes(value);
 }
 
-/** A lower-case slug, as a topic's key, or one segment of a venue's or an org's. */
+/** A lower-case slug, as a category's key, or one segment of a venue's or an org's. */
 export const SLUG = /^[a-z0-9]+(?:-[a-z0-9]+)*$/;
 const MAX_SEGMENT = 60;
 
@@ -83,14 +83,14 @@ export const venueFileSchema = z
   });
 
 /**
- * A `topic.json`: a topic's name. A topic works as a Wikipedia category does: pages are in it through their own
- * `in-topic` links, a topic in another one included, which makes it a subtopic there.
+ * A `category.json`: a category's name. A category works as a Wikipedia category does: pages are in it through their own
+ * `in-category` links, a category in another one included, which makes it a subcategory there.
  */
-export const topicFileSchema = z
+export const categoryFileSchema = z
   .strictObject({
-    name: shortText(120).meta({ description: 'The topic\'s name: "Linear attention".' }),
+    name: shortText(120).meta({ description: 'The category\'s name: "Linear attention".' }),
   })
-  .meta({ title: 'Topic', description: "A topic page's topic.json: its name." });
+  .meta({ title: 'Category', description: "A category page's category.json: its name." });
 
 /** An `org.json`: an institution, or a department or lab under one. */
 export const orgFileSchema = z
@@ -114,7 +114,7 @@ export const orgFileSchema = z
   .meta({ title: 'Organisation', description: "An organisation page's org.json." });
 
 export type VenueFile = z.output<typeof venueFileSchema>;
-export type TopicFile = z.output<typeof topicFileSchema>;
+export type CategoryFile = z.output<typeof categoryFileSchema>;
 export type OrgFile = z.output<typeof orgFileSchema>;
 
 /** The generic slots every kind has; a kind may add more (a paper's nested ones). */
@@ -220,17 +220,17 @@ export const KINDS = {
     scope: true,
     maxDepth: 4,
   },
-  topic: {
-    kind: 'topic',
-    title: 'Topic',
-    route: '/t',
+  category: {
+    kind: 'category',
+    title: 'Category',
+    route: '/c',
     repo: true,
-    kindFile: 'topic.json',
-    kindFileSchema: topicFileSchema,
+    kindFile: 'category.json',
+    kindFileSchema: categoryFileSchema,
     owners: null,
     community: true,
-    slots: slots('topic'),
-    fileTypes: ['section', 'labeledLink', 'topic'],
+    slots: slots('category'),
+    fileTypes: ['section', 'labeledLink', 'category'],
     contextKeys: [...COMMON_CONTEXT, 'page.hasSignals'],
     scope: true,
     maxDepth: 1,
@@ -302,7 +302,7 @@ export type PageAddress = { kind: 'paper'; id: PaperId; shortId?: number } | { k
 
 /**
  * A public identifier (DESIGN.md §8), as a link's `to` holds it: `arxiv:1706.03762`, `doi:10.…`,
- * `openreview:…`, `venue:iclr/2027`, `topic:linear-attention`, `org:eth/inf`, `user:alice`. `null` if it isn't one.
+ * `openreview:…`, `venue:iclr/2027`, `category:linear-attention`, `org:eth/inf`, `user:alice`. `null` if it isn't one.
  */
 export function parseIdentifier(text: string): PageAddress | null {
   const at = text.indexOf(':');

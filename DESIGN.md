@@ -214,14 +214,14 @@ extensions/<id>/...             reserved: data owned by one extension (section 1
 ```
 
 **Pages of every kind** (decided 2026-11-16, built in `handoffs/pages.md` Phase 1). A paper is the first kind of
-page; venues (`/v/iclr/2027`), topics (`/t/<slug>`), organisations (`/o/<slug>`) and people (`/u/<handle>`) are
+page; venues (`/v/iclr/2027`), categories (`/c/<slug>`), organisations (`/o/<slug>`) and people (`/u/<handle>`) are
 pages built the same way, each a repo with the same shape: `.gitattributes`, `prek.toml` and
 `.potentialpaper/metadata.json` (`{ layout, kind, key }`) for the system; its parts' sections, `owners/` (on every
-kind with owners) and `community/`; each part's `links.jsonl` (§8); its kind file (`venue.json`, `topic.json`,
+kind with owners) and `community/`; each part's `links.jsonl` (§8); its kind file (`venue.json`, `category.json`,
 `org.json`); and `extensions/`. **A person's page is the exception: it has no repo** (decided 2026-11-21,
 `KINDS.user.repo`), only its account, which they change at `/profile`. The kind registry, `src/lib/kinds.ts`, declares each
 kind's address, kind file and schema, parts, **how its owners are confirmed** (a paper's authors by claim, a venue's
-organisers by a claim an admin decides, an org's members by address; a topic and a person's page have none), slots (`<kind>.main`, `<kind>.aside`, `<kind>.body`, `<kind>.tabs`), file types and plugin context keys;
+organisers by a claim an admin decides, an org's members by address; a category and a person's page have none), slots (`<kind>.main`, `<kind>.aside`, `<kind>.body`, `<kind>.tabs`), file types and plugin context keys;
 `rules.ts` holds one table of path rules per kind, which decides both what a page may hold and who writes it.
 
 **One page, every kind** (decided 2026-11-20). Every kind is shown by the same page (`components/pages/PageView.tsx`):
@@ -271,32 +271,24 @@ be its organisation's or under them, so nobody widens an org to take in another 
 **Its papers** (`page_members`, `via` `affiliation`, §4.9) are those with a confirmed author claim by a verified
 member who shows their institution (weight 1), and those whose page 1 prints an address at one of its domains or
 under one (weight 0.5), rolled up from its departments. The page lists its departments and labs, the members who show
-it as their institution (by handle; §5.3), the venues and topics its papers are at by count, and its papers.
+it as their institution (by handle; §5.3), the venues its papers are at by count, and its papers.
 
-**Topic pages** (built in `handoffs/pages.md` Phase 5). A topic (`/t/linear-attention`, `topic:linear-attention`) is a
-research idea at the size of a Wikipedia article, not a field. There is no seeded list and no bot writes them: anyone
-verified makes one (`/new/topic`, `POST /api/v1/topics`), or makes it from a paper's "Add a topic", which links the
-paper and makes the topic if no topic has that name or alias. Names are checked first: two names are the same when
-they differ only in case, accents, punctuation and plurals (`lib/topics.ts`), and a name or alias another topic has
-is refused (`topic_exists`); the forms list similar topics as one types. Its `topic.json` holds its name, aliases and
-optional `broader` topics (a loose DAG, by slug, each a topic that exists); its article is `community/` ("What it
-is", "Key ideas", "History", "Open problems" as the editor's starting headings); `related` links (§8) name related
-topics. **A paper is in a topic** through its own labeled link, `in-topic` or `introduces-topic`, in its
-`community/links.jsonl`, or its `owners/links.jsonl` when one of its confirmed authors adds it; a topic's papers roll
-up from the topics it is broader than. The page reads as an article: its names and where to edit it, the article,
-where it started (the papers that introduced it); beside them its broader, narrower and related topics, the venues
-and organisations its papers are at by count, and its links; below, its papers, sortable by date, venue and review
-score (the mean of the venue's first score field, compared by where it sits in the venue's range, as scales differ),
-and **"might belong here"**: `topic_suggestions`, which the `topic-suggestions` consumer keeps from OpenReview
-keywords (now kept in `submission.json`), and the topic's names in titles and abstracts. A person confirms one (the
-paper is linked, as their edit) or dismisses it, and a dismissal is remembered: the machine never rewrites a decided
-row. **Editing** the names, broader and related topics and the article is one commit (`/t/<slug>/edit`,
-`PATCH /api/v1/pages/{identifier}/topic`), as a push would be. **Renaming** moves the page's key and leaves its old
-slug in `page_redirects`; **merging** folds the duplicate's names (as aliases), broader topics, sections and links
-into the survivor in one commit and marks the duplicate `pages.merged_into`, so its address and identifier lead to
-the survivor and it takes no more commits, while its history stays. Either way the page answers to its old
-identifiers: membership (`page_scope_names`) and "what links here" count links that name them (`formerKeys`). Both
-are open to the community, under page protection, and show in `/changes` (§7).
+**Categories** (built in `handoffs/pages.md` Phase 5; topics until 2026-11-22) work as Wikipedia's categories do. A
+category (`/c/linear-attention`, `category:linear-attention`) is a research idea with an article, not a field. There
+is no seeded list and no bot writes them: anyone verified makes one (`/new/category`, `POST /api/v1/categories`), or
+from "Add" in the categories bar at the foot of any page, which puts the page in it and makes the category if none
+has that name. Names are checked first: two names are the same when they differ only in case, accents, punctuation
+and plurals (`lib/categories.ts`), and a taken name is refused (`category_exists`). Its `category.json` holds only its
+name; its article is `community/`. **A page of any kind is in a category** through its own labeled link,
+`in-category`, in its `community/links.jsonl`, or its `owners/links.jsonl` when one of its owners adds it; a category
+in a category is a subcategory there. Nothing rolls up: a category lists only what is in it directly. The page reads
+as its article, then its subcategories and its other pages, by name (`GET /api/v1/pages/{identifier}/category`).
+**Editing** the name and the article is one commit (`/c/<slug>/edit`, `PATCH /api/v1/pages/{identifier}/category`),
+as a push would be. **Renaming** moves the page's key and leaves its old slug in `page_redirects`; **merging** folds
+the duplicate's sections and links into the survivor in one commit and marks the duplicate `pages.merged_into`, so
+its address and identifier lead to the survivor and it takes no more commits, while its history stays. Either way the
+page answers to its old identifiers: membership (`page_scope_names`) and "what links here" count links that name them
+(`formerKeys`). Both are open to the community, under page protection, and show in `/changes` (§7).
 
 **Sections** are named `NN-slug.md` or `NN-slug.html`: two digits, then a lower-case ASCII slug.
 They show in the order of their names, which is the order `ls` lists them in. A section's title is the
@@ -573,11 +565,6 @@ rows (`scope_state`: `changed_at`, and a `due_at` a few seconds ahead, debounced
 the first change), and the worker recomputes due scopes after each pass. Its own `scope-stats` consumer only marks,
 so `consumers:rebuild -- scope-stats` still starts it over.
 
-Topic suggestions (`topic_suggestions`) are kept by the `topic-suggestions` consumer, which handles papers and
-topics: a topic's event matches its names against every paper, a paper's event matches the paper against every
-topic. Its rows have a status, and only `open` ones are ever rewritten (its reset deletes those alone), so what people
-decided survives a rebuild.
-
 Data that comes from tables rather than repos is the other case. An org's papers come from author claims, confirmed
 addresses, `show_institution` and the addresses read off PDFs, none of which is a commit to the paper's page. Triggers
 on those tables put the affected papers in a queue (`org_members_due`, migration `0038`), and the worker's
@@ -809,8 +796,7 @@ below it.
 - **Anti-vandalism is the real product.** Wikipedia works because patrolling is cheap, so these are
   v1 and not extras:
   - `/changes`, a filterable feed of all edits. Built (`handoffs/pages.md` Phase 5, `server/changes.ts`): every
-    commit to every page newest first in the outbox's order, by kind of page, bots hidden unless asked, and "moves
-    papers" for changes to a topic's broader topics, merges and renames; also `GET /api/v1/changes`. Who made each
+    commit to every page newest first in the outbox's order, by kind of page, bots hidden unless asked; also `GET /api/v1/changes`. Who made each
     change shows as the page's history shows it (a handle, a confirmed author's name on their paper, the system)
   - watchlists with email digest
   - one-click revert
@@ -845,7 +831,7 @@ page's `<part>/links.jsonl` (`community/links.jsonl`, `owners/links.jsonl`), so 
 ```
 
 - `to` is a public identifier, never an internal id, so a clone means something on its own: a paper's
-  (`arxiv:…`, `doi:…`) or any other kind's (`venue:iclr/2027`, `topic:linear-attention`, `org:eth`, `user:alice`).
+  (`arxiv:…`, `doi:…`) or any other kind's (`venue:iclr/2027`, `category:linear-attention`, `org:eth`, `user:alice`).
 - `page_links` is the query index, derived from git and rebuildable. It answers "what links here",
   which is shown on the target page as well as the source.
 - `origin` comes from the path: `owners/` links show as owner-asserted and `community/` links as
@@ -872,12 +858,11 @@ Labels are data, in a table, with a reading in each direction:
 | `concurrent-with`    | concurrent with    | (symmetric)       | discourse |                |               |
 | `same-idea-as`       | same idea as       | (symmetric)       | discourse |                |               |
 | `related`            | related to         | (symmetric)       | discourse |                |               |
-| `in-topic`           | is about           | covered by        | topic     |                |               |
-| `introduces-topic`   | introduces         | introduced by     | topic     |                |               |
+| `in-category`        | is in              | contains          | category  |                |               |
 
 Built 2026-11-16 (`handoffs/pages.md` Phase 1): the vocabulary is `src/lib/labeled-links.ts`, where each label
-also says which kinds it goes from and to (the classic labels paper to paper, `related` between any kinds, the
-topic labels paper to topic). The person labels (`wrote`, `homepage`, `orcid`, `scholar`) went with person pages'
+also says which kinds it goes from and to (the classic labels paper to paper, `related` between any kinds, `in-category`
+any kind to a category). The person labels (`wrote`, `homepage`, `orcid`, `scholar`) went with person pages'
 repos on 2026-11-21: a person's links are on their account, and their papers are their confirmed author claims. `page_links` is kept by the `links` outbox consumer (`server/page-links.ts`), not in
 the commit's transaction, and the paper page and every other kind show "Links" and "What links here".
 
@@ -930,7 +915,7 @@ Wikipedia talk page.
 ## 10. Extensions (later, but shaped from day one)
 
 **Goal:** anyone can add a feature with nothing more than a public GitHub repo. A plugin adds panels to any kind of
-page (a paper, a venue, a topic, an org, a person: `handoffs/pages.md`), readers find and install the ones they
+page (a paper, a venue, a category, an org, a person: `handoffs/pages.md`), readers find and install the ones they
 want, and each reader's site and plugin preferences live in one `settings.json`. Decided with Benedict on
 2026-11-16; `handoffs/plugins.md` is the plan and its phases, and where it and this section differ, it wins.
 
@@ -996,7 +981,7 @@ Built 2026-11-16 (`handoffs/plugins.md` Phase 2). A plugin is a public repo (or 
   frame with `{ paper }`, with it the plugin's frame opens beside the row (`{ type: "popover", command, paper }`) for
   a form, may set notes too, and closes with `ui.close`. `lists.read` is its own permission because the list is what
   the reader is looking at, searches included. `examples/plugins/reading-list` is the pattern. Not yet: notes on a
-  phone (the venue's column is hidden there), on venue, topic and org lists, or a setting to choose whose note shows.
+  phone (the venue's column is hidden there), on venue, category and org lists, or a setting to choose whose note shows.
 - **`when` conditions** (`lib/plugins/when.ts`), VS Code's clauses cut down: `page.hasScores`,
   `page.kind == venue && signedIn`. Each kind offers its context keys in the kind registry (`KindInfo.contextKeys`:
   `page.kind`, `signedIn`, `viewer.isOwner`, and `page.hasScores`/`page.hasSubmissions` where they mean something). A
@@ -1073,13 +1058,13 @@ Arbitrary JavaScript on the main origin could act as any signed-in user. So:
   Data comes three ways: aggregates the site computes per scope (a `scope_stats` consumer, §4.9), generic bulk
   reads of a scope's papers with ETags, and a plugin's own backend (its `network` origins, or a bot, below).
   Per-user plugin storage is fine.
-  - **Aggregates (A)**, built: `scope_stats` keeps, per scope (a venue, topic or org, rolled up through
+  - **Aggregates (A)**, built: `scope_stats` keeps, per scope (a venue, category or org, rolled up through
     `page_ancestors`), venue and score field of the venue's review forms, every submission's mean over its reviews,
     sorted, with 20 fixed-width bins between the form's range and the same split by outcome (accepted, rejected,
     withdrawn, pending). The venue stays in the key, since a 6 at one venue is no 6 at another. Served at
     `GET /api/v1/pages/{identifier}/scores` (venues, fields, counts) and `…/scores/{venue}/{field}` (the numbers),
     public, ETagged and cached a minute, and by `scope.scores`. Curve-fitting is the client's. Each venue in these
-    answers names its own page (`venue.page`: the venue page whose `sources` list it), since a topic's or an org's
+    answers names its own page (`venue.page`: the venue page whose `sources` list it), since a category's or an org's
     numbers are only its own papers'. `?marks=true` (`scope.scores(…, { marks: true })`) adds the scope's own
     submissions in the field by name (paper identifier, title, mean, outcome), read live with the statistics' rules,
     up to 1,000 a field, so a plugin can mark an org's papers on its venue's distribution. The site setting

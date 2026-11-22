@@ -10,6 +10,10 @@ export const dynamic = 'force-dynamic';
 const UPDATES: { date: string; text: string }[] = [
   {
     date: '2026-11-22',
+    text: 'Topics are called categories now, as on Wikipedia, with no old names kept: the kind is `category`, its pages are `/c/<slug>` (identifier `category:<slug>`, kind file `category.json`), the label that puts a page in one is `in-category`, and the routes are `GET`/`POST /api/v1/categories`, `GET /api/v1/pages/<identifier>/category` (its `subcategories` and `pages`) and `POST /api/v1/pages/<identifier>/categories` `{ "category": "category:<slug>" }` or `{ "name" }`. A taken name is refused with `category_exists`.',
+  },
+  {
+    date: '2026-11-22',
     text: 'Topics work as Wikipedia\'s categories do. A page of any kind (a paper, a venue, an organisation, a topic) is put in a topic with `POST /api/v1/pages/<identifier>/topics` `{ "topic" }` or `{ "name" }`, which adds an `in-topic` link to its `links.jsonl`; a topic in a topic is a subtopic there, and nothing rolls up. `GET …/topic` lists a topic\'s subtopics and its other pages by name. A topic\'s `topic.json` has only its `name`: aliases, `broader` and related topics are gone, as are the `introduces-topic` label, `…/topic-papers`, `…/suggestions` and `/changes?rollUp=`. An organisation\'s overview no longer lists topics.',
   },
   {

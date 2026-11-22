@@ -82,7 +82,7 @@ describe('settings.json', () => {
       'navbar.hidden': ['papers'],
     });
     const reset = await api('PATCH', '/me/settings', { cookie, body: { 'navbar.hidden': null } });
-    expect(reset.body.values['navbar.hidden']).toEqual([]);
+    expect(reset.body.values['navbar.hidden']).toEqual(['changes']);
     expect(reset.body.text).not.toContain('navbar.hidden');
 
     const bad = await api('PATCH', '/me/settings', { cookie, body: { 'navbar.hidden': ['settings'] } });

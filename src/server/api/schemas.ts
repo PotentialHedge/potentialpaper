@@ -91,7 +91,7 @@ export const PaperIdentifier = z.object({ scheme: z.enum(['arxiv', 'doi', 'openr
  * A page of any kind (`lib/kinds.ts`'s `PageRef`): a paper by an identifier, any other kind by its kind and key,
  * `{ "scheme": "venue", "value": "iclr/2027" }`.
  */
-export const PageSchemeParam = z.enum(['arxiv', 'doi', 'openreview', 'venue', 'topic', 'org', 'user']);
+export const PageSchemeParam = z.enum(['arxiv', 'doi', 'openreview', 'venue', 'category', 'org', 'user']);
 export const PageIdentifier = z.object({ scheme: PageSchemeParam, value: z.string().min(1).max(300) });
 export const PaperResponse = z.object({
   title: z.string(),
@@ -946,7 +946,7 @@ export const PageSummary = z.object({
 });
 
 export const PageResponse = PageSummary.extend({
-  /** The pages above it: a paper's venues, topics and orgs; an org's parents. */
+  /** The pages above it: a paper's venues, categories and orgs; an org's parents. */
   scopes: z.array(PageSummary),
   /** What `when` conditions test. */
   facts: z.object({ hasScores: z.boolean(), hasSubmissions: z.boolean(), hasSignals: z.boolean() }),
@@ -1138,88 +1138,88 @@ export const PagePapersQuery = z.object({
   limit: z.coerce.number().int().min(1).max(5000).optional(),
 });
 
-// Topic pages (`handoffs/pages.md` Phase 5, `server/topic-pages.ts`): Wikipedia-style categories with an article.
+// Category pages (`handoffs/pages.md` Phase 5, `server/category-pages.ts`): Wikipedia-style categories with an article.
 
-const topicName = z.string().min(1).max(120);
-const topicSlugParam = z.string().min(1).max(60);
+const categoryName = z.string().min(1).max(120);
+const categorySlugParam = z.string().min(1).max(60);
 
-/** `GET /topics?q=`: topics whose name is like `q`, the same name first. */
-export const TopicSearchQuery = z.object({ q: z.string().max(120).default('') });
+/** `GET /categories?q=`: categories whose name is like `q`, the same name first. */
+export const CategorySearchQuery = z.object({ q: z.string().max(120).default('') });
 
-export const TopicMatches = z.object({
-  topics: z.array(
+export const CategoryMatches = z.object({
+  categories: z.array(
     z.object({
       identifier: z.string(),
       key: z.string(),
       name: z.string(),
       url: z.string(),
-      /** The same name: making another topic of it would be a duplicate. */
+      /** The same name: making another category of it would be a duplicate. */
       exact: z.boolean(),
     }),
   ),
 });
 
-/** `POST /topics`: a new topic. */
-export const NewTopicBody = z.object({
-  name: topicName,
+/** `POST /categories`: a new category. */
+export const NewCategoryBody = z.object({
+  name: categoryName,
   /** Its address; made from the name when absent. */
-  slug: topicSlugParam.optional(),
+  slug: categorySlugParam.optional(),
   /** The article's first section, "What it is", in Markdown. */
   summary: z.string().max(20_000).optional(),
 });
 
-/** `POST /pages/{identifier}/topics`: puts a page in a topic, by identifier, or by name (made if no topic has it). */
-export const PageTopicBody = z
+/** `POST /pages/{identifier}/categories`: puts a page in a category, by identifier, or by name (made if no category has it). */
+export const PageCategoryBody = z
   .object({
-    topic: z.string().min(1).max(200).optional(),
-    name: topicName.optional(),
+    category: z.string().min(1).max(200).optional(),
+    name: categoryName.optional(),
     note: z.string().max(2000).optional(),
   })
-  .refine((body) => body.topic || body.name, { message: 'give topic (an identifier) or name' });
+  .refine((body) => body.category || body.name, { message: 'give category (an identifier) or name' });
 
-export const PageTopicResult = z.object({
-  topic: PageSummary,
+export const PageCategoryResult = z.object({
+  category: PageSummary,
   created: z.boolean(),
   status: z.enum(['linked', 'exists']),
 });
 
-const TopicMember = z.object({
+const CategoryMember = z.object({
   identifier: z.string().nullable(),
   url: z.string().nullable(),
   kind: z.string(),
   name: z.string().nullable(),
 });
 
-/** `GET /pages/{identifier}/topic`: a topic's subtopics and other pages, by name, as a Wikipedia category lists them. */
-export const TopicOverview = z.object({
-  subtopics: z.array(TopicMember),
-  pages: z.array(TopicMember),
-  /** Topics merged into it, by their old identifiers. */
+/** `GET /pages/{identifier}/category`: a category's subcategories and other pages, by name, as a Wikipedia category lists them. */
+export const CategoryOverview = z.object({
+  subcategories: z.array(CategoryMember),
+  pages: z.array(CategoryMember),
+  /** Categories merged into it, by their old identifiers. */
   mergedFrom: z.array(z.string()),
   protection: z
     .object({ level: z.string(), reason: z.string().nullable(), expiresAt: z.string().nullable() })
     .nullable(),
 });
 
-/** `PATCH /pages/{identifier}/topic`: edits a topic in one commit; what is left out stays. */
-export const TopicEditBody = z.object({
+/** `PATCH /pages/{identifier}/category`: edits a category in one commit; what is left out stays. */
+export const CategoryEditBody = z.object({
   /** The commit the form loaded. */
   base: z
     .string()
     .regex(/^[0-9a-f]{40}$/)
     .nullable(),
-  name: topicName.optional(),
+  name: categoryName.optional(),
   /** The whole article as Markdown, a `#` heading per section. */
   article: z.string().max(200_000).optional(),
   summary: z.string().max(500).optional(),
 });
 
-export const TopicEdited = z.object({ head: z.string().nullable(), changed: z.boolean() });
+export const CategoryEdited = z.object({ head: z.string().nullable(), changed: z.boolean() });
 
-/** `POST /pages/{identifier}/rename`: a topic's new address, and optionally its new name. */
-export const RenameBody = z.object({ slug: topicSlugParam, name: topicName.optional() });
+/** `POST /pages/{identifier}/rename`: a category's new address, and optionally its new name. */
+export const RenameBody = z.object({ slug: categorySlugParam, name: categoryName.optional() });
 
-/** `POST /pages/{identifier}/merge`: merges this topic into another. */
+/** `POST /pages/{identifier}/merge`: merges this category into another. */
 export const MergeBody = z.object({ into: z.string().min(1).max(200), summary: z.string().max(500).optional() });
 
 /** `GET`/`PUT /pages/{identifier}/protection`. */
@@ -1242,7 +1242,7 @@ export const ProtectionBody = z.object({
 
 /** `GET /changes`: the patrol feed. */
 export const ChangesQuery = z.object({
-  kind: z.enum(['paper', 'venue', 'topic', 'org', 'user']).optional(),
+  kind: z.enum(['paper', 'venue', 'category', 'org', 'user']).optional(),
   bots: z.enum(['true', 'false']).default('false'),
   before: z.coerce.number().int().min(1).optional(),
   limit: z.coerce.number().int().min(1).max(200).default(50),

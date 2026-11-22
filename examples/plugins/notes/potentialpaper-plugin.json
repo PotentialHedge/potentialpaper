@@ -13,7 +13,7 @@
       {
         "id": "notes",
         "title": "My notes",
-        "kinds": ["paper", "venue", "topic", "org"],
+        "kinds": ["paper", "venue", "category", "org"],
         "slot": "aside",
         "when": "signedIn"
       }

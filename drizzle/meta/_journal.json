@@ -386,6 +386,13 @@
       "when": 1795382900516,
       "tag": "0054_drop_topic_suggestions",
       "breakpoints": true
+    },
+    {
+      "idx": 55,
+      "version": "7",
+      "when": 1795383698285,
+      "tag": "0055_categories",
+      "breakpoints": true
     }
   ]
 }

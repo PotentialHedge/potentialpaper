@@ -421,7 +421,7 @@ describe('the page routes plugins read', () => {
       scopes: [{ identifier: 'venue:iclr' }],
       facts: { hasSubmissions: true, hasScores: true },
     });
-    expect((await api('GET', `/pages/${enc('topic:nothing-here')}`)).status).toBe(404);
+    expect((await api('GET', `/pages/${enc('category:nothing-here')}`)).status).toBe(404);
 
     const files = (await api('GET', `/pages/${enc('venue:iclr/2027')}/files`)).body;
     expect(files).toMatchObject({

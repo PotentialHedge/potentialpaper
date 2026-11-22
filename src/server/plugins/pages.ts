@@ -83,7 +83,7 @@ export async function mustFindPage(identifier: string, database: Database = getD
 }
 
 /**
- * The pages above a page: a paper's venues, topics and orgs (`page_members`); any other page's parents (an edition's
+ * The pages above a page: a paper's venues, categories and orgs (`page_members`); any other page's parents (an edition's
  * series, an org's parents), as far as they exist.
  */
 export async function scopesOfPage(page: PageRow, database: Database = getDb()): Promise<PageSummary[]> {

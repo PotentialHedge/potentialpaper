@@ -307,12 +307,12 @@ describe('organiser claims', () => {
   });
 
   it('are only for venues, by verified accounts, and a rejection stays', async () => {
-    await createPage('topic', 'linear-attention');
+    await createPage('category', 'linear-attention');
     const page = await createPage('venue', 'neurips/2027');
     const ada = await verifiedAccount();
     expect(
       (
-        await api('POST', `/pages/${encodeURIComponent('topic:linear-attention')}/claim`, {
+        await api('POST', `/pages/${encodeURIComponent('category:linear-attention')}/claim`, {
           cookie: ada.cookie,
           body: { evidence: 'me' },
         })

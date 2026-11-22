@@ -8,10 +8,10 @@ import { refreshPageIds } from '@/server/pages/refresh';
 const USAGE = `Sets, shows or lifts a page's protection (DESIGN.md §7, server/page-protection.ts). Admins only, on the
 server; the same as PUT /api/v1/pages/{identifier}/protection.
 
-  npm run pages:protect -- topic:linear-attention                       show it
-  npm run pages:protect -- topic:linear-attention established [--reason "Edit war"] [--days 7]
-  npm run pages:protect -- topic:linear-attention admins
-  npm run pages:protect -- topic:linear-attention none                  lift it
+  npm run pages:protect -- category:linear-attention                       show it
+  npm run pages:protect -- category:linear-attention established [--reason "Edit war"] [--days 7]
+  npm run pages:protect -- category:linear-attention admins
+  npm run pages:protect -- category:linear-attention none                  lift it
 
 Levels: ${PROTECTION_LEVELS.join(', ')}. established: accounts verified for a few days; admins: admins only. Owners
 (a paper's authors, a venue's organisers, an org's members) keep their own part, and bots their grants.`;

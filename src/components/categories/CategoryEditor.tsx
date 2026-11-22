@@ -4,12 +4,12 @@ import { useRouter } from 'next/navigation';
 import { type FormEvent, useState } from 'react';
 import { ui } from '@/components/ui';
 import { failureOf, send } from './api';
-import { useTopicMatches } from './useTopicMatches';
+import { useCategoryMatches } from './useCategoryMatches';
 
 /**
- * A topic's editor (`handoffs/pages.md` Phase 5): its name and its article in one commit
- * (`PATCH /api/v1/pages/{identifier}/topic`, merged with whatever changed since the form loaded); renaming it
- * (`/rename`) and merging it into another (`/merge`), each leaving a redirect. The topics it is in are added from the
+ * A category's editor (`handoffs/pages.md` Phase 5): its name and its article in one commit
+ * (`PATCH /api/v1/pages/{identifier}/category`, merged with whatever changed since the form loaded); renaming it
+ * (`/rename`) and merging it into another (`/merge`), each leaving a redirect. The categories it is in are added from the
  * bar at the foot of its page, as any page's are.
  */
 
@@ -18,7 +18,7 @@ interface Initial {
   article: string;
 }
 
-export function TopicEditor({
+export function CategoryEditor({
   identifier,
   slug,
   base,
@@ -42,7 +42,7 @@ export function TopicEditor({
     setBusy(true);
     setNote(null);
     try {
-      const res = await send('PATCH', `${path}/topic`, {
+      const res = await send('PATCH', `${path}/category`, {
         base,
         name: name.trim(),
         article,
@@ -51,7 +51,7 @@ export function TopicEditor({
       if (!res.ok) return setNote({ ok: false, text: (await failureOf(res)).message });
       const body = (await res.json()) as { changed: boolean };
       if (!body.changed) return setNote({ ok: true, text: 'Nothing changed.' });
-      router.push(`/t/${slug}`);
+      router.push(`/c/${slug}`);
     } catch {
       setNote({ ok: false, text: 'Could not reach the server.' });
     } finally {
@@ -119,7 +119,7 @@ function Rename({ path, slug, name }: { path: string; slug: string; name: string
         ...(newName.trim() !== name ? { name: newName.trim() } : {}),
       });
       if (!res.ok) return setProblem((await failureOf(res)).message);
-      router.push(`/t/${newSlug.trim()}`);
+      router.push(`/c/${newSlug.trim()}`);
     } catch {
       setProblem('Could not reach the server.');
     } finally {
@@ -138,7 +138,7 @@ function Rename({ path, slug, name }: { path: string; slug: string; name: string
         <input value={newName} onChange={(e) => setNewName(e.target.value)} className={`${ui.input} mt-0.5`} />
       </label>
       <label className="block text-[13px] text-muted">
-        Address: /t/
+        Address: /c/
         <input
           value={newSlug}
           onChange={(e) => setNewSlug(e.target.value.toLowerCase())}
@@ -165,16 +165,16 @@ function Merge({ path, slug }: { path: string; slug: string }) {
   const [chosen, setChosen] = useState<{ key: string; name: string } | null>(null);
   const [busy, setBusy] = useState(false);
   const [problem, setProblem] = useState<string | null>(null);
-  const matches = useTopicMatches(chosen ? '' : into).filter((m) => m.key !== slug);
+  const matches = useCategoryMatches(chosen ? '' : into).filter((m) => m.key !== slug);
 
   async function submit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
-    const target = chosen?.key ?? into.trim().replace(/^topic:/, '');
+    const target = chosen?.key ?? into.trim().replace(/^category:/, '');
     if (!target) return;
     setBusy(true);
     setProblem(null);
     try {
-      const res = await send('POST', `${path}/merge`, { into: `topic:${target}` });
+      const res = await send('POST', `${path}/merge`, { into: `category:${target}` });
       if (!res.ok) return setProblem((await failureOf(res)).message);
       const body = (await res.json()) as { address: string };
       router.push(body.address);
@@ -187,9 +187,9 @@ function Merge({ path, slug }: { path: string; slug: string }) {
 
   return (
     <form onSubmit={submit} className="mt-10 space-y-3">
-      <h2 className={ui.sectionHeading}>Merge into another topic</h2>
+      <h2 className={ui.sectionHeading}>Merge into another category</h2>
       <p className="text-[13px] text-muted">
-        When this topic is the same idea as another: its sections and links move there, what is in it is in that one,
+        When this category is the same idea as another: its sections and links move there, what is in it is in that one,
         and its address leads there. Its history stays.
       </p>
       <input
@@ -198,8 +198,8 @@ function Merge({ path, slug }: { path: string; slug: string }) {
           setInto(e.target.value);
           setChosen(null);
         }}
-        placeholder="The topic it is the same as"
-        aria-label="The topic to merge into"
+        placeholder="The category it is the same as"
+        aria-label="The category to merge into"
         className={ui.input}
       />
       {matches.length > 0 && (
@@ -209,7 +209,7 @@ function Merge({ path, slug }: { path: string; slug: string }) {
               <button type="button" className={ui.linkBtn} onClick={() => setChosen({ key: m.key, name: m.name })}>
                 {m.name}
               </button>{' '}
-              <span className="text-faint">topic:{m.key}</span>
+              <span className="text-faint">category:{m.key}</span>
             </li>
           ))}
         </ul>

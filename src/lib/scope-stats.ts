@@ -6,7 +6,7 @@ import type { SubmissionStatus } from './submissions';
  * with fixed-width bins and the same split by outcome. Pure, so the consumer (`server/scope-stats.ts`), the routes, the
  * venue page and the tests share it.
  *
- * The venue stays in the key even on a topic's or an organisation's page, since a 6 at ICLR and a 6 at NeurIPS are
+ * The venue stays in the key even on a category's or an organisation's page, since a 6 at ICLR and a 6 at NeurIPS are
  * different scales.
  */
 

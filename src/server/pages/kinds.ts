@@ -66,8 +66,8 @@ export async function redirectedPage(db: Reader, kind: KeyedKind, key: string): 
 }
 
 /**
- * The page a keyed page was merged into, as far as merges go (a topic merged into one later merged again), or the page
- * itself if it wasn't (`pages.merged_into`, `topic-pages.ts`).
+ * The page a keyed page was merged into, as far as merges go (a category merged into one later merged again), or the page
+ * itself if it wasn't (`pages.merged_into`, `category-pages.ts`).
  */
 export async function survivorOf(db: Reader, page: PageRow): Promise<PageRow> {
   let current = page;
@@ -83,7 +83,7 @@ export async function survivorOf(db: Reader, page: PageRow): Promise<PageRow> {
 
 /**
  * The page an address names, or `null`, following an old key's redirect and a merge: a paper through its identifiers
- * (to the paper that survived its merge), any other kind by its key (to the topic it was merged into). Never asks a
+ * (to the paper that survived its merge), any other kind by its key (to the category it was merged into). Never asks a
  * paper source, so it is safe on unbounded input.
  */
 export async function findPageByAddress(db: Reader, address: PageAddress): Promise<PageRow | null> {
@@ -149,7 +149,7 @@ export async function insertPage(kind: KeyedKind, key: string, database: Databas
 }
 
 /**
- * The other keys a keyed page answers to: its old keys (`page_redirects`, a renamed topic's or a person's old handle),
+ * The other keys a keyed page answers to: its old keys (`page_redirects`, a renamed category's or a person's old handle),
  * and the keys of pages merged into it with theirs (`pages.merged_into`). Links and memberships that name one of these
  * count for the page (`page-links.ts`, `page-members.ts`).
  */

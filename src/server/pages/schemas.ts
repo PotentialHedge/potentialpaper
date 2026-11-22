@@ -5,7 +5,7 @@ import {
   orgFileSchema,
   PAGE_KINDS,
   type PageKind,
-  topicFileSchema,
+  categoryFileSchema,
   venueFileSchema,
 } from '@/lib/kinds';
 import { labeledLinkSchema, LINK_LABELS } from '@/lib/labeled-links';
@@ -188,7 +188,7 @@ export const PAGE_SCHEMAS = {
     render: { panel: 'AuthorSection', slots: ['paper.author'] },
   }),
   venue: fileType(kindFileType('venue', venueFileSchema)),
-  topic: fileType(kindFileType('topic', topicFileSchema)),
+  category: fileType(kindFileType('category', categoryFileSchema)),
   org: fileType(kindFileType('org', orgFileSchema)),
   link: fileType({
     title: 'Link',

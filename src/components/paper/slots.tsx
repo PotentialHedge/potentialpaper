@@ -1,5 +1,5 @@
 import type { ComponentType } from 'react';
-import { Backlinks, Links, type PageCommon, Sections, Topics } from '@/components/pages/common';
+import { Backlinks, Links, type PageCommon, Sections, Categories } from '@/components/pages/common';
 import { pagePath } from '@/lib/kinds';
 import { ui } from '@/components/ui';
 import type { PanelId } from '@/lib/panels';
@@ -133,7 +133,7 @@ export const PAPER_PANELS: Record<PanelId<'paper'>, ComponentType<PanelProps>> =
   read: ReadThePaper,
   'versions-box': VersionsAside,
   'submissions-box': SubmissionsAside,
-  topics: Topics,
+  categories: Categories,
   links: Links,
   backlinks: Backlinks,
   versions: Versions,

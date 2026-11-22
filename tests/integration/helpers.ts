@@ -86,11 +86,11 @@ import * as orgChildrenRoute from '@/app/api/v1/pages/[identifier]/children/rout
 import * as pageScoresRoute from '@/app/api/v1/pages/[identifier]/scores/route';
 import * as pageScoreFieldRoute from '@/app/api/v1/pages/[identifier]/scores/[venue]/[field]/route';
 import * as pagePapersRoute from '@/app/api/v1/pages/[identifier]/papers/route';
-import * as topicsRoute from '@/app/api/v1/topics/route';
+import * as categoriesRoute from '@/app/api/v1/categories/route';
 import * as changesRoute from '@/app/api/v1/changes/route';
 import * as eventsRoute from '@/app/api/v1/events/route';
-import * as topicRoute from '@/app/api/v1/pages/[identifier]/topic/route';
-import * as pageTopicsRoute from '@/app/api/v1/pages/[identifier]/topics/route';
+import * as categoryRoute from '@/app/api/v1/pages/[identifier]/category/route';
+import * as pageCategoriesRoute from '@/app/api/v1/pages/[identifier]/categories/route';
 import * as renameRoute from '@/app/api/v1/pages/[identifier]/rename/route';
 import * as mergeRoute from '@/app/api/v1/pages/[identifier]/merge/route';
 import * as protectionRoute from '@/app/api/v1/pages/[identifier]/protection/route';
@@ -197,13 +197,13 @@ const ROUTES: [RegExp, any][] = [
   [/^\/signal-sets\/(?<owner>[^/?]+)\/(?<name>[^/?]+)\/generations$/, signalGenerationsRoute],
   [/^\/signal-sets\/(?<owner>[^/?]+)\/(?<name>[^/?]+)\/generations\/(?<generation>\d+)\/publish$/, signalPublishRoute],
   [/^\/signal-sets\/(?<owner>[^/?]+)\/(?<name>[^/?]+)$/, signalSetRoute],
-  [/^\/pages\/(?<identifier>[^/?]+)\/topic$/, topicRoute],
-  [/^\/pages\/(?<identifier>[^/?]+)\/topics$/, pageTopicsRoute],
+  [/^\/pages\/(?<identifier>[^/?]+)\/category$/, categoryRoute],
+  [/^\/pages\/(?<identifier>[^/?]+)\/categories$/, pageCategoriesRoute],
   [/^\/pages\/(?<identifier>[^/?]+)\/rename$/, renameRoute],
   [/^\/pages\/(?<identifier>[^/?]+)\/merge$/, mergeRoute],
   [/^\/pages\/(?<identifier>[^/?]+)\/protection$/, protectionRoute],
   [/^\/pages\/(?<identifier>[^/?]+)$/, pageSummary],
-  [/^\/topics(\?.*)?$/, topicsRoute],
+  [/^\/categories(\?.*)?$/, categoriesRoute],
   [/^\/changes(\?.*)?$/, changesRoute],
   [/^\/events(\?.*)?$/, eventsRoute],
   [/^\/settings$/, siteSettings],

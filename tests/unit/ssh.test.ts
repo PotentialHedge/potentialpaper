@@ -161,11 +161,11 @@ describe('the exec command', () => {
         page: { kind: 'venue', key: 'iclr/2027' },
       });
     }
-    expect(parseSshPath('t/linear-attention.git', 'git-receive-pack')).toMatchObject({
-      page: { kind: 'topic', key: 'linear-attention' },
-      scheme: 'topic',
+    expect(parseSshPath('c/linear-attention.git', 'git-receive-pack')).toMatchObject({
+      page: { kind: 'category', key: 'linear-attention' },
+      scheme: 'category',
     });
-    expect(parseSshPath('t/Not A Slug.git', 'git-upload-pack')).toBeNull();
+    expect(parseSshPath('c/Not A Slug.git', 'git-upload-pack')).toBeNull();
     expect(parseSshPath('paper/x.git', 'git-upload-pack')).toBeNull();
     expect(parseSshPath('openreview/dskf2Ppd9o', 'git-upload-pack')).toMatchObject({
       page: { id: { scheme: 'openreview', value: 'dskf2Ppd9o' } },

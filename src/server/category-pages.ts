@@ -1,16 +1,24 @@
 import { eq, inArray, sql } from 'drizzle-orm';
 import { getDb, type Database } from '@/db';
 import { pageRedirects, pages } from '@/db/schema';
-import { formatIdentifier, keyProblem, KINDS, pagePath, partsOf, type TopicFile, topicFileSchema } from '@/lib/kinds';
+import {
+  formatIdentifier,
+  keyProblem,
+  KINDS,
+  pagePath,
+  partsOf,
+  type CategoryFile,
+  categoryFileSchema,
+} from '@/lib/kinds';
 import {
   encodeLabeledLink,
   type LabeledLinkLine,
   LINKS_FILE,
   newLinkId,
   parseLabeledLinks,
-  TOPIC_LABEL,
+  CATEGORY_LABEL,
 } from '@/lib/labeled-links';
-import { topicNameKey, topicSlug } from '@/lib/topics';
+import { categoryNameKey, categorySlug } from '@/lib/categories';
 import { ApiError } from './api/errors';
 import { linksTo, type PageLink } from './page-links';
 import { indexMembers } from './page-members';
@@ -26,68 +34,68 @@ import { readCommit, readFiles, readHead, readText, type Reader } from './pages/
 import { LAYOUT_VERSION, METADATA_PATH, sectionName } from './pages/rules';
 
 /**
- * Topic pages (`handoffs/pages.md` Phase 5): research ideas that work as Wikipedia's categories do, each with an
+ * Category pages (`handoffs/pages.md` Phase 5): research ideas that work as Wikipedia's categories do, each with an
  * article the community writes. Anyone verified makes one; there is no seeded list and no bot writes them.
  *
- * - **In a topic**: a page of any kind is in a topic through its own `in-topic` link (`linkPageToTopic`), in its
- *   `community/links.jsonl`, or its owners' `links.jsonl` when one of them adds it. A topic in another topic is a
- *   subtopic there. Membership is direct: nothing rolls up from subtopics. A paper's link also makes it a member of
- *   the topic's scope (`page-members.ts`), for its statistics.
- * - **The topic page** lists its subtopics and its other pages, by name (`topicOverview`), from "what links here".
- * - **Making one** (`createTopic`): from the "New topic" form, or by name from "Add to a topic", which makes the
- *   topic if no topic has that name yet (`topicsNamed`, `similarTopics` check names first, to keep duplicates down).
- * - **Editing** (`editTopic`: name and article), **renaming** (`renameTopic`, a new address with a redirect from the
- *   old) and **merging** (`mergeTopic`, the duplicate folded into the survivor and redirected there) are open to the
+ * - **In a category**: a page of any kind is in a category through its own `in-category` link (`linkPageToCategory`), in its
+ *   `community/links.jsonl`, or its owners' `links.jsonl` when one of them adds it. A category in another category is a
+ *   subcategory there. Membership is direct: nothing rolls up from subcategories. A paper's link also makes it a member of
+ *   the category's scope (`page-members.ts`), for its statistics.
+ * - **The category page** lists its subcategories and its other pages, by name (`categoryOverview`), from "what links here".
+ * - **Making one** (`createCategory`): from the "New category" form, or by name from "Add to a category", which makes the
+ *   category if no category has that name yet (`categoriesNamed`, `similarCategories` check names first, to keep duplicates down).
+ * - **Editing** (`editCategory`: name and article), **renaming** (`renameCategory`, a new address with a redirect from the
+ *   old) and **merging** (`mergeCategory`, the duplicate folded into the survivor and redirected there) are open to the
  *   community, through the path rules and page protection (`page-protection.ts`), and show in the patrol feed.
  */
 
-/** A topic as its name is: its key and name. */
-export interface TopicNames {
+/** A category as its name is: its key and name. */
+export interface CategoryNames {
   pageId: string;
   key: string;
   name: string;
 }
 
-/** Every topic that isn't merged into another, with its name. */
-export async function allTopicNames(database: Reader = getDb()): Promise<TopicNames[]> {
-  const { rows } = await database.execute<{ id: string; key: string; kind_file: TopicFile | null }>(sql`
+/** Every category that isn't merged into another, with its name. */
+export async function allCategoryNames(database: Reader = getDb()): Promise<CategoryNames[]> {
+  const { rows } = await database.execute<{ id: string; key: string; kind_file: CategoryFile | null }>(sql`
     select p.id, p.key, c.kind_file
       from pages p
       left join page_current c on c.page_id = p.id
-     where p.kind = 'topic' and p.merged_into is null
+     where p.kind = 'category' and p.merged_into is null
   `);
   return rows.map((row) => ({ pageId: row.id, key: row.key, name: row.kind_file?.name ?? row.key }));
 }
 
-/** The topics called one of these names, as duplicates are told (`topicNameKey`). */
-export async function topicsNamed(
+/** The categories called one of these names, as duplicates are told (`categoryNameKey`). */
+export async function categoriesNamed(
   names: readonly string[],
   options: { except?: string; database?: Reader } = {},
-): Promise<TopicNames[]> {
-  const wanted = new Set(names.map(topicNameKey).filter(Boolean));
+): Promise<CategoryNames[]> {
+  const wanted = new Set(names.map(categoryNameKey).filter(Boolean));
   if (wanted.size === 0) return [];
-  return (await allTopicNames(options.database)).filter(
-    (topic) => topic.pageId !== options.except && wanted.has(topicNameKey(topic.name)),
+  return (await allCategoryNames(options.database)).filter(
+    (category) => category.pageId !== options.except && wanted.has(categoryNameKey(category.name)),
   );
 }
 
-/** A topic a form offers for a name typed into it. */
-export interface TopicMatch {
+/** A category a form offers for a name typed into it. */
+export interface CategoryMatch {
   identifier: string;
   key: string;
   name: string;
-  /** It is the same name: making another topic of it would be a duplicate. */
+  /** It is the same name: making another category of it would be a duplicate. */
   exact: boolean;
 }
 
 /**
- * Topics whose name is like `q`: the same name first (`exact`), then by trigram similarity and words in common. What
- * the "New topic" and "Add to a topic" forms show as one types.
+ * Categories whose name is like `q`: the same name first (`exact`), then by trigram similarity and words in common. What
+ * the "New category" and "Add to a category" forms show as one types.
  */
-export async function similarTopics(
+export async function similarCategories(
   q: string,
   options: { limit?: number; database?: Reader } = {},
-): Promise<TopicMatch[]> {
+): Promise<CategoryMatch[]> {
   const { limit = 10, database = getDb() } = options;
   const text = q.replace(/\s+/g, ' ').trim().slice(0, 120);
   if (text.length < 2) return [];
@@ -95,17 +103,17 @@ export async function similarTopics(
     select p.key, c.name, similarity(lower(c.name), lower(${text})) as sim
       from pages p
       join page_current c on c.page_id = p.id
-     where p.kind = 'topic' and p.merged_into is null and c.name is not null
+     where p.kind = 'category' and p.merged_into is null and c.name is not null
        and (c.name ilike ${`%${text.replace(/[\\%_]/g, (c) => `\\${c}`)}%`}
             or lower(${text}) like '%' || lower(c.name) || '%'
             or similarity(lower(c.name), lower(${text})) > 0.3)
      order by sim desc
      limit 100
   `);
-  const exact = new Set((await topicsNamed([text], { database })).map((topic) => topic.key));
+  const exact = new Set((await categoriesNamed([text], { database })).map((category) => category.key));
   return rows
     .map((row) => ({
-      identifier: formatIdentifier({ kind: 'topic', key: row.key }),
+      identifier: formatIdentifier({ kind: 'category', key: row.key }),
       key: row.key,
       name: row.name,
       exact: exact.has(row.key),
@@ -116,29 +124,29 @@ export async function similarTopics(
     .map((match) => ({ identifier: match.identifier, key: match.key, name: match.name, exact: match.exact }));
 }
 
-function exists(topic: TopicNames): ApiError {
-  const identifier = formatIdentifier({ kind: 'topic', key: topic.key });
-  return new ApiError(409, 'topic_exists', `${identifier} is called “${topic.name}” already`, {
+function exists(category: CategoryNames): ApiError {
+  const identifier = formatIdentifier({ kind: 'category', key: category.key });
+  return new ApiError(409, 'category_exists', `${identifier} is called “${category.name}” already`, {
     identifier,
-    name: topic.name,
+    name: category.name,
   });
 }
 
-function encodeTopicFile(file: TopicFile): string {
+function encodeCategoryFile(file: CategoryFile): string {
   return `${JSON.stringify({ name: file.name }, null, 2)}\n`;
 }
 
-/** `topic.json` checked as the schema says, or a 422 naming the field. */
-function parseTopicFile(input: unknown): TopicFile {
-  const parsed = topicFileSchema.safeParse(input);
+/** `category.json` checked as the schema says, or a 422 naming the field. */
+function parseCategoryFile(input: unknown): CategoryFile {
+  const parsed = categoryFileSchema.safeParse(input);
   if (!parsed.success) {
     const issue = parsed.error.issues[0];
-    throw new ApiError(422, 'validation_error', `${issue.path.join('.') || 'topic'}: ${issue.message}`);
+    throw new ApiError(422, 'validation_error', `${issue.path.join('.') || 'category'}: ${issue.message}`);
   }
   return parsed.data;
 }
 
-export interface NewTopic {
+export interface NewCategory {
   name: string;
   /** Its address; made from the name when absent. */
   slug?: string;
@@ -146,33 +154,34 @@ export interface NewTopic {
   summary?: string;
 }
 
-/** The section a topic's article starts with, from the form's "What it is". */
+/** The section a category's article starts with, from the form's "What it is". */
 const SUMMARY_PATH = 'community/10-what-it-is.md';
 
 /**
- * Makes a topic: its page, and its `topic.json` (and the article's first section, if given) committed by whoever makes
- * it, so the path rules check it as any edit. Refuses a name another topic has (`topic_exists`), and an address that
+ * Makes a category: its page, and its `category.json` (and the article's first section, if given) committed by whoever makes
+ * it, so the path rules check it as any edit. Refuses a name another category has (`category_exists`), and an address that
  * is taken. Anyone verified may (`rules.ts`).
  */
-export async function createTopic(input: NewTopic, actor: Actor, database: Database = getDb()): Promise<PageRow> {
+export async function createCategory(input: NewCategory, actor: Actor, database: Database = getDb()): Promise<PageRow> {
   if (actor.kind !== 'account') throw new ApiError(403, 'forbidden', 'sign in first');
   const name = input.name.replace(/\s+/g, ' ').trim();
-  const slug = (input.slug?.trim().toLowerCase() || topicSlug(name)) ?? '';
-  if (!slug) throw new ApiError(422, 'validation_error', 'slug: give the topic an address in Latin letters or digits');
-  const problem = keyProblem('topic', slug);
-  if (problem) throw new ApiError(422, 'validation_error', `slug: topic:${slug} ${problem}`);
-  const file = parseTopicFile({ name });
-  const [taken] = await topicsNamed([file.name], { database });
+  const slug = (input.slug?.trim().toLowerCase() || categorySlug(name)) ?? '';
+  if (!slug)
+    throw new ApiError(422, 'validation_error', 'slug: give the category an address in Latin letters or digits');
+  const problem = keyProblem('category', slug);
+  if (problem) throw new ApiError(422, 'validation_error', `slug: category:${slug} ${problem}`);
+  const file = parseCategoryFile({ name });
+  const [taken] = await categoriesNamed([file.name], { database });
   if (taken) throw exists(taken);
-  if (await findKeyedPage(database, 'topic', slug)) {
-    throw new ApiError(409, 'page_exists', `topic:${slug} is there already; choose another address`, {
-      identifier: `topic:${slug}`,
+  if (await findKeyedPage(database, 'category', slug)) {
+    throw new ApiError(409, 'page_exists', `category:${slug} is there already; choose another address`, {
+      identifier: `category:${slug}`,
     });
   }
-  const changes: FileChange[] = [{ path: KINDS.topic.kindFile, content: encodeTopicFile(file) }];
+  const changes: FileChange[] = [{ path: KINDS.category.kindFile, content: encodeCategoryFile(file) }];
   const summary = input.summary?.trim();
   if (summary) changes.push({ path: SUMMARY_PATH, content: `# What it is\n\n${summary}\n` });
-  const page = await createPage('topic', slug, database);
+  const page = await createPage('category', slug, database);
   try {
     const result = await commitPage(page.id, page.head, actor, changes, `Start ${file.name}`, { database });
     if (result.status !== 'committed') throw new ApiError(409, 'page_busy', 'the page changed meanwhile; try again');
@@ -180,31 +189,34 @@ export async function createTopic(input: NewTopic, actor: Actor, database: Datab
     await database.delete(pages).where(eq(pages.id, page.id));
     throw err;
   }
-  await refreshPages({ kind: 'topic', key: slug });
+  await refreshPages({ kind: 'category', key: slug });
   return page;
 }
 
-/** A topic by identifier (`topic:linear-attention`, following renames and merges) or by its name. */
-async function findTopic(ref: { topic?: string; name?: string }, database: Database): Promise<PageRow | null> {
-  if (ref.topic) {
-    const page = await findPage(ref.topic.startsWith('topic:') ? ref.topic : `topic:${ref.topic}`, database);
-    if (!page || page.kind !== 'topic') throw new ApiError(404, 'not_found', `no topic is ${ref.topic}`);
+/** A category by identifier (`category:linear-attention`, following renames and merges) or by its name. */
+async function findCategory(ref: { category?: string; name?: string }, database: Database): Promise<PageRow | null> {
+  if (ref.category) {
+    const page = await findPage(
+      ref.category.startsWith('category:') ? ref.category : `category:${ref.category}`,
+      database,
+    );
+    if (!page || page.kind !== 'category') throw new ApiError(404, 'not_found', `no category is ${ref.category}`);
     return page;
   }
-  const [named] = await topicsNamed([ref.name ?? ''], { database });
+  const [named] = await categoriesNamed([ref.name ?? ''], { database });
   return named ? mustPage(database, named.pageId) : null;
 }
 
-export interface PageTopicInput {
-  /** The topic by identifier; or else by `name`, which makes it if no topic has that name. */
-  topic?: string;
+export interface PageCategoryInput {
+  /** The category by identifier; or else by `name`, which makes it if no category has that name. */
+  category?: string;
   name?: string;
   note?: string;
 }
 
-export interface PageTopicResult {
-  topic: PageRow;
-  /** The topic was made for this. */
+export interface PageCategoryResult {
+  category: PageRow;
+  /** The category was made for this. */
   created: boolean;
   /** `exists`: the page was in it already. */
   status: 'linked' | 'exists';
@@ -224,28 +236,28 @@ function appendLine(text: string, line: string): string {
 }
 
 /**
- * Puts a page of any kind in a topic, as a Wikipedia page is put in a category: an `in-topic` link from the page in
+ * Puts a page of any kind in a category, as a Wikipedia page is put in a category: an `in-category` link from the page in
  * its `community/links.jsonl`, or its owners' `links.jsonl` when one of its owners adds it, so they assert it as
- * owners (DESIGN.md §8). By name, the topic is made if no topic has that name. A topic put in another is a subtopic.
+ * owners (DESIGN.md §8). By name, the category is made if no category has that name. A category put in another is a subcategory.
  */
-export async function linkPageToTopic(
+export async function linkPageToCategory(
   page: PageRow,
-  input: PageTopicInput,
+  input: PageCategoryInput,
   actor: Actor,
   database: Database = getDb(),
-): Promise<PageTopicResult> {
+): Promise<PageCategoryResult> {
   if (actor.kind !== 'account') throw new ApiError(403, 'forbidden', 'sign in first');
   const parts = partsOf(page.kind);
-  if (parts.length === 0) throw new ApiError(422, 'validation_error', `a ${page.kind} page is put in no topic`);
-  let topic = await findTopic(input, database);
+  if (parts.length === 0) throw new ApiError(422, 'validation_error', `a ${page.kind} page is put in no category`);
+  let category = await findCategory(input, database);
   let created = false;
-  if (!topic) {
-    if (!input.name?.trim()) throw new ApiError(422, 'validation_error', 'name a topic, or give its identifier');
-    topic = await createTopic({ name: input.name }, actor, database);
+  if (!category) {
+    if (!input.name?.trim()) throw new ApiError(422, 'validation_error', 'name a category, or give its identifier');
+    category = await createCategory({ name: input.name }, actor, database);
     created = true;
   }
-  if (topic.id === page.id) throw new ApiError(422, 'validation_error', 'a topic is not in itself');
-  const target = formatIdentifier({ kind: 'topic', key: topic.key });
+  if (category.id === page.id) throw new ApiError(422, 'validation_error', 'a category is not in itself');
+  const target = formatIdentifier({ kind: 'category', key: category.key });
   const roles = await rolesOf(database, actor, page.id);
   const owners = KINDS[page.kind].owners;
   const part = roles.owner && owners ? owners.dir : parts[parts.length - 1];
@@ -255,48 +267,48 @@ export async function linkPageToTopic(
   for (const each of parts) {
     const parsed = parseLabeledLinks(await textAt(database, page.id, head, `${each}/${LINKS_FILE}`), page.kind);
     const links = 'links' in parsed ? parsed.links : [];
-    if (links.some((link) => link.label === TOPIC_LABEL && link.target === target)) {
-      return { topic, created, status: 'exists' };
+    if (links.some((link) => link.label === CATEGORY_LABEL && link.target === target)) {
+      return { category, created, status: 'exists' };
     }
   }
   const line: LabeledLinkLine = {
     id: newLinkId(),
     to: target,
-    label: TOPIC_LABEL,
+    label: CATEGORY_LABEL,
     ...(input.note?.trim() ? { note: input.note.trim() } : {}),
   };
   const content = appendLine(await textAt(database, page.id, head, path), encodeLabeledLink(line));
-  const name = (await topicName(database, topic)) ?? topic.key;
-  const result = await commitPage(page.id, head, actor, [{ path, content }], `Add to the topic ${name}`, {
+  const name = (await categoryName(database, category)) ?? category.key;
+  const result = await commitPage(page.id, head, actor, [{ path, content }], `Add to the category ${name}`, {
     database,
   });
   if (result.status !== 'committed') throw new ApiError(409, 'page_busy', 'the page changed meanwhile; try again');
-  await refreshPageIds(database, [page.id, topic.id]);
-  return { topic, created, status: 'linked' };
+  await refreshPageIds(database, [page.id, category.id]);
+  return { category, created, status: 'linked' };
 }
 
-async function topicName(db: Reader, topic: PageRow): Promise<string | null> {
+async function categoryName(db: Reader, category: PageRow): Promise<string | null> {
   const { rows } = await db.execute<{ name: string | null }>(
-    sql`select name from page_current where page_id = ${topic.id}`,
+    sql`select name from page_current where page_id = ${category.id}`,
   );
   return rows[0]?.name ?? null;
 }
 
-/** What a topic page lists besides its article: its subtopics and its other pages, as a Wikipedia category does. */
-export interface TopicOverview {
-  /** The topics in it, by name. */
-  subtopics: PageLink[];
+/** What a category page lists besides its article: its subcategories and its other pages, as a Wikipedia category does. */
+export interface CategoryOverview {
+  /** The categories in it, by name. */
+  subcategories: PageLink[];
   /** The pages of other kinds in it, by name. */
   pages: PageLink[];
-  /** The topics merged into it, by their old slugs. */
+  /** The categories merged into it, by their old slugs. */
   mergedFrom: string[];
   protection: Protection | null;
 }
 
 const byName = (a: PageLink, b: PageLink) => (a.page.name ?? '').localeCompare(b.page.name ?? '');
 
-/** A topic's members (the pages whose `in-topic` links name it, under any of its names) and its merges. */
-export async function topicOverview(page: PageRow, database: Database = getDb()): Promise<TopicOverview> {
+/** A category's members (the pages whose `in-category` links name it, under any of its names) and its merges. */
+export async function categoryOverview(page: PageRow, database: Database = getDb()): Promise<CategoryOverview> {
   const [links, protection, merged] = await Promise.all([
     linksTo(page.id, database),
     protectionOf(database, page.id),
@@ -305,20 +317,20 @@ export async function topicOverview(page: PageRow, database: Database = getDb())
   const seen = new Set<string>();
   const members = links.filter((link) => {
     const id = link.page.pageId;
-    if (link.label !== TOPIC_LABEL || !id || seen.has(id)) return false;
+    if (link.label !== CATEGORY_LABEL || !id || seen.has(id)) return false;
     seen.add(id);
     return true;
   });
   return {
-    subtopics: members.filter((link) => link.page.kind === 'topic').sort(byName),
-    pages: members.filter((link) => link.page.kind !== 'topic').sort(byName),
+    subcategories: members.filter((link) => link.page.kind === 'category').sort(byName),
+    pages: members.filter((link) => link.page.kind !== 'category').sort(byName),
     mergedFrom: merged.map((row) => row.key).sort(),
     protection,
   };
 }
 
-/** The overview as the API gives it (`GET /pages/{identifier}/topic`), with identifiers and addresses. */
-export function presentTopicOverview(overview: TopicOverview, origin: string) {
+/** The overview as the API gives it (`GET /pages/{identifier}/category`), with identifiers and addresses. */
+export function presentCategoryOverview(overview: CategoryOverview, origin: string) {
   const member = (link: PageLink) => ({
     identifier: link.page.address ? formatIdentifier(link.page.address) : null,
     url: link.page.address ? `${origin}${pagePath(link.page.address)}` : null,
@@ -326,9 +338,9 @@ export function presentTopicOverview(overview: TopicOverview, origin: string) {
     name: link.page.name,
   });
   return {
-    subtopics: overview.subtopics.map(member),
+    subcategories: overview.subcategories.map(member),
     pages: overview.pages.map(member),
-    mergedFrom: overview.mergedFrom.map((key) => formatIdentifier({ kind: 'topic', key })),
+    mergedFrom: overview.mergedFrom.map((key) => formatIdentifier({ kind: 'category', key })),
     protection: overview.protection
       ? {
           level: overview.protection.level,
@@ -339,8 +351,8 @@ export function presentTopicOverview(overview: TopicOverview, origin: string) {
   };
 }
 
-/** What `editTopic` changes; anything left out stays as it is. */
-export interface TopicEdit {
+/** What `editCategory` changes; anything left out stays as it is. */
+export interface CategoryEdit {
   /** The commit the form loaded, so a change made meanwhile is merged rather than lost. */
   base: string | null;
   name?: string;
@@ -350,24 +362,24 @@ export interface TopicEdit {
 }
 
 /**
- * Edits a topic in one commit: its name (`topic.json`) and its article's sections. Goes through `commitPage`, so the
+ * Edits a category in one commit: its name (`category.json`) and its article's sections. Goes through `commitPage`, so the
  * path rules and page protection hold, a push could do the same, and a change made since `base` is merged. The
- * topics it is in are its links, added like any page's.
+ * categories it is in are its links, added like any page's.
  */
-export async function editTopic(page: PageRow, edit: TopicEdit, actor: Actor, database: Database = getDb()) {
-  if (page.kind !== 'topic') throw new ApiError(422, 'validation_error', 'only a topic page is edited here');
+export async function editCategory(page: PageRow, edit: CategoryEdit, actor: Actor, database: Database = getDb()) {
+  if (page.kind !== 'category') throw new ApiError(422, 'validation_error', 'only a category page is edited here');
   const base = edit.base;
   const commit = base ? await readCommit(database, page.id, base) : null;
   const files = commit ? await readFiles(database, page.id, commit.tree) : new Map<string, string>();
   const changes: FileChange[] = [];
 
   if (edit.name !== undefined) {
-    const file = parseTopicFile({ name: edit.name.replace(/\s+/g, ' ').trim() });
-    const [taken] = await topicsNamed([file.name], { except: page.id, database });
+    const file = parseCategoryFile({ name: edit.name.replace(/\s+/g, ' ').trim() });
+    const [taken] = await categoriesNamed([file.name], { except: page.id, database });
     if (taken) throw exists(taken);
-    const content = encodeTopicFile(file);
-    if (content !== (await readText(database, page.id, files.get(KINDS.topic.kindFile)))) {
-      changes.push({ path: KINDS.topic.kindFile, content });
+    const content = encodeCategoryFile(file);
+    if (content !== (await readText(database, page.id, files.get(KINDS.category.kindFile)))) {
+      changes.push({ path: KINDS.category.kindFile, content });
     }
   }
 
@@ -381,10 +393,10 @@ export async function editTopic(page: PageRow, edit: TopicEdit, actor: Actor, da
   }
 
   if (changes.length === 0) return { status: 'unchanged' as const, oid: base };
-  const result = await commitPage(page.id, base, actor, changes, edit.summary?.trim() || 'Edit the topic', {
+  const result = await commitPage(page.id, base, actor, changes, edit.summary?.trim() || 'Edit the category', {
     database,
   });
-  if (result.status === 'committed') await refreshPages({ kind: 'topic', key: page.key });
+  if (result.status === 'committed') await refreshPages({ kind: 'category', key: page.key });
   return result;
 }
 
@@ -401,22 +413,22 @@ async function textsAt(db: Reader, pageId: string) {
   return { head, files };
 }
 
-function topicFileOf(files: ReadonlyMap<string, string>): TopicFile | null {
+function categoryFileOf(files: ReadonlyMap<string, string>): CategoryFile | null {
   try {
-    const parsed = topicFileSchema.safeParse(JSON.parse(files.get(KINDS.topic.kindFile) ?? 'null'));
+    const parsed = categoryFileSchema.safeParse(JSON.parse(files.get(KINDS.category.kindFile) ?? 'null'));
     return parsed.success ? parsed.data : null;
   } catch {
     return null;
   }
 }
 
-/** Whoever may edit the topic's `topic.json` (anyone verified) and isn't held back by its protection. */
-async function checkMayEditTopic(db: Reader, page: PageRow, actor: Actor): Promise<void> {
+/** Whoever may edit the category's `category.json` (anyone verified) and isn't held back by its protection. */
+async function checkMayEditCategory(db: Reader, page: PageRow, actor: Actor): Promise<void> {
   if (actor.kind !== 'account') throw new ApiError(403, 'forbidden', 'sign in first');
   const roles = await rolesOf(db, actor, page.id);
   if (!roles.verified && !roles.admin)
     throw new ApiError(403, 'forbidden', 'confirm an institutional email address first');
-  await checkProtection(db, page.id, roles, [KINDS.topic.kindFile]);
+  await checkProtection(db, page.id, roles, [KINDS.category.kindFile]);
 }
 
 /** The handle a commit summary names, for the system's commits made on a person's behalf. */
@@ -427,42 +439,42 @@ async function handleOf(db: Reader, actor: Actor): Promise<string> {
 }
 
 /**
- * Gives a topic a new address: `topic:<slug>` and `/t/<slug>`, with a redirect from the old one (`page_redirects`),
+ * Gives a category a new address: `category:<slug>` and `/c/<slug>`, with a redirect from the old one (`page_redirects`),
  * so links and bookmarks that name the old slug still find it (`page-members.ts` counts the old name among the
  * page's). The page's metadata commit says who moved it. With `name`, the name changes too, in the same person's
  * commit.
  */
-export async function renameTopic(
+export async function renameCategory(
   page: PageRow,
   input: { slug: string; name?: string },
   actor: Actor,
   database: Database = getDb(),
 ): Promise<PageRow> {
-  if (page.kind !== 'topic') throw new ApiError(422, 'validation_error', 'only a topic is renamed here');
-  await checkMayEditTopic(database, page, actor);
+  if (page.kind !== 'category') throw new ApiError(422, 'validation_error', 'only a category is renamed here');
+  await checkMayEditCategory(database, page, actor);
   const slug = input.slug.trim().toLowerCase();
-  const problem = keyProblem('topic', slug);
-  if (problem) throw new ApiError(422, 'validation_error', `slug: topic:${slug} ${problem}`);
+  const problem = keyProblem('category', slug);
+  if (problem) throw new ApiError(422, 'validation_error', `slug: category:${slug} ${problem}`);
   const old = page.key;
   const by = await handleOf(database, actor);
   if (slug !== old) {
     await database.transaction(async (tx) => {
       await lockPage(tx, page.id);
-      if (await findKeyedPage(tx, 'topic', slug)) {
-        throw new ApiError(409, 'page_exists', `topic:${slug} is there already`, { identifier: `topic:${slug}` });
+      if (await findKeyedPage(tx, 'category', slug)) {
+        throw new ApiError(409, 'page_exists', `category:${slug} is there already`, { identifier: `category:${slug}` });
       }
       await tx.update(pages).set({ key: slug }).where(eq(pages.id, page.id));
       await tx
         .insert(pageRedirects)
-        .values({ kind: 'topic', key: old, pageId: page.id })
+        .values({ kind: 'category', key: old, pageId: page.id })
         .onConflictDoUpdate({ target: [pageRedirects.kind, pageRedirects.key], set: { pageId: page.id } });
-      const content = `${JSON.stringify({ layout: LAYOUT_VERSION, kind: 'topic', key: slug }, null, 2)}\n`;
+      const content = `${JSON.stringify({ layout: LAYOUT_VERSION, kind: 'category', key: slug }, null, 2)}\n`;
       await commitPage(
         page.id,
         await readHead(tx, page.id),
         { kind: 'system' },
         [{ path: METADATA_PATH, content }],
-        `Moved from topic:${old} to topic:${slug} by ${by}`,
+        `Moved from category:${old} to category:${slug} by ${by}`,
         { database: tx as unknown as Database },
       );
     });
@@ -471,53 +483,54 @@ export async function renameTopic(
   const name = input.name?.replace(/\s+/g, ' ').trim();
   if (name) {
     const { head, files } = await textsAt(database, page.id);
-    if (topicFileOf(files)?.name !== name) {
-      await editTopic(moved, { base: head, name, summary: `Rename to ${name}` }, actor, database);
+    if (categoryFileOf(files)?.name !== name) {
+      await editCategory(moved, { base: head, name, summary: `Rename to ${name}` }, actor, database);
     }
   }
-  await refreshPages({ kind: 'topic', key: old });
-  await refreshPages({ kind: 'topic', key: slug });
+  await refreshPages({ kind: 'category', key: old });
+  await refreshPages({ kind: 'category', key: slug });
   return moved;
 }
 
 /**
- * Merges a duplicate topic into another: the survivor gains the duplicate's article's sections (each saying where it
+ * Merges a duplicate category into another: the survivor gains the duplicate's article's sections (each saying where it
  * came from) and its links, in one commit by whoever merges; the duplicate's page is marked merged
  * (`pages.merged_into`), so its address, its identifier and its old slugs lead to the survivor, pages in it are in the
  * survivor (`linksTo` and `page-members.ts` follow merges), and nobody commits to it again. Its history stays.
  */
-export async function mergeTopic(
+export async function mergeCategory(
   duplicate: PageRow,
   survivor: PageRow,
   actor: Actor,
   options: { summary?: string; database?: Database } = {},
 ): Promise<{ status: 'committed' | 'unchanged'; oid: string | null }> {
   const database = options.database ?? getDb();
-  if (duplicate.kind !== 'topic' || survivor.kind !== 'topic') {
-    throw new ApiError(422, 'validation_error', 'only a topic is merged into a topic');
+  if (duplicate.kind !== 'category' || survivor.kind !== 'category') {
+    throw new ApiError(422, 'validation_error', 'only a category is merged into a category');
   }
-  if (duplicate.id === survivor.id) throw new ApiError(422, 'validation_error', 'a topic cannot be merged into itself');
-  await checkMayEditTopic(database, duplicate, actor);
-  await checkMayEditTopic(database, survivor, actor);
+  if (duplicate.id === survivor.id)
+    throw new ApiError(422, 'validation_error', 'a category cannot be merged into itself');
+  await checkMayEditCategory(database, duplicate, actor);
+  await checkMayEditCategory(database, survivor, actor);
   const result = await database.transaction(async (tx) => {
     const rows = await tx
       .select({ id: pages.id, mergedInto: pages.mergedInto })
       .from(pages)
       .where(inArray(pages.id, [duplicate.id, survivor.id]))
       .for('update');
-    if (rows.length !== 2) throw new ApiError(404, 'not_found', 'no such topic');
+    if (rows.length !== 2) throw new ApiError(404, 'not_found', 'no such category');
     if (rows.some((row) => row.mergedInto))
-      throw new ApiError(409, 'page_merged', 'one of these topics was merged already');
+      throw new ApiError(409, 'page_merged', 'one of these categories was merged already');
     await lockPage(tx, duplicate.id);
     const theirs = await textsAt(tx, duplicate.id);
     const ours = await textsAt(tx, survivor.id);
-    const changes = foldTopics(ours.files, theirs.files, duplicate.key, survivor.key);
+    const changes = foldCategories(ours.files, theirs.files, duplicate.key, survivor.key);
     const commit = await commitPage(
       survivor.id,
       ours.head,
       actor,
       changes,
-      options.summary?.trim() || `Merge topic:${duplicate.key} into this topic`,
+      options.summary?.trim() || `Merge category:${duplicate.key} into this category`,
       { database: tx as unknown as Database },
     );
     await tx.update(pages).set({ mergedInto: survivor.id }).where(eq(pages.id, duplicate.id));
@@ -535,13 +548,13 @@ export async function mergeTopic(
   // (the consumer would catch up on the survivor's next event).
   const head = await readHead(database, survivor.id);
   if (head) await indexMembers(database, survivor.id, head);
-  await refreshPages({ kind: 'topic', key: duplicate.key });
-  await refreshPages({ kind: 'topic', key: survivor.key });
+  await refreshPages({ kind: 'category', key: duplicate.key });
+  await refreshPages({ kind: 'category', key: survivor.key });
   return result;
 }
 
-/** The changes that fold a duplicate topic's files into the survivor's (`mergeTopic`). */
-export function foldTopics(
+/** The changes that fold a duplicate category's files into the survivor's (`mergeCategory`). */
+export function foldCategories(
   survivor: ReadonlyMap<string, string>,
   duplicate: ReadonlyMap<string, string>,
   from: string,
@@ -564,8 +577,8 @@ export function foldTopics(
       title: sectionTitle(section),
       text: `${section.text.trimEnd()}\n\n${
         section.name.format === 'html'
-          ? `<p><em>From topic:${from}, merged into this page.</em></p>`
-          : `*From topic:${from}, merged into this page.*`
+          ? `<p><em>From category:${from}, merged into this page.</em></p>`
+          : `*From category:${from}, merged into this page.*`
       }\n`,
       format: section.name.format,
     }));
@@ -573,15 +586,15 @@ export function foldTopics(
   }
 
   const path = `community/${LINKS_FILE}`;
-  const ourLinks = parseLabeledLinks(survivor.get(path) ?? '', 'topic');
-  const theirLinks = parseLabeledLinks(duplicate.get(path) ?? '', 'topic');
+  const ourLinks = parseLabeledLinks(survivor.get(path) ?? '', 'category');
+  const theirLinks = parseLabeledLinks(duplicate.get(path) ?? '', 'category');
   if ('links' in ourLinks && 'links' in theirLinks && theirLinks.links.length > 0) {
     const seen = new Set(ourLinks.links.map((link) => `${link.label} ${link.target}`));
     const ids = new Set(ourLinks.links.map((link) => link.id));
     const lines = ourLinks.links.map((link) => encodeLabeledLink(link));
     for (const link of theirLinks.links) {
       const key = `${link.label} ${link.target}`;
-      if (seen.has(key) || link.target === `topic:${into}` || link.target === `topic:${from}`) continue;
+      if (seen.has(key) || link.target === `category:${into}` || link.target === `category:${from}`) continue;
       seen.add(key);
       lines.push(encodeLabeledLink({ ...link, id: ids.has(link.id) ? newLinkId() : link.id }));
       ids.add(link.id);

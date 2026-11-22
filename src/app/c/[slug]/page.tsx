@@ -1,6 +1,6 @@
 import { KeyedPageRoute, keyedPageMetadata } from '@/components/pages/page-route';
 
-/** A topic page (`lib/kinds.ts`), at `/t/<key>`. */
+/** A category page (`lib/kinds.ts`), at `/c/<key>`. */
 type Props = { params: Promise<{ slug: string }> };
 
 // Rendered on the first request, then cached; what links here and a scope's papers change with other pages'
@@ -12,9 +12,9 @@ export function generateStaticParams() {
 }
 
 export async function generateMetadata({ params }: Props) {
-  return keyedPageMetadata('topic', [(await params).slug]);
+  return keyedPageMetadata('category', [(await params).slug]);
 }
 
 export default async function Page({ params }: Props) {
-  return <KeyedPageRoute kind="topic" segments={[(await params).slug]} />;
+  return <KeyedPageRoute kind="category" segments={[(await params).slug]} />;
 }

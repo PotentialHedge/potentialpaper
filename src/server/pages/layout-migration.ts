@@ -208,7 +208,7 @@ const OLD_OWNERS: Record<PageKind, string | null> = {
   venue: 'organizers',
   org: 'members',
   user: 'about',
-  topic: null,
+  category: null,
 };
 
 /**

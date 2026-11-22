@@ -32,7 +32,7 @@ export async function paperPaths(index: number, database: Database = getDb()): P
   return rows.map((r) => `/s/${r.short_id}`);
 }
 
-/** Every venue, topic, organisation and person's page that isn't merged into another. */
+/** Every venue, category, organisation and person's page that isn't merged into another. */
 export async function keyedPaths(database: Database = getDb()): Promise<string[]> {
   const { rows } = await database.execute<{ kind: string; key: string }>(sql`
     select kind, key from pages

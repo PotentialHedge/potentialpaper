@@ -27,7 +27,7 @@ export const API_VERSION = 1;
  */
 export const PERMISSIONS = {
   'page.read': "Read the page it is on: its sections, links and kind file (a venue's venue.json, …)",
-  'scope.read': 'List the papers of venues, topics and organisations',
+  'scope.read': 'List the papers of venues, categories and organisations',
   'reviews.read': "Read papers' submissions, reviews and decisions",
   'lists.read':
     'See which papers the home page lists for you (your searches, your papers and those you follow), to add a note to each',

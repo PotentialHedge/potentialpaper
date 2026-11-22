@@ -16,7 +16,7 @@ export const MAX_LINKS_PER_FILE = 500;
 const MAX_NOTE = 2000;
 const MAX_ANCHOR = 200;
 
-export type LinkGroup = 'lineage' | 'support' | 'contest' | 'discourse' | 'topic';
+export type LinkGroup = 'lineage' | 'support' | 'contest' | 'discourse' | 'category';
 
 /**
  * What a link's `to` names: a page of a kind, or `web`, an https address elsewhere, which only the labels that say so
@@ -95,20 +95,20 @@ export const LINK_LABELS = {
   'responds-to': { reads: 'responds to', inverse: 'response from', group: 'discourse', cito: 'repliesTo', ...PAPERS },
   'concurrent-with': { reads: 'concurrent with', inverse: 'concurrent with', group: 'discourse', ...PAPERS },
   'same-idea-as': { reads: 'same idea as', inverse: 'same idea as', group: 'discourse', ...PAPERS },
-  /** Between pages of any kinds: topic to topic, paper to venue, … */
+  /** Between pages of any kinds: category to category, paper to venue, … */
   related: { reads: 'related to', inverse: 'related to', group: 'discourse' },
   /**
-   * A page is in a topic, as a Wikipedia page is in a category (`handoffs/pages.md`): from a page of any kind, a topic
-   * too, which makes it a subtopic.
+   * A page is in a category, as a Wikipedia page is in a category (`handoffs/pages.md`): from a page of any kind, a category
+   * too, which makes it a subcategory.
    */
-  'in-topic': { reads: 'is in', inverse: 'has', group: 'topic', to: ['topic'] },
+  'in-category': { reads: 'is in', inverse: 'contains', group: 'category', to: ['category'] },
 } as const satisfies Record<string, LinkLabel>;
 
 export type LinkLabelName = keyof typeof LINK_LABELS;
 export const LINK_LABEL_NAMES = Object.keys(LINK_LABELS) as LinkLabelName[];
 
-/** The label that puts a page in a topic: a paper's makes it a member of the topic (`page_members.via`). */
-export const TOPIC_LABEL = 'in-topic' satisfies LinkLabelName;
+/** The label that puts a page in a category: a paper's makes it a member of the category (`page_members.via`). */
+export const CATEGORY_LABEL = 'in-category' satisfies LinkLabelName;
 
 const anchor = z.string().trim().min(1).max(MAX_ANCHOR);
 
@@ -121,7 +121,7 @@ export const labeledLinkSchema = z
       .meta({ description: 'The link\'s id, unique in its file: a ULID such as "01JC8Z4X6Q0N4C3T6G1W6R2B7M".' }),
     to: z.string().max(300).meta({
       description:
-        'The target, by public identifier: arxiv:1706.03762, doi:10.…, openreview:…, venue:iclr/2027, topic:linear-attention, org:eth, user:alice.',
+        'The target, by public identifier: arxiv:1706.03762, doi:10.…, openreview:…, venue:iclr/2027, category:linear-attention, org:eth, user:alice.',
     }),
     label: z.enum(LINK_LABEL_NAMES).meta({ description: 'What the link says (DESIGN.md §8).' }),
     note: z.string().trim().min(1).max(MAX_NOTE).optional().meta({

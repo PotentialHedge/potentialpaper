@@ -34,7 +34,7 @@ import { htmlProblem } from './html';
  * kind file, and `extensions/`. The rest above is a paper's own. Other kinds today:
  *
  *   .potentialpaper/metadata.json   the system's: the layout's version, the kind and the key
- *   venue.json, topic.json, org.json or profile.json   the kind file (`lib/kinds.ts`)
+ *   venue.json, category.json, org.json or profile.json   the kind file (`lib/kinds.ts`)
  *   owners/                         the owners' sections, where the kind has owners; community/ on all but a user's
  *   <part>/links.jsonl              that part's labeled links
  *
@@ -357,7 +357,7 @@ function kindFileRule(kind: Exclude<PageKind, 'paper'>): PathRule {
     covers: (path) => path === kindFile,
     layout: fine,
     denied: (roles, path) => {
-      if (kind === 'topic') return may.verified(roles);
+      if (kind === 'category') return may.verified(roles);
       if (roles.system) return METADATA_ONLY;
       return roles.owner || roles.admin || may.granted(roles, path)
         ? null
@@ -546,7 +546,7 @@ export function grantCovers(pattern: string, path: string): boolean {
 /**
  * Why a bot can't be granted this pattern on pages of this kind, or `null`. On papers, a source's folder of imported
  * reviews, `reviews/<source>/**`; on venues and orgs, the kind file (the `venues` and `orgs` bots of
- * `handoffs/pages.md`); no bot writes topic or user pages. Extensions' folders come with them (DESIGN.md §10).
+ * `handoffs/pages.md`); no bot writes category or user pages. Extensions' folders come with them (DESIGN.md §10).
  */
 export function grantProblem(pattern: string, kind: PageKind = 'paper'): string | null {
   if (kind === 'venue' || kind === 'org') {

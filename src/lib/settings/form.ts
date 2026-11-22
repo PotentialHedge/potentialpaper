@@ -94,7 +94,7 @@ const KIND_CATEGORY: Record<PanelKind, string> = Object.fromEntries(
 const KIND_DESCRIPTION: Record<PanelKind, string> = {
   paper: "Which parts of a paper's page you see, and in what order.",
   venue: "Which parts of a venue's page you see, and in what order.",
-  topic: "Which parts of a topic's page you see, and in what order.",
+  category: "Which parts of a category's page you see, and in what order.",
   org: "Which parts of an organisation's page you see, and in what order.",
   user: "Which parts of a person's page you see, and in what order.",
 };

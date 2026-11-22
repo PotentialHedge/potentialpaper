@@ -9,7 +9,7 @@ import { setupPrompt } from '@/lib/agent-prompt';
 
 /**
  * How to edit a page of any kind: in the web editor (`/code/…`), with git, by having the reader's AI agent set git
- * up (a prompt pointing at `/agent/setup`, the one setup checklist), or a kind's own form (a topic's). Every page is
+ * up (a prompt pointing at `/agent/setup`, the one setup checklist), or a kind's own form (a category's). Every page is
  * a git repository, so all of them edit the same files, held to the same rules. Opens from the "edit" button under the title, and from any link to
  * `#edit` (and the old `#edit-…` links) on the page.
  *
@@ -25,7 +25,7 @@ export interface EditOptions {
   clone: { https: string; ssh: string | null };
   /** The page has a repository yet: it starts with its first edit, so until then only the web editor works. */
   hasRepo: boolean;
-  /** A form of the kind's own for the common edits, offered first (a topic's names and article). */
+  /** A form of the kind's own for the common edits, offered first (a category's names and article). */
   form?: { href: string; label: string };
 }
 

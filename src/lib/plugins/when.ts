@@ -7,7 +7,7 @@ import { KINDS, PAGE_KINDS, type PageKind } from '../kinds';
  *
  *     page.hasScores
  *     page.kind == venue && !signedIn
- *     (page.hasSubmissions || viewer.isOwner) && page.kind != topic
+ *     (page.hasSubmissions || viewer.isOwner) && page.kind != category
  *
  * Keys are the context keys a kind offers (`KindInfo.contextKeys` in `lib/kinds.ts`). A key a page's kind doesn't
  * offer reads as unset, so false. Values after `==` and `!=` are bare words or quoted strings. Pure.

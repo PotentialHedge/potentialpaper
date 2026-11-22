@@ -49,7 +49,7 @@ export const API_ERROR_CODES = [
   // Pages above the paper (`handoffs/pages.md` Phase 5).
   'page_merged',
   'page_protected',
-  'topic_exists',
+  'category_exists',
 ] as const;
 
 export type ApiErrorCode = (typeof API_ERROR_CODES)[number];

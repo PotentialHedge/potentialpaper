@@ -3,7 +3,7 @@ import * as S from './schemas';
 
 /**
  * `/openapi.json`: an OpenAPI 3.1 description of the public page routes (`GET /api/v1/pages/{identifier}/…`, and the
- * topic and change lists, `/topics` and `/changes`), which
+ * category and change lists, `/categories` and `/changes`), which
  * plugins (through the SDK) and outside backends (`handoffs/plugins.md`, data for plugins A, B and D) read alike. The
  * response bodies are made from the same zod schemas the routes check their answers against, so the two can't drift.
  * Also `/.well-known/jwks.json`, for plugins' backends (data for plugins D). The rest of the API is described in `/llms.txt` and the agent instructions; it can join here route by route.
@@ -16,7 +16,7 @@ const identifier = {
   in: 'path',
   required: true,
   description:
-    "A page's identifier, URL-encoded as one path segment: `venue%3Aiclr%2F2027`, `topic%3Alinear-attention`, `arxiv%3A1706.03762`.",
+    "A page's identifier, URL-encoded as one path segment: `venue%3Aiclr%2F2027`, `category%3Alinear-attention`, `arxiv%3A1706.03762`.",
   schema: { type: 'string' },
 };
 
@@ -139,7 +139,7 @@ export function openApiDocument(origin: string) {
       ),
       '/pages/{identifier}/members': get(
         "A scope's papers",
-        `A venue's, topic's or organisation's papers, paged; a venue's and an organisation's rolled up from the pages under them (editions, departments and labs). ${CACHED}`,
+        `A venue's, category's or organisation's papers, paged; a venue's and an organisation's rolled up from the pages under them (editions, departments and labs). ${CACHED}`,
         S.PageMembers,
         [
           identifier,
@@ -174,20 +174,20 @@ export function openApiDocument(origin: string) {
         `The organisation above it, its departments and labs with their papers, the members who show it as their institution (by handle), and the venues its papers are at, by count. ${CACHED}`,
         S.OrgOverview,
       ),
-      '/pages/{identifier}/topic': get(
-        "A topic's pages",
-        `As a Wikipedia category lists them: its subtopics (topics in it) and its other pages, each by name, from their \`in-topic\` links; the topics merged into it; and its protection. Members are direct: nothing rolls up from subtopics. ${CACHED}`,
-        S.TopicOverview,
+      '/pages/{identifier}/category': get(
+        "A category's pages",
+        `As a Wikipedia category lists them: its subcategories (categories in it) and its other pages, each by name, from their \`in-category\` links; the categories merged into it; and its protection. Members are direct: nothing rolls up from subcategories. ${CACHED}`,
+        S.CategoryOverview,
       ),
       '/pages/{identifier}/protection': get(
         "A page's protection",
         `Whether only established accounts (\`established\`) or only admins (\`admins\`) may edit what the community writes on it; \`null\` when it isn't protected. ${CACHED}`,
         S.Protection,
       ),
-      '/topics': get(
-        'Topics by name',
-        `Topics whose name is like \`q\`, the same name (\`exact\`) first. ${CACHED}`,
-        S.TopicMatches,
+      '/categories': get(
+        'Categories by name',
+        `Categories whose name is like \`q\`, the same name (\`exact\`) first. ${CACHED}`,
+        S.CategoryMatches,
         [query('q', 'A name.', { type: 'string' })],
       ),
       '/changes': get(
@@ -197,7 +197,7 @@ export function openApiDocument(origin: string) {
         [
           query('kind', 'Only pages of this kind.', {
             type: 'string',
-            enum: ['paper', 'venue', 'topic', 'org', 'user'],
+            enum: ['paper', 'venue', 'category', 'org', 'user'],
           }),
           query('bots', "Bots' commits too.", { type: 'string', enum: ['true', 'false'], default: 'false' }),
           query('before', 'Older than this change (`next` of the previous page).', { type: 'integer' }),
@@ -251,7 +251,7 @@ export function openApiDocument(origin: string) {
           },
           query(
             'marks',
-            "`true` adds `marks`: the scope's own submissions in this field, each with its paper and mean, ascending (`null` above 1,000). For a topic or an org, draw the whole venue from `venue.page`'s statistics and mark these on it.",
+            "`true` adds `marks`: the scope's own submissions in this field, each with its paper and mean, ascending (`null` above 1,000). For a category or an org, draw the whole venue from `venue.page`'s statistics and mark these on it.",
             { type: 'string', enum: ['true', 'false'], default: 'false' },
           ),
         ],

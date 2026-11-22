@@ -389,7 +389,7 @@ export interface SignalColumns {
 /**
  * Some of a set's signals for every paper on this site that has one, by column: the map's whole input in one read.
  * A vector's column is flat (`dims` numbers a paper). A label's values are indexes into `keys`, with each key's title.
- * `scope` keeps only a venue's, topic's or org's papers (with its roll-up).
+ * `scope` keeps only a venue's, category's or org's papers (with its roll-up).
  */
 export async function signalColumns(
   setId: string,

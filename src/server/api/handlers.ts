@@ -95,15 +95,15 @@ import { rolesOf } from '../pages/check';
 import { presentChanges, recentChanges } from '../changes';
 import { protectionOf, setProtection } from '../page-protection';
 import {
-  createTopic,
-  editTopic,
-  linkPageToTopic,
-  mergeTopic,
-  presentTopicOverview,
-  renameTopic,
-  similarTopics,
-  topicOverview,
-} from '../topic-pages';
+  createCategory,
+  editCategory,
+  linkPageToCategory,
+  mergeCategory,
+  presentCategoryOverview,
+  renameCategory,
+  similarCategories,
+  categoryOverview,
+} from '../category-pages';
 import { countTransition, countView, MIN_SHOWN_VIEWS, transitionCounts } from '../view-counter';
 import { countInstitution, countTime, pageAnalytics } from '../page-analytics';
 import { ApiError } from './errors';
@@ -1233,7 +1233,7 @@ async function orgPage(params: Record<string, string | string[]>) {
   return page;
 }
 
-/** An org's parent, departments and labs, the members who show their institution, and its venues and topics by count. Public. */
+/** An org's parent, departments and labs, the members who show their institution, and its venues and categories by count. Public. */
 export const getOrgOverview = route(async (_req, params) => {
   const page = await orgPage(params);
   return respond(S.OrgOverview, presentOrgOverview(await orgOverview(page), siteUrl()), { headers: PUBLIC_MINUTE });
@@ -1367,83 +1367,86 @@ export const getPagePapers = route(async (req, params) => {
   return new Response(body, { status: 200, headers: { ...headers, 'Content-Type': 'application/x-ndjson' } });
 });
 
-// Topic pages (`handoffs/pages.md` Phase 5, `server/topic-pages.ts`), page protection and the patrol feed.
+// Category pages (`handoffs/pages.md` Phase 5, `server/category-pages.ts`), page protection and the patrol feed.
 
-async function topicPage(params: Record<string, string | string[]>) {
+async function categoryPage(params: Record<string, string | string[]>) {
   const page = await mustFindPage(identifierParam(params));
-  if (page.kind !== 'topic') throw new ApiError(422, 'validation_error', 'only a topic page has this');
+  if (page.kind !== 'category') throw new ApiError(422, 'validation_error', 'only a category page has this');
   return page;
 }
 
-/** Topics whose name is like `q`, the same name first: what the forms check before making one. Public. */
-export const getTopics = route(async (req) => {
-  const { q } = parseQuery(req, S.TopicSearchQuery);
+/** Categories whose name is like `q`, the same name first: what the forms check before making one. Public. */
+export const getCategories = route(async (req) => {
+  const { q } = parseQuery(req, S.CategorySearchQuery);
   const origin = siteUrl();
-  const topics = (await similarTopics(q)).map((t) => ({ ...t, url: `${origin}${keyedPagePath('topic', t.key)}` }));
-  return respond(S.TopicMatches, { topics }, { headers: PUBLIC_MINUTE });
+  const categories = (await similarCategories(q)).map((t) => ({
+    ...t,
+    url: `${origin}${keyedPagePath('category', t.key)}`,
+  }));
+  return respond(S.CategoryMatches, { categories }, { headers: PUBLIC_MINUTE });
 });
 
-/** Makes a topic. Anyone verified may; a name another topic has is refused (`topic_exists`). */
-export const postTopic = route(async (req) => {
+/** Makes a category. Anyone verified may; a name another category has is refused (`category_exists`). */
+export const postCategory = route(async (req) => {
   const principal = await requireVerified(req);
-  const body = await parseBody(req, S.NewTopicBody);
-  const page = await createTopic(body, actorOf(principal));
-  return respond(S.PageResponse, await resolvePage(formatIdentifier({ kind: 'topic', key: page.key })), {
+  const body = await parseBody(req, S.NewCategoryBody);
+  const page = await createCategory(body, actorOf(principal));
+  return respond(S.PageResponse, await resolvePage(formatIdentifier({ kind: 'category', key: page.key })), {
     status: 201,
     principal,
   });
 });
 
-/** Puts a page of any kind in a topic (an `in-topic` link from it), making the topic if it is named and doesn't exist. */
-export const postPageTopic = route(async (req, params) => {
+/** Puts a page of any kind in a category (an `in-category` link from it), making the category if it is named and doesn't exist. */
+export const postPageCategory = route(async (req, params) => {
   const principal = await requireVerified(req);
   const page = await mustFindPage(identifierParam(params));
-  const body = await parseBody(req, S.PageTopicBody);
-  const result = await linkPageToTopic(page, body, actorOf(principal));
-  const summary = (await pageSummaries([result.topic.id])).get(result.topic.id)!;
+  const body = await parseBody(req, S.PageCategoryBody);
+  const result = await linkPageToCategory(page, body, actorOf(principal));
+  const summary = (await pageSummaries([result.category.id])).get(result.category.id)!;
   return respond(
-    S.PageTopicResult,
-    { topic: summary, created: result.created, status: result.status },
+    S.PageCategoryResult,
+    { category: summary, created: result.created, status: result.status },
     { status: result.status === 'linked' ? 201 : 200, principal },
   );
 });
 
-/** A topic's subtopics and other pages, by name, its merges and its protection. Public. */
-export const getTopicOverview = route(async (_req, params) => {
-  const page = await topicPage(params);
-  return respond(S.TopicOverview, presentTopicOverview(await topicOverview(page), siteUrl()), {
+/** A category's subcategories and other pages, by name, its merges and its protection. Public. */
+export const getCategoryOverview = route(async (_req, params) => {
+  const page = await categoryPage(params);
+  return respond(S.CategoryOverview, presentCategoryOverview(await categoryOverview(page), siteUrl()), {
     headers: PUBLIC_MINUTE,
   });
 });
 
-/** Edits a topic: its name and article, in one commit. */
-export const patchTopic = route(async (req, params) => {
+/** Edits a category: its name and article, in one commit. */
+export const patchCategory = route(async (req, params) => {
   const principal = await requireVerified(req);
-  const page = await topicPage(params);
-  const body = await parseBody(req, S.TopicEditBody);
-  const result = await editTopic(page, body, actorOf(principal));
-  return respond(S.TopicEdited, { head: result.oid, changed: result.status === 'committed' }, { principal });
+  const page = await categoryPage(params);
+  const body = await parseBody(req, S.CategoryEditBody);
+  const result = await editCategory(page, body, actorOf(principal));
+  return respond(S.CategoryEdited, { head: result.oid, changed: result.status === 'committed' }, { principal });
 });
 
-/** Gives a topic a new address (and name), leaving a redirect from the old. */
+/** Gives a category a new address (and name), leaving a redirect from the old. */
 export const postRename = route(async (req, params) => {
   const principal = await requireVerified(req);
-  const page = await topicPage(params);
+  const page = await categoryPage(params);
   const body = await parseBody(req, S.RenameBody);
-  const moved = await renameTopic(page, body, actorOf(principal));
-  return respond(S.PageResponse, await resolvePage(formatIdentifier({ kind: 'topic', key: moved.key })), {
+  const moved = await renameCategory(page, body, actorOf(principal));
+  return respond(S.PageResponse, await resolvePage(formatIdentifier({ kind: 'category', key: moved.key })), {
     principal,
   });
 });
 
-/** Merges this topic into another, leaving a redirect. */
+/** Merges this category into another, leaving a redirect. */
 export const postMerge = route(async (req, params) => {
   const principal = await requireVerified(req);
-  const page = await topicPage(params);
+  const page = await categoryPage(params);
   const { into, summary } = await parseBody(req, S.MergeBody);
-  const survivor = await mustFindPage(into.includes(':') ? into : `topic:${into}`);
-  await mergeTopic(page, survivor, actorOf(principal), { summary });
-  return respond(S.PageResponse, await resolvePage(formatIdentifier({ kind: 'topic', key: survivor.key })), {
+  const survivor = await mustFindPage(into.includes(':') ? into : `category:${into}`);
+  await mergeCategory(page, survivor, actorOf(principal), { summary });
+  return respond(S.PageResponse, await resolvePage(formatIdentifier({ kind: 'category', key: survivor.key })), {
     principal,
   });
 });

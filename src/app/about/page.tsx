@@ -26,7 +26,7 @@ export default function AboutPage() {
         </p>
         <p>
           Papers are joined by labeled links, such as &ldquo;extends&rdquo; or &ldquo;fails to replicate&rdquo;, each a
-          public claim with an author and a history. Venues, topics, organisations and people have pages too.
+          public claim with an author and a history. Venues, categories, organisations and people have pages too.
         </p>
       </div>
 

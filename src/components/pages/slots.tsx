@@ -4,15 +4,15 @@ import { type KeyedKind, pagePath } from '@/lib/kinds';
 import type { OrgOverview } from '@/server/org-pages';
 import type { ScopePaper } from '@/server/page-members';
 import type { UserPageView } from '@/server/user-pages';
-import { Backlinks, Links, type PageCommon, Sections, Topics } from './common';
+import { Backlinks, Links, type PageCommon, Sections, Categories } from './common';
 import { OrgAbout, OrgDepartments, OrgPeople, OrgVenues } from './org-panels';
-import { TopicAbout, TopicMembers, type TopicView } from './topic-panels';
+import { CategoryAbout, CategoryMembers, type CategoryView } from './category-panels';
 import { UserActivity, UserComments, UserIdentity, UserPapers } from './user-panels';
 import { VenueAbout, VenueEditions, VenuePapers, VenueScores } from './venue-panels';
 
 /**
  * The panels of the kinds of page other than a paper (`lib/kinds.ts`), by id in `lib/panels.ts`: every kind's
- * (`common.tsx`) and each kind's own (`venue-panels.tsx`, `org-panels.tsx`, `topic-panels.tsx`, `user-panels.tsx`),
+ * (`common.tsx`) and each kind's own (`venue-panels.tsx`, `org-panels.tsx`, `category-panels.tsx`, `user-panels.tsx`),
  * laid out by the page every kind shares (`PageView.tsx`). A paper's are `components/paper/slots.tsx`.
  */
 
@@ -26,10 +26,10 @@ export interface KindPanelProps extends PageCommon {
   papers: { count: number; list: ScopePaper[] } | null;
   /** A person's page: what its account shows (`server/user-pages.ts`); `null` on other kinds. */
   user: UserPageView | null;
-  /** An org's page: where it sits, its people, venues and topics (`server/org-pages.ts`); `null` on other kinds. */
+  /** An org's page: where it sits, its people, venues and categories (`server/org-pages.ts`); `null` on other kinds. */
   org: OrgOverview | null;
-  /** A topic's page: its subtopics and other pages (`server/topic-pages.ts`); `null` on other kinds. */
-  topic: TopicView | null;
+  /** A category's page: its subcategories and other pages (`server/category-pages.ts`); `null` on other kinds. */
+  category: CategoryView | null;
 }
 
 /** A scope's papers (`page_members`), rolled up: its departments' and labs'. */
@@ -58,15 +58,15 @@ const COMMON: Record<string, ComponentType<KindPanelProps>> = {
   sections: Sections,
   links: Links,
   backlinks: Backlinks,
-  topics: Topics,
+  categories: Categories,
 };
 
 /** Each kind's panels by id: every kind's, and its own. */
 export const KIND_PANELS: Record<KeyedKind, Record<string, ComponentType<KindPanelProps>>> = {
   // Its editions, its review scores, its submissions by status.
   venue: { ...COMMON, about: VenueAbout, editions: VenueEditions, scores: VenueScores, papers: VenuePapers },
-  // Its article, then what is in it: its subtopics and its other pages, as a Wikipedia category lists them.
-  topic: { ...COMMON, about: TopicAbout, members: TopicMembers },
+  // Its article, then what is in it: its subcategories and its other pages, as a Wikipedia category lists them.
+  category: { ...COMMON, about: CategoryAbout, members: CategoryMembers },
   // Where it sits, its departments and labs, the people who show it as their institution, its venues, and
   // its papers, rolled up from its departments.
   org: {

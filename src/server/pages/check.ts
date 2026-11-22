@@ -211,7 +211,7 @@ export async function takeCommit(actor: Actor, rateLimit: RateLimitConfig = COMM
 
 /**
  * The page is there and not merged into another, whose page is the one to edit: a paper (`papers.merged_into`) or a
- * topic (`pages.merged_into`, `topic-pages.ts`).
+ * category (`pages.merged_into`, `category-pages.ts`).
  */
 export async function checkPaper(db: Reader, pageId: string, migration = false): Promise<void> {
   const page = await mustPage(db, pageId);

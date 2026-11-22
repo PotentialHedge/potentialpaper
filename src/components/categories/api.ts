@@ -1,5 +1,5 @@
 /**
- * The topic forms' calls to `/api/v1` (`handoffs/pages.md` Phase 5): what went wrong, in words a reader can act on.
+ * The category forms' calls to `/api/v1` (`handoffs/pages.md` Phase 5): what went wrong, in words a reader can act on.
  * Browser only.
  */
 
@@ -27,17 +27,17 @@ export async function send(method: string, path: string, body: unknown): Promise
   });
 }
 
-/** A topic a form offers as one types (`GET /api/v1/topics?q=`). */
-export interface TopicMatch {
+/** A category a form offers as one types (`GET /api/v1/categories?q=`). */
+export interface CategoryMatch {
   identifier: string;
   key: string;
   name: string;
   exact: boolean;
 }
 
-export async function findTopics(q: string, signal?: AbortSignal): Promise<TopicMatch[]> {
+export async function findCategories(q: string, signal?: AbortSignal): Promise<CategoryMatch[]> {
   if (q.trim().length < 2) return [];
-  const res = await fetch(`/api/v1/topics?q=${encodeURIComponent(q.trim())}`, { signal });
+  const res = await fetch(`/api/v1/categories?q=${encodeURIComponent(q.trim())}`, { signal });
   if (!res.ok) return [];
-  return ((await res.json()) as { topics: TopicMatch[] }).topics;
+  return ((await res.json()) as { categories: CategoryMatch[] }).categories;
 }

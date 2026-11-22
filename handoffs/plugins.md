@@ -8,7 +8,7 @@ rebuttal (a `reviews.history` RPC), and the open question of `plugins.default`.
 ## Goal
 
 Make the site as extensible as we can safely make it. Anyone with a public GitHub repo can add panels to any page:
-a paper, a venue, a topic, an organisation or a person (`handoffs/pages.md`). Readers find those plugins and install
+a paper, a venue, a category, an organisation or a person (`handoffs/pages.md`). Readers find those plugins and install
 them, and each reader's site and plugin preferences live in one
 `settings.json`, as in VS Code and Presio. The first plugin outside this repo is **score standing**, the acceptodds
 "where you stand" figure for review scores. It shows the histogram and the continuous curve, and it lives at
@@ -49,7 +49,7 @@ Prior art to read before starting: Presio's plugin system (`gh api repos/Potenti
   an approval prompt instead of running. New permissions in an update need consent again.
 - **Data for plugins comes three ways (A, B and D). Plugins never write state that other users share.**
   - **A: aggregates the site computes.** A `scope_stats` outbox consumer keeps per-score-field statistics for each
-    **scope**: any page above the paper (a venue, a topic, an org), over its members in `page_members`
+    **scope**: any page above the paper (a venue, a category, an org), over its members in `page_members`
     (`handoffs/pages.md`). It is rebuildable like every consumer (DESIGN.md §4.9) and served by the REST API and by
     the RPC.
   - **B: generic bulk reads.** A scope's papers with their submissions, score vectors and decisions, with an ETag,
@@ -89,7 +89,7 @@ Prior art to read before starting: Presio's plugin system (`gh api repos/Potenti
 
 - **Manifest** (`lib/plugins/manifest.ts`, zod, JSON Schema at `/schemas/plugin-manifest.json`): `id`, `name`,
   `version`, `apiVersion`, `main` (an HTML file), `permissions`, `network` (origins, https only), and `contributes`:
-  `panels` (`{ id, title, kinds, slot, when? }`, where `kinds` names the page kinds (`paper`, `venue`, `topic`, `org`,
+  `panels` (`{ id, title, kinds, slot, when? }`, where `kinds` names the page kinds (`paper`, `venue`, `category`, `org`,
   `user`) and `slot` is `main`, `aside` or `tab`, resolved against the kind's slots), `pages` (whole pages of the
   plugin's own, at `/x/<plugin>/…`), `settings`, and `commands`. Unknown fields are warnings, not errors, so a newer
   manifest still loads on an older host. The validator reports every problem in one pass.
@@ -115,15 +115,15 @@ Prior art to read before starting: Presio's plugin system (`gh api repos/Potenti
   - Theme tokens are sent on load and on change, so plugins can match light and dark.
   - Frames load lazily when scrolled into view.
 - **RPC protocol** (`lib/plugins/protocol.ts`), versioned. It starts with:
-  - `context.get`: the page (`kind`, identifier, address), its **scopes** (for a paper: its venues, topics and orgs;
-    for a topic: its broader topics; for an org: its parents), viewer signed in or not, theme.
+  - `context.get`: the page (`kind`, identifier, address), its **scopes** (for a paper: its venues, categories and orgs;
+    for a category: the categories it is in; for an org: its parents), viewer signed in or not, theme.
   - `settings.get`, `settings.set` (own keys only), and a `settings.change` event.
   - `storage.get` and `storage.set`: per user and per plugin, 64 KB, in Postgres, for small state that should follow
     the account.
   - `page.read` (permission `page.read`): the current page's kind file, sections and links, for any kind. For a
     `user` page, this is only what the §5.3 rules let the public see.
-  - `page.members` (permission `scope.read`): a venue's, topic's or org's papers, paged, with roll-up from children.
-  - `page.resolve`: any identifier (`venue:iclr/2027`, `topic:…`) to a page's summary, so a plugin can follow links.
+  - `page.members` (permission `scope.read`): a venue's, category's or org's papers, paged, with roll-up from children.
+  - `page.resolve`: any identifier (`venue:iclr/2027`, `category:…`) to a page's summary, so a plugin can follow links.
   - `reviews.forPaper` (permission `reviews.read`): a paper's submissions, notes and venue forms, from
     `submissions.ts`.
   - `ui.setHeight` and `ui.openUrl`.
@@ -158,7 +158,7 @@ Prior art to read before starting: Presio's plugin system (`gh api repos/Potenti
   `page_members` rather than repos, so it runs after the reviews projection and the membership consumer. Either chain
   it off them, or have it read events and recompute the affected scopes. Pick whichever is simpler and idempotent.
   - Per `(scope, venue, field)`, for every field the venue's forms mark `score`, it keeps the items below. The
-    venue stays in the key even for topics and orgs, since a 6 at ICLR and a 6 at NeurIPS are different scales.
+    venue stays in the key even for categories and orgs, since a 6 at ICLR and a 6 at NeurIPS are different scales.
     A scope that is a venue has a single venue.
     - every submission's mean over its reviews, sorted (reuse the means in `lib/submissions.ts`);
     - the count;
@@ -201,7 +201,7 @@ TypeScript, with `dist/` committed (we never build) and CI that fails if `dist/`
 
 - Manifest:
   - Permissions: `reviews.read`, `scope.read`.
-  - One panel for `kinds: [paper, venue, org]` (not topics), `slot: aside` on papers and `main` elsewhere,
+  - One panel for `kinds: [paper, venue, org]` (not categories), `slot: aside` on papers and `main` elsewhere,
     `when: page.hasScores`.
   - Settings:
     - `view`: `both` (default), `histogram` or `curve`.
@@ -560,7 +560,7 @@ Built:
     `page_ancestors`, so a series has its editions' venues, each apart.
   - **Which submissions count:** every submission of the scope's member papers. A paper that is a member through a
     submission (a venue's) counts only its submissions to the venues the scope answers to, so NeurIPS doesn't show
-    up on ICLR's page. A topic or org gets every venue its papers went to.
+    up on ICLR's page. A category or org gets every venue its papers went to.
   - **When it runs:** the `reviews` and `members` consumers mark the affected scopes and every scope above them,
     inside the transaction that changes their rows (`markPaperScopes`/`markScopes`). A paper's scopes are marked
     before and after, so a scope it leaves is recomputed too. Marking writes `scope_state`: `changed_at`, plus a
@@ -725,7 +725,7 @@ Built:
   (`PLUGIN_NETWORK_TESTS=1`; skipped otherwise): newest release, consent for its two permissions, its settings'
   defaults and a bad value refused, `dist/index.html` and its assets served from its own origin with the SDK allowed
   by the CSP and its sources not served, where its panel shows (paper `aside`, edition and series `main`, not on a
-  topic, not on an org without members), and the data it reads (the venue page's list names the venue the paper's
+  category, not on an org without members), and the data it reads (the venue page's list names the venue the paper's
   submission names, rating first; the field's sorted means and split). DESIGN.md §10 ("The model") and
   IMPLEMENTATION.md Milestone 8 note it.
 
@@ -888,7 +888,7 @@ Built:
   - **From a venue id to its page:** every `ScoreSummary.venue` (the list and the field) carries `page`, the venue's
     own page summary, or `null` (`venuePagesOf`). That is the venue page whose `page_scope_names` hold the venue id
     (its `venue.json` `sources`), not merged, the deepest first. Its statistics of the venue are the whole venue's,
-    where a topic's or an org's are only its own papers'.
+    where a category's or an org's are only its own papers'.
   - **Named means:** `GET /api/v1/pages/{identifier}/scores/{venue}/{field}?marks=true` adds `marks`, the scope's own
     submissions in that field, ascending by mean: `{ identifier, address, title, mean, outcome }`
     (`scopeScoreMarks`). The submissions and means are the statistics' own (the same `scopeSubmissionsSql` and score
@@ -946,8 +946,8 @@ For later phases:
 
 - Phase 6's "Later": before/after rebuttal needs `reviews.history` in the host.
 - `plugins.default` is still open; score standing is a candidate.
-- Topics: score standing doesn't declare them, but `venue.page` and `marks` work on a topic too, so a topic view
-  is a manifest line and `orgTabs` under another name, plus `page.hasScores` in `KINDS.topic.contextKeys` (pages
+- Categories: score standing doesn't declare them, but `venue.page` and `marks` work on a category too, so a category view
+  is a manifest line and `orgTabs` under another name, plus `page.hasScores` in `KINDS.category.contextKeys` (pages
   Phase 5's note).
 
 Checks: typecheck, lint, prettier (`config/institution-ror.json` was unformatted before this phase) and `next build`

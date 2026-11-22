@@ -18,7 +18,7 @@ import { mergePapers } from '@/server/merge-papers';
 import { ApiError } from '@/server/api/errors';
 import type { Actor } from '@/server/pages/check';
 import { findPage } from '@/server/pages/kinds';
-import { createTopic, linkPageToTopic } from '@/server/topic-pages';
+import { createCategory, linkPageToCategory } from '@/server/category-pages';
 import { syncVenuePages } from '@/server/venue-pages';
 import { FIXTURE_PATH, type Fixture } from './fixture';
 
@@ -28,7 +28,7 @@ const forumUrl = (forum: string) => `https://openreview.net/forum?id=${forum}`;
  * `npm run db:seed`: wipes the database in DATABASE_URL, migrates it, and fills it with a small dev data set through
  * the app's own import and commit paths, so every projection (search, submissions, venue pages, stats) is as the
  * worker would leave it. Papers come from fixture.json (built by `potentialpaper-tools`' `seed:*` commands); people, comments and
- * topics are below: extend them here.
+ * categories are below: extend them here.
  */
 
 /** Every seeded person signs in with this password. */
@@ -41,8 +41,8 @@ const PEOPLE = [
   { email: 'alan@mit.edu', handle: 'alan', realName: 'Alan Turing' },
 ];
 
-/** Topics, each with the keywords that put a fixture paper in it. */
-const TOPICS = [
+/** Categories, each with the keywords that put a fixture paper in it. */
+const CATEGORIES = [
   {
     name: 'Large language models',
     slug: 'llms',
@@ -193,14 +193,14 @@ async function merges(fixture: Fixture, actor: Actor) {
   }
 }
 
-async function topics(fixture: Fixture, actor: Actor) {
+async function categories(fixture: Fixture, actor: Actor) {
   const all = fixture.venues.flatMap((v) => v.papers);
-  for (const topic of TOPICS) {
-    await createTopic({ name: topic.name, slug: topic.slug, summary: topic.summary }, actor);
-    const members = all.filter((p) => p.keywords.some((k) => topic.match.test(k))).slice(0, 6);
+  for (const category of CATEGORIES) {
+    await createCategory({ name: category.name, slug: category.slug, summary: category.summary }, actor);
+    const members = all.filter((p) => p.keywords.some((k) => category.match.test(k))).slice(0, 6);
     for (const p of members) {
       const page = await findPage(`openreview:${p.id}`);
-      if (page) await unhurried(() => linkPageToTopic(page, { topic: `topic:${topic.slug}` }, actor));
+      if (page) await unhurried(() => linkPageToCategory(page, { category: `category:${category.slug}` }, actor));
     }
   }
 }
@@ -252,7 +252,7 @@ async function main() {
   await syncVenuePages();
   const dev = people.get('dev')!;
   await merges(fixture, { kind: 'account', accountId: dev.id, isAdmin: true });
-  await topics(fixture, { kind: 'account', accountId: dev.id, isAdmin: false });
+  await categories(fixture, { kind: 'account', accountId: dev.id, isAdmin: false });
   await comments(fixture, people);
   await project();
 

@@ -3,16 +3,16 @@
 import { useRouter } from 'next/navigation';
 import { type FormEvent, useState } from 'react';
 import { ui } from '@/components/ui';
-import { topicSlug } from '@/lib/topics';
+import { categorySlug } from '@/lib/categories';
 import { failureOf, send } from './api';
-import { useTopicMatches } from './useTopicMatches';
+import { useCategoryMatches } from './useCategoryMatches';
 
 /**
- * The "New topic" form (`handoffs/pages.md` Phase 5): a name, its address and the article's first words. The
- * topics it is in are added afterwards from the bar at the foot of its page, as any page's are. As the name is typed it lists topics that are there already, the same name first, so a
- * duplicate isn't made by accident; the server refuses one anyway (`topic_exists`).
+ * The "New category" form (`handoffs/pages.md` Phase 5): a name, its address and the article's first words. The
+ * categories it is in are added afterwards from the bar at the foot of its page, as any page's are. As the name is typed it lists categories that are there already, the same name first, so a
+ * duplicate isn't made by accident; the server refuses one anyway (`category_exists`).
  */
-export function NewTopicForm({ initialName = '' }: { initialName?: string }) {
+export function NewCategoryForm({ initialName = '' }: { initialName?: string }) {
   const router = useRouter();
   const [name, setName] = useState(initialName);
   const [slug, setSlug] = useState('');
@@ -20,16 +20,16 @@ export function NewTopicForm({ initialName = '' }: { initialName?: string }) {
   const [summary, setSummary] = useState('');
   const [busy, setBusy] = useState(false);
   const [problem, setProblem] = useState<{ message: string; link?: string } | null>(null);
-  const matches = useTopicMatches(name);
+  const matches = useCategoryMatches(name);
   const exact = matches.filter((m) => m.exact);
-  const shownSlug = slugTouched ? slug : (topicSlug(name) ?? '');
+  const shownSlug = slugTouched ? slug : (categorySlug(name) ?? '');
 
   async function submit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
     setBusy(true);
     setProblem(null);
     try {
-      const res = await send('POST', '/topics', {
+      const res = await send('POST', '/categories', {
         name: name.trim(),
         slug: shownSlug,
         ...(summary.trim() ? { summary: summary.trim() } : {}),
@@ -39,10 +39,10 @@ export function NewTopicForm({ initialName = '' }: { initialName?: string }) {
         const identifier = failure.details?.identifier;
         return setProblem({
           message: failure.message,
-          link: typeof identifier === 'string' ? `/t/${identifier.slice('topic:'.length)}` : undefined,
+          link: typeof identifier === 'string' ? `/c/${identifier.slice('category:'.length)}` : undefined,
         });
       }
-      router.push(`/t/${shownSlug}`);
+      router.push(`/c/${shownSlug}`);
     } catch {
       setProblem({ message: 'Could not reach the server.' });
     } finally {
@@ -66,19 +66,19 @@ export function NewTopicForm({ initialName = '' }: { initialName?: string }) {
       {matches.length > 0 && (
         <div className="text-[13px]" aria-live="polite">
           <p className={exact.length > 0 ? 'text-down' : 'text-muted'}>
-            {exact.length > 0 ? 'That topic is there already:' : 'Topics with names like it:'}
+            {exact.length > 0 ? 'That category is there already:' : 'Categories with names like it:'}
           </p>
           <ul className="mt-1 space-y-0.5">
             {matches.map((m) => (
               <li key={m.key}>
-                <a href={`/t/${m.key}`}>{m.name}</a>
+                <a href={`/c/${m.key}`}>{m.name}</a>
               </li>
             ))}
           </ul>
         </div>
       )}
       <label className="block text-[13px] text-muted">
-        Address: /t/
+        Address: /c/
         <input
           value={shownSlug}
           onChange={(e) => {
@@ -101,7 +101,7 @@ export function NewTopicForm({ initialName = '' }: { initialName?: string }) {
         />
       </label>
       <button className={ui.btn({ inline: true })} disabled={busy || !name.trim() || !shownSlug || exact.length > 0}>
-        Make the topic
+        Make the category
       </button>
       {problem && (
         <p className={ui.note(false)}>

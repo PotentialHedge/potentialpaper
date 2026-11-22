@@ -11,7 +11,7 @@ import {
 } from '@/db/schema';
 import { formatIdentifier, KINDS, type PageAddress, parentsOf, sourcesOf } from '@/lib/kinds';
 import { canonicalPaperId } from '@/lib/paper-ids';
-import { TOPIC_LABEL } from '@/lib/labeled-links';
+import { CATEGORY_LABEL } from '@/lib/labeled-links';
 import { parseReviewFile, parseReviewPath } from '@/lib/review-files';
 import type { Consumer } from './consumers/types';
 import { readPageLinks } from './page-links';
@@ -21,7 +21,7 @@ import type { Writer } from './pages/projections';
 import { markPaperScopes, markScopes } from './scope-stats';
 
 /**
- * Membership of the pages above the paper (`handoffs/pages.md`): which papers a venue, topic or org has, kept by
+ * Membership of the pages above the paper (`handoffs/pages.md`): which papers a venue, category or org has, kept by
  * the `members` consumer in `page_members`, and the roll-up closure in `page_ancestors`. Every list, count and
  * statistic of a scope reads these.
  *
@@ -29,7 +29,7 @@ import { markPaperScopes, markScopes } from './scope-stats';
  *
  * - a **paper's** event writes what it says it belongs to, by public name (`page_member_sources`): each
  *   submission's venue, as `<source>:<venue id>` from `reviews/<source>/<submission>/submission.json`, and each
- *   topic it links to with `in-topic`, from its `links.jsonl`;
+ *   category it links to with `in-category`, from its `links.jsonl`;
  * - a **scope's** event writes the names it answers to (`page_scope_names`: its identifier and its kind file's
  *   `sources`) and its parents (`page_parents`).
  *
@@ -121,7 +121,7 @@ async function paperSources(db: Reader, page: PageRow, files: ReadonlyMap<string
     out.set(`submission ${source}`, { via: 'submission', source });
   }
   for (const { link } of await readPageLinks(db, page, files)) {
-    if (link.label !== TOPIC_LABEL) continue;
+    if (link.label !== CATEGORY_LABEL) continue;
     out.set(`${link.label} ${link.target}`, { via: link.label, source: link.target });
   }
   return [...out.values()];
@@ -160,7 +160,7 @@ const MAX_DEPTH = 16;
 
 /**
  * `page_ancestors` again, whole: the closure of `page_parents` over the pages they name. Scopes are few (venues,
- * orgs, topics: thousands), and a scope's parents change rarely, so this is cheap enough to do on each scope's
+ * orgs, categories: thousands), and a scope's parents change rarely, so this is cheap enough to do on each scope's
  * event; the seam, if it grows, is recomputing only the changed page's descendants.
  */
 async function closeAncestors(tx: Writer): Promise<void> {
@@ -208,7 +208,7 @@ export async function indexMembers(database: Database, pageId: string, head: str
   }
   if (!KINDS[page.kind].scope) return;
 
-  // A topic merged into another is no scope of its own: the survivor answers to its names (`topic-pages.ts`).
+  // A category merged into another is no scope of its own: the survivor answers to its names (`category-pages.ts`).
   if ((await survivorOf(database, page)).id !== page.id) {
     await database.transaction(async (tx) => {
       await markScopes(tx, sql`select ${pageId}::uuid`);
@@ -228,7 +228,7 @@ export async function indexMembers(database: Database, pageId: string, head: str
     // A kind file that doesn't parse names no sources and no parents.
   }
   const kind = page.kind;
-  // Its old keys too (a renamed topic's, those of topics merged into it), so links that name them still count.
+  // Its old keys too (a renamed category's, those of categories merged into it), so links that name them still count.
   const names = [
     ...[page.key, ...(await formerKeys(database, page))].map((key) => formatIdentifier({ kind, key })),
     ...sourcesOf(page.kind, kindFile),
@@ -309,7 +309,7 @@ export function rolledUp(scopeId: string) {
 
 export interface ScopeMember {
   paperId: string;
-  /** How it belongs, by each way it does: `submission`, `in-topic`, … */
+  /** How it belongs, by each way it does: `submission`, `in-category`, … */
   via: string[];
 }
 

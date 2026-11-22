@@ -6,7 +6,7 @@ import { pageSummaries } from './plugins/pages';
 
 /**
  * Unique viewers per day of a page of any kind, as acceptodds counts a listing's. A paper's page id is the paper's
- * id, so one counter covers papers, venues, topics, orgs and people.
+ * id, so one counter covers papers, venues, categories, orgs and people.
  *
  * A visitor is a signed-in account, or else a network: the client's IPv4 address, or its IPv6 /64
  * (`lib/ip-network.ts`), from `Cf-Connecting-Ip` via `clientIp()`, so it is the real client behind Cloudflare.

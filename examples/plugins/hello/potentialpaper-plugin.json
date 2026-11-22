@@ -12,7 +12,7 @@
       {
         "id": "hello",
         "title": "Hello",
-        "kinds": ["paper", "venue", "topic", "org", "user"],
+        "kinds": ["paper", "venue", "category", "org", "user"],
         "slot": { "paper": "aside", "*": "main" }
       }
     ],

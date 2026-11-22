@@ -1,16 +1,16 @@
-# Handoff: pages above the paper (venues, topics, organisations, people)
+# Handoff: pages above the paper (venues, categories, organisations, people)
 
 Status: plan, 2026-11-16; the kinds were unified on 2026-11-20 (see the Log). Every phase is built: 1 (the page model), 2 (venue pages), 3 (user pages), 4 (organisation
-pages) and 5 (topic pages); see the Log. Score standing's org view, which Phase 4 unblocked, is built too
+pages) and 5 (category pages); see the Log. Score standing's org view, which Phase 4 unblocked, is built too
 (`handoffs/plugins.md`, Phase 6's org view). What remains is "Later" and the open questions. Read with `handoffs/plugins.md`: plugins work on every kind of
 page this plan adds.
 
 ## Goal
 
-Today the site has one kind of page, the paper. Researchers also think in venues, research topics, institutions
+Today the site has one kind of page, the paper. Researchers also think in venues, research categories, institutions
 and labs, and people. Each of these becomes a page of its own, built the same way as a paper's: a git repo of small
 files with path rules, derived data from outbox consumers, named slots, and file types that bots write and plugins
-show. A plugin written once can then add a panel to a paper, a venue, a topic, an organisation or a person.
+show. A plugin written once can then add a panel to a paper, a venue, a category, an organisation or a person.
 
 ## Decisions (made with Benedict, 2026-11-16)
 
@@ -34,13 +34,13 @@ show. A plugin written once can then add a panel to a paper, a venue, a topic, a
 - **The kinds and their addresses.** Each kind's public identifier is also what a link's `to` holds (DESIGN.md §8),
   so a clone still means something on its own.
 
-| Kind  | Address                                                                       | Identifier         | Kind file                                                                        |
-| ----- | ----------------------------------------------------------------------------- | ------------------ | -------------------------------------------------------------------------------- |
-| paper | `/abs/…` as today                                                             | `arxiv:…`, `doi:…` | `.potentialpaper/metadata.json`                                                  |
-| venue | `/v/iclr` (series), `/v/iclr/2027` (edition), deeper for tracks and workshops | `venue:iclr/2027`  | `venue.json`: name, dates, URL, `sources` (`openreview:ICLR.cc/2027/Conference`) |
-| topic | `/t/<slug>`                                                                   | `topic:<slug>`     | `topic.json`: name; a topic is in topics through its own `in-topic` links        |
-| org   | `/o/<slug>`, `/o/<slug>/<child>` for departments and labs                     | `org:<slug>`       | `org.json`: name, `domains`, `parents`, ROR id                                   |
-| user  | `/u/<handle>`                                                                 | `user:<handle>`    | `profile.json`: what the person chose to show                                    |
+| Kind     | Address                                                                       | Identifier         | Kind file                                                                              |
+| -------- | ----------------------------------------------------------------------------- | ------------------ | -------------------------------------------------------------------------------------- |
+| paper    | `/abs/…` as today                                                             | `arxiv:…`, `doi:…` | `.potentialpaper/metadata.json`                                                        |
+| venue    | `/v/iclr` (series), `/v/iclr/2027` (edition), deeper for tracks and workshops | `venue:iclr/2027`  | `venue.json`: name, dates, URL, `sources` (`openreview:ICLR.cc/2027/Conference`)       |
+| category | `/c/<slug>`                                                                   | `category:<slug>`  | `category.json`: name; a category is in categories through its own `in-category` links |
+| org      | `/o/<slug>`, `/o/<slug>/<child>` for departments and labs                     | `org:<slug>`       | `org.json`: name, `domains`, `parents`, ROR id                                         |
+| user     | `/u/<handle>`                                                                 | `user:<handle>`    | `profile.json`: what the person chose to show                                          |
 
 - **Shared layout.** Every kind has the same layout:
   - `.potentialpaper/` for the system;
@@ -58,26 +58,26 @@ show. A plugin written once can then add a panel to a paper, a venue, a topic, a
       confirmed by an admin for now (`claims:decide`). Until someone claims it, the section stays empty and the
       page shows "Organise this venue? Claim it".
     - The kind file and `sources`: the `venues` bot, organisers and admins.
-  - Topic: community-run, like a Wikipedia article. Any verified account can make a topic and edit any topic's
-    `community/`, `topic.json` (its name) and links, subject to page protection. No bot writes topic pages.
+  - Category: community-run, like a Wikipedia article. Any verified account can make a category and edit any category's
+    `community/`, `category.json` (its name) and links, subject to page protection. No bot writes category pages.
   - Org: `members/` for verified members (an affiliation whose domain is one of the org's `domains`), `community/`
     for any verified account, and the kind file for members and admins.
   - User: only the account itself, its agents' tokens, and admins.
 - **Membership is links and projections.**
   - A paper is at a venue through its submissions: the projection that already exists.
-  - A page of any kind is in a topic through a labeled link from the page to `topic:<slug>`, `in-topic` ("is in" /
+  - A page of any kind is in a category through a labeled link from the page to `category:<slug>`, `in-category` ("is in" /
     "has"), asserted by the community or by its owners, as a Wikipedia page is in a category (Phase 5, changed
-    2026-11-22). A paper's makes it a member of the topic's scope, for its statistics.
+    2026-11-22). A paper's makes it a member of the category's scope, for its statistics.
   - A paper is from an org through confirmed author claims of verified members who chose to show their
     institution, and through the domains printed on page 1 (`pdf_documents.emails`).
   - One consumer keeps `page_members(scope_page_id, paper_id, via, weight)` from all of these. Every list, count,
     statistic and plugin query above the paper reads that table.
-- **Topics are concepts, not a taxonomy** (decided 2026-11-16). A topic is a research idea at the size of a
+- **Categories are concepts, not a taxonomy** (decided 2026-11-16). A category is a research idea at the size of a
   Wikipedia article ("Linear attention", "State space models", "Mixture of experts"), not a field such as `cs.LG`.
-  The page is an article the community writes, plus the papers on it. There is no seeded list: topics exist because
-  someone made them. A topic is in broader topics as any page is, by its own `in-topic` links ("Linear attention" in
-  "Efficient transformers"), as a subtopic.
-- **Hierarchies roll up**, but for topics, which list only what is in them directly. A series' papers are its editions'. An org's
+  The page is an article the community writes, plus the papers on it. There is no seeded list: categories exist because
+  someone made them. A category is in broader categories as any page is, by its own `in-category` links ("Linear attention" in
+  "Efficient transformers"), as a subcategory.
+- **Hierarchies roll up**, but for categories, which list only what is in them directly. A series' papers are its editions'. An org's
   papers are its children's. The consumer keeps the closure (`page_ancestors`), so a roll-up is one join.
 - **Every account has a public page at `/u/<handle>`** (decided 2026-11-16). It is made with the account, so a
   handle always resolves to a page. What it shows is the account's choice, through `profile.json` and the `user.*`
@@ -97,7 +97,7 @@ show. A plugin written once can then add a panel to a paper, a venue, a topic, a
 - `rules.ts`, `commitPage`, clone and push over HTTP and SSH, the outbox and the consumers become kind-aware. A
   consumer declares the kinds it handles.
 - Links: `to` accepts any kind's identifier. `page_links` becomes kind-aware, so "what links here" works on every
-  page. Add the `in-topic` label.
+  page. Add the `in-category` label.
 - `page_members` and `page_ancestors` with their consumer, starting with venue membership from `submissions`.
 - Routes and slots per kind, generic: `<kind>.main`, `<kind>.aside`, `<kind>.tabs`. The paper page's slots
   (`components/paper/slots.tsx`) become the first instance.
@@ -129,23 +129,23 @@ show. A plugin written once can then add a panel to a paper, a venue, a topic, a
 - Shows members who chose to show their institution, the org's papers (rolled up from its children), and venues by
   count.
 
-### Phase 5: topic pages
+### Phase 5: category pages
 
-**Changed 2026-11-22: topics work as Wikipedia's categories do.** What was built first (aliases, `broader`, related
-topics, "introduced by", roll-up, sortable papers, venues and orgs boxes, "might belong here" suggestions) is gone:
+**Changed 2026-11-22: categories work as Wikipedia's categories do.** What was built first (aliases, `broader`, related
+categories, "introduced by", roll-up, sortable papers, venues and orgs boxes, "might belong here" suggestions) is gone:
 
-- A page of any kind is in a topic through its own `in-topic` link in its `links.jsonl`, shown in a bar at the foot
-  of every page ("Topics: A · B · Add"), where "Add" puts it in one by name, making the topic if none has that name.
-  A topic in a topic is a subtopic there. Membership is direct: nothing rolls up.
-- A topic's page is its article (`community/`), then its subtopics and its other pages, by name. `topic.json` is the
+- A page of any kind is in a category through its own `in-category` link in its `links.jsonl`, shown in a bar at the foot
+  of every page ("Categories: A · B · Add"), where "Add" puts it in one by name, making the category if none has that name.
+  A category in a category is a subcategory there. Membership is direct: nothing rolls up.
+- A category's page is its article (`community/`), then its subcategories and its other pages, by name. `category.json` is the
   name only.
-- Anyone verified makes, edits (name, article), renames and merges topics, with page protection and the patrol feed;
+- Anyone verified makes, edits (name, article), renames and merges categories, with page protection and the patrol feed;
   a merge or rename leaves a redirect, as paper merges do.
 - Typed facts ("introduced by", "uses dataset") come later, as an infobox-like step after categories.
 
 ### Later (not this plan)
 
-- Embedding clusters as suggested new topics, from the map's vectors.
+- Embedding clusters as suggested new categories, from the map's vectors.
 - Workshops and tracks as venue children with their own sources.
 - Following a page of any kind for the feed and notifications.
 

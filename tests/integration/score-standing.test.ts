@@ -24,7 +24,7 @@ import { api, closePool, resetDatabase, signUp, submittedVersion } from './helpe
  * Score standing (`handoffs/plugins.md` Phase 6), the first plugin outside this repo, installed from GitHub as any
  * reader would install it: its newest release, copied at its commit, its manifest checked by the host, its built
  * files served from its own origin. Then where its panel shows (`page.hasScores` on papers and venues, never on
- * topics, and on organisations with scored papers), and that the data it reads has the shape it reads, the org view's
+ * categories, and on organisations with scored papers), and that the data it reads has the shape it reads, the org view's
  * included (the venue's own page and the org's papers by name).
  *
  * It talks to GitHub, so it runs only with `PLUGIN_NETWORK_TESTS=1`:
@@ -159,7 +159,7 @@ describe.skipIf(!NETWORK)('score standing, installed from GitHub', () => {
       [{ path: 'venue.json', content: JSON.stringify({ name: 'ICLR 2027', sources: [`openreview:${VENUE}`] }) }],
       'Venue',
     );
-    await createPage('topic', 'linear-attention');
+    await createPage('category', 'linear-attention');
     const eth = await createPage('org', 'eth');
     await commitPage(
       eth.id,
@@ -239,7 +239,7 @@ describe.skipIf(!NETWORK)('score standing, installed from GitHub', () => {
     expect(await shows('arxiv:2701.00001')).toBe('submission');
     expect(await shows('venue:iclr/2027')).toBe('main');
     expect(await shows('venue:iclr')).toBe('main');
-    expect(await shows('topic:linear-attention')).toBeNull();
+    expect(await shows('category:linear-attention')).toBeNull();
     // An organisation with scored papers shows it; one without stays quiet.
     expect(await shows('org:eth')).toBe('main');
     expect(await shows('org:empty')).toBeNull();

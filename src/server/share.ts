@@ -114,7 +114,7 @@ export async function shortIdOf(pageId: string, database: Database = getDb()): P
 
 /**
  * The page a short id names, as something to share: `null` for anything but digits, or no such page. A merged
- * paper or topic gives the page it was merged into.
+ * paper or category gives the page it was merged into.
  */
 export async function shareSubject(ref: string, database: Database = getDb()): Promise<ShareSubject | null> {
   if (!/^\d{1,9}$/.test(ref)) return null;

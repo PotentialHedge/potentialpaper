@@ -3,27 +3,27 @@ import { ui } from '@/components/ui';
 import { formatIdentifier, KINDS, pagePath } from '@/lib/kinds';
 import type { PageLink } from '@/server/page-links';
 import { protectionWords } from '@/server/page-protection';
-import type { TopicOverview } from '@/server/topic-pages';
+import type { CategoryOverview } from '@/server/category-pages';
 import type { KindPanelProps } from './slots';
 
 /**
- * A topic's own panels (`handoffs/pages.md` Phase 5), beside the generic ones in `slots.tsx`. A topic works as a
- * Wikipedia category does: the community's article, then the lists made from what is in it, its subtopics and its
- * other pages, by name. What they show comes from `server/topic-pages.ts`'s `topicOverview`, read once by the route
+ * A category's own panels (`handoffs/pages.md` Phase 5), beside the generic ones in `slots.tsx`. A category works as a
+ * Wikipedia category does: the community's article, then the lists made from what is in it, its subcategories and its
+ * other pages, by name. What they show comes from `server/category-pages.ts`'s `categoryOverview`, read once by the route
  * (`page-route.tsx`); like every panel, they are the same HTML for every reader.
  */
 
-export type TopicView = TopicOverview;
+export type CategoryView = CategoryOverview;
 
 /** What was merged into it, and whether it is protected. */
-export function TopicAbout({ topic }: KindPanelProps) {
-  if (!topic) return null;
-  const { protection, mergedFrom } = topic;
+export function CategoryAbout({ category }: KindPanelProps) {
+  if (!category) return null;
+  const { protection, mergedFrom } = category;
   const facts: ReactNode[] = [];
   if (mergedFrom.length > 0) {
-    facts.push(<>Merged with {mergedFrom.map((key) => formatIdentifier({ kind: 'topic', key })).join(', ')}</>);
+    facts.push(<>Merged with {mergedFrom.map((key) => formatIdentifier({ kind: 'category', key })).join(', ')}</>);
   }
-  facts.push(<a href="/new/topic">New topic</a>);
+  facts.push(<a href="/new/category">New category</a>);
   return (
     <div>
       <p className={`${ui.fine} text-center`}>
@@ -44,7 +44,7 @@ export function TopicAbout({ topic }: KindPanelProps) {
   );
 }
 
-/** Most of a list shown; the API has the rest (`GET /pages/{identifier}/topic`). */
+/** Most of a list shown; the API has the rest (`GET /pages/{identifier}/category`). */
 const SHOWN = 200;
 
 function MemberList({ title, links }: { title: string; links: PageLink[] }) {
@@ -62,7 +62,7 @@ function MemberList({ title, links }: { title: string; links: PageLink[] }) {
             ) : (
               link.page.name
             )}
-            {link.page.kind !== 'paper' && link.page.kind !== 'topic' && link.page.kind !== 'web' && (
+            {link.page.kind !== 'paper' && link.page.kind !== 'category' && link.page.kind !== 'web' && (
               <span className={ui.fine}> {KINDS[link.page.kind].title.toLowerCase()}</span>
             )}
           </li>
@@ -73,16 +73,16 @@ function MemberList({ title, links }: { title: string; links: PageLink[] }) {
   );
 }
 
-/** What is in it, as a Wikipedia category lists it: its subtopics, then its other pages, each by name. */
-export function TopicMembers({ topic }: KindPanelProps) {
-  if (!topic) return null;
-  if (topic.subtopics.length + topic.pages.length === 0) {
-    return <p className={ui.empty}>Nothing is in this topic yet. Add a page to it from that page.</p>;
+/** What is in it, as a Wikipedia category lists it: its subcategories, then its other pages, each by name. */
+export function CategoryMembers({ category }: KindPanelProps) {
+  if (!category) return null;
+  if (category.subcategories.length + category.pages.length === 0) {
+    return <p className={ui.empty}>Nothing is in this category yet. Add a page to it from that page.</p>;
   }
   return (
     <>
-      <MemberList title="Subtopics" links={topic.subtopics} />
-      <MemberList title="Pages" links={topic.pages} />
+      <MemberList title="Subcategories" links={category.subcategories} />
+      <MemberList title="Pages" links={category.pages} />
     </>
   );
 }

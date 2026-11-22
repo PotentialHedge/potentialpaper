@@ -31,7 +31,7 @@ const REQUEST =
 /**
  * A clone address, taken apart: the page as written in it, and the file asked for under `.git/`. A paper's is
  * `/git/<scheme>/<identifier>.git` (`arxiv`, `doi`, `openreview`); any other kind's `/git/<kind>/<key>.git`
- * (`/git/venue/iclr/2027.git`, `/git/topic/linear-attention.git`), as its identifier is `<kind>:<key>`.
+ * (`/git/venue/iclr/2027.git`, `/git/category/linear-attention.git`), as its identifier is `<kind>:<key>`.
  */
 export interface GitAddress {
   page: PageAddress;

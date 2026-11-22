@@ -1,9 +1,9 @@
 import { SLUG } from './kinds';
 
 /**
- * Topics (`handoffs/pages.md` Phase 5): research ideas ("Linear attention") that work as Wikipedia's categories do,
- * each with an article the community writes. Anyone verified makes one. What the server and the browser share about them: a topic's
- * address from its name, and when two names are the same name, so that the form can say "that topic is there
+ * Categories (`handoffs/pages.md` Phase 5): research ideas ("Linear attention") that work as Wikipedia's categories do,
+ * each with an article the community writes. Anyone verified makes one. What the server and the browser share about them: a category's
+ * address from its name, and when two names are the same name, so that the form can say "that category is there
  * already" before a duplicate is made.
  *
  * Pure.
@@ -12,7 +12,7 @@ import { SLUG } from './kinds';
 const MAX_SLUG = 60;
 
 /** "State-space models (SSMs)" → `state-space-models-ssms`; `null` if nothing of it is Latin letters or digits. */
-export function topicSlug(name: string): string | null {
+export function categorySlug(name: string): string | null {
   const slug = name
     .normalize('NFKD')
     .replace(/\p{M}/gu, '')
@@ -38,7 +38,7 @@ function singular(word: string): string {
  * A name as duplicates are told by: lower case, accents and punctuation gone, each word singular. "State-space
  * models" and "state space model" are the same name; "Linear attention" and "Attention" are not.
  */
-export function topicNameKey(name: string): string {
+export function categoryNameKey(name: string): string {
   return name
     .normalize('NFKD')
     .replace(/\p{M}/gu, '')

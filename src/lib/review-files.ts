@@ -158,7 +158,7 @@ export const submissionFileSchema = z
       .meta({ description: 'Where it was submitted.' }),
     number: z.number().int().nullable().meta({ description: "The submission's number at the venue, if it has one." }),
     keywords: z.array(shortText(200)).max(MAX_KEYWORDS).optional().meta({
-      description: 'The keywords its authors gave the source, as they wrote them. Topic suggestions match them.',
+      description: 'The keywords its authors gave the source, as they wrote them.',
     }),
     url: httpsUrl.meta({ description: 'Where it is at the source, linked from its credit.' }),
     license,

@@ -282,12 +282,12 @@ export const commitIdentities = pgTable(
 );
 
 /**
- * Every page of every kind (`lib/kinds.ts`): a paper, a venue, a topic, an organisation or a person. A page is a
+ * Every page of every kind (`lib/kinds.ts`): a paper, a venue, a category, an organisation or a person. A page is a
  * repo (DESIGN.md §4), and every table of the page store is keyed by its id first (`page_objects`, `page_refs`,
  * …, §4.11). **A paper's page id is its paper id**, and its row is made with the paper by a trigger
  * (`papers_page_insert`, migration `0032`), so that it holds whatever wrote the paper; deleting the paper deletes
  * it, and with it the repo. Other kinds' pages are made by `server/pages/kinds.ts`'s `createPage`. `key` is what
- * the kind's address names (`iclr/2027`, a topic's slug, a handle); a paper's is its id, as its addresses are
+ * the kind's address names (`iclr/2027`, a category's slug, a handle); a paper's is its id, as its addresses are
  * `paper_identifiers`.
  */
 export const pages = pgTable(
@@ -297,7 +297,7 @@ export const pages = pgTable(
     kind: text('kind', { enum: PAGE_KINDS }).notNull(),
     key: text('key').notNull(),
     /**
-     * A topic merged into another (`handoffs/pages.md` Phase 5, `server/topic-pages.ts`): its page and history stay, its
+     * A category merged into another (`handoffs/pages.md` Phase 5, `server/category-pages.ts`): its page and history stay, its
      * address and identifier lead to the page it was merged into, and nobody commits to it again.
      */
     mergedInto: uuid('merged_into').references((): AnyPgColumn => pages.id, { onDelete: 'set null' }),
@@ -319,10 +319,10 @@ export type Page = typeof pages.$inferSelect;
 
 /**
  * Where a page's old address leads (`handoffs/pages.md` Phases 3 and 5): a user page is keyed by its account's handle,
- * so a changed handle moves the page's key and leaves its old key here; a renamed topic leaves its old slug. `/u/<old>`
- * and `user:<old>` (`/t/<old>`, `topic:<old>`) then still find the page. A user's is written only by the triggers on
+ * so a changed handle moves the page's key and leaves its old key here; a renamed category leaves its old slug. `/u/<old>`
+ * and `user:<old>` (`/c/<old>`, `category:<old>`) then still find the page. A user's is written only by the triggers on
  * `accounts` (migration `0037`), so every writer of a handle leaves one, and deleted when another account takes the old
- * handle; a topic's by `renameTopic` (`server/topic-pages.ts`), deleted when a new topic takes the old slug.
+ * handle; a category's by `renameCategory` (`server/category-pages.ts`), deleted when a new category takes the old slug.
  */
 export const pageRedirects = pgTable(
   'page_redirects',
@@ -501,7 +501,7 @@ export const pageLinks = pgTable(
 
 /**
  * What each paper says it belongs to, by public name: a submission's venue (`via` `submission`, `source`
- * `openreview:ICLR.cc/2027/Conference`), a topic it links to (`via` the label, `source` `topic:<slug>`), or an
+ * `openreview:ICLR.cc/2027/Conference`), a category it links to (`via` the label, `source` `category:<slug>`), or an
  * institution's email domain (`via` `affiliation`, `source` `domain:ethz.ch`, and every domain above the address's:
  * a confirmed author who shows their institution, weight 1, or an address printed on page 1, weight 0.5). Written by
  * the `members` consumer (`server/page-members.ts`) from the paper's files and, for affiliations, from
@@ -535,7 +535,7 @@ export const orgMembersDue = pgTable('org_members_due', {
 });
 
 /**
- * The names a scope (a venue, topic or org page) answers to: its own identifier (`venue:iclr/2027`) and its kind
+ * The names a scope (a venue, category or org page) answers to: its own identifier (`venue:iclr/2027`) and its kind
  * file's `sources`. Written by the `members` consumer.
  */
 export const pageScopeNames = pgTable(
@@ -549,7 +549,7 @@ export const pageScopeNames = pgTable(
   (t) => [primaryKey({ columns: [t.pageId, t.name] }), index('page_scope_names_name_idx').on(t.name)],
 );
 
-/** A scope's parents, by identifier (`lib/kinds.ts`'s `parentsOf`): an edition's series, a topic's broader topics. */
+/** A scope's parents, by identifier (`lib/kinds.ts`'s `parentsOf`): an edition's series, an org's parents. */
 export const pageParents = pgTable(
   'page_parents',
   {
@@ -562,7 +562,7 @@ export const pageParents = pgTable(
 );
 
 /**
- * The papers of every scope (`handoffs/pages.md`): a venue's through their submissions, a topic's through links,
+ * The papers of every scope (`handoffs/pages.md`): a venue's through their submissions, a category's through links,
  * an org's through its members' confirmed claims and the domains printed on page 1 (`via` `affiliation` for both, so
  * nothing public tells the two apart). Every list, count, statistic and plugin query above the paper reads
  * this table, rolled up through `page_ancestors`. Written only by the `members` consumer; `weight` is for later
@@ -585,7 +585,7 @@ export const pageMembers = pgTable(
 
 /**
  * The closure of `page_parents` over the pages they name: every ancestor of a scope, at its shortest depth, so a
- * roll-up (a series' papers are its editions', a topic's include its narrower topics') is one join. Written by
+ * roll-up (a series' papers are its editions') is one join. Written by
  * the `members` consumer.
  */
 export const pageAncestors = pgTable(
@@ -786,7 +786,7 @@ export const submissions = pgTable(
     status: text('status', { enum: SUBMISSION_STATUSES }),
     /** As the venue words it: "Accept (Poster)". */
     decision: text('decision'),
-    /** The keywords its authors gave the source (OpenReview's), from `submission.json`; topic suggestions match them. */
+    /** The keywords its authors gave the source (OpenReview's), from `submission.json`. */
     keywords: text('keywords')
       .array()
       .notNull()

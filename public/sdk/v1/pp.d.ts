@@ -4,7 +4,7 @@
  */
 
 declare namespace PP {
-  type PageKind = 'paper' | 'venue' | 'topic' | 'org' | 'user';
+  type PageKind = 'paper' | 'venue' | 'category' | 'org' | 'user';
 
   type Permission = 'page.read' | 'scope.read' | 'reviews.read' | 'lists.read' | 'identity';
   type Outcome = 'accepted' | 'rejected' | 'withdrawn' | 'pending';
@@ -20,7 +20,7 @@ declare namespace PP {
   /** A page as plugins see it. */
   interface PageSummary {
     kind: PageKind;
-    /** Its public identifier: `venue:iclr/2027`, `arxiv:1706.03762`, `topic:linear-attention`. */
+    /** Its public identifier: `venue:iclr/2027`, `arxiv:1706.03762`, `category:linear-attention`. */
     identifier: string;
     /** Its path on the site. */
     address: string;
@@ -69,7 +69,7 @@ declare namespace PP {
     | { type: 'popover'; list: 'home'; command: string; paper: string; size: Size };
     /** The page the panel is on; `null` on the plugin's own page and on a list. */
     page: PageSummary | null;
-    /** The pages above it: a paper's venues, topics and orgs; a topic's broader topics; an org's parents. */
+    /** The pages above it: a paper's venues, categories and orgs; an org's parents. */
     scopes: PageSummary[];
     viewer: { signedIn: boolean; isOwner: boolean };
     theme: Theme;
@@ -113,7 +113,7 @@ declare namespace PP {
 
   interface PageFiles {
     page: PageSummary;
-    /** Its kind file as it parses (`venue.json`, `topic.json`, …); a paper's metadata. */
+    /** Its kind file as it parses (`venue.json`, `category.json`, …); a paper's metadata. */
     kindFile: Record<string, unknown> | null;
     sections: Section[];
     links: Link[];
@@ -162,7 +162,7 @@ declare namespace PP {
   interface ScoreSummary {
     /**
      * `<source>:<venue id>`: `openreview:ICLR.cc/2027/Conference`. A 6 at one venue is no 6 at another. `page` is the
-     * venue's own page, whose statistics of it are the whole venue's (a topic's or an org's are only its papers');
+     * venue's own page, whose statistics of it are the whole venue's (a category's or an org's are only its papers');
      * `null` for a venue with no page.
      */
     venue: { id: string; name: string; page: PageSummary | null };
@@ -309,7 +309,7 @@ declare namespace PP {
     page: {
       /** Needs `page.read`. The current page when no identifier is given. */
       read(identifier?: string): Promise<PageFiles>;
-      /** Needs `scope.read`: a venue's, topic's or org's papers, rolled up from the pages under it. */
+      /** Needs `scope.read`: a venue's, category's or org's papers, rolled up from the pages under it. */
       members(
         identifier?: string,
         options?: { offset?: number; limit?: number; rollUp?: boolean },
@@ -321,9 +321,9 @@ declare namespace PP {
     };
     scope: {
       /**
-       * Needs `scope.read`: a venue's, topic's or org's score statistics, the current page by default. Without `venue`
+       * Needs `scope.read`: a venue's, category's or org's score statistics, the current page by default. Without `venue`
        * and `field`, the list of venues and fields; with both, that field's sorted means, bins and split by outcome.
-       * `{ marks: true }` adds the scope's own submissions by name (`marks`). For a whole venue's numbers on a topic's or
+       * `{ marks: true }` adds the scope's own submissions by name (`marks`). For a whole venue's numbers on a category's or
        * an org's page, ask the venue's own page: `scores(summary.venue.page.identifier, venue, field)`.
        */
       scores(identifier?: string): Promise<ScoreList>;
@@ -353,7 +353,7 @@ declare namespace PP {
       set(set: string): Promise<SignalSet>;
       /**
        * Some of a set's signals (all by default) for every paper that has one, by column. `scope` keeps one venue's,
-       * topic's or org's papers. Index `i` of every column is `papers[i]`.
+       * category's or org's papers. Index `i` of every column is `papers[i]`.
        */
       columns(
         set: string,

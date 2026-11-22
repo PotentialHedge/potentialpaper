@@ -14,7 +14,7 @@ import { closePool, resetDatabase } from './helpers';
 
 /**
  * The consumers above the paper (`handoffs/pages.md` Phase 1): `links` ("what links here", on every kind) and
- * `members` (`page_members` from submissions and topic links, `page_ancestors` for roll-ups).
+ * `members` (`page_members` from submissions and category links, `page_ancestors` for roll-ups).
  */
 
 beforeEach(resetDatabase);
@@ -85,7 +85,7 @@ describe('the links consumer', () => {
     const me = await person();
     const a = await paper('2401.00001');
     const b = await paper('2401.00002');
-    const topic = await createPage('topic', 'linear-attention');
+    const category = await createPage('category', 'linear-attention');
     await commitPage(
       a,
       null,
@@ -95,8 +95,8 @@ describe('the links consumer', () => {
           path: 'community/links.jsonl',
           content: [
             '{"id":"1","to":"arxiv:2401.00002v3","label":"extends","note":"Same idea, faster."}',
-            '{"id":"2","to":"topic:linear-attention","label":"in-topic"}',
-            '{"id":"3","to":"topic:not-yet","label":"in-topic"}',
+            '{"id":"2","to":"category:linear-attention","label":"in-category"}',
+            '{"id":"3","to":"category:not-yet","label":"in-category"}',
             '',
           ].join('\n'),
         },
@@ -104,30 +104,30 @@ describe('the links consumer', () => {
       'Links',
     );
     await commitPage(
-      topic.id,
-      topic.head,
+      category.id,
+      category.head,
       me,
       [
-        { path: 'topic.json', content: '{ "name": "Linear attention" }\n' },
-        { path: 'community/links.jsonl', content: '{"id":"r","to":"topic:not-yet","label":"related"}\n' },
+        { path: 'category.json', content: '{ "name": "Linear attention" }\n' },
+        { path: 'community/links.jsonl', content: '{"id":"r","to":"category:not-yet","label":"related"}\n' },
       ],
-      'Topic',
+      'Category',
     );
     await catchUp();
 
     const from = await linksFrom(a);
     expect(from.map((l) => [l.label, l.page.name, l.origin])).toEqual([
       ['extends', 'Paper 2401.00002', 'community'],
-      ['in-topic', 'Linear attention', 'community'],
-      ['in-topic', null, 'community'],
+      ['in-category', 'Linear attention', 'community'],
+      ['in-category', null, 'community'],
     ]);
     expect(from[0]).toMatchObject({ note: 'Same idea, faster.', page: { pageId: b, kind: 'paper' } });
     expect(await linksTo(b)).toMatchObject([{ label: 'extends', page: { pageId: a, name: 'Paper 2401.00001' } }]);
-    expect(await linksTo(topic.id)).toMatchObject([{ label: 'in-topic', page: { pageId: a } }]);
+    expect(await linksTo(category.id)).toMatchObject([{ label: 'in-category', page: { pageId: a } }]);
 
-    // A topic named before its page was made is found once it is, from both sides.
-    const later = await createPage('topic', 'not-yet');
-    expect((await linksTo(later.id)).map((l) => l.page.pageId).sort()).toEqual([a, topic.id].sort());
+    // A category named before its page was made is found once it is, from both sides.
+    const later = await createPage('category', 'not-yet');
+    expect((await linksTo(later.id)).map((l) => l.page.pageId).sort()).toEqual([a, category.id].sort());
     expect((await linksFrom(a))[2].page).toMatchObject({ pageId: later.id, name: 'not-yet' });
 
     // Taking a link out takes it out of the index.
@@ -180,19 +180,19 @@ describe('the members consumer', () => {
     expect((await getDb().select().from(pageMembers)).toSorted(byKey)).toEqual(before.toSorted(byKey));
   });
 
-  it('makes papers members of the topics they link to, directly: a topic in a topic rolls nothing up', async () => {
+  it('makes papers members of the categories they link to, directly: a category in a category rolls nothing up', async () => {
     const me = await person();
-    const broad = await createPage('topic', 'efficient-transformers');
-    const narrow = await createPage('topic', 'linear-attention');
+    const broad = await createPage('category', 'efficient-transformers');
+    const narrow = await createPage('category', 'linear-attention');
     await commitPage(
       narrow.id,
       narrow.head,
       me,
       [
-        { path: 'topic.json', content: '{ "name": "Linear attention" }\n' },
+        { path: 'category.json', content: '{ "name": "Linear attention" }\n' },
         {
           path: 'community/links.jsonl',
-          content: '{"id":"b","to":"topic:efficient-transformers","label":"in-topic"}\n',
+          content: '{"id":"b","to":"category:efficient-transformers","label":"in-category"}\n',
         },
       ],
       'In efficient transformers',
@@ -202,11 +202,16 @@ describe('the members consumer', () => {
       p,
       null,
       me,
-      [{ path: 'community/links.jsonl', content: '{"id":"t","to":"topic:linear-attention","label":"in-topic"}\n' }],
-      'Topic',
+      [
+        {
+          path: 'community/links.jsonl',
+          content: '{"id":"t","to":"category:linear-attention","label":"in-category"}\n',
+        },
+      ],
+      'Category',
     );
     await catchUp();
-    expect(await scopeMembers(narrow.id)).toEqual([{ paperId: p, via: ['in-topic'] }]);
+    expect(await scopeMembers(narrow.id)).toEqual([{ paperId: p, via: ['in-category'] }]);
     expect(await members(broad.id)).toEqual([]);
     expect(await getDb().select().from(pageAncestors)).toEqual([]);
     expect((await linksTo(broad.id)).map((l) => l.page.pageId)).toEqual([narrow.id]);
