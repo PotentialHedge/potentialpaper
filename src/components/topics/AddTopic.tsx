@@ -1,6 +1,7 @@
 'use client';
 
 import { type FormEvent, type ReactNode, useState } from 'react';
+import { Modal } from '@/components/Modal';
 import { ui } from '@/components/ui';
 import { TOPIC_LINK_CHOICES, type TopicLinkLabel } from '@/lib/topics';
 import { failureOf, send } from './api';
@@ -56,76 +57,92 @@ export function AddTopic({ identifier, children }: { identifier: string; childre
     <div className={ui.box}>
       <div className={ui.boxHeadingRow}>
         <h2 className={ui.runIn}>Topics</h2>
-        <button type="button" className={ui.boxAction} onClick={() => setOpen(!open)} title="Add a topic">
-          {open ? 'Cancel' : 'Add'}
+        <button
+          type="button"
+          className={ui.boxAction}
+          onClick={() => {
+            setNote(null);
+            setOpen(true);
+          }}
+          title="Add a topic"
+        >
+          Add
         </button>
       </div>
       {children}
-      {open && form()}
+      <Modal open={open} onClose={() => setOpen(false)} title="Add a topic">
+        {form()}
+      </Modal>
     </div>
   );
 
   function form() {
     return (
-    <form onSubmit={submit} className="mt-2 text-[13px]">
-      <input
-        value={name}
-        onChange={(e) => {
-          setName(e.target.value);
-          setChosen(null);
-        }}
-        required
-        maxLength={120}
-        placeholder="A topic, such as Linear attention"
-        aria-label="Topic"
-        className={ui.input}
-      />
-      {matches.length > 0 && (
-        <ul className="mb-2 space-y-0.5">
-          {matches.slice(0, 6).map((m) => (
-            <li key={m.key}>
-              <button
-                type="button"
-                className={ui.linkBtn}
-                onClick={() => {
-                  setChosen(m.identifier);
-                  setName(m.name);
-                }}
-              >
-                {m.name}
-              </button>
-              {m.matched !== m.name && <span className="text-faint"> ({m.matched})</span>}
-            </li>
+      <form onSubmit={submit} className="mt-3">
+        <input
+          data-autofocus
+          value={name}
+          onChange={(e) => {
+            setName(e.target.value);
+            setChosen(null);
+          }}
+          required
+          maxLength={120}
+          placeholder="A topic, such as Linear attention"
+          aria-label="Topic"
+          className={ui.input}
+        />
+        {matches.length > 0 && (
+          <ul className="mb-2 space-y-0.5">
+            {matches.slice(0, 6).map((m) => (
+              <li key={m.key}>
+                <button
+                  type="button"
+                  className={ui.linkBtn}
+                  onClick={() => {
+                    setChosen(m.identifier);
+                    setName(m.name);
+                  }}
+                >
+                  {m.name}
+                </button>
+                {m.matched !== m.name && <span className="text-faint"> ({m.matched})</span>}
+              </li>
+            ))}
+          </ul>
+        )}
+        {name.trim().length > 1 && !chosen && !exact && (
+          <p className="mb-2 text-xs text-muted">No topic is called that yet: adding makes it.</p>
+        )}
+        <fieldset className="mb-2 flex flex-wrap gap-x-3">
+          <legend className="sr-only">How the paper is in it</legend>
+          {TOPIC_LINK_CHOICES.map((choice) => (
+            <label key={choice.label} className="flex items-center gap-1">
+              <input
+                type="radio"
+                name="label"
+                checked={label === choice.label}
+                onChange={() => setLabel(choice.label)}
+              />
+              The paper {choice.words}
+            </label>
           ))}
-        </ul>
-      )}
-      {name.trim().length > 1 && !chosen && !exact && (
-        <p className="mb-2 text-xs text-muted">No topic is called that yet: adding makes it.</p>
-      )}
-      <fieldset className="mb-2 flex flex-wrap gap-x-3">
-        <legend className="sr-only">How the paper is in it</legend>
-        {TOPIC_LINK_CHOICES.map((choice) => (
-          <label key={choice.label} className="flex items-center gap-1">
-            <input type="radio" name="label" checked={label === choice.label} onChange={() => setLabel(choice.label)} />
-            The paper {choice.words}
-          </label>
-        ))}
-      </fieldset>
-      <button className={ui.btn({ inline: true })} disabled={busy || !name.trim()}>
-        Add
-      </button>
-      {note && (
-        <p className={ui.note(note.ok)}>
-          {note.text}
-          {note.link && (
-            <>
-              {' '}
-              <a href={note.link}>Open the topic</a>
-            </>
-          )}
-        </p>
-      )}
-    </form>
-  );
+        </fieldset>
+        <button className={ui.btn({ inline: true })} disabled={busy || !name.trim()}>
+          Add
+        </button>
+        {note && (
+          <p className={ui.note(note.ok)}>
+            {note.text}
+            {note.link && (
+              <>
+                {' '}
+                <a href={note.link}>Open the topic</a>
+              </>
+            )}
+          </p>
+        )}
+      </form>
+    );
   }
 }
