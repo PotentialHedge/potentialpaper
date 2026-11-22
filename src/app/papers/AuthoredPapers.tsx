@@ -233,10 +233,6 @@ function CoAuthors({ row }: { row: AuthoredRow }) {
         <p className="text-muted">Every author of this paper is confirmed.</p>
       ) : (
         <form onSubmit={add}>
-          <p className="mb-2 text-subtle">
-            They are confirmed at once, and can write the author section with you. They need an account with a confirmed
-            institutional address; they can step down from the paper themselves.
-          </p>
           <div className="flex flex-wrap items-start gap-x-2 narrow:flex-col narrow:items-stretch">
             <span className="min-w-0 flex-1">
               <Select name="author" defaultValue="" aria-label="Which author they are" required data-autofocus>
@@ -295,20 +291,17 @@ function Invite({ row, open }: { row: AuthoredRow; open: { name: string; index: 
       .replace(/\+/g, '%20')}`;
   return (
     <>
-      <h3 className={`${ui.boxHeading} mt-5`}>Not on PotentialPaper yet?</h3>
-      <p className="mb-2 text-subtle">
-        Send them this link. Once they sign up and claim their name, they show up here for you to confirm.
-      </p>
+      <h3 className={`${ui.boxHeading} mt-5`}>Or invite them</h3>
       <CopyField value={link} label="Invite link" />
       <p className="mt-2">
-        Or email{' '}
+        Email{' '}
         {open.map((a, i) => (
           <span key={a.index}>
             {i > 0 && ', '}
             <a href={mailto(a.name)}>{a.name}</a>
           </span>
         ))}{' '}
-        from your own mail.
+        yourself.
       </p>
     </>
   );
