@@ -31,7 +31,10 @@ export function HomeNextStep({ example, host }: { example?: TutorialExample; hos
   return (
     <div className="mb-5 flex justify-center font-sans">
       {seen?.profileComplete ? (
-        <OnboardAgent className={`text-base font-semibold ${ui.linkBtn}`} />
+        // Not on a phone, where no agent runs.
+        <div className="narrow:hidden">
+          <OnboardAgent className={`text-base font-semibold ${ui.linkBtn}`} />
+        </div>
       ) : (
         <GettingStartedSheet example={example} host={host} signedIn={seen !== null} />
       )}

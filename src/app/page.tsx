@@ -29,6 +29,16 @@ export const dynamic = 'force-dynamic';
 
 const ON = ui.on;
 
+/** The home page's heading, one picked at random on each load. */
+const TAGLINES = [
+  'A public page for every paper',
+  'Every paper, in the words of its readers',
+  'Where papers meet their critics',
+  'What researchers say about a paper, in one place',
+  'Every paper has a page. Researchers write it.',
+  'See how papers connect',
+];
+
 /** Sorts kept out of the row, in the ⋯ menu (on a phone every sort is in the filter menu). */
 const MENU_SORTS: readonly SearchSort[] = ['oldest', 'title'];
 
@@ -165,7 +175,7 @@ export default async function Home({
       <Announcements items={announced.filter((a) => !dismissed.has(a.id))} />
       <header className="mt-12 pb-6 text-center narrow:mt-8">
         <h1 className="mt-2 mb-3 text-[30px] leading-snug font-normal narrow:text-2xl">
-          A public page for every paper
+          {TAGLINES[Math.floor(Math.random() * TAGLINES.length)]}
         </h1>
         <InstitutionStrip names={institutions} />
         {!q && (

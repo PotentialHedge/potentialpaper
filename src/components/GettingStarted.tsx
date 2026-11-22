@@ -83,10 +83,10 @@ export function agentPromptStep(): TutorialStep {
   };
 }
 
-/** The tutorial's second button on its last step: on to `agentPromptStep`. */
+/** The tutorial's second button on its last step: on to `agentPromptStep`. Not on a phone, where no agent runs. */
 export function OnboardAgentButton({ onClick }: { onClick: () => void }) {
   return (
-    <button type="button" className={ui.btn({ ghost: true })} onClick={onClick}>
+    <button type="button" className={`${ui.btn({ ghost: true })} narrow:hidden`} onClick={onClick}>
       Onboard my agent
     </button>
   );
