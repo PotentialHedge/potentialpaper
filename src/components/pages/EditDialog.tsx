@@ -2,6 +2,7 @@
 
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { AgentPromptField } from '@/components/AgentPromptField';
+import { CopyField } from '@/components/CopyField';
 import { PencilIcon, WITH_ICON } from '@/components/icons';
 import { ui } from '@/components/ui';
 import { setupPrompt } from '@/lib/agent-prompt';
@@ -241,33 +242,11 @@ function ExtensionOffer({ onDecline }: { onDecline: () => void }) {
   );
 }
 
-/** A shell command: a `$` prompt, so it reads as one for a terminal, and a copy button. */
+/** A shell command to copy (`CopyField`, with `$` in front). */
 function TerminalLine({ text, onCopied }: { text: string; onCopied?: () => void }) {
-  const [copied, setCopied] = useState(false);
   return (
-    <div className="mt-2 flex items-stretch border border-rule bg-white">
-      <code className={`${ui.mono} min-w-0 flex-1 overflow-x-auto px-2 py-1.5 whitespace-nowrap`}>
-        <span aria-hidden className="text-faint select-none">
-          ${' '}
-        </span>
-        {text}
-      </code>
-      <button
-        type="button"
-        className={`${ui.linkBtn} border-l border-rule px-2.5 text-xs`}
-        onClick={async () => {
-          try {
-            await navigator.clipboard.writeText(text);
-            setCopied(true);
-            setTimeout(() => setCopied(false), 1500);
-            onCopied?.();
-          } catch {
-            // No clipboard: the command is there to select.
-          }
-        }}
-      >
-        {copied ? 'copied' : 'copy'}
-      </button>
+    <div className="mt-2">
+      <CopyField value={text} label="Command" marker="shell" onCopied={onCopied} />
     </div>
   );
 }
