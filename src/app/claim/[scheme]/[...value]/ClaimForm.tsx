@@ -2,6 +2,7 @@
 
 import { useRouter } from 'next/navigation';
 import { useState, type FormEvent } from 'react';
+import { CodeInput } from '@/components/CodeInput';
 import { InfoTip } from '@/components/InfoTip';
 import { ui } from '@/components/ui';
 import type { PaperId } from '@/lib/paper-ids';
@@ -156,13 +157,11 @@ function OpenClaim(props: Props) {
       },
     );
 
-  const confirmCode = (e: FormEvent) => {
-    e.preventDefault();
-    void run(
-      () => post('/api/v1/claims/code/confirm', { paper, email: sentTo, code }),
+  const confirmCode = (value = code) =>
+    run(
+      () => post('/api/v1/claims/code/confirm', { paper, email: sentTo, code: value }),
       () => setSentTo(null),
-    );
-  };
+    ).then(() => setCode(''));
 
   const ask = () =>
     run(
@@ -252,7 +251,13 @@ function OpenClaim(props: Props) {
             <section className="mt-5">
               <h3 className={ui.boxHeading}>Confirm your email:</h3>
               {sentTo ? (
-                <form onSubmit={confirmCode} className="flex flex-wrap items-start gap-2">
+                <form
+                  onSubmit={(e: FormEvent) => {
+                    e.preventDefault();
+                    void confirmCode();
+                  }}
+                  className="flex flex-wrap items-center gap-2"
+                >
                   <span className="w-full text-subtle">
                     We sent a code to {sentTo}. It works for an hour.
                     {props.devMail && (
@@ -266,19 +271,17 @@ function OpenClaim(props: Props) {
                       </>
                     )}
                   </span>
-                  <input
+                  <CodeInput
+                    compact
                     value={code}
-                    onChange={(e) => setCode(e.target.value)}
-                    inputMode="numeric"
-                    autoComplete="one-time-code"
-                    placeholder="6-digit code"
-                    aria-label="Code"
-                    className={`${ui.input} max-w-[10rem]`}
+                    onChange={setCode}
+                    onComplete={(value) => confirmCode(value)}
+                    disabled={busy}
                     autoFocus
                   />
                   <button
                     type="submit"
-                    disabled={busy || !code.trim()}
+                    disabled={busy || code.length !== 6}
                     className={ui.btn({ inline: true, flush: true })}
                   >
                     {busy ? 'Checking…' : 'Confirm'}

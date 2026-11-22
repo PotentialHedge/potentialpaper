@@ -2,6 +2,7 @@
 
 import { useRouter } from 'next/navigation';
 import { useState } from 'react';
+import { CodeInput } from '@/components/CodeInput';
 import { ui } from '@/components/ui';
 import { hasSubaddress, SUBADDRESS_REFUSED } from '@/lib/email-address';
 
@@ -94,10 +95,10 @@ export function Affiliations({ initial, n }: { initial: AffiliationRow[]; n: num
     if (sent && fromForm) setEmail('');
   }
 
-  function confirm(row: AffiliationRow) {
+  function confirm(row: AffiliationRow, code = codes[row.id] ?? '') {
     return run(
       `verify:${row.id}`,
-      () => post(`/api/v1/me/affiliations/${row.id}/verify`, { code: (codes[row.id] ?? '').trim() }),
+      () => post(`/api/v1/me/affiliations/${row.id}/verify`, { code }),
       `Confirmed: ${row.institutionName}.`,
     );
   }
@@ -138,22 +139,19 @@ export function Affiliations({ initial, n }: { initial: AffiliationRow[]; n: num
                     </span>
                   ) : (
                     <form
-                      className="flex items-baseline gap-1.5"
+                      className="flex flex-wrap items-center gap-1.5"
                       onSubmit={(e) => {
                         e.preventDefault();
                         void confirm(r);
                       }}
                     >
-                      <input
-                        inputMode="numeric"
-                        autoComplete="one-time-code"
-                        pattern="\s*\d{6}\s*"
-                        maxLength={8}
-                        placeholder="6-digit code"
-                        aria-label={`Code sent to ${r.email}`}
+                      <CodeInput
+                        compact
                         value={codes[r.id] ?? ''}
-                        onChange={(e) => setCodes({ ...codes, [r.id]: e.target.value })}
-                        className="w-[7.5em] border border-rule bg-white px-1.5 py-0.5 font-mono text-[13px] narrow:text-base"
+                        onChange={(value) => setCodes({ ...codes, [r.id]: value })}
+                        onComplete={(value) => void confirm(r, value)}
+                        disabled={busy !== null}
+                        aria-label={`Code sent to ${r.email}`}
                       />
                       <button type="submit" className={ui.linkBtn} disabled={busy !== null}>
                         confirm

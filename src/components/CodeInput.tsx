@@ -9,6 +9,9 @@ import { OTPInput, REGEXP_ONLY_DIGITS, type SlotProps } from 'input-otp';
  * password managers all fill it at once, and deleting or moving the cursor
  * works as in any field. Digits only; anything else typed or pasted is
  * refused, and a pasted code with spaces or dashes is cleaned first.
+ *
+ * Centered and large on its own (sign-up); `compact` is smaller and starts at the left, for a code inside a form
+ * (claiming a paper, confirming an address on the profile).
  */
 export function CodeInput({
   value,
@@ -17,6 +20,7 @@ export function CodeInput({
   length = 6,
   autoFocus,
   disabled,
+  compact = false,
   ref,
   'aria-label': ariaLabel = 'Code',
 }: {
@@ -27,6 +31,8 @@ export function CodeInput({
   length?: number;
   autoFocus?: boolean;
   disabled?: boolean;
+  /** Smaller boxes, left-aligned. */
+  compact?: boolean;
   /** The real input, to focus it again. */
   ref?: React.Ref<HTMLInputElement>;
   'aria-label'?: string;
@@ -45,11 +51,11 @@ export function CodeInput({
       autoFocus={autoFocus}
       disabled={disabled}
       aria-label={ariaLabel}
-      containerClassName="my-2 flex items-center justify-center has-disabled:opacity-50"
+      containerClassName={`flex items-center has-disabled:opacity-50 ${compact ? '' : 'my-2 justify-center'}`}
       render={({ slots }) => (
         <div className="flex">
           {slots.map((slot, i) => (
-            <Slot key={i} {...slot} />
+            <Slot key={i} {...slot} compact={compact} />
           ))}
         </div>
       )}
@@ -58,17 +64,17 @@ export function CodeInput({
 }
 
 /** One box: its digit, or the blinking caret where the next one goes. */
-function Slot({ char, hasFakeCaret, isActive }: SlotProps) {
+function Slot({ char, hasFakeCaret, isActive, compact }: SlotProps & { compact: boolean }) {
   return (
     <div
-      className={`relative -ml-px flex h-11 w-10 items-center justify-center border bg-white font-mono text-xl text-ink first:ml-0 narrow:h-12 narrow:w-11 ${
-        isActive ? 'z-10 border-ink outline outline-ink' : 'border-rule-strong'
-      }`}
+      className={`relative -ml-px flex items-center justify-center border bg-white font-mono text-ink first:ml-0 ${
+        compact ? 'h-8 w-7 text-base narrow:h-10 narrow:w-9' : 'h-11 w-10 text-xl narrow:h-12 narrow:w-11'
+      } ${isActive ? 'z-10 border-ink outline outline-ink' : 'border-rule-strong'}`}
     >
       {char}
       {hasFakeCaret && (
         <div className="pointer-events-none absolute inset-0 flex items-center justify-center">
-          <div className="h-5 w-px animate-caret-blink bg-ink" />
+          <div className={`${compact ? 'h-4' : 'h-5'} w-px animate-caret-blink bg-ink`} />
         </div>
       )}
     </div>
