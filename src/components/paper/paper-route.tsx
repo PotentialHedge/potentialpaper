@@ -6,7 +6,7 @@ import { buildPanels } from '@/components/pages/common';
 import { PageActions } from '@/components/pages/PageActions';
 import { PageHeader, PageView } from '@/components/pages/PageView';
 import type { PluginPageData } from '@/components/plugins/PluginPage';
-import { agentPaperPath, canonicalPaperId, paperPath, parsePaperId, type PaperScheme } from '@/lib/paper-ids';
+import { agentPaperPath, canonicalPaperId, parsePaperId, type PaperScheme } from '@/lib/paper-ids';
 import { getDb } from '@/db';
 import { pageCurrent, pdfDocuments } from '@/db/schema';
 import { findPaper, type FoundPaper } from '@/server/papers';
@@ -203,6 +203,7 @@ export async function PaperRoute({ scheme, segments }: { scheme: PaperScheme; se
                 }
           }
           edit={{
+            pagePath: pagePath(shown),
             codePath: toolPath('code', address),
             clone: cloneAddresses(canonical),
             hasRepo: current !== undefined,

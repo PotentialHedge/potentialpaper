@@ -39,7 +39,7 @@ const TASKS: Record<string, { title: string; steps: (l: Links) => string[] }> = 
     title: 'Build an interactive demo of a paper',
     steps: ({ origin, setup }) => [
       `Set up as ${setup} says, for this paper's page: sign in (with the code if there is one), then git and a clone of the page (its step 3 says how the paper's path gives its clone address).`,
-      `Read the paper: its agent page is its address with \`/agent\` in front (\`${origin}/agent/abs/1706.03762\`), with its PDF and what its page already has. Look in \`demos/\` and the \`community/\` sections for a demo it already has, and build a different one.`,
+      `Read the paper: its agent page is its address with \`/agent\` in front (\`${origin}/agent/s/42\`), with its PDF and what its page already has. Look in \`demos/\` and the \`community/\` sections for a demo it already has, and build a different one.`,
       'Pick one idea of the paper that is easier to understand by playing with it: an equation with a parameter to drag, an algorithm to step through, a figure to explore. Say in a line or two what you plan, and ask the person before you build it.',
       "Build it as a folder `demos/<name>/` in the clone (`<name>` a lower-case slug), with an `index.html`. Plain HTML, CSS and JavaScript that run as they are, with no build step; each file at most 1 MB. Make it work at any width, with the controls labelled and a sentence saying what to try.\n\n   Make it look roughly like the page it sits in, loosely, not exactly: a light, off-white background (`#fefdfb`) with near-black text (`#1d1d1d`); a serif (Georgia) for prose and a system sans-serif for controls and labels; one accent, the site's dark red (`#b31b1b`), for what matters most, with greys (`#777`, `#ddd` for thin rules and borders) for the rest; square corners, no shadows or gradients, and plenty of space. Charts plain, as in a paper. Where the idea needs more colours (several series, a heat map), use a few muted ones.\n\n   Keep the layout still while people use it: nothing should move under the pointer. Give changing numbers a fixed width (`font-variant-numeric: tabular-nums`, a `min-width`) and labels room so they never wrap to a new line as a value changes; put the controls above whatever changes size; and reserve space for results (fixed rows, a fixed-height chart) rather than adding and removing large parts, since the page around the demo moves when its height does.",
       'Show it on the page: add a community section, `community/NN-<name>.md`, that starts with a `#` heading, says in a sentence what the demo shows, and embeds it:\n\n   ````\n   ```demo demos/<name>\n   Its title\n   What it shows, in a line.\n   ```\n   ````',
@@ -64,7 +64,7 @@ export async function GET(_req: Request, { params }: { params: Promise<{ what: s
   return markdown(
     `# ${task.title}
 
-The person who sent you here gave you a paper's address on PotentialPaper (a path like \`/abs/1706.03762\`: it is on ${origin}), and maybe a sign-in code.
+The person who sent you here gave you a paper's address on PotentialPaper (a path like \`/s/42\` or \`/abs/1706.03762\`: it is on ${origin}), and maybe a sign-in code.
 
 ${steps}
 `,

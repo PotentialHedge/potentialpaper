@@ -18,6 +18,8 @@ import { setupPrompt } from '@/lib/agent-prompt';
  */
 
 export interface EditOptions {
+  /** The page's address, its short one where it has one: what the agent prompt names the page by. */
+  pagePath: string;
   codePath: string;
   clone: { https: string; ssh: string | null };
   /** The page has a repository yet: it starts with its first edit, so until then only the web editor works. */
@@ -40,7 +42,7 @@ const VSIX = '/editor/potentialpaper.vsix';
 /** Remembers, in this browser, that the reader declined the extension, so copying doesn't ask again. */
 const DECLINED = 'pp:edit:no-extension';
 
-export function EditDialog({ codePath, clone, hasRepo, form }: EditOptions) {
+export function EditDialog({ pagePath, codePath, clone, hasRepo, form }: EditOptions) {
   const dialog = useRef<HTMLDialogElement>(null);
   const [via, setVia] = useState<'https' | 'ssh'>('https');
   const [offer, setOffer] = useState(false);
@@ -56,18 +58,18 @@ export function EditDialog({ codePath, clone, hasRepo, form }: EditOptions) {
     if (made.current) return;
     made.current = true;
     const origin = window.location.origin;
-    setPrompt(setupPrompt(origin, clone.https));
+    setPrompt(setupPrompt(origin, pagePath));
     void (async () => {
       try {
         const res = await fetch('/api/v1/me/agent-code', { method: 'POST' });
         if (!res.ok) return;
         const { code } = (await res.json()) as { code?: string };
-        if (code) setPrompt(setupPrompt(origin, clone.https, code));
+        if (code) setPrompt(setupPrompt(origin, pagePath, code));
       } catch {
         // Signed out, or offline: the agent asks for an email instead (`/agent/setup`).
       }
     })();
-  }, [clone.https]);
+  }, [pagePath]);
 
   useEffect(() => {
     const check = () => {

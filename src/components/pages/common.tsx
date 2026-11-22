@@ -2,7 +2,7 @@ import { type ComponentType, Fragment, type ReactNode } from 'react';
 import { AddMissing } from '@/components/paper/AddMissing';
 import { AuthorPanels, CommunityPanels } from '@/components/plugins/NestedPanels';
 import { ui } from '@/components/ui';
-import { GENERIC_SLOTS, type GenericSlot, identifierPath, KINDS, type PageAddress, type PageKind } from '@/lib/kinds';
+import { GENERIC_SLOTS, type GenericSlot, KINDS, pagePath, type PageAddress, type PageKind } from '@/lib/kinds';
 import { toolPath } from '@/lib/page-tools';
 import { type PanelKind, slotPanels } from '@/lib/panels';
 import type { OwnersInfo } from '@/server/owners';
@@ -150,7 +150,7 @@ export function Sections({ kind, address, ownersHtml, communityHtml, owners }: P
           )}
           {kind === 'paper' && (
             <div className={`${ui.fine} mt-3 font-sans`}>
-              <AddMissing what="demo" paperPath={identifierPath(address)} />
+              <AddMissing what="demo" paperPath={pagePath(address)} />
             </div>
           )}
           {/* Plugins' panels in the community's sections (`paper.community`): the paper map's minimap. */}

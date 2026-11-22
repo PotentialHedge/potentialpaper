@@ -190,13 +190,13 @@
   .md .section-edit {
     @apply ml-3 font-sans text-xs text-faint [font-variant-caps:normal];
   }
-  /* A demo (`server/pages/markdown.ts`): part of the page, as a paper's figure is, with no box around it.
-     16:9 until its page reports a height (`DemoFrames`). */
+  /* A demo (`server/pages/markdown.ts`): part of the page, as a paper's figure is, in a thin frame. 16:9 until its
+     page reports a height (`DemoFrames`), which is the height inside the border. */
   .md figure.demo {
     @apply my-5;
   }
   .md .demo-frame {
-    @apply block aspect-video w-full border-0 bg-transparent;
+    @apply box-content block aspect-video w-[calc(100%-2px)] border border-rule bg-transparent;
   }
   .md .demo-frame.demo-sized {
     aspect-ratio: auto;

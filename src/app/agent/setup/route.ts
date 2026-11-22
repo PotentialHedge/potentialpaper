@@ -23,7 +23,7 @@ export function GET() {
 
   const body = `# Set up to work on PotentialPaper
 
-This is the setup checklist for an AI agent working for a person on PotentialPaper (${origin}). Go through it in order and **check each step before you change anything**: much of it may be in place already from an earlier session. Do step 1 always. When the prompt names a page's git path ("Follow this for /git/….git", the clone address \`${origin}/git/….git\`), the person wants to edit that page's files with git: do every step, for that page. Otherwise do steps 2–6 only when they ask you to edit pages with git. When you finish, tell the person in a few lines what was already set up, what you set up, and anything left for them to do.
+This is the setup checklist for an AI agent working for a person on PotentialPaper (${origin}). Go through it in order and **check each step before you change anything**: much of it may be in place already from an earlier session. Do step 1 always. When the prompt names a page ("Follow this for /s/42", a path on ${origin}), the person wants to edit that page's files with git: do every step, for that page. Otherwise do steps 2–6 only when they ask you to edit pages with git. When you finish, tell the person in a few lines what was already set up, what you set up, and anything left for them to do.
 
 Ask the person before you install software, and before you change anything outside the page's clone (global git config, \`~/.ssh\`). Never print the token, or a private key, back to them or anywhere else.
 
@@ -94,7 +94,7 @@ Every page is a git repository; a page's PDFs and picture are kept with Git LFS.
 
 ## 3. Clone the page
 
-The prompt usually names the page's git path; its clone address is that path on ${origin}. A page's HTTPS address is its path under \`${origin}/git/\` with \`.git\` at the end (\`${origin}/abs/1706.03762\` → \`${origin}/git/arxiv/1706.03762.git\`; a venue, topic or organisation: \`${origin}/git/<kind>/<key>.git\`)${
+The prompt usually names the page by its path on ${origin}. A paper's agent page (its path with \`/agent\` in front: \`${origin}/agent/s/42\`) gives its clone address. Otherwise a page's HTTPS address is its path under \`${origin}/git/\` with \`.git\` at the end (\`${origin}/abs/1706.03762\` → \`${origin}/git/arxiv/1706.03762.git\`; a venue, topic or organisation: \`${origin}/git/<kind>/<key>.git\`)${
     ssh
       ? `; over SSH it is the same path after \`${ssh}/\` (\`${ssh}/abs/1706.03762.git\`, the paper's own address; \`${ssh}/<kind>/<key>.git\` otherwise)`
       : ''

@@ -13,7 +13,8 @@ export const PLUGINS_GUIDE_PATH = '/plugins.md';
 /**
  * Every prompt the site gives a reader to paste into their AI agent has this one shape: "Follow <origin><page>[ for
  * <target>]." and "My sign-in code: <code>" when there is one. The page says everything else. The site's address is
- * written once: `target` is a path on it (`/abs/1706.03762`, `/git/….git`), read against the page's origin.
+ * written once: `target` is a path on it, a page's short one where it has one (`/s/42`, `/v/iclr/2027`), read against
+ * the page's origin.
  */
 export function followPrompt(origin: string, page: string, { target, code }: { target?: string; code?: string } = {}) {
   const follow = `Follow ${origin}${page}${target ? ` for ${target}` : ''}.`;
@@ -36,13 +37,18 @@ export function agentPrompt(origin: string, code?: string): string {
 }
 
 /** The prompt a paper's "Add" buttons give (`AddMissing`): the task's page, `/agent/add/<what>`, for the paper's path. */
-export function addPrompt(origin: string, what: 'version' | 'submission' | 'demo', paperPath: string, code?: string): string {
+export function addPrompt(
+  origin: string,
+  what: 'version' | 'submission' | 'demo',
+  paperPath: string,
+  code?: string,
+): string {
   return followPrompt(origin, `/agent/add/${what}`, { target: onSite(origin, paperPath), code });
 }
 
-/** The prompt the Edit dialog's agent option gives: `/agent/setup`, the one setup checklist, for the page's git path. */
-export function setupPrompt(origin: string, cloneUrl: string, code?: string): string {
-  return followPrompt(origin, AGENT_SETUP_PATH, { target: onSite(origin, cloneUrl), code });
+/** The prompt the Edit dialog's agent option gives: `/agent/setup`, the one setup checklist, for the page's path. */
+export function setupPrompt(origin: string, pagePath: string, code?: string): string {
+  return followPrompt(origin, AGENT_SETUP_PATH, { target: onSite(origin, pagePath), code });
 }
 
 /** The prompt to build a plugin with an agent (Settings → Plugins, and the top of `/plugins.md`). */

@@ -106,20 +106,22 @@ function ReadThePaper({ identifiers, pdf, picture }: PanelProps) {
   );
 }
 
-function Submissions({ submissions, canonical }: PanelProps) {
-  return <SubmissionsSection submissions={submissions} paperPath={paperPath(canonical)} />;
+function Submissions({ submissions, address }: PanelProps) {
+  return <SubmissionsSection submissions={submissions} paperPath={pagePath(address)} />;
 }
 
-function SubmissionsAside({ submissions, canonical }: PanelProps) {
-  return <SubmissionsBox submissions={submissions} paperPath={paperPath(canonical)} />;
+function SubmissionsAside({ submissions, address }: PanelProps) {
+  return <SubmissionsBox submissions={submissions} paperPath={pagePath(address)} />;
 }
 
-function Versions({ versions, canonical, paper }: PanelProps) {
-  return <VersionsSection versions={versions} canonical={canonical} paperTitle={paper.title} />;
+function Versions({ versions, canonical, paper, address }: PanelProps) {
+  return (
+    <VersionsSection versions={versions} canonical={canonical} paperPath={pagePath(address)} paperTitle={paper.title} />
+  );
 }
 
-function VersionsAside({ versions, canonical }: PanelProps) {
-  return <VersionsBox versions={versions} paperPath={paperPath(canonical)} />;
+function VersionsAside({ versions, address }: PanelProps) {
+  return <VersionsBox versions={versions} paperPath={pagePath(address)} />;
 }
 
 /** The discussion (DESIGN.md §9): a client island, since what it shows depends on who is reading. */

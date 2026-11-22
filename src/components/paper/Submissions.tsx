@@ -260,13 +260,7 @@ function SubmissionView({ submission }: { submission: Submission }) {
   );
 }
 
-export function SubmissionsSection({
-  submissions,
-  paperPath,
-}: {
-  submissions: Submission[];
-  paperPath: string;
-}) {
+export function SubmissionsSection({ submissions, paperPath }: { submissions: Submission[]; paperPath: string }) {
   const add = <AddMissing what="submission" paperPath={paperPath} />;
   return (
     <Fold id="submissions" title="Submissions">
@@ -287,13 +281,7 @@ export function SubmissionsSection({
 }
 
 /** One line per submission beside the page, with the mean of its first score, out of its most when known. */
-export function SubmissionsBox({
-  submissions,
-  paperPath,
-}: {
-  submissions: Submission[];
-  paperPath: string;
-}) {
+export function SubmissionsBox({ submissions, paperPath }: { submissions: Submission[]; paperPath: string }) {
   if (submissions.length === 0) return null;
   return (
     <div className={ui.box}>

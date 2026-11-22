@@ -58,7 +58,7 @@ export function DemoFrames() {
     };
 
     function setHeight(frame: HTMLIFrameElement, s: FrameState, next: number) {
-      const current = frame.getBoundingClientRect().height;
+      const current = frame.clientHeight;
       if (current === 0 || Math.abs(next - current) < 2) return;
       if (s.last && s.quick && Math.abs(s.last.to - current) < 2) {
         const sameWay = next > current === s.last.to > s.last.from;
@@ -78,7 +78,7 @@ export function DemoFrames() {
       clearTimeout(s.timer);
       s.timer = undefined;
       if (s.frozen || s.hovered || s.wanted === 0) return;
-      if (s.wanted < frame.getBoundingClientRect().height) {
+      if (s.wanted < frame.clientHeight) {
         s.timer = setTimeout(() => {
           s.timer = undefined;
           if (!s.hovered && !s.frozen) setHeight(frame, s, s.wanted);
@@ -100,7 +100,7 @@ export function DemoFrames() {
       s.wanted = next;
       s.quick = s.last !== null && performance.now() - s.last.at < LOOP_WINDOW;
       // The first height, and any growth, at once; a shrink waits (`settle`).
-      if (!frame.classList.contains('demo-sized') || next > frame.getBoundingClientRect().height) {
+      if (!frame.classList.contains('demo-sized') || next > frame.clientHeight) {
         clearTimeout(s.timer);
         s.timer = undefined;
         setHeight(frame, s, next);

@@ -10,7 +10,6 @@ import {
   type VersionSubmission,
 } from '@/lib/versions';
 import { toolPath } from '@/lib/page-tools';
-import { paperPath } from '@/lib/paper-ids';
 import { AddMissing } from '@/components/paper/AddMissing';
 import { Fold } from '@/components/paper/Fold';
 
@@ -80,15 +79,17 @@ function Evidence({ urls }: { urls: string[] }) {
 export function VersionsSection({
   versions,
   canonical,
+  paperPath: here,
   paperTitle,
 }: {
   versions: PaperVersion[];
   canonical: PaperId;
+  /** The paper's address, its short one where it has one, for the "Add" prompts. */
+  paperPath: string;
   paperTitle: string;
 }) {
   const [a, b] = defaults(versions);
   const comparable = versions.length >= 2;
-  const here = paperPath(canonical);
   return (
     <Fold
       id="versions"
@@ -218,13 +219,7 @@ export function VersionsSection({
 }
 
 /** Beside the page: each version on a line, with what its latest venue decided. */
-export function VersionsBox({
-  versions,
-  paperPath,
-}: {
-  versions: PaperVersion[];
-  paperPath: string;
-}) {
+export function VersionsBox({ versions, paperPath }: { versions: PaperVersion[]; paperPath: string }) {
   if (versions.length === 0) return null;
   return (
     <div className={ui.box}>

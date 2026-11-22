@@ -5,7 +5,7 @@ import { notFound, redirect } from 'next/navigation';
 import { cache } from 'react';
 import { getDb } from '@/db';
 import { pageCurrent } from '@/db/schema';
-import { type KeyedKind, keyedPagePath, keyProblem, KINDS, pageName } from '@/lib/kinds';
+import { type KeyedKind, keyedPagePath, keyProblem, KINDS, pageName, pagePath } from '@/lib/kinds';
 import { linksFrom, linksTo } from '@/server/page-links';
 import { scopeMemberCount, scopePapers } from '@/server/page-members';
 import { cloneAddresses } from '@/server/pages/clone';
@@ -149,6 +149,7 @@ export async function KeyedPageRoute({ kind, segments }: { kind: KeyedKind; segm
           edit={
             KINDS[kind].repo
               ? {
+                  pagePath: pagePath(address),
                   codePath: toolPath('code', address),
                   clone: cloneAddresses(address),
                   hasRepo: current !== null,
