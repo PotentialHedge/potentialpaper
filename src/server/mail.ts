@@ -18,7 +18,8 @@ export interface Mail {
   html: string;
 }
 
-const outbox: Mail[] = [];
+// On `globalThis`, so pages and route handlers, which dev can load as separate module copies, share one outbox.
+const outbox: Mail[] = ((globalThis as { __devOutbox?: Mail[] }).__devOutbox ??= []);
 
 /** Mail "sent" without Resend, newest last. Dev and tests only. */
 export function devOutbox(): readonly Mail[] {
