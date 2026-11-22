@@ -79,13 +79,14 @@ export function Sections({ kind, address, ownersHtml, communityHtml, owners }: P
       {owners && (
         <div id="owners">
           {ask && !owners.claimed ? (
-            <p className={`${ui.fine} font-sans`}>
-              {ask.question}{' '}
-              <a href={owners.claimPath ?? undefined} rel="nofollow" className="font-semibold text-accent">
+            <div className="flex flex-wrap items-center gap-x-4 gap-y-2 border border-l-[3px] border-frame border-l-accent bg-card px-4 py-3 font-sans text-[13px]">
+              <p className="min-w-0 flex-1 basis-64 text-muted">
+                <strong className="text-ink">{ask.question}</strong> {ask.action} {ask.pitch}
+              </p>
+              <a href={owners.claimPath ?? undefined} rel="nofollow" className={ui.btn({ inline: true, flush: true })}>
                 {ask.action}
-              </a>{' '}
-              {ask.pitch}
-            </p>
+              </a>
+            </div>
           ) : (
             both && (
               <PartLabel>
