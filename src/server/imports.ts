@@ -7,6 +7,7 @@ import type { PaperVersion, VersionPdf } from '@/lib/versions';
 import { ApiError } from './api/errors';
 import type { Principal } from './auth';
 import { versionPdfAt } from './files';
+import { IMPORT_RATE_LIMIT } from './import-reviews';
 import { rolesOf, type Actor } from './pages/check';
 import { commitPage, type CommitResult } from './pages/commit';
 import { grantCovers } from './pages/rules';
@@ -117,7 +118,7 @@ export async function importVersions(
       versions: merged.map((v) => ({ ...v, pdf: v.pdf ? { url: v.pdf.url, license: v.pdf.license } : undefined })),
       summary: input.summary ?? 'Import the versions',
     },
-    { database },
+    { database, rateLimit: IMPORT_RATE_LIMIT },
   );
   return { result, identifiers };
 }
@@ -147,6 +148,7 @@ export async function importPdf(
   const result = await commitPage(paper.id, head, actor, versionChanges(versions, after), 'Add the PDF', {
     database,
     evidence: [input.at.url],
+    rateLimit: IMPORT_RATE_LIMIT,
   });
   return { result, identifiers };
 }
@@ -198,7 +200,7 @@ export async function importLinks(
     actor,
     linkChanges(files.keys(), links),
     input.summary ?? 'Add links from the abstract',
-    { database },
+    { database, rateLimit: IMPORT_RATE_LIMIT },
   );
   return { result, identifiers };
 }
