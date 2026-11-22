@@ -43,7 +43,7 @@ const TASKS: Record<string, { title: string; steps: (l: Links) => string[] }> = 
       'Pick one idea of the paper that is easier to understand by playing with it: an equation with a parameter to drag, an algorithm to step through, a figure to explore. Say in a line or two what you plan, and ask the person before you build it.',
       'Build it as a folder `demos/<name>/` in the clone (`<name>` a lower-case slug), with an `index.html`. Plain HTML, CSS and JavaScript that run as they are, with no build step; each file at most 1 MB. Make it work at any width, with the controls labelled and a sentence saying what to try.',
       'Show it on the page: add a community section, `community/NN-<name>.md`, that starts with a `#` heading, says in a sentence what the demo shows, and embeds it:\n\n   ````\n   ```demo demos/<name>\n   Its title\n   What it shows, in a line.\n   ```\n   ````',
-      'Open `demos/<name>/index.html` in a browser to check it works, show the person, and commit and push only once they agree. Then give them the paper\'s address, where the demo now shows.',
+      "Open `demos/<name>/index.html` in a browser to check it works, show the person, and commit and push only once they agree. Then give them the paper's address, where the demo now shows.",
     ],
   },
 };
