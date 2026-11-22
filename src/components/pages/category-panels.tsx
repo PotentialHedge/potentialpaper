@@ -47,12 +47,20 @@ export function CategoryAbout({ category }: KindPanelProps) {
 /** Most of a list shown; the API has the rest (`GET /pages/{identifier}/category`). */
 const SHOWN = 200;
 
-function MemberList({ title, links }: { title: string; links: PageLink[] }) {
+function MemberList({ title, links, search }: { title: string; links: PageLink[]; search?: string }) {
   if (links.length === 0) return null;
   return (
     <section>
       <h2 className={ui.groupHeading}>
         {title} <span className={ui.fine}>({links.length.toLocaleString('en')})</span>
+        {search && (
+          <>
+            {' '}
+            <a href={search} className={`${ui.fine} font-sans`}>
+              search them
+            </a>
+          </>
+        )}
       </h2>
       <ul className="columns-2 gap-8 narrow:columns-1">
         {links.slice(0, SHOWN).map((link) => (
@@ -73,8 +81,11 @@ function MemberList({ title, links }: { title: string; links: PageLink[] }) {
   );
 }
 
-/** What is in it, as a Wikipedia category lists it: its subcategories, then its other pages, each by name. */
-export function CategoryMembers({ category }: KindPanelProps) {
+/**
+ * What is in it, as a Wikipedia category lists it: its subcategories, then its other pages, each by name, with a link
+ * to search its papers (the home page's category filter).
+ */
+export function CategoryMembers({ category, pageKey }: KindPanelProps) {
   if (!category) return null;
   if (category.subcategories.length + category.pages.length === 0) {
     return <p className={ui.empty}>Nothing is in this category yet. Add a page to it from that page.</p>;
@@ -82,7 +93,15 @@ export function CategoryMembers({ category }: KindPanelProps) {
   return (
     <>
       <MemberList title="Subcategories" links={category.subcategories} />
-      <MemberList title="Pages" links={category.pages} />
+      <MemberList
+        title="Pages"
+        links={category.pages}
+        search={
+          category.pages.some((link) => link.page.kind === 'paper')
+            ? `/?category=${encodeURIComponent(pageKey)}`
+            : undefined
+        }
+      />
     </>
   );
 }

@@ -22,7 +22,7 @@
 
 import { prefixTsquery } from './search';
 
-export const TEXT_FIELDS = ['title', 'author', 'venue'] as const;
+export const TEXT_FIELDS = ['title', 'author', 'venue', 'category'] as const;
 export const NUMBER_FIELDS = ['year'] as const;
 export const SEARCH_FIELDS = [...TEXT_FIELDS, ...NUMBER_FIELDS] as const;
 export type SearchField = (typeof SEARCH_FIELDS)[number];
@@ -36,6 +36,9 @@ const ALIASES: Record<string, SearchField> = {
   a: 'author',
   venue: 'venue',
   v: 'venue',
+  category: 'category',
+  cat: 'category',
+  c: 'category',
   year: 'year',
   y: 'year',
 };
@@ -45,6 +48,12 @@ export const FIELD_HELP: { field: SearchField; aliases: string[]; example: strin
   { field: 'title', aliases: ['t'], example: 'title:diffusion', means: 'title contains' },
   { field: 'author', aliases: ['a'], example: 'author:"de freitas"', means: 'an author contains' },
   { field: 'venue', aliases: ['v'], example: 'venue:iclr', means: 'venue contains' },
+  {
+    field: 'category',
+    aliases: ['c'],
+    example: 'category:"linear attention"',
+    means: 'in a category whose name contains',
+  },
   { field: 'year', aliases: ['y'], example: 'year>=2026', means: 'year published' },
 ];
 

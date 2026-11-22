@@ -11,6 +11,7 @@ import {
   type SearchScope,
   websearchOf,
 } from '@/lib/query';
+import { CATEGORY_LABEL } from '@/lib/labeled-links';
 import { MARK_END, MARK_START, normalizeSearch, prefixTsquery, type SearchSort } from '@/lib/search';
 
 export const SEARCH_PAGE_SIZE = 50;
@@ -61,6 +62,8 @@ export interface SearchFilter {
   q?: string | null;
   /** One venue, exactly. */
   venue?: string | null;
+  /** One category, by its slug: the papers in it directly (`page_members`, `in-category`). */
+  category?: string | null;
   sort?: SearchSort;
   /** Only the papers this account follows. */
   followedBy?: string | null;
@@ -83,6 +86,11 @@ function followed(accountId: string): SQL {
 /** The papers an account is an author of, or has asked to be (`server/my-papers.ts`'s `authoredPapers`). */
 function authored(accountId: string): SQL {
   return sql`p.id in (select a.paper_id from author_claims a where a.account_id = ${accountId}::uuid and a.status in ('confirmed', 'pending'))`;
+}
+
+/** The papers in a category (its `in-category` members, `page_members`) that `which` picks, on `cp` and `cc`. */
+function inCategory(which: SQL): SQL {
+  return sql`p.id in (select m.paper_id from page_members m join pages cp on cp.id = m.scope_page_id left join page_current cc on cc.page_id = cp.id where m.via = ${CATEGORY_LABEL} and cp.kind = 'category' and ${which})`;
 }
 
 /** The query is a bound parameter; the prefix alternative is made of letters and digits only (`lib/search.ts`). */
@@ -138,6 +146,12 @@ function predicate(node: SearchNode, fuzzy: boolean, scopes: Scopes): SQL {
       return textPredicate(node, fuzzy, scopes);
     case 'match': {
       const pattern = containsPattern(node.value);
+      if (node.field === 'category') {
+        const inOne = inCategory(
+          sql`(cp.key ilike ${pattern} or coalesce(cc.kind_file ->> 'name', '') ilike ${pattern})`,
+        );
+        return node.op === '=' ? inOne : sql`not ${inOne}`;
+      }
       if (node.field === 'author') {
         const named = sql`exists (select from jsonb_array_elements_text(p.authors) a(name) where a.name ilike ${pattern})`;
         return node.op === '=' ? named : sql`not ${named}`;
@@ -264,6 +278,7 @@ type Found = Omit<SearchHit, 'matches' | 'matchCount'> & { id: string };
 async function readPage(
   {
     venue,
+    category,
     sort = 'relevance',
     page = 1,
     limit = SEARCH_PAGE_SIZE,
@@ -281,6 +296,7 @@ async function readPage(
     [
       sql`p.merged_into is null`,
       ...(venue ? [sql`p.venue = ${venue}`] : []),
+      ...(category ? [inCategory(sql`cp.key = ${category}`)] : []),
       ...(followedBy ? [followed(followedBy)] : []),
       ...(authoredBy ? [authored(authoredBy)] : []),
       ...(exceptFollowedBy ? [sql`not ${followed(exceptFollowedBy)}`] : []),
@@ -385,4 +401,33 @@ export async function topVenues(limit = 8, database: Database = getDb()): Promis
     limit ${limit}
   `);
   return rows.map((r) => r.venue);
+}
+
+/** The categories with the most papers, for the home page's filter: their slugs and names. */
+export async function topCategories(
+  limit = 8,
+  database: Database = getDb(),
+): Promise<{ slug: string; name: string }[]> {
+  const { rows } = await database.execute<{ slug: string; name: string }>(sql`
+    select cp.key as slug, coalesce(cc.kind_file ->> 'name', cp.key) as name
+    from page_members m
+    join pages cp on cp.id = m.scope_page_id
+    join papers p on p.id = m.paper_id
+    left join page_current cc on cc.page_id = cp.id
+    where m.via = ${CATEGORY_LABEL} and cp.kind = 'category' and cp.merged_into is null and p.merged_into is null
+    group by cp.key, cc.kind_file
+    order by count(*) desc, name
+    limit ${limit}
+  `);
+  return rows;
+}
+
+/** A category's name, by its slug; `null` if there is none. */
+export async function categoryName(slug: string, database: Database = getDb()): Promise<string | null> {
+  const { rows } = await database.execute<{ name: string }>(sql`
+    select coalesce(cc.kind_file ->> 'name', cp.key) as name
+    from pages cp left join page_current cc on cc.page_id = cp.id
+    where cp.kind = 'category' and cp.key = ${slug}
+  `);
+  return rows[0]?.name ?? null;
 }

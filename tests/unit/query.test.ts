@@ -86,6 +86,16 @@ describe('parseSearch', () => {
     expect(parseSearch('-(a)').node).toEqual(text([], ['a']));
   });
 
+  it('filters by category, by name or slug', () => {
+    expect(parseSearch('category:"linear attention"').node).toEqual({
+      kind: 'match',
+      field: 'category',
+      op: '=',
+      value: 'linear attention',
+    });
+    expect(parseSearch('c:llms').node).toEqual({ kind: 'match', field: 'category', op: '=', value: 'llms' });
+  });
+
   it('forgives unbalanced parentheses, dangling ORs and lone dashes', () => {
     expect(parseSearch('a) b').node).toEqual(text(['a', 'b']));
     expect(parseSearch('(a OR b').node).toEqual({ kind: 'or', items: [text(['a']), text(['b'])] });
