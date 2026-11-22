@@ -159,11 +159,11 @@ Every edit to a page takes \`evidence\`, up to 10 addresses (links, or \`url\`s 
 A paper's confirmed authors write its author section. Claiming needs a verified account.
 
 1. Find them: \`GET ${api}/me/claim-suggestions\` lists papers they may have written, likeliest first (\`?q=<title words or a name>\` to search). Or take the papers they name.
-2. Read the paper's claim: \`GET ${api}/claims?scheme=<scheme>&value=<value>\` gives their own \`claim\` (if any), the \`authors\` as printed, the indices already \`taken\`, the addresses \`printed\` on its first page (\`authorOf\` says whose each is, where that is clear), and which of their own confirmed addresses are \`onPaper\`. Check with the person which author they are.
+2. Read the paper's claim: \`GET ${api}/claims?scheme=<scheme>&value=<value>\` gives their own \`claim\` (if any), the \`authors\` as printed, the indices already \`taken\`, whether one of their confirmed addresses is printed on it (\`addressOnPaper\`) and whose that is (\`authorIndexOnPaper\`). Check with the person which author they are.
 3. Claim, in the first way that fits, with \`"paper": { "scheme", "value" }\` and the \`authorIndex\`:
-   - One of their addresses is \`onPaper\`: \`POST ${api}/claims\` with \`{ "paper", "authorIndex" }\`. Confirmed at once.
-   - Their address at the time is \`printed\` but not theirs on the site yet: \`POST ${api}/claims/code\` with \`{ "paper", "authorIndex", "email": "<the printed address>" }\` mails a code there; ask them for it, then \`POST ${api}/claims/code/confirm\` with \`{ "paper", "email", "code" }\`.
-   - The paper has confirmed co-authors: \`POST ${api}/claims/ask\` with \`{ "paper", "authorIndex", "evidence": "<a line for them>" }\` asks them to confirm it.
+   - \`addressOnPaper\`: \`POST ${api}/claims\` with \`{ "paper", "authorIndex" }\`. Confirmed at once.
+   - Their address at the time is printed on the paper (ask them, or read its first page) but is not on their account: \`POST ${api}/claims/code\` with \`{ "paper", "authorIndex", "email": "<that address>" }\` mails a code there (\`validation_error\` if it is not printed on it); ask them for it, then \`POST ${api}/claims/code/confirm\` with \`{ "paper", "email", "code" }\`.
+   - The paper has confirmed co-authors (\`confirmedNames\`): \`POST ${api}/claims/ask\` with \`{ "paper", "authorIndex", "evidence": "<a line for them>" }\` asks them to confirm it.
    - Otherwise: \`POST ${api}/claims\` with \`{ "paper", "authorIndex", "evidence": "<links that show it is them>" }\`, and an admin decides.
 4. \`hidden: true\`: it is under review; only an author whose address is printed on it can claim it now.
 

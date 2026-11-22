@@ -488,9 +488,8 @@ export const getClaim = route(async (req) => {
       taken: confirmed.map((c) => c.authorIndex),
       confirmedNames: hidden ? [] : confirmed.map((c) => c.authorName),
       hidden,
-      printed,
-      onPaper: addresses.onPaper,
-      ownAddresses: addresses.own,
+      addressOnPaper: addresses.onPaper.length > 0,
+      authorIndexOnPaper: addresses.onPaper.map((e) => printed.authorOf[e]).find((i) => i !== undefined) ?? null,
     },
     { principal },
   );

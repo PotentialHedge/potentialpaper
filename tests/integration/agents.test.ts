@@ -187,8 +187,8 @@ describe('agent onboarding and claiming', () => {
       authors: ['Ashish Vaswani', 'Noam Shazeer'],
       taken: [],
       hidden: false,
-      onPaper: [],
-      ownAddresses: ['ada@ethz.ch'],
+      addressOnPaper: false,
+      authorIndexOnPaper: null,
     });
     const claimed = await api('POST', '/claims', { token, body: { paper: PAPER, authorIndex: 1 } });
     expect(claimed.status).toBe(201);

@@ -348,20 +348,19 @@ export const OwnClaim = z.object({
 });
 
 /**
- * `GET /claims`: the viewer's claim, and what they need to make one, as the claim page shows it. `authors` as printed
- * (pick an `authorIndex` from it); `taken`, the indices someone is already confirmed as; `printed`, the addresses on
- * the paper's first page and whose each is where that is clear; `onPaper`, the viewer's own confirmed addresses among
- * them (a claim with one confirms at once). `hidden`: under review, so nothing says who claimed it and only an author
- * with an address on it may claim.
+ * `GET /claims`: the viewer's claim, and what they need to make one. `authors` as printed (pick an `authorIndex` from
+ * it); `taken`, the indices someone is already confirmed as. `addressOnPaper`: one of the viewer's confirmed addresses
+ * is printed on its first page, so a claim confirms at once; `authorIndexOnPaper`, whose it is, where that is clear.
+ * No address is ever shown. `hidden`: under review, so nothing says who claimed it, and only an author with an
+ * address on it may claim.
  */
 export const ClaimContext = OwnClaim.extend({
   authors: z.array(z.string()),
   taken: z.array(z.number().int()),
   confirmedNames: z.array(z.string()),
   hidden: z.boolean(),
-  printed: z.object({ emails: z.array(z.string()), authorOf: z.record(z.string(), z.number().int()) }),
-  onPaper: z.array(z.string()),
-  ownAddresses: z.array(z.string()),
+  addressOnPaper: z.boolean(),
+  authorIndexOnPaper: z.number().int().nullable(),
 });
 
 /**

@@ -10,7 +10,7 @@ export const dynamic = 'force-dynamic';
 const UPDATES: { date: string; text: string }[] = [
   {
     date: '2026-11-22',
-    text: "Two ways to do more for a person. Sign in through their browser: \`POST /api/v1/agent/link\` gives a \`url\` to open for them and a \`secret\` to poll \`POST /api/v1/agent/link/token\` with until they approve (see \`/agent/setup\`, step 1); someone new signs up on that page. And claim their papers: \`GET /api/v1/claims\` now gives what a claim needs (the authors as printed, who is taken, the addresses on the paper and which are theirs), and \`/agent/start\` says how to claim, choose a new account's handle and add co-authors. Only keys, SSH keys, passwords and plugin permissions stay the person's own to change.",
+    text: "Two ways to do more for a person. Sign in through their browser: \`POST /api/v1/agent/link\` gives a \`url\` to open for them and a \`secret\` to poll \`POST /api/v1/agent/link/token\` with until they approve (see \`/agent/setup\`, step 1); someone new signs up on that page. And claim their papers: \`GET /api/v1/claims\` now gives what a claim needs (the authors as printed, who is taken, and whether one of their addresses is on the paper), and \`/agent/start\` says how to claim, choose a new account's handle and add co-authors. Only keys, SSH keys, passwords and plugin permissions stay the person's own to change.",
   },
   {
     date: '2026-11-21',
