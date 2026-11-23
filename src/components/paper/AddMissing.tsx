@@ -63,11 +63,14 @@ export function AddMissing({
   what,
   paperPath,
   compact = false,
+  words,
 }: {
   what: Missing;
   paperPath: string;
   /** Just "Add", as a box's heading has it. */
   compact?: boolean;
+  /** Other words for the question and the link than `ASK`'s. */
+  words?: { question: string; action: string };
 }) {
   const [open, setOpen] = useState(false);
   const [prompt, setPrompt] = useState('');
@@ -95,9 +98,9 @@ export function AddMissing({
         </button>
       ) : (
         <span className="text-faint">
-          {ask.question}{' '}
+          {(words ?? ask).question}{' '}
           <button type="button" className={ui.linkBtn} onClick={() => void show()}>
-            {ask.action}
+            {(words ?? ask).action}
           </button>
         </span>
       )}

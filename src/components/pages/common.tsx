@@ -158,9 +158,9 @@ export function Sections({ kind, address, ownersHtml, communityHtml, owners }: P
           {communityHtml ? (
             <Html html={communityHtml} />
           ) : (
-            <CommunityInvite kind={kind} />
+            <CommunityInvite kind={kind} paperPath={kind === 'paper' ? pagePath(address) : null} />
           )}
-          {kind === 'paper' && (
+          {kind === 'paper' && communityHtml && (
             <div className={`${ui.fine} mt-3 font-sans`}>
               <AddMissing what="demo" paperPath={pagePath(address)} />
             </div>
@@ -177,14 +177,26 @@ export function Sections({ kind, address, ownersHtml, communityHtml, owners }: P
   );
 }
 
-/** A community part nobody has started: an invitation to write the first of it, not an empty room. */
-function CommunityInvite({ kind }: { kind: PageKind }) {
+/**
+ * A community part nobody has started: an invitation to write it, not an empty room. On a paper it offers a demo too,
+ * which is otherwise a line under the community's sections.
+ */
+function CommunityInvite({ kind, paperPath }: { kind: PageKind; paperPath: string | null }) {
   const { title, hint } = COMMUNITY_INVITE[kind] ?? INVITE;
   return (
     <div className="flex flex-wrap items-center gap-x-4 gap-y-2 border border-dashed border-frame px-4 py-3 font-sans text-[13px]">
-      <p className="min-w-0 flex-1 basis-64 text-muted">
+      <div className="min-w-0 flex-1 basis-64 text-muted">
         <strong className="text-ink">{title}</strong> {hint}
-      </p>
+        {paperPath && (
+          <div className="mt-1">
+            <AddMissing
+              what="demo"
+              paperPath={paperPath}
+              words={{ question: 'Or make it interactive:', action: 'build a demo with your AI agent' }}
+            />
+          </div>
+        )}
+      </div>
       <a href={EDIT} rel="nofollow" className={ui.btn({ inline: true, flush: true })}>
         Start writing
       </a>
