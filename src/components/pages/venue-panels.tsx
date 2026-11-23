@@ -1,5 +1,6 @@
 import { ui } from '@/components/ui';
-import { formatIdentifier, keyedPagePath, type VenueFile } from '@/lib/kinds';
+import { formatIdentifier, keyedPagePath, pagePath, type VenueFile } from '@/lib/kinds';
+import { AddFactRow, OwnFactRows } from './OwnFacts';
 import type { StatOutcome } from '@/lib/scope-stats';
 import { formatScore, STATUS_LABELS } from '@/lib/submissions';
 import { sourceTitle, sourceUrl } from '@/lib/venues';
@@ -35,13 +36,11 @@ const date = (iso: string) =>
  * What the venue file says, as the top of its infobox: its dates, where it is held, its own site, and where its
  * submissions come from. The venue's JSON-LD (`venueJsonLd`) says the same, from the same file.
  */
-export function VenueAbout({ kindFile }: KindPanelProps) {
-  if (!kindFile) return null;
-  const venue = kindFile as VenueFile;
+export function VenueAbout({ kindFile, own, address }: KindPanelProps) {
+  const venue = (kindFile ?? {}) as Partial<VenueFile>;
   const dates = [venue.dates?.start, venue.dates?.end].filter((d): d is string => Boolean(d)).map(date);
   const locations = venue.locations ?? [];
   const sources = venue.sources ?? [];
-  if (dates.length === 0 && locations.length === 0 && !venue.url && sources.length === 0) return null;
   return (
     <div className={ui.box}>
       <table className={ui.facts}>
@@ -94,8 +93,10 @@ export function VenueAbout({ kindFile }: KindPanelProps) {
               </td>
             </tr>
           )}
+          {own && <OwnFactRows facts={own} ownersTitle="the organisers" />}
         </tbody>
       </table>
+      <AddFactRow pagePath={pagePath(address)} />
     </div>
   );
 }

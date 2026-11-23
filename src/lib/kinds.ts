@@ -197,6 +197,7 @@ export const KINDS = {
     fileTypes: [
       'section',
       'labeledLink',
+      'fact',
       'authorPlugins',
       'link',
       'version',
@@ -219,7 +220,7 @@ export const KINDS = {
     owners: { dir: OWNERS_DIR, title: 'the organisers', noun: 'confirmed organisers', claim: 'organisers' },
     community: true,
     slots: slots('venue'),
-    fileTypes: ['section', 'labeledLink', 'venue'],
+    fileTypes: ['section', 'labeledLink', 'fact', 'venue'],
     contextKeys: [...COMMON_CONTEXT, 'page.hasScores', 'page.hasSubmissions', 'page.hasSignals'],
     scope: true,
     maxDepth: 4,

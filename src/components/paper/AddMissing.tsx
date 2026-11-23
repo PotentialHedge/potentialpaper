@@ -13,7 +13,7 @@ import { ui } from '@/components/ui';
  * the page's files themselves, in the Edit dialog (`EditDialog`).
  */
 
-type Missing = 'version' | 'submission' | 'demo' | 'picture';
+type Missing = 'version' | 'submission' | 'demo' | 'picture' | 'fact';
 
 const ASK: Record<Missing, { question: string; action: string; title: string; files: ReactNode }> = {
   version: {
@@ -33,6 +33,16 @@ const ASK: Record<Missing, { question: string; action: string; title: string; fi
     files: (
       <>
         Each version is a file in the page&apos;s <code>versions/</code>.
+      </>
+    ),
+  },
+  fact: {
+    question: '',
+    action: 'Add a row',
+    title: 'Add a row to the infobox',
+    files: (
+      <>
+        Rows are lines of <code>owners/facts.jsonl</code> (the owners&apos;) or <code>community/facts.jsonl</code>.
       </>
     ),
   },

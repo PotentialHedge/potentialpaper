@@ -1,3 +1,4 @@
+import type { PageFacts } from '@/lib/infobox-facts';
 import type { ComponentType } from 'react';
 import { ui } from '@/components/ui';
 import { type KeyedKind, pagePath } from '@/lib/kinds';
@@ -22,6 +23,8 @@ export interface KindPanelProps extends PageCommon {
   pageKey: string;
   /** Its kind file as it parses, or `null`. */
   kindFile: Record<string, unknown> | null;
+  /** The rows its owners and community added to its infobox (`facts.jsonl`), or `null` when it has none. */
+  own: PageFacts | null;
   /** A scope's papers, rolled up from the pages under it, and how many there are; `null` on a page that isn't one. */
   papers: { count: number; list: ScopePaper[] } | null;
   /** A person's page: what its account shows (`server/user-pages.ts`); `null` on other kinds. */

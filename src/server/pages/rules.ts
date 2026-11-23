@@ -2,6 +2,7 @@ import { z } from 'zod';
 import { DEMO_NAME, DEMOS_DIR, MAX_DEMO_NAME } from '@/lib/demos';
 import { KINDS, OWNERS_DIR, PAGE_KINDS, type PageKind, partsOf } from '@/lib/kinds';
 import { LINKS_FILE, parseLabeledLinks } from '@/lib/labeled-links';
+import { FACTS_FILE, parseFacts } from '@/lib/infobox-facts';
 import { parseLinkFile } from '@/lib/paper-links';
 import { parseReviewPath, parseReviewFile, REVIEWS_DIR, reviewSourceOf } from '@/lib/review-files';
 import { parseVersionFile, VERSION_ID, type VersionPdf } from '@/lib/versions';
@@ -37,6 +38,7 @@ import { htmlProblem } from './html';
  *   venue.json, category.json, org.json or profile.json   the kind file (`lib/kinds.ts`)
  *   owners/                         the owners' sections, where the kind has owners; community/ on all but a user's
  *   <part>/links.jsonl              that part's labeled links
+ *   <part>/facts.jsonl              that part's rows of the infobox (papers and venues)
  *
  * PDFs and pictures are Git LFS pointers (`parseLfsPointer`): the repo holds their hash and size, the bytes
  * are in R2 (`server/lfs.ts`), and `git lfs` moves them through the batch API (`server/git/lfs.ts`).
@@ -192,6 +194,17 @@ export function sectionName(path: string, part: PagePart): (OrderedName & { form
   return { ...name, format: name.extension === 'md' ? 'markdown' : 'html' };
 }
 
+/** Whether the path is a part's infobox rows, `<part>/facts.jsonl`, on a page of a kind that has them. */
+export function isFactsPath(path: string, kind: PageKind = 'paper'): boolean {
+  const slash = path.indexOf('/');
+  return (
+    (KINDS[kind].fileTypes as readonly string[]).includes('fact') &&
+    slash > 0 &&
+    path.slice(slash + 1) === FACTS_FILE &&
+    partsOf(kind).includes(path.slice(0, slash))
+  );
+}
+
 /** Whether the path is a part's labeled links, `<part>/links.jsonl`, on a page of this kind. */
 export function isLabeledLinksPath(path: string, kind: PageKind = 'paper'): boolean {
   const slash = path.indexOf('/');
@@ -296,7 +309,7 @@ export function encodeLfsPointer({ sha256, bytes }: LfsPointer): string {
 /** What a page of a kind holds, said when a path isn't one of them. */
 function kindLayout(kind: PageKind): string {
   const parts = partsOf(kind).map((part) => `${part}/`);
-  const sections = `${parts.join(' and ')} (sections named like 10-summary.md or 20-results.html, and links.jsonl${kind === 'paper' ? `; ${OWNERS_DIR}/ also plugins.json` : ''})`;
+  const sections = `${parts.join(' and ')} (sections named like 10-summary.md or 20-results.html, links.jsonl${(KINDS[kind].fileTypes as readonly string[]).includes('fact') ? ', facts.jsonl' : ''}${kind === 'paper' ? `; ${OWNERS_DIR}/ also plugins.json` : ''})`;
   if (kind !== 'paper') {
     return `${kind} pages hold .gitattributes, prek.toml, ${METADATA_PATH}, ${KINDS[kind].kindFile}, ${sections} and extensions/`;
   }
@@ -343,9 +356,12 @@ function partRule(kind: PageKind, part: string, denied: PathRule['denied']): Pat
   return {
     covers: (path) => path.startsWith(`${part}/`),
     layout: (path) =>
-      sectionName(path, part) || isLabeledLinksPath(path, kind) || (kind === 'paper' && path === AUTHOR_PLUGINS_PATH)
+      sectionName(path, part) ||
+      isLabeledLinksPath(path, kind) ||
+      isFactsPath(path, kind) ||
+      (kind === 'paper' && path === AUTHOR_PLUGINS_PATH)
         ? null
-        : `${part}/ holds one file per section, named like 10-summary.md or 20-results.html (two digits, a lower-case slug), and ${LINKS_FILE}`,
+        : `${part}/ holds one file per section, named like 10-summary.md or 20-results.html (two digits, a lower-case slug), ${LINKS_FILE}${(KINDS[kind].fileTypes as readonly string[]).includes('fact') ? ` and ${FACTS_FILE}` : ''}`,
     denied,
   };
 }
@@ -706,6 +722,10 @@ export function contentProblem(path: string, content: string, kind: PageKind = '
   if (path === GITATTRIBUTES_PATH) return content === GITATTRIBUTES ? null : 'is the same on every page, and fixed';
   if (isLabeledLinksPath(path, kind)) {
     const parsed = parseLabeledLinks(content, kind);
+    return 'problem' in parsed ? parsed.problem : null;
+  }
+  if (isFactsPath(path, kind)) {
+    const parsed = parseFacts(content, kind);
     return 'problem' in parsed ? parsed.problem : null;
   }
   if (kind === 'paper' && path === AUTHOR_PLUGINS_PATH) {

@@ -1,16 +1,16 @@
+import { AddFactRow, OwnFactRows } from '@/components/pages/OwnFacts';
 import { ui } from '@/components/ui';
 import { type PaperFacts, VENUE_ROW_LABEL } from '@/lib/paper-facts';
 
 /**
- * The infobox's facts about a paper, a row each as Wikipedia's: where it was accepted, presented and sent, and its
- * keywords. Built from `paperFacts` (`lib/paper-facts.ts`), as the page's JSON-LD and meta tags are, so the three never
- * disagree. Each row links to where the fact is shown in full: a venue to its page here.
+ * The infobox's facts about a paper, a row each as Wikipedia's: where it was accepted, presented and sent, its area and
+ * keywords, then the rows its authors and the community added. Built from `paperFacts` (`lib/paper-facts.ts`), as the
+ * page's JSON-LD and meta tags are, so they never disagree. A venue links to its page here.
  */
-export function Facts({ facts }: { facts: PaperFacts }) {
-  if (facts.venues.length === 0 && facts.keywords.length === 0 && !facts.area) return null;
+export function Facts({ facts, pagePath }: { facts: PaperFacts; pagePath: string }) {
   return (
     <div className={ui.box}>
-      <table className={ui.facts}>
+      <table className={`${ui.facts} empty:hidden`}>
         <tbody>
           {facts.venues.map((v, i) => (
             <tr key={i}>
@@ -46,8 +46,10 @@ export function Facts({ facts }: { facts: PaperFacts }) {
               <td className="text-muted">{facts.keywords.join(', ')}</td>
             </tr>
           )}
+          <OwnFactRows facts={facts.own} ownersTitle="the authors" />
         </tbody>
       </table>
+      <AddFactRow pagePath={pagePath} />
     </div>
   );
 }

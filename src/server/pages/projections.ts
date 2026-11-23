@@ -1,7 +1,8 @@
 import { eq, notInArray, sql } from 'drizzle-orm';
 import { getDb, type Database } from '@/db';
 import { authorClaims, commitIdentities, pageCurrent, pageRefs, pageRevisions } from '@/db/schema';
-import { KINDS, pageName } from '@/lib/kinds';
+import { KINDS, OWNERS_DIR, pageName } from '@/lib/kinds';
+import { FACTS_FILE, parseFacts, type PageFacts } from '@/lib/infobox-facts';
 import { AUTHOR_PLUGINS_PATH, type AuthorPanel, parseAuthorPlugins } from '@/lib/plugins/author-plugins';
 import { pageDemoSources } from '../demos/attach';
 import { readLinks, readThumbnail, readVersions } from './content';
@@ -113,6 +114,19 @@ async function readAuthorPlugins(
   return 'panels' in parsed && parsed.panels.length > 0 ? parsed.panels : null;
 }
 
+/** The page's own infobox rows, by part; `null` when it has none, or its kind has none. */
+async function readFacts(db: Reader, page: PageRow, files: ReadonlyMap<string, string>): Promise<PageFacts | null> {
+  if (!(KINDS[page.kind].fileTypes as readonly string[]).includes('fact')) return null;
+  const read = async (part: string) => {
+    const blob = files.get(`${part}/${FACTS_FILE}`);
+    if (!blob) return [];
+    const parsed = parseFacts((await readText(db, page.id, blob)) ?? '', page.kind);
+    return 'facts' in parsed ? parsed.facts : [];
+  };
+  const facts = { owners: await read(KINDS[page.kind].owners?.dir ?? OWNERS_DIR), community: await read('community') };
+  return facts.owners.length + facts.community.length > 0 ? facts : null;
+}
+
 /** Makes `page_current` say what the commit at the head says. */
 export async function writeCurrent(tx: Writer, pageId: string, head: string, commit: Commit): Promise<void> {
   const files = await readFiles(tx, pageId, commit.tree);
@@ -146,6 +160,7 @@ export async function writeCurrent(tx: Writer, pageId: string, head: string, com
     links: links.length > 0 ? links : null,
     versions: versions.length > 0 ? versions : null,
     authorPlugins: await readAuthorPlugins(tx, page, files),
+    facts: await readFacts(tx, page, files),
     ...(await readKindFile(tx, page, files)),
     updatedAt: commit.at,
   };

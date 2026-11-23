@@ -142,6 +142,11 @@ categories, "introduced by", roll-up, sortable papers, venues and orgs boxes, "m
 - Anyone verified makes, edits (name, article), renames and merges categories, with page protection and the patrol feed;
   a merge or rename leaves a redirect, as paper merges do.
 - Typed facts ("introduced by", "uses dataset") come later, as an infobox-like step after categories.
+  **Built 2026-11-23:** a page's side column is one infobox. Its rows are read from where each fact is kept
+  (`lib/paper-facts.ts`: versions, submissions, `venue.json`), and people add rows of their own as lines of a part's
+  `facts.jsonl` (`lib/infobox-facts.ts`): free text, owners' then community's, never a label the infobox fills in
+  itself. A primary area or keyword is a fact about a submission, never a category. Comparable scores across papers
+  belong in signals, not rows.
 
 ### Later (not this plan)
 

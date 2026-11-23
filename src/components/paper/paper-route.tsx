@@ -53,6 +53,7 @@ const loadCurrent = cache(async (paperId: string) => {
       authorHtml: pageCurrent.authorHtml,
       communityHtml: pageCurrent.communityHtml,
       authorPlugins: pageCurrent.authorPlugins,
+      facts: pageCurrent.facts,
       cover: pdfDocuments.coverUrl,
     })
     .from(pageCurrent)
@@ -72,6 +73,7 @@ async function factsOf({ paper, identifiers }: FoundPaper) {
     submissions,
     identifiers,
     pdf: current?.pdf?.url ?? null,
+    own: current?.facts ?? null,
   });
 }
 

@@ -7,6 +7,7 @@ import { getDb } from '@/db';
 import { pageCurrent } from '@/db/schema';
 import { type KeyedKind, keyedPagePath, keyProblem, KINDS, pageName, pagePath, venueFileSchema } from '@/lib/kinds';
 import { siteUrl } from '@/server/site';
+import type { PageFacts } from '@/lib/infobox-facts';
 import { venueJsonLd } from './venue-panels';
 import { linksFrom, linksTo } from '@/server/page-links';
 import { scopeMemberCount, scopePapers } from '@/server/page-members';
@@ -41,6 +42,7 @@ type Loaded =
         kindFile: Record<string, unknown> | null;
         ownersHtml: string | null;
         communityHtml: string | null;
+        facts: PageFacts | null;
       } | null;
     };
 
@@ -64,6 +66,7 @@ const load = cache(async (kind: KeyedKind, segments: string[]): Promise<Loaded |
       kindFile: pageCurrent.kindFile,
       ownersHtml: pageCurrent.authorHtml,
       communityHtml: pageCurrent.communityHtml,
+      facts: pageCurrent.facts,
     })
     .from(pageCurrent)
     .where(eq(pageCurrent.pageId, page.id));
@@ -117,6 +120,7 @@ export async function KeyedPageRoute({ kind, segments }: { kind: KeyedKind; segm
     pageId: page.id,
     name: current?.name ?? pageName(kind, key, null),
     kindFile: current?.kindFile ?? null,
+    own: current?.facts ?? null,
     ownersHtml: current?.ownersHtml ?? null,
     communityHtml: current?.communityHtml ?? null,
     linksFrom: from,

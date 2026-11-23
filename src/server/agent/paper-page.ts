@@ -5,6 +5,8 @@ import { AGENT_POST_KINDS } from '@/lib/agent-posts';
 import { AGENT_START_PATH } from '@/lib/agent-prompt';
 import { agentPaperPath, paperPath, shortPath, type PaperId } from '@/lib/paper-ids';
 import { titleLinks } from '@/lib/paper-links';
+import { paperFacts, type PaperFacts, VENUE_ROW_LABEL } from '@/lib/paper-facts';
+import type { FactLine } from '@/lib/infobox-facts';
 import { sortVersions, versionStanding, type PaperVersion } from '@/lib/versions';
 import type { FieldValue, Submission } from '@/lib/submissions';
 import { confirmedAuthors } from '../claims';
@@ -28,6 +30,7 @@ export async function agentPaperMarkdown(found: FoundPaper, canonical: PaperId, 
         authorMarkdown: pageCurrent.authorMarkdown,
         communityMarkdown: pageCurrent.communityMarkdown,
         versions: pageCurrent.versions,
+        facts: pageCurrent.facts,
         head: pageCurrent.head,
       })
       .from(pageCurrent)
@@ -68,6 +71,19 @@ export async function agentPaperMarkdown(found: FoundPaper, canonical: PaperId, 
   }
   out.push('');
 
+  out.push(
+    ...infoboxLines(
+      paperFacts({
+        paper,
+        versions: current?.versions ?? [],
+        submissions,
+        identifiers,
+        pdf: current?.pdf?.url ?? null,
+        own: current?.facts ?? null,
+      }),
+    ),
+  );
+
   out.push('## Abstract', '', paper.abstract ?? '_Not shown here: its license does not allow it._', '');
 
   out.push('## Author section', '');
@@ -94,6 +110,30 @@ export async function agentPaperMarkdown(found: FoundPaper, canonical: PaperId, 
   out.push(...discussion(posts));
   out.push(...howToPost(canonical, origin));
   return out.join('\n');
+}
+
+/** The paper page's infobox, from the same facts (`lib/paper-facts.ts`), with the rows people added and where. */
+function infoboxLines(facts: PaperFacts): string[] {
+  const rows: string[] = [];
+  for (const v of facts.venues) {
+    const detail = [v.presentation, v.site && `in ${v.site}`].filter(Boolean).join(', ');
+    rows.push(`- ${VENUE_ROW_LABEL[v.status ?? 'unknown']}: ${v.venue}${detail ? ` (${detail})` : ''}`);
+  }
+  if (facts.area) rows.push(`- Area: ${facts.area.name} (as the authors chose it at ${facts.area.venue})`);
+  if (facts.keywords.length > 0) rows.push(`- Keywords: ${facts.keywords.join(', ')}`);
+  if (facts.tldr) rows.push(`- TL;DR: ${facts.tldr}`);
+  const own = (rows: FactLine[], file: string) =>
+    rows.map((r) => `- ${r.label}: ${r.value}${r.url ? ` (${r.url})` : ''} [${file}]`);
+  rows.push(...own(facts.own.owners, 'owners/facts.jsonl'), ...own(facts.own.community, 'community/facts.jsonl'));
+  if (rows.length === 0) return [];
+  return [
+    '## Infobox',
+    '',
+    'Rows marked with a file are ones people added: one JSON line each there, `{"label", "value", "url"?}`. The rest come from where each fact is kept.',
+    '',
+    ...rows,
+    '',
+  ];
 }
 
 /** The versions as a list, oldest first, with their ids for comparing and editing them. */

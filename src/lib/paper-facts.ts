@@ -1,3 +1,4 @@
+import type { PageFacts } from './infobox-facts';
 import { keyedPagePath } from './kinds';
 import { sourceLinks, type PaperId } from './paper-ids';
 import { reviewsKey } from './review-files';
@@ -44,6 +45,8 @@ export interface PaperFacts {
   area: { name: string; venue: string } | null;
   /** Its one-sentence summary, from its newest submission that has one. */
   tldr: string | null;
+  /** The rows its authors and the community added (`owners/facts.jsonl`, `community/facts.jsonl`). */
+  own: PageFacts;
   /** Its addresses elsewhere: arXiv, DOI, OpenReview. */
   identifiers: { label: string; url: string }[];
   pdf: string | null;
@@ -81,12 +84,14 @@ export function paperFacts({
   submissions,
   identifiers,
   pdf,
+  own = null,
 }: {
   paper: { title: string; authors: string[]; abstract: string | null };
   versions: readonly PaperVersion[];
   submissions: readonly Submission[];
   identifiers: readonly PaperId[];
   pdf: string | null;
+  own?: PageFacts | null;
 }): PaperFacts {
   const sorted = sortVersions(versions);
   const paths = venuePaths(submissions);
@@ -119,6 +124,7 @@ export function paperFacts({
     keywords,
     area: areaOf(submissions),
     tldr: submissions.find((s) => s.tldr)?.tldr ?? null,
+    own: own ?? { owners: [], community: [] },
     identifiers: identifiers.flatMap(sourceLinks).filter((l) => l.label !== 'PDF'),
     pdf,
   };

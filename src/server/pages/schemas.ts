@@ -12,6 +12,7 @@ import { labeledLinkSchema, LINK_LABELS } from '@/lib/labeled-links';
 import { linkFileSchema } from '@/lib/paper-links';
 import { authorPluginsFileSchema } from '@/lib/plugins/author-plugins';
 import { formsFileSchema, noteFileSchema, submissionFileSchema } from '@/lib/review-files';
+import { factLineSchema } from '@/lib/infobox-facts';
 import { scoreOf } from '@/lib/submissions';
 import { versionFileSchema } from '@/lib/versions';
 import { leadingHtmlTitle } from './html';
@@ -178,6 +179,17 @@ export const PAGE_SCHEMAS = {
       },
     ],
     render: { panel: 'Links', slots: PAGE_KINDS.map((kind) => `${kind}.aside`) },
+  }),
+  fact: fileType({
+    title: 'Infobox rows',
+    scope: 'page',
+    schema: factLineSchema,
+    glob: `${PARTS_GLOB}/facts.jsonl`,
+    filesRegex: `^${PARTS_RE}/facts\\.jsonl$`,
+    writable: true,
+    format: 'jsonl',
+    index: (fact) => [{ kind: 'fact', text: words(fact.label, fact.value), fields: { label: fact.label } }],
+    render: { panel: 'Facts', slots: ['paper.aside', 'venue.aside'] },
   }),
   authorPlugins: fileType({
     title: 'Author section plugins',

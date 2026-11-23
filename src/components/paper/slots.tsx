@@ -117,8 +117,8 @@ function Submissions({ submissions, address }: PanelProps) {
   return <SubmissionsSection submissions={submissions} paperPath={pagePath(address)} />;
 }
 
-function FactsAside({ facts }: PanelProps) {
-  return <Facts facts={facts} />;
+function FactsAside({ facts, address }: PanelProps) {
+  return <Facts facts={facts} pagePath={pagePath(address)} />;
 }
 
 function Versions({ versions, paper, address }: PanelProps) {

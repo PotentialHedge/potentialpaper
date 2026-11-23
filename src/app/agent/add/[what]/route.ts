@@ -35,6 +35,16 @@ const TASKS: Record<string, { title: string; steps: (l: Links) => string[] }> = 
       'Tell the person what you found, and save it only once they agree.',
     ],
   },
+  fact: {
+    title: "Add a row to a page's infobox",
+    steps: ({ origin, setup }) => [
+      `Set up as ${setup} says, for this page: sign in (with the code if there is one), then git and a clone of the page (its step 3 says how the page's path gives its clone address).`,
+      `Read the page: its agent page is its address with \`/agent\` in front (\`${origin}/agent/s/42\`). Its infobox already shows, from where each is kept, where a paper was submitted and what each venue decided, its area and keywords (a venue's dates, locations and website): never add those as rows.`,
+      'Ask the person what the row should say, if they haven\'t: a fact about this page that a reader scanning its infobox wants, such as "PyTorch implementation: 76.1% top-1 on ImageNet" with a link to the code, or "Compute: 8×A100, 3 days". Short: a label of up to 40 characters, a value of up to 300, plain text.',
+      'Add it as one line of JSON, `{"label": "…", "value": "…", "url": "https://…"}` (the url optional, and `"evidence": ["https://…"]` for what backs it up), to `community/facts.jsonl`; or to `owners/facts.jsonl` if the person is one of the page\'s confirmed owners (a paper\'s authors). One row a line, at most 30 a file.',
+      "Show the person the row; commit and push only once they agree. Then give them the page's address, where the row now shows in the infobox.",
+    ],
+  },
   picture: {
     title: "Add a paper's picture",
     steps: ({ origin, setup }) => [

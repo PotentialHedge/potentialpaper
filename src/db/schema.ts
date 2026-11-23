@@ -25,6 +25,7 @@ import { PAGE_KINDS } from '../lib/kinds';
 import { NOTE_KINDS, SUBMISSION_STATUSES, type FieldValue, type VenueForms } from '../lib/submissions';
 import type { Bins, ScoreGroup, StatOutcome } from '../lib/scope-stats';
 import type { TitleLink } from '../lib/paper-links';
+import type { PageFacts } from '../lib/infobox-facts';
 import type { PaperVersion } from '../lib/versions';
 import type { AuthorPanel } from '../lib/plugins/author-plugins';
 import type { PdfPointer, ThumbnailPointer } from '@/server/pages/rules';
@@ -433,6 +434,8 @@ export const pageCurrent = pgTable('page_current', {
   links: jsonb('links').$type<TitleLink[]>(),
   /** The page's `versions/`, oldest first (`lib/versions.ts`). */
   versions: jsonb('versions').$type<PaperVersion[]>(),
+  /** Its parts' `facts.jsonl`: the rows people added to its infobox (`lib/infobox-facts.ts`). */
+  facts: jsonb('facts').$type<PageFacts>(),
   /** A paper's `owners/plugins.json`: the plugins' panels its authors let into the author section, if it parses. */
   authorPlugins: jsonb('author_plugins').$type<AuthorPanel[]>(),
   /**
