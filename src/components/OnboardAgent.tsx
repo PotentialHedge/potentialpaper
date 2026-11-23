@@ -91,12 +91,11 @@ export function OnboardAgent({
 }
 
 /**
- * The agent screen's prompt (`AgentPromptButton`): made as it opens, shown to select by hand, and a button under it
- * that copies it. A signed-in viewer's carries a one-time code, which replaces the plain prompt once it comes.
+ * The agent screen's prompt (`AgentPromptButton`): `AgentPromptField`, made as it opens. A signed-in viewer's carries
+ * a one-time code, which replaces the plain prompt once it comes.
  */
 export function AgentPromptBox() {
   const [prompt, setPrompt] = useState('');
-  const [copied, setCopied] = useState(false);
 
   useEffect(() => {
     let current = true;
@@ -116,27 +115,6 @@ export function AgentPromptBox() {
     };
   }, []);
 
-  async function copy() {
-    try {
-      await navigator.clipboard.writeText(prompt);
-      setCopied(true);
-      setTimeout(() => setCopied(false), 1500);
-    } catch {
-      // No clipboard: the prompt is there to select.
-    }
-  }
-
-  return (
-    <div>
-      <code
-        aria-label="Prompt for your AI agent"
-        className={`${ui.mono} block min-h-[3lh] border border-frame bg-highlight/60 px-3 py-2.5 leading-relaxed [overflow-wrap:anywhere] whitespace-pre-wrap text-ink select-all`}
-      >
-        {prompt}
-      </code>
-      <button type="button" className={ui.btn()} disabled={!prompt} onClick={() => void copy()}>
-        {copied ? 'Prompt copied' : 'Copy the prompt'}
-      </button>
-    </div>
-  );
+  // No caption: the screen's title says what to do with it.
+  return <AgentPromptField prompt={prompt} label="" />;
 }
