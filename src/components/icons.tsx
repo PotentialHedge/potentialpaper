@@ -95,6 +95,15 @@ export function EyeIcon({ className = 'size-3.5' }: { className?: string }) {
   );
 }
 
+/** Three rising bars: statistics. */
+export function ChartIcon({ className = 'size-3.5' }: { className?: string }) {
+  return (
+    <svg {...line} className={className}>
+      <path d="M3 13.5V9M8 13.5V5M13 13.5V2.5" />
+    </svg>
+  );
+}
+
 /** A star: follow a paper. Filled when followed. */
 export function StarIcon({ className = 'size-3.5', filled = false }: { className?: string; filled?: boolean }) {
   return (

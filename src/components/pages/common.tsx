@@ -2,6 +2,7 @@ import { type ComponentType, Fragment, type ReactNode } from 'react';
 import { AddMissing } from '@/components/paper/AddMissing';
 import { AddCategory } from '@/components/categories/AddCategory';
 import { AuthorPanels, CommunityPanels } from '@/components/plugins/NestedPanels';
+import { ChartIcon, EyeIcon } from '@/components/icons';
 import { ui } from '@/components/ui';
 import {
   formatIdentifier,
@@ -42,18 +43,28 @@ export interface PageCommon {
 export const EDIT = '#edit';
 
 /** How each kind asks its owners in, while it has none, and once it has some. */
-const ASK: Partial<Record<OwnersInfo['claim'], { question: string; action: string; join: string; pitch: string }>> = {
+/** An icon sitting in a line of text, on its baseline. */
+const INLINE_ICON = 'inline size-3.5 -translate-y-px align-middle';
+
+/** "with views and other statistics", each with its icon. */
+const STATS = (
+  <>
+    with <EyeIcon className={INLINE_ICON} /> views and other <ChartIcon className={INLINE_ICON} /> statistics
+  </>
+);
+
+const ASK: Partial<Record<OwnersInfo['claim'], { question: string; action: string; join: string; pitch: ReactNode }>> = {
   authors: {
     question: 'Are you an author?',
     action: 'Claim this paper',
     join: 'also an author?',
-    pitch: "to see who's reading it, with views and other statistics, and to write about it here.",
+    pitch: <>to see who&apos;s reading it, {STATS}, and to write about it here.</>,
   },
   organisers: {
     question: 'Organise this venue?',
     action: 'Claim it',
     join: 'also organising?',
-    pitch: "to see who's reading it, with views and other statistics, and to write here.",
+    pitch: <>to see who&apos;s reading it, {STATS}, and to write here.</>,
   },
   domain: { question: 'A member?', action: 'See how', join: 'how to join', pitch: 'to write here.' },
 };
