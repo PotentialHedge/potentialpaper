@@ -29,7 +29,7 @@ import { renderComment } from './render';
  *     random, made the first time the account comments anonymously on the paper (`comment_aliases`), the same
  *     on all its anonymous comments there, and unrelated to its alias on any other paper. That lets a reader
  *     follow one voice and mention it as `@k3xm`. An anonymous comment from before a claim stays anonymous;
- *   - anything else by handle, with the real name and institutions the account chose to show.
+ *   - anything else by handle, with the real name if the account chose to show it.
  *
  * **Mentions.** `@name` mentions an alias on this paper or an account's handle; an alias wins over a handle
  * spelled the same, since it is what the page shows here. Each comment carries the names in its body that
@@ -58,7 +58,7 @@ const COMMENT_BUDGET: RateLimitConfig = { burst: 30, perSecond: 30 / 3600 };
 export type CommentAuthor =
   | { kind: 'author'; name: string }
   | { kind: 'alias'; alias: string }
-  | { kind: 'account'; handle: string; realName: string | null; institutions: string[]; bot: boolean };
+  | { kind: 'account'; handle: string; realName: string | null; bot: boolean };
 
 export interface CommentView {
   id: string;
@@ -232,8 +232,6 @@ const commentColumns = {
   ts: sql<string>`to_char(${comments.createdAt} at time zone 'UTC', 'YYYY-MM-DD"T"HH24:MI:SS.US"Z"')`,
   handle: accounts.handle,
   realName: accounts.realName,
-  showInstitution: accounts.showInstitution,
-  institutions: accounts.institutions,
   isBot: accounts.isBot,
   // Uses comments_parent_created_idx. `r` is the reply; the outer row is `comments`.
   replyCount: sql<number>`(select count(*)::int from comments r where r.parent_id = ${comments.id})`,
@@ -256,8 +254,6 @@ type CommentRow = {
   ts: string;
   handle: string;
   realName: string | null;
-  showInstitution: boolean;
-  institutions: string[];
   isBot: boolean;
   replyCount: number;
   head: Buffer | null;
@@ -531,7 +527,6 @@ function authorFor(r: CommentRow, alias: string | undefined, authorName: string 
     kind: 'account',
     handle: r.handle,
     realName: r.realName,
-    institutions: r.showInstitution ? r.institutions : [],
     bot: r.isBot,
   };
 }

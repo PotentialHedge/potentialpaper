@@ -729,7 +729,7 @@ which the page, plugins' `page.read` and the public routes all read. The page's 
 papers) follow `real_name` as above.
 
 **The institution is one choice everywhere** (`handoffs/pages.md` Phase 4): `show_institution`, asked at onboarding
-and changed on the profile, shows it beside the handle on comments and edits, on the person's page, and on their
+and changed on the profile, shows it on the person's page and on their
 organisation's page, which then lists the handle among its people and counts the papers they are a confirmed author
 of. There is no separate `user.show.institution`, so the institution is never public in one place and hidden in
 another. An org page lists only handles; a real name stays on the person's own page as `user.show.realName` says.

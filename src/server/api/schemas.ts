@@ -723,7 +723,6 @@ const CommentAuthor = z.discriminatedUnion('kind', [
     kind: z.literal('account'),
     handle: z.string(),
     realName: z.string().nullable(),
-    institutions: z.array(z.string()),
     bot: z.boolean(),
     isYou: z.boolean(),
   }),

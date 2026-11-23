@@ -38,7 +38,7 @@ export const USER_SHOW: Record<UserShowItem, UserShowInfo> = {
   institution: {
     title: 'Institution',
     description:
-      "Show the institutions of your confirmed addresses: on your page, beside your handle on comments, and on your organisation's page, which then lists you as a member and counts the papers you authored. Set on your profile, where you answered it at sign-up; off until you choose.",
+      "Show the institutions of your confirmed addresses: on your page and on your organisation's page, which then lists you as a member and counts the papers you authored. Set on your profile, where you answered it at sign-up; off until you choose.",
     default: false,
   },
   claimedPapers: {

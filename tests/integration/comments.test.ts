@@ -48,7 +48,6 @@ describe('comments', () => {
     expect(first.body.author).toMatchObject({
       kind: 'account',
       handle: 'ada',
-      institutions: ['ETH Zurich'],
       isYou: true,
     });
     expect(first.body.html).toContain('class="katex"');

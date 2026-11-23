@@ -412,8 +412,9 @@ function Byline({ author }: { author: Comment['author'] }) {
   return (
     <span>
       {author.realName && <span className="text-ink">{author.realName} </span>}
-      <span className={author.realName ? '' : 'text-ink'}>@{shownHandle(author.handle, author.bot)}</span>
-      {author.institutions.length > 0 && <span>, {author.institutions.join(', ')}</span>}
+      <a href={`/u/${author.handle}`} className={author.realName ? '' : 'text-ink'}>
+        @{shownHandle(author.handle, author.bot)}
+      </a>
       {you}
     </span>
   );
