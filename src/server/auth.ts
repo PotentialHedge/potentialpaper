@@ -5,7 +5,14 @@ import { user, type Account } from '@/db/schema';
 import { ApiError } from './api/errors';
 import { ensureAccountForUser } from './accounts';
 import { getAuth } from './better-auth';
-import { consume, rateLimitConfig, rateLimitHeaders, type RateLimitResult } from './ratelimit';
+import {
+  accountRateLimit,
+  consume,
+  rateLimitConfig,
+  rateLimitHeaders,
+  type RateLimitConfig,
+  type RateLimitResult,
+} from './ratelimit';
 import { verifyToken } from './tokens';
 
 /**
@@ -92,7 +99,7 @@ async function authenticateToken(req: Request, header: string): Promise<Principa
   if (!SAFE_METHODS.has(req.method) && !verified.scopes.includes('write')) {
     throw new ApiError(403, 'forbidden', 'this token may only read');
   }
-  const rateLimit = await countRequest(`account:${verified.account.id}`, await trustedAccount(verified.account));
+  const rateLimit = await countRequest(`account:${verified.account.id}`, await bucketOf(verified.account));
   return { account: verified.account, isAdmin: false, credentialId: verified.id, via: 'token', rateLimit };
 }
 
@@ -124,14 +131,18 @@ export async function authenticateGitPush(req: Request): Promise<Principal> {
   if (!verified.account.isBot && !verified.account.verifiedAt) {
     throw new ApiError(403, 'not_verified', 'Confirm an institutional email address before you push.');
   }
-  const rateLimit = await countRequest(`account:${verified.account.id}`, await trustedAccount(verified.account));
+  const rateLimit = await countRequest(`account:${verified.account.id}`, await bucketOf(verified.account));
   return { account: verified.account, isAdmin: false, credentialId: verified.id, via: 'token', rateLimit };
 }
 
 /**
- * A bot's, or an admin's own: their tokens get the trusted bucket (`rateLimitConfig`). A token still never acts as
- * an admin; this only sets its pace.
+ * A token's bucket (`accountRateLimit`): a bot's own limit when an admin set one, else the trusted bucket for a bot's or
+ * an admin's own token. A token still never acts as an admin; this only sets its pace.
  */
+async function bucketOf(account: Account): Promise<RateLimitConfig> {
+  return accountRateLimit(account, await trustedAccount(account));
+}
+
 async function trustedAccount(account: Account): Promise<boolean> {
   if (account.isBot) return true;
   if (!account.userId || !process.env.ADMIN_EMAILS) return false;
@@ -139,9 +150,9 @@ async function trustedAccount(account: Account): Promise<boolean> {
   return row ? isAdminEmail(row.email) : false;
 }
 
-/** One request from the credential's bucket, or a 429. */
-async function countRequest(key: string, trusted = false): Promise<RateLimitResult> {
-  const rateLimit = await consume(key, rateLimitConfig(trusted));
+/** One request from the credential's bucket (`true`: the trusted one), or a 429. */
+async function countRequest(key: string, bucket: boolean | RateLimitConfig = false): Promise<RateLimitResult> {
+  const rateLimit = await consume(key, typeof bucket === 'boolean' ? rateLimitConfig(bucket) : bucket);
   if (!rateLimit.allowed) {
     throw new ApiError(
       429,

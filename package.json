@@ -23,6 +23,7 @@
     "consumers:rebuild": "tsx scripts/rebuild-consumer.ts",
     "bots:grant": "tsx scripts/grant-bot.ts",
     "bots:token": "tsx scripts/bot-token.ts",
+    "bots:limit": "tsx scripts/bot-limit.ts",
     "settings:site": "tsx scripts/site-settings.ts",
     "announcements": "tsx scripts/announcements.ts",
     "pages:create": "tsx scripts/create-page.ts",

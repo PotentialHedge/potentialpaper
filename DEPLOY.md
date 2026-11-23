@@ -97,6 +97,10 @@ importer, the bot `openreview`, and grants it `reviews/openreview/**`. Grant or 
 `dc run --rm tools npm run bots:grant -- <handle> 'reviews/<source>/**' --by <admin handle> [--create]`
 (`--revoke` takes it back; no arguments lists every grant).
 
+Every bot shares the trusted request limit (`API_RATE_LIMIT_TRUSTED_*`) unless it has its own: keep an outside
+publisher's bot slower with `dc run --rm tools npm run bots:limit -- <handle> --per-second 50 --burst 500` (`--clear`
+goes back to the default; no arguments lists the bots and their limits).
+
 ## Plugins' identity keys
 
 Plugins with the `identity` permission get tokens the site signs (ES256), which their backends verify at

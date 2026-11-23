@@ -393,6 +393,13 @@
       "when": 1795383698285,
       "tag": "0055_categories",
       "breakpoints": true
+    },
+    {
+      "idx": 56,
+      "version": "7",
+      "when": 1795430569182,
+      "tag": "0056_bot_rate_limits",
+      "breakpoints": true
     }
   ]
 }

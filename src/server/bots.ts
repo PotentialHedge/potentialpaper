@@ -106,3 +106,40 @@ export async function listGrants(database: Database = getDb()): Promise<Grant[]>
     .innerJoin(accounts, eq(accounts.id, botGrants.accountId))
     .orderBy(accounts.handle, botGrants.kind, botGrants.pattern);
 }
+
+export interface BotLimit {
+  handle: string;
+  /** `null`: the trusted bucket (`rateLimitConfig(true)`). */
+  perSecond: number | null;
+  burst: number | null;
+}
+
+/** Every bot with its own request limit, if it has one (`bots:limit`). */
+export async function listBotLimits(database: Database = getDb()): Promise<BotLimit[]> {
+  const rows = await database
+    .select({ handle: accounts.handle, perSecond: accounts.rateLimitPerSecond, burst: accounts.rateLimitBurst })
+    .from(accounts)
+    .where(eq(accounts.isBot, true))
+    .orderBy(accounts.handle);
+  return rows.map((row) => ({ ...row, handle: row.handle ?? '' }));
+}
+
+/**
+ * Sets a bot's own request limit (`accountRateLimit`), or with `null` takes it back to the trusted bucket. Whether
+ * there was such a bot.
+ */
+export async function setBotLimit(
+  handle: string,
+  limit: { perSecond: number; burst: number } | null,
+  database: Database = getDb(),
+): Promise<boolean> {
+  if (limit && !(limit.perSecond > 0 && Number.isInteger(limit.burst) && limit.burst >= 1)) {
+    throw new Error('the limit needs --per-second above 0 and a whole --burst of at least 1');
+  }
+  const updated = await database
+    .update(accounts)
+    .set({ rateLimitPerSecond: limit?.perSecond ?? null, rateLimitBurst: limit?.burst ?? null })
+    .where(and(eq(accounts.handle, handle), eq(accounts.isBot, true)))
+    .returning({ id: accounts.id });
+  return updated.length > 0;
+}

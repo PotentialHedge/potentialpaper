@@ -44,6 +44,19 @@ export function rateLimitConfig(trusted = false): RateLimitConfig {
   return { burst, perSecond };
 }
 
+/**
+ * An account's bucket: a bot's own limit when an admin set one (`bots:limit`), else the trusted bucket for bots and
+ * admins, else a person's. A person's account never has its own, whatever its row says.
+ */
+export function accountRateLimit(
+  account: { isBot: boolean; rateLimitPerSecond: number | null; rateLimitBurst: number | null },
+  trusted: boolean,
+): RateLimitConfig {
+  const { isBot, rateLimitPerSecond: perSecond, rateLimitBurst: burst } = account;
+  if (isBot && perSecond !== null && burst !== null && perSecond > 0 && burst >= 1) return { perSecond, burst };
+  return rateLimitConfig(trusted);
+}
+
 /** Take one request from `key`'s bucket, if there is one to take. */
 export async function consume(
   key: string,

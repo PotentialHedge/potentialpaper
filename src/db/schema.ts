@@ -72,6 +72,13 @@ export const accounts = pgTable(
     /** When the account's first institutional address was confirmed; `null` once none is. Gates writing. */
     verifiedAt: timestamp('verified_at', { withTimezone: true, mode: 'date' }),
     isBot: boolean('is_bot').notNull().default(false),
+    /**
+     * A bot's own request limit, set by an admin (`bots:limit`), so an outside publisher's bot can be kept slower than
+     * our importers. Both or neither; without them a bot has the trusted bucket (`accountRateLimit`). A person's
+     * account ignores them.
+     */
+    rateLimitPerSecond: doublePrecision('rate_limit_per_second'),
+    rateLimitBurst: integer('rate_limit_burst'),
     /** Whether a `@` mention in a comment may be mailed (`server/mentions.ts`). On by default. */
     mentionMail: boolean('mention_mail').notNull().default(true),
     /** Whether edits and comments on followed papers may be mailed (`server/follows.ts`). On by default. */
