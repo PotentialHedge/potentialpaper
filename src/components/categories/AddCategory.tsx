@@ -1,6 +1,6 @@
 'use client';
 
-import { type FormEvent, useState } from 'react';
+import { type FormEvent, useId, useState } from 'react';
 import { Modal } from '@/components/Modal';
 import { ui } from '@/components/ui';
 import { failureOf, send } from './api';
@@ -28,6 +28,21 @@ export function AddCategory({
   const [note, setNote] = useState<{ ok: boolean; text: string; link?: string } | null>(null);
   const matches = useCategoryMatches(chosen ? '' : name);
   const exact = matches.find((m) => m.exact);
+  const listId = useId();
+  const [listOpen, setListOpen] = useState(false);
+  const [active, setActive] = useState(0);
+  // The list under the field: the categories like what is typed, then, when none has that name, making it.
+  const typed = name.trim();
+  const rows: ({ identifier: string; name: string } | null)[] =
+    chosen || typed.length < 2 ? [] : [...matches.slice(0, 8), ...(exact ? [] : [null])];
+  const showList = listOpen && rows.length > 0;
+  const pick = (row: { identifier: string; name: string } | null) => {
+    if (row) {
+      setChosen(row.identifier);
+      setName(row.name);
+    }
+    setListOpen(false);
+  };
 
   async function submit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
@@ -86,36 +101,63 @@ export function AddCategory({
       <form onSubmit={submit} className="mt-3">
         <input
           data-autofocus
+          role="combobox"
+          aria-expanded={showList}
+          aria-controls={listId}
+          aria-autocomplete="list"
+          aria-activedescendant={showList ? `${listId}-${active}` : undefined}
+          autoComplete="off"
           value={name}
           onChange={(e) => {
             setName(e.target.value);
             setChosen(null);
+            setActive(0);
+            setListOpen(true);
+          }}
+          onFocus={() => setListOpen(true)}
+          onBlur={() => setListOpen(false)}
+          onKeyDown={(e) => {
+            if (e.key === 'ArrowDown' || e.key === 'ArrowUp') {
+              e.preventDefault();
+              setListOpen(true);
+              if (rows.length > 0) setActive((i) => (i + (e.key === 'ArrowDown' ? 1 : rows.length - 1)) % rows.length);
+            } else if (e.key === 'Enter' && showList) {
+              e.preventDefault();
+              pick(rows[active] ?? null);
+            } else if (e.key === 'Escape' && showList) {
+              e.preventDefault();
+              e.stopPropagation();
+              setListOpen(false);
+            }
           }}
           required
           maxLength={120}
           placeholder="A category, such as Linear attention"
           aria-label="Category"
-          className={ui.input}
+          className={`${ui.input} w-full`}
         />
-        {matches.length > 0 && (
-          <ul className="mb-2 space-y-0.5">
-            {matches.slice(0, 6).map((m) => (
-              <li key={m.key}>
-                <button
-                  type="button"
-                  className={ui.linkBtn}
-                  onClick={() => {
-                    setChosen(m.identifier);
-                    setName(m.name);
-                  }}
-                >
-                  {m.name}
-                </button>
+        {showList && (
+          <ul id={listId} role="listbox" className="-mt-px mb-2 max-h-60 overflow-auto border border-frame bg-card">
+            {rows.map((row, i) => (
+              <li
+                key={row?.identifier ?? ''}
+                id={`${listId}-${i}`}
+                role="option"
+                aria-selected={i === active}
+                // Before the field's blur closes the list.
+                onMouseDown={(e) => {
+                  e.preventDefault();
+                  pick(row);
+                }}
+                onMouseEnter={() => setActive(i)}
+                className={`cursor-pointer px-2 py-1.5 ${i === active ? 'bg-rule-soft' : ''}`}
+              >
+                {row ? row.name : <span className="text-muted">Make a new category “{typed}”</span>}
               </li>
             ))}
           </ul>
         )}
-        {name.trim().length > 1 && !chosen && !exact && (
+        {typed.length > 1 && !chosen && !exact && !showList && (
           <p className="mb-2 text-xs text-muted">No category is called that yet: adding makes it.</p>
         )}
         <button className={ui.btn({ inline: true })} disabled={busy || !name.trim()}>
