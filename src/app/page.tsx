@@ -30,15 +30,11 @@ export const dynamic = 'force-dynamic';
 
 const ON = ui.on;
 
-/** The home page's heading, one picked at random on each load. */
-const TAGLINES = [
-  'A public page for every paper',
-  'Every paper, in the words of its readers',
-  'Where papers meet their critics',
-  'What researchers say about a paper, in one place',
-  'Every paper has a page. Researchers write it.',
-  'See how papers connect',
-];
+/** The home page's heading. */
+const TITLE = 'A public page for every paper, written by researchers';
+
+/** Where the site's code is. */
+const REPO_URL = 'https://github.com/PotentialHedge/potentialpaper';
 
 /** Sorts kept out of the row, in the ⋯ menu (on a phone every sort is in the filter menu). */
 const MENU_SORTS: readonly SearchSort[] = ['oldest', 'title'];
@@ -176,23 +172,25 @@ export default async function Home({
     <main className={ui.page}>
       <Announcements items={announced.filter((a) => !dismissed.has(a.id))} />
       <header className="mt-12 pb-6 text-center narrow:mt-8">
-        <h1 className="mt-2 mb-3 text-[30px] leading-snug font-normal narrow:text-2xl">
-          {TAGLINES[Math.floor(Math.random() * TAGLINES.length)]}
-        </h1>
+        <h1 className="mt-2 mb-3 text-[30px] leading-snug font-normal narrow:text-2xl">{TITLE}</h1>
         <InstitutionStrip names={institutions} />
         {!q && (
           <div className="mx-auto mt-5 max-w-[min(680px,85%)] text-[14px] leading-[1.55]">
             <HomeNextStep example={tutorialExample(all.hits)} host={new URL(siteUrl()).host} />
             <h2 className={`${ui.boxHeading} text-center`}>Abstract</h2>
             <p className="text-justify hyphens-auto">
-              PotentialPaper gives each research paper one page that verified researchers can edit. Its authors keep a
-              section of their own, the community keeps another, and labeled links say how papers connect: which ones
-              extend, replicate or contradict each other. Every change is kept as a git commit. Any arXiv link works
-              here too: change the domain of <span className={ui.mono}>arxiv.org/abs/1706.03762</span> to this
-              site&apos;s. Paper pages can be read, but not yet edited. You can already{' '}
+              PotentialPaper gives every research paper one public page. Its authors keep a section of their own,
+              verified researchers write the community&apos;s, and labeled links show how papers connect: which ones
+              extend, replicate or contradict each other. Every change is a git commit, made in the browser, with git,
+              or by your AI agent. Any arXiv link works here too: change the domain of{' '}
+              <span className={ui.mono}>arxiv.org/abs/1706.03762</span> to this site&apos;s.{' '}
               <Link href="/welcome" className="text-accent">
-                join with your institutional email
+                Join with your institutional email
               </Link>
+              . The code is{' '}
+              <a href={REPO_URL} className="text-accent" rel="noopener noreferrer">
+                on GitHub
+              </a>
               .
             </p>
           </div>
