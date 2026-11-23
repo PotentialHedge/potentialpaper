@@ -253,7 +253,7 @@ const githubSource = z.string().refine((text) => parsePluginSource(text)?.kind =
 
 /** The plugins every reader has unless the site's settings change `plugins.default`: the paper map and scores. */
 export const DEFAULT_PLUGINS: readonly string[] = [
-  'github:benedict-armstrong/potentialpaper-paper-map@v0.7.0',
+  'github:benedict-armstrong/potentialpaper-paper-map@v0.7.1',
   'github:benedict-armstrong/potentialpaper-score-standing@v0.3.2',
 ];
 
