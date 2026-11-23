@@ -130,9 +130,10 @@ export function PictureDrop({ canonical, paperPath }: { canonical: PaperId; pape
         }}
       />
       {error && <p className={ui.note(false)}>{error}</p>}
-      <p className={`${ui.fine} mt-1.5`}>
+      {/* A div: the prompt's dialog can't be inside a <p>. */}
+      <div className={`${ui.fine} mt-1.5`}>
         <AddMissing what="picture" paperPath={paperPath} />
-      </p>
+      </div>
     </div>
   );
 }
