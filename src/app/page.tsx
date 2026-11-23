@@ -23,6 +23,7 @@ import { institutionNames } from '@/server/affiliations';
 import { currentAnnouncements } from '@/server/announcements';
 import { viewerFromHeaders } from '@/server/auth';
 import { siteUrl } from '@/server/site';
+import { CategoryFilter } from '@/components/categories/CategoryFilter';
 import {
   categoryName,
   SEARCH_PAGE_SIZE,
@@ -141,10 +142,6 @@ export default async function Home({
       institutionNames(),
     ]);
   const venues = venue && !topVenueList.includes(venue) ? [...topVenueList, venue] : topVenueList;
-  const categories =
-    category && !topCategoryList.some((c) => c.slug === category)
-      ? [...topCategoryList, { slug: category, name: chosenCategory ?? category }]
-      : topCategoryList;
   const categoryLabel = category ? (chosenCategory ?? category) : null;
   const cookieJar = await cookies();
   const mineOpen = cookieJar.get(MINE_COOKIE)?.value !== '0';
@@ -184,6 +181,13 @@ export default async function Home({
   const moreLabel = [MENU_SORTS.includes(sort) && sort, venue, categoryLabel, onlyFollowed && '★']
     .filter(Boolean)
     .join(', ');
+  const categoryPicker = (
+    <CategoryFilter
+      base={href({ category: '' })}
+      current={category ? { slug: category, name: categoryLabel ?? category } : null}
+      top={topCategoryList}
+    />
+  );
   const viewLink = (v: 'compact' | 'detailed') => (
     <Link
       href={href({ view: v === 'detailed' ? 'detailed' : '' })}
@@ -293,25 +297,10 @@ export default async function Home({
                 ))}
               </div>
             </div>
-            {categories.length > 0 && (
-              <div>
-                <h3 className={ui.boxHeading}>Category</h3>
-                <div className="flex flex-wrap gap-x-4 gap-y-2">
-                  <PopoverClose asChild>
-                    <Link href={href({ category: '' })} className={category ? '' : ON}>
-                      all categories
-                    </Link>
-                  </PopoverClose>
-                  {categories.map((c) => (
-                    <PopoverClose key={c.slug} asChild>
-                      <Link href={href({ category: c.slug })} className={c.slug === category ? ON : ''}>
-                        {c.name}
-                      </Link>
-                    </PopoverClose>
-                  ))}
-                </div>
-              </div>
-            )}
+            <div>
+              <h3 className={ui.boxHeading}>Category</h3>
+              {categoryPicker}
+            </div>
             {viewer && (
               <PopoverClose asChild>
                 <Link href={href({ following: onlyFollowed ? '0' : '1' })} className={onlyFollowed ? ON : ''}>
@@ -396,23 +385,7 @@ export default async function Home({
                 </Link>
               </PopoverClose>
             ))}
-            {categories.length > 0 && (
-              <PopoverClose asChild>
-                <Link
-                  href={href({ category: '' })}
-                  className={`mt-1 border-t border-rule pt-1.5 ${category ? '' : ON}`}
-                >
-                  all categories
-                </Link>
-              </PopoverClose>
-            )}
-            {categories.map((c) => (
-              <PopoverClose key={c.slug} asChild>
-                <Link href={href({ category: c.slug })} className={c.slug === category ? ON : ''}>
-                  {c.name}
-                </Link>
-              </PopoverClose>
-            ))}
+            <div className="mt-1 w-56 border-t border-rule pt-1.5">{categoryPicker}</div>
             {viewer && (
               <PopoverClose asChild>
                 <Link
