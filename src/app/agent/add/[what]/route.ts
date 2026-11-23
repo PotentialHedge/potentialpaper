@@ -35,6 +35,16 @@ const TASKS: Record<string, { title: string; steps: (l: Links) => string[] }> = 
       'Tell the person what you found, and save it only once they agree.',
     ],
   },
+  picture: {
+    title: "Add a paper's picture",
+    steps: ({ origin, setup }) => [
+      `Set up as ${setup} says, for this paper's page: sign in (with the code if there is one), then git, Git LFS and a clone of the page (its step 3 says how the paper's path gives its clone address).`,
+      `Read the paper: its agent page is its address with \`/agent\` in front (\`${origin}/agent/s/42\`), with its PDF.`,
+      "Pick the one picture that best says what the paper does: usually its overview figure (often Figure 1), or else its key result. Crop it to that figure alone, with no page margins, captions or running text, landscape if it can be, around 1200 to 1600 pixels wide. A paper's own figure is fine to use on its page; never take a picture from elsewhere.",
+      'Save it in the clone as `thumbnail.png` (or `.jpg` for a photo, `.gif`, `.webp`, `.avif`), at most 8 MB, and beside it a `thumbnail.json` with its words: `{ "alt": "what the picture shows, for someone who can\'t see it", "caption": "a short caption, like the paper\'s own" }`. Git LFS keeps the picture; check `git lfs ls-files` lists it before committing.',
+      "If a person is working with you, show them the picture and its caption, and change what they ask; commit and push only once they agree. Then give them the paper's address, where the picture now shows.",
+    ],
+  },
   demo: {
     title: 'Build an interactive demo of a paper',
     steps: ({ origin, setup }) => [

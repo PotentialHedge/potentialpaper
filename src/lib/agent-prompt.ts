@@ -39,7 +39,7 @@ export function agentPrompt(origin: string, code?: string): string {
 /** The prompt a paper's "Add" buttons give (`AddMissing`): the task's page, `/agent/add/<what>`, for the paper's path. */
 export function addPrompt(
   origin: string,
-  what: 'version' | 'submission' | 'demo',
+  what: 'version' | 'submission' | 'demo' | 'picture',
   paperPath: string,
   code?: string,
 ): string {

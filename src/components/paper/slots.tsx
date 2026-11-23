@@ -7,6 +7,7 @@ import { AbstractText } from '@/components/AbstractText';
 import type { Paper } from '@/db/schema';
 import { paperPath, sourceLinks, sourceName, type PaperId } from '@/lib/paper-ids';
 import { Comments } from './Comments';
+import { PictureDrop } from './PictureDrop';
 import type { Submission } from '@/lib/submissions';
 import type { PdfPointer } from '@/server/pages/rules';
 import { SubmissionsBox, SubmissionsSection } from './Submissions';
@@ -46,7 +47,7 @@ function Abstract({ paper }: PanelProps) {
   return <AbstractText text={paper.abstract} />;
 }
 
-function ReadThePaper({ identifiers, pdf, picture }: PanelProps) {
+function ReadThePaper({ identifiers, pdf, picture, canonical, address }: PanelProps) {
   // The PDF and its credit already link the file and its source, which are often the paper's own there.
   const links = identifiers.flatMap(sourceLinks).filter(({ url }) => url !== pdf?.source && url !== pdf?.url);
   const opens = pdf?.url ?? links[0]?.url;
@@ -58,6 +59,7 @@ function ReadThePaper({ identifiers, pdf, picture }: PanelProps) {
   );
   return (
     <div className={ui.box}>
+      {!picture && <PictureDrop canonical={canonical} paperPath={pagePath(address)} />}
       {picture && image && (
         <figure className="mb-3">
           <div className="border border-rule bg-white">

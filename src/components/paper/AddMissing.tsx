@@ -8,12 +8,12 @@ import { ui } from '@/components/ui';
 
 /**
  * A small "Missing a version? Add it" under the paper's versions (and "Want an interactive demo?" under its community
- * sections). It opens a choice: a prompt for the reader's AI
+ * sections, and under an empty picture frame). It opens a choice: a prompt for the reader's AI
  * agent, which finds what is missing with evidence and asks before saving (`/agent/start` says how), or editing
  * the page's files themselves, in the Edit dialog (`EditDialog`).
  */
 
-type Missing = 'version' | 'submission' | 'demo';
+type Missing = 'version' | 'submission' | 'demo' | 'picture';
 
 const ASK: Record<Missing, { question: string; action: string; title: string; files: ReactNode }> = {
   version: {
@@ -33,6 +33,17 @@ const ASK: Record<Missing, { question: string; action: string; title: string; fi
     files: (
       <>
         Each version is a file in the page&apos;s <code>versions/</code>.
+      </>
+    ),
+  },
+  picture: {
+    question: 'Or',
+    action: 'ask your AI agent to add one',
+    title: 'Add a picture',
+    files: (
+      <>
+        The picture is the page&apos;s <code>thumbnail.png</code> (or .jpg, .gif, .webp, .avif), its caption{' '}
+        <code>thumbnail.json</code>.
       </>
     ),
   },
