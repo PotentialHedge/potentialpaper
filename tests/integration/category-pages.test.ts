@@ -117,6 +117,9 @@ describe('making a category', () => {
     expect(found.body.categories[0]).toMatchObject({ key: 'state-space-models', exact: true });
     const similar = await api('GET', `/categories?q=${enc('space model')}`);
     expect(similar.body.categories[0]).toMatchObject({ key: 'state-space-models', exact: false });
+    // Misspelled, or part of the name misspelled.
+    const misspelled = await api('GET', `/categories?q=${enc('stat spce')}`);
+    expect(misspelled.body.categories[0]).toMatchObject({ key: 'state-space-models' });
   });
 
   it('needs a verified account', async () => {

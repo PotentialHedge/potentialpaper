@@ -89,7 +89,7 @@ export interface CategoryMatch {
 }
 
 /**
- * Categories whose name is like `q`: the same name first (`exact`), then by trigram similarity and words in common. What
+ * Categories whose name is like `q`, misspelled or not: the same name first (`exact`), then by trigram similarity, of the whole name or its closest words (`word_similarity`). What
  * the "New category" and "Add to a category" forms show as one types.
  */
 export async function similarCategories(
@@ -100,13 +100,16 @@ export async function similarCategories(
   const text = q.replace(/\s+/g, ' ').trim().slice(0, 120);
   if (text.length < 2) return [];
   const { rows } = await database.execute<{ key: string; name: string; sim: number }>(sql`
-    select p.key, c.name, similarity(lower(c.name), lower(${text})) as sim
+    select p.key, c.name,
+           greatest(similarity(lower(c.name), lower(${text})), word_similarity(lower(${text}), lower(c.name))) as sim
       from pages p
       join page_current c on c.page_id = p.id
      where p.kind = 'category' and p.merged_into is null and c.name is not null
        and (c.name ilike ${`%${text.replace(/[\\%_]/g, (c) => `\\${c}`)}%`}
             or lower(${text}) like '%' || lower(c.name) || '%'
-            or similarity(lower(c.name), lower(${text})) > 0.3)
+            or similarity(lower(c.name), lower(${text})) > 0.3
+            -- Misspelled, or part of the name misspelled: "langauge" finds "Large language models".
+            or word_similarity(lower(${text}), lower(c.name)) > 0.45)
      order by sim desc
      limit 100
   `);
