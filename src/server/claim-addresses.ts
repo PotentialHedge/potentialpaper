@@ -4,7 +4,6 @@ import { getDb, type Database } from '@/db';
 import { isUniqueViolation } from '@/db/errors';
 import { accountEmails, affiliations, papers, type Account } from '@/db/schema';
 import { claimCodeMail } from '@/lib/claim-mails';
-import { paperPath } from '@/lib/paper-ids';
 import {
   addAffiliation,
   hashCode,
@@ -75,7 +74,7 @@ export async function sendClaimCode(
       code,
       title: paper?.title ?? '',
       authorName: claim.authorName,
-      claimUrl: `${siteUrl()}${summary ? `/claim${paperPath(summary.canonical)}` : '/claim'}`,
+      claimUrl: `${siteUrl()}${summary ? `/claim${summary.path}` : '/claim'}`,
     });
 
   if (await institutionForEmail(email, database)) {

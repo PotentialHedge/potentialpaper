@@ -2,7 +2,7 @@ import { notFound, redirect } from 'next/navigation';
 import { ui } from '@/components/ui';
 import { addressOfPath, formatIdentifier, KINDS, type PageAddress, type PageRef, pageRefOf } from '@/lib/kinds';
 import { type Tool, toolPath } from '@/lib/page-tools';
-import { namedPage, type NamedPage } from '@/server/pages/named';
+import { namedPage, namedPageByShortId, type NamedPage } from '@/server/pages/named';
 import type { FoundPaper } from '@/server/papers';
 
 /** What the edit, history, diff, claim and versions pages share, for a page of any kind (`lib/page-tools.ts`). */
@@ -21,11 +21,19 @@ export interface ToolPage extends NamedPage {
  */
 export async function toolPage(tool: Tool, params: ToolParams, query = ''): Promise<ToolPage> {
   const { scheme, value } = await params;
-  const asked = addressOfPath(scheme, value);
-  const found = asked && (await namedPage(asked));
+  // A paper's short address (`/history/s/42`), or any page's identifier path (`/history/abs/1706.03762`).
+  const short = scheme === 's' && value.length === 1 && /^\d{1,9}$/.test(value[0]) ? Number(value[0]) : null;
+  const asked = short === null ? addressOfPath(scheme, value) : null;
+  const found = short !== null ? await namedPageByShortId(short) : asked && (await namedPage(asked));
   // A person's page has no files, so no history, edit or claim page (`KINDS.user.repo`).
-  if (!asked || !found || !KINDS[found.address.kind].repo) notFound();
-  if (formatIdentifier(found.address) !== formatIdentifier(asked)) redirect(toolPath(tool, found.address, query));
+  if (!found || !KINDS[found.address.kind].repo) notFound();
+  // Any other address of it (an identifier path, an old key, a merged page) goes to its canonical one.
+  const canonical = found.address.kind === 'paper' ? (found.address.shortId ?? null) : null;
+  const same =
+    short !== null
+      ? canonical === short
+      : canonical === null && asked !== null && formatIdentifier(found.address) === formatIdentifier(asked);
+  if (!same) redirect(toolPath(tool, found.address, query));
   return { ...found, ref: pageRefOf(found.address) };
 }
 

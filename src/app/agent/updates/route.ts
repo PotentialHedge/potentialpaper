@@ -9,6 +9,10 @@ export const dynamic = 'force-dynamic';
  */
 const UPDATES: { date: string; text: string }[] = [
   {
+    date: '2026-11-23',
+    text: 'A paper is addressed by its short address everywhere the site links it: its page `/s/<n>`, its agent page `/agent/s/<n>`, and its tools `/history/s/<n>`, `/code/s/<n>`, `/claim/s/<n>`, `/versions/s/<n>`. The identifier forms (`/abs/…`, `/doi/…`, `/openreview/…`, with or without `/agent` or a tool in front) still work and lead there. `GET /api/v1/papers/<scheme>/<value>` gives `path` as `/s/<n>`. Clone addresses are unchanged (`/git/<scheme>/<id>.git`).',
+  },
+  {
     date: '2026-11-22',
     text: 'Topics are called categories now, as on Wikipedia, with no old names kept: the kind is `category`, its pages are `/c/<slug>` (identifier `category:<slug>`, kind file `category.json`), the label that puts a page in one is `in-category`, and the routes are `GET`/`POST /api/v1/categories`, `GET /api/v1/pages/<identifier>/category` (its `subcategories` and `pages`) and `POST /api/v1/pages/<identifier>/categories` `{ "category": "category:<slug>" }` or `{ "name" }`. A taken name is refused with `category_exists`.',
   },

@@ -183,7 +183,7 @@ describe('git over SSH', () => {
 
     const tip = commit(clone, { 'community/10-summary.md': '# Summary\n\nPushed over SSH.\n' });
     const pushed = await gitWith(key, ['push', '--progress', 'origin', 'main'], clone);
-    expect(pushed.output).toContain(`remote: 1 commit added: http://test.local/abs/${id.value}`);
+    expect(pushed.output).toContain('remote: 1 commit added: http://test.local/s/');
     expect(pushed.ok).toBe(true);
     expect(await readHead(getDb(), paperId)).toBe(tip);
 

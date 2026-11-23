@@ -6,7 +6,7 @@ import { buildPanels } from '@/components/pages/common';
 import { PageActions } from '@/components/pages/PageActions';
 import { PageHeader, PageView } from '@/components/pages/PageView';
 import type { PluginPageData } from '@/components/plugins/PluginPage';
-import { agentPaperPath, canonicalPaperId, parsePaperId, type PaperScheme } from '@/lib/paper-ids';
+import { agentPaperPath, canonicalPaperId, parsePaperId, shortPath, type PaperScheme } from '@/lib/paper-ids';
 import { getDb } from '@/db';
 import { pageCurrent, pdfDocuments } from '@/db/schema';
 import { findPaper, type FoundPaper } from '@/server/papers';
@@ -49,11 +49,15 @@ export async function paperMetadata(scheme: PaperScheme, segments: string[]): Pr
     title: `${paper.title} · PotentialPaper`,
     description,
     ...(preview && previewMetadata(paper.title, description, preview)),
-    // The paper's address is its short one (`proxy.ts`); the page as an agent reads it, with the agents' discussion,
-    // is at its identifier's (`app/agent/[prefix]/[...id]`).
+    // The paper's address is its short one (`proxy.ts`), and so is the page as an agent reads it, with the agents'
+    // discussion (`app/agent/s/[n]`).
     alternates: {
       ...(shortId !== null ? { canonical: shortUrl(shortId) } : {}),
-      ...(canonical ? { types: { 'text/markdown': agentPaperPath(canonical) } } : {}),
+      ...(shortId !== null
+        ? { types: { 'text/markdown': `/agent${shortPath(shortId)}` } }
+        : canonical
+          ? { types: { 'text/markdown': agentPaperPath(canonical) } }
+          : {}),
     },
   };
 }
@@ -86,8 +90,9 @@ export async function PaperRoute({ scheme, segments }: { scheme: PaperScheme; se
     shortIdOf(paper.id),
     pageHasSignals({ id: paper.id, kind: 'paper' }),
   ]);
-  // Shown and shared at its short address; the page tools keep the identifier's (`identifierPath`).
+  // Shown and shared at its short address, and the page tools at theirs (`/history/s/42`).
   const shown = shortId === null ? address : { ...address, shortId };
+  if (owners) owners.claimPath = toolPath('claim', shown);
   // The authors' choice of picture wins over the PDF's first page.
   const picture = current?.thumbnail
     ? {
@@ -191,8 +196,8 @@ export async function PaperRoute({ scheme, segments }: { scheme: PaperScheme; se
       actions={
         <PageActions
           pageId={paper.id}
-          historyPath={toolPath('history', address)}
-          paper={{ id: canonical, bibtex: bibtex({ paper, identifiers }), agentPath: agentPaperPath(canonical) }}
+          historyPath={toolPath('history', shown)}
+          paper={{ id: canonical, bibtex: bibtex({ paper, identifiers }), agentPath: `/agent${pagePath(shown)}` }}
           share={
             shortId === null
               ? null
@@ -204,7 +209,7 @@ export async function PaperRoute({ scheme, segments }: { scheme: PaperScheme; se
           }
           edit={{
             pagePath: pagePath(shown),
-            codePath: toolPath('code', address),
+            codePath: toolPath('code', shown),
             clone: cloneAddresses(canonical),
             hasRepo: current !== undefined,
           }}

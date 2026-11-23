@@ -5,6 +5,7 @@ import {
   pageMembers,
   pageMemberSources,
   pageParents,
+  pages,
   pageScopeNames,
   paperIdentifiers,
   papers,
@@ -382,12 +383,14 @@ export async function scopePapers(
       paperId: pageMembers.paperId,
       title: papers.title,
       year: papers.year,
+      shortId: pages.shortId,
       via: sql<string[]>`array_agg(distinct ${pageMembers.via})`,
     })
     .from(pageMembers)
     .innerJoin(papers, eq(papers.id, pageMembers.paperId))
+    .innerJoin(pages, eq(pages.id, pageMembers.paperId))
     .where(rolledUp(scopeId))
-    .groupBy(pageMembers.paperId, papers.title, papers.year, papers.createdAt)
+    .groupBy(pageMembers.paperId, papers.title, papers.year, papers.createdAt, pages.shortId)
     .orderBy(sql`${papers.year} desc nulls last`, desc(papers.createdAt))
     .limit(limit);
   const ids = rows.map((row) => row.paperId);
@@ -398,9 +401,9 @@ export async function scopePapers(
           .from(paperIdentifiers)
           .where(inArray(paperIdentifiers.paperId, ids))
       : [];
-  return rows.map((row) => {
+  return rows.map(({ shortId, ...row }) => {
     const id = canonicalPaperId(identifiers.filter((i) => i.paperId === row.paperId));
-    return { ...row, address: id ? { kind: 'paper', id: { scheme: id.scheme, value: id.value } } : null };
+    return { ...row, address: id ? { kind: 'paper', id: { scheme: id.scheme, value: id.value }, shortId } : null };
   });
 }
 

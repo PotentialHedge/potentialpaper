@@ -8,7 +8,7 @@ import { HandleCombobox, type HandleMatch } from '@/components/HandleCombobox';
 import { Modal } from '@/components/Modal';
 import { Select } from '@/components/Select';
 import { ui } from '@/components/ui';
-import { paperPath, type PaperId } from '@/lib/paper-ids';
+import type { PaperId } from '@/lib/paper-ids';
 import type { AuthoredPaper, WaitingClaim } from '@/server/my-papers';
 
 /** `server/my-papers.ts`'s rows, with dates as strings to cross to the client. */
@@ -23,7 +23,8 @@ async function messageOf(res: Response): Promise<string> {
   return body?.error?.message ?? `Something went wrong (${res.status}).`;
 }
 
-const claimPath = (paper: PaperId) => `/claim${paperPath(paper)}`;
+/** The claim page at the paper's short address (`/claim/s/42`). */
+const claimPath = (path: string) => `/claim${path}`;
 
 /**
  * The papers the viewer is an author of, or has claimed, as Table `n`. A confirmed author opens a modal from a paper's
@@ -75,7 +76,7 @@ export function AuthoredPapers({
                       <span className={`${ui.badge} whitespace-nowrap`}>invited by @{row.mine.invitedBy}</span>
                     ) : (
                       !confirmed && (
-                        <Link href={claimPath(row.canonical)} className="hover:no-underline">
+                        <Link href={claimPath(row.path)} className="hover:no-underline">
                           <span className={ui.badge}>pending</span>
                         </Link>
                       )
@@ -348,7 +349,7 @@ function CoAuthors({ row }: { row: AuthoredRow }) {
  */
 function Invite({ row, open }: { row: AuthoredRow; open: { name: string; index: number }[] }) {
   // Only rendered once the modal opens, in the browser.
-  const link = `${window.location.origin}/welcome?next=${encodeURIComponent(claimPath(row.canonical))}`;
+  const link = `${window.location.origin}/welcome?next=${encodeURIComponent(claimPath(row.path))}`;
   const text = (name: string) =>
     `Hi ${name.split(' ')[0]},\n\n` +
     `I've claimed our paper “${row.title}” on PotentialPaper, where authors write a short section about their paper. ` +

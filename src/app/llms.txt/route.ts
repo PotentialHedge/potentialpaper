@@ -14,10 +14,10 @@ export function GET() {
 ## Read the site
 
 - [Home](${origin}/): papers, searchable with \`?q=\` (\`category:"<name>"\` keeps a category's papers)
-- A paper: \`${origin}/abs/<arXiv id>\`, \`${origin}/doi/<doi>\`, \`${origin}/openreview/<id>\`
-- A paper for agents: the same address with \`/agent\` in front, e.g. [${origin}/agent/abs/1706.03762](${origin}/agent/abs/1706.03762)
-- A page's history as git: \`git clone ${origin}/git/<scheme>/<id>.git\` (a paper), \`${origin}/git/<kind>/<key>.git\` (any other kind). Every page's tools are its address behind the tool's name: \`${origin}/history/v/iclr/2027\`, \`/code/…\` (the web editor), \`/claim/…\`. A page's owners (a paper's confirmed authors, a venue's organisers, an org's members, a person) write its \`owners/\`; anyone verified its \`community/\`. A paper's other identifiers redirect to its canonical address
-- A paper's versions (preprints, submissions and what each venue decided, each with its PDF and evidence), two compared: \`${origin}/versions/<scheme>/<id>?a=<version id>&b=<version id>\`
+- A paper: its short address, \`${origin}/s/<n>\`. \`${origin}/abs/<arXiv id>\`, \`${origin}/doi/<doi>\` and \`${origin}/openreview/<id>\` lead there (the first visit to an arXiv id fetches the paper)
+- A paper for agents: the same address with \`/agent\` in front, \`${origin}/agent/s/<n>\`; e.g. [${origin}/agent/abs/1706.03762](${origin}/agent/abs/1706.03762) leads to it
+- A page's history as git: \`git clone ${origin}/git/<scheme>/<id>.git\` (a paper), \`${origin}/git/<kind>/<key>.git\` (any other kind). Every page's tools are its address behind the tool's name: \`${origin}/history/s/42\` (a paper), \`${origin}/history/v/iclr/2027\`, \`/code/…\` (the web editor), \`/claim/…\`. A page's owners (a paper's confirmed authors, a venue's organisers, an org's members, a person) write its \`owners/\`; anyone verified its \`community/\`. A paper's other identifiers redirect to its canonical address
+- A paper's versions (preprints, submissions and what each venue decided, each with its PDF and evidence), two compared: \`${origin}/versions/s/<n>?a=<version id>&b=<version id>\`
 
 ## For agents
 

@@ -1,6 +1,6 @@
 import { and, eq } from 'drizzle-orm';
 import { getDb, type Database } from '@/db';
-import { paperIdentifiers } from '@/db/schema';
+import { pages, paperIdentifiers } from '@/db/schema';
 import { isPageKind, KINDS, keyProblem, type PageAddress } from '@/lib/kinds';
 import { canonicalPaperId, PAPER_SCHEMES, type PaperId, parsePaperId } from '@/lib/paper-ids';
 import { findPaper } from '../papers';
@@ -116,11 +116,12 @@ export async function findRepo(
   if (canonical.scheme !== scheme || canonical.value !== raw) {
     return { kind: 'redirect', to: clonePath(canonical, `/${file}`) };
   }
+  const [short] = await database.select({ shortId: pages.shortId }).from(pages).where(eq(pages.id, found.paper.id));
   return {
     kind: 'repo',
     pageId: found.paper.id,
     page: { id: found.paper.id, kind: 'paper', key: found.paper.id },
-    address: { kind: 'paper', id: canonical },
+    address: { kind: 'paper', id: canonical, ...(short ? { shortId: short.shortId } : {}) },
     head,
     identifiers: found.identifiers,
   };

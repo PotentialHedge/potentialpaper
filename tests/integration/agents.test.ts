@@ -4,6 +4,7 @@ import { join } from 'node:path';
 import { eq } from 'drizzle-orm';
 import { afterAll, beforeAll, beforeEach, describe, expect, it } from 'vitest';
 import { GET as agentPage } from '@/app/agent/[prefix]/[...id]/route';
+import { GET as agentShortPage } from '@/app/agent/s/[n]/route';
 import { getDb } from '@/db';
 import { user } from '@/db/auth-schema';
 import { accounts, authorClaims } from '@/db/schema';
@@ -55,7 +56,13 @@ function upload(token: string, file: File) {
 
 async function readAgentPage(path: string): Promise<{ status: number; text: string; location: string | null }> {
   const [, , prefix, ...id] = path.split('/');
-  const res = await agentPage(new Request(new URL(path, ORIGIN)), { params: Promise.resolve({ prefix, id }) });
+  let res = await agentPage(new Request(new URL(path, ORIGIN)), { params: Promise.resolve({ prefix, id }) });
+  // A paper's agent page is at its short address, `/agent/s/<n>`, and its identifiers redirect there.
+  const short = res.status === 308 ? /\/agent\/s\/(\d+)$/.exec(res.headers.get('location') ?? '') : null;
+  if (short) {
+    const n = short[1];
+    res = await agentShortPage(new Request(new URL(`/agent/s/${n}`, ORIGIN)), { params: Promise.resolve({ n }) });
+  }
   return { status: res.status, text: await res.text(), location: res.headers.get('location') };
 }
 

@@ -91,7 +91,7 @@ describe('following papers', () => {
     if (edit.status !== 'committed') return;
     expect(await mailEditFollowers(paperId, bob.account.id, [edit.seq])).toBe(1);
     expect(lastMailTo('ada@ethz.ch')?.subject).toBe('Edited: “Attention Is All You Need”');
-    expect(lastMailTo('ada@ethz.ch')?.text).toContain('/history/abs/1706.03762');
+    expect(lastMailTo('ada@ethz.ch')?.text).toMatch(/\/history\/s\/\d+/);
     expect(devOutbox().some((m) => m.to === 'bob@ethz.ch' && m.subject.startsWith('Edited'))).toBe(false);
 
     // The next edit within the hour sends nothing.

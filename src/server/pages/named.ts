@@ -1,6 +1,6 @@
 import { eq } from 'drizzle-orm';
 import { getDb, type Database } from '@/db';
-import { pageCurrent } from '@/db/schema';
+import { pageCurrent, pages, papers } from '@/db/schema';
 import { type PageAddress, pageName, pagePath } from '@/lib/kinds';
 import { findPaper, type FoundPaper } from '../papers';
 import { addressOf, findPageByAddress, type PageRow } from './kinds';
@@ -37,4 +37,24 @@ export async function namedPage(asked: PageAddress, database: Database = getDb()
     path: pagePath(address),
     paper: null,
   };
+}
+
+/**
+ * The page a short address names (`/s/<n>`, as the page tools take it too: `/history/s/<n>`), as `NamedPage`, or
+ * `null` if there is none. A merged paper's short address names the paper it was merged into.
+ */
+export async function namedPageByShortId(shortId: number, database: Database = getDb()): Promise<NamedPage | null> {
+  if (!Number.isSafeInteger(shortId) || shortId < 1) return null;
+  const [row] = await database.select().from(pages).where(eq(pages.shortId, shortId));
+  if (!row) return null;
+  let page: PageRow = row;
+  for (let hops = 0; page.kind === 'paper' && hops < 8; hops++) {
+    const [paper] = await database.select({ mergedInto: papers.mergedInto }).from(papers).where(eq(papers.id, page.id));
+    if (!paper?.mergedInto) break;
+    const [survivor] = await database.select().from(pages).where(eq(pages.id, paper.mergedInto));
+    if (!survivor) break;
+    page = survivor;
+  }
+  const address = await addressOf(database, page);
+  return address && namedPage(address, database);
 }

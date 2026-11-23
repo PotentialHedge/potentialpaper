@@ -5,7 +5,7 @@ import { ui } from '@/components/ui';
 import type { PanelId } from '@/lib/panels';
 import { AbstractText } from '@/components/AbstractText';
 import type { Paper } from '@/db/schema';
-import { paperPath, sourceLinks, sourceName, type PaperId } from '@/lib/paper-ids';
+import { sourceLinks, sourceName, type PaperId } from '@/lib/paper-ids';
 import { Comments } from './Comments';
 import { PictureDrop } from './PictureDrop';
 import type { Submission } from '@/lib/submissions';
@@ -113,10 +113,8 @@ function SubmissionsAside({ submissions, address }: PanelProps) {
   return <SubmissionsBox submissions={submissions} paperPath={pagePath(address)} />;
 }
 
-function Versions({ versions, canonical, paper, address }: PanelProps) {
-  return (
-    <VersionsSection versions={versions} canonical={canonical} paperPath={pagePath(address)} paperTitle={paper.title} />
-  );
+function Versions({ versions, paper, address }: PanelProps) {
+  return <VersionsSection versions={versions} paperPath={pagePath(address)} paperTitle={paper.title} />;
 }
 
 function VersionsAside({ versions, address }: PanelProps) {
@@ -124,8 +122,8 @@ function VersionsAside({ versions, address }: PanelProps) {
 }
 
 /** The discussion (DESIGN.md §9): a client island, since what it shows depends on who is reading. */
-function Discussion({ canonical }: PanelProps) {
-  return <Comments paper={canonical} path={paperPath(canonical)} />;
+function Discussion({ canonical, address }: PanelProps) {
+  return <Comments paper={canonical} path={pagePath(address)} />;
 }
 
 /** Each built-in panel, by its id in `lib/panels.ts`, which also gives its slot and its default order. */

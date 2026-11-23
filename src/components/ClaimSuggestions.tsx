@@ -1,7 +1,7 @@
 'use client';
 
 import { useEffect, useState } from 'react';
-import { paperPath, type PaperId } from '@/lib/paper-ids';
+import type { PaperId } from '@/lib/paper-ids';
 import { ui } from './ui';
 
 /** `GET /api/v1/me/claim-suggestions`'s rows. */
@@ -125,13 +125,13 @@ export function ClaimSuggestions({ autoFocus = false }: { autoFocus?: boolean })
                   {done?.ok || row.mine?.status === 'confirmed' ? (
                     <span className="text-up">You, as {done?.name ?? row.authors[row.mine!.authorIndex]}</span>
                   ) : row.mine?.status === 'pending' ? (
-                    <a href={`/claim${paperPath(row.paper)}`}>Waiting · open</a>
+                    <a href={`/claim${row.path}`}>Waiting · open</a>
                   ) : row.byEmail && likely !== null && !done ? (
                     <button type="button" className={ui.linkBtn} onClick={() => void claim(row, likely)}>
                       Claim as {row.authors[likely]}
                     </button>
                   ) : (
-                    <a href={`/claim${paperPath(row.paper)}`}>{row.byEmail ? 'Claim' : 'Claim or ask'}</a>
+                    <a href={`/claim${row.path}`}>{row.byEmail ? 'Claim' : 'Claim or ask'}</a>
                   )}
                   {done && !done.ok && <div className={ui.note(false)}>{done.text}</div>}
                 </div>

@@ -156,7 +156,7 @@ describe('git push over HTTPS', () => {
     // `--progress`, or git asks the server to be quiet when no terminal is watching.
     const pushed = await push(clone, '--progress');
     expect(pushed).toMatchObject({ ok: true });
-    expect(pushed.output).toContain(`remote: 1 commit added: http://test.local/abs/${id.value}`);
+    expect(pushed.output).toContain('remote: 1 commit added: http://test.local/s/');
     // Asked without credentials first, then with them, as git does when the server says 401.
     expect(requests).toContain(`GET ${clonePath(id)}/info/refs?service=git-receive-pack anonymous`);
     expect(requests.at(-1)).toBe(`POST ${clonePath(id)}/git-receive-pack auth`);

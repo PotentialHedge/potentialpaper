@@ -1,6 +1,5 @@
 import { ui } from '@/components/ui';
 import { evidenceLabel } from '@/lib/evidence';
-import type { PaperId } from '@/lib/paper-ids';
 import type { SubmissionStatus } from '@/lib/submissions';
 import {
   formatVersionDate,
@@ -9,7 +8,6 @@ import {
   type PaperVersion,
   type VersionSubmission,
 } from '@/lib/versions';
-import { toolPath } from '@/lib/page-tools';
 import { AddMissing } from '@/components/paper/AddMissing';
 import { Fold } from '@/components/paper/Fold';
 
@@ -78,13 +76,11 @@ function Evidence({ urls }: { urls: string[] }) {
 
 export function VersionsSection({
   versions,
-  canonical,
   paperPath: here,
   paperTitle,
 }: {
   versions: PaperVersion[];
-  canonical: PaperId;
-  /** The paper's address, its short one where it has one, for the "Add" prompts. */
+  /** The paper's address, its short one (`/s/42`), which its "Add" prompts and its tools' links go by. */
   paperPath: string;
   paperTitle: string;
 }) {
@@ -100,7 +96,7 @@ export function VersionsSection({
             <a href="#edit" rel="nofollow">
               {versions.length > 0 ? 'edit' : 'add'}
             </a>{' '}
-            · <a href={toolPath('history', { kind: 'paper', id: canonical })}>history</a>
+            · <a href={`/history${here}`}>history</a>
           </span>
         </>
       }
@@ -111,7 +107,7 @@ export function VersionsSection({
           <AddMissing what="version" paperPath={here} />
         </div>
       ) : (
-        <form action={toolPath('versions', { kind: 'paper', id: canonical })} method="get">
+        <form action={`/versions${here}`} method="get">
           <div className={ui.tableScroll}>
             <table className={`${ui.table} font-sans text-sm`}>
               <thead>

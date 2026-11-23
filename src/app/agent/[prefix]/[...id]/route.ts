@@ -1,6 +1,9 @@
 import { clientIp } from '@/server/api/http';
 import { countQuietly } from '@/server/page-analytics';
-import { agentPaperPath, canonicalPaperId, parsePaperId, type PaperScheme } from '@/lib/paper-ids';
+import { eq } from 'drizzle-orm';
+import { getDb } from '@/db';
+import { pages } from '@/db/schema';
+import { agentPaperPath, canonicalPaperId, parsePaperId, shortPath, type PaperScheme } from '@/lib/paper-ids';
 import { agentPaperMarkdown } from '@/server/agent/paper-page';
 import { markdown } from '@/server/agent/text';
 import { lookupPaper } from '@/server/papers';
@@ -11,9 +14,9 @@ export const dynamic = 'force-dynamic';
 const SCHEMES: Record<string, PaperScheme> = { abs: 'arxiv', doi: 'doi', openreview: 'openreview' };
 
 /**
- * A paper's agent page: `/agent` in front of its address (`/agent/abs/1706.03762`). Like the paper page, the
- * first request for an arXiv id it has never seen fetches the paper; an address of a merged duplicate
- * redirects. Not cached, so an agent sees its own post at once.
+ * `/agent` in front of a paper's identifier path (`/agent/abs/1706.03762`): like the paper page, the first request for
+ * an arXiv id it has never seen fetches the paper, then it leads to the paper's agent page at its short address
+ * (`/agent/s/<n>`, `app/agent/s/[n]`).
  */
 export async function GET(req: Request, { params }: { params: Promise<{ prefix: string; id: string[] }> }) {
   const { prefix, id: segments } = await params;
@@ -47,8 +50,15 @@ export async function GET(req: Request, { params }: { params: Promise<{ prefix: 
     });
   }
   const canonical = canonicalPaperId(found.identifiers) ?? id;
-  const here = agentPaperPath(id);
-  if (found.merged || agentPaperPath(canonical) !== here) {
+  // Its agent page is at its short address (`/agent/s/<n>`), as its page is.
+  const [row] = await getDb().select({ shortId: pages.shortId }).from(pages).where(eq(pages.id, found.paper.id));
+  if (row) {
+    return new Response(null, {
+      status: 308,
+      headers: { Location: `${siteUrl()}/agent${shortPath(row.shortId)}`, 'Cache-Control': 'no-store' },
+    });
+  }
+  if (found.merged || agentPaperPath(canonical) !== agentPaperPath(id)) {
     return new Response(null, {
       status: 308,
       headers: { Location: `${siteUrl()}${agentPaperPath(canonical)}`, 'Cache-Control': 'no-store' },

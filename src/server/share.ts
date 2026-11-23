@@ -3,7 +3,7 @@ import { eq } from 'drizzle-orm';
 import { getDb, type Database } from '@/db';
 import { pageCurrent, pages, paperIdentifiers, papers } from '@/db/schema';
 import { type KeyedKind, KINDS, keyedPagePath, pageName } from '@/lib/kinds';
-import { canonicalPaperId, paperPath } from '@/lib/paper-ids';
+import { canonicalPaperId, shortPath } from '@/lib/paper-ids';
 import { STATUS_LABELS } from '@/lib/submissions';
 import { survivorOf } from './pages/kinds';
 import { siteUrl } from './site';
@@ -212,7 +212,7 @@ async function paperSubject(paperId: string, database: Database, hops = 0): Prom
         .join(', ') || null,
     summary: null,
     status: submission ? { text: badge.message, tone: badge.tone } : null,
-    path: paperPath(canonical),
+    path: shortPath(page.shortId),
     badge,
   };
 }

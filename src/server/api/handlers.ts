@@ -5,6 +5,7 @@ import { searchHandles, updateProfile } from '../accounts';
 import { addAffiliation, listAffiliations, removeAffiliation, verifyAffiliation } from '../affiliations';
 import { authenticate, requireAuth, requireSession, requireVerified, viewerFromHeaders, type Principal } from '../auth';
 import { cloneAddresses } from '../pages/clone';
+import { shortIdOf } from '../share';
 import { commitWorkspace, readBlob, readWorkspace, rebaseWorkspace, storeWorkspaceFile } from '../workspace';
 import { issueAgentCode, redeemAgentCode, requestAgentCode } from '../agent-codes';
 import { answerAgentLink, pollAgentLink, startAgentLink } from '../agent-links';
@@ -298,6 +299,7 @@ export const getPaper = route(async (_req, params) => {
     );
   }
   const { paper, identifiers } = found;
+  const shortId = await shortIdOf(paper.id);
   return respond(S.PaperResponse, {
     title: paper.title,
     authors: paper.authors,
@@ -305,7 +307,8 @@ export const getPaper = route(async (_req, params) => {
     year: paper.year,
     venue: paper.venue,
     identifiers,
-    path: paperPath(canonicalPaperId(identifiers) ?? id),
+    // Its page's short address, `/s/<n>`.
+    path: shortId === null ? paperPath(canonicalPaperId(identifiers) ?? id) : shortPath(shortId),
   });
 });
 

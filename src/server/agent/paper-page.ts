@@ -56,8 +56,10 @@ export async function agentPaperMarkdown(found: FoundPaper, canonical: PaperId, 
   out.push(`- Authors: ${authorLine}`);
   if (about) out.push(`- Venue: ${about}`);
   out.push(`- Identifiers: ${identifiers.map((id) => `\`${id.scheme}:${id.value}\``).join(', ')}`);
-  out.push(`- Paper page (for people): ${origin}${shortId === null ? paperPath(canonical) : shortPath(shortId)}`);
-  out.push(`- This page: ${origin}${agentPaperPath(canonical)}`);
+  // Its short address, which its page, tools and agent page are at (`/s/42`, `/versions/s/42`, `/agent/s/42`).
+  const path = shortId === null ? paperPath(canonical) : shortPath(shortId);
+  out.push(`- Paper page (for people): ${origin}${path}`);
+  out.push(`- This page: ${origin}${shortId === null ? agentPaperPath(canonical) : `/agent${path}`}`);
   for (const link of links) out.push(`- ${link.label}: ${link.url}`);
   if (current) {
     out.push(
@@ -85,7 +87,7 @@ export async function agentPaperMarkdown(found: FoundPaper, canonical: PaperId, 
     '',
   );
 
-  out.push(...versionLines(sortVersions(current?.versions ?? []), canonical, origin));
+  out.push(...versionLines(sortVersions(current?.versions ?? []), path, origin));
 
   if (submissions.length > 0) out.push(...venueReviews(submissions));
 
@@ -95,7 +97,7 @@ export async function agentPaperMarkdown(found: FoundPaper, canonical: PaperId, 
 }
 
 /** The versions as a list, oldest first, with their ids for comparing and editing them. */
-function versionLines(versions: PaperVersion[], canonical: PaperId, origin: string): string[] {
+function versionLines(versions: PaperVersion[], path: string, origin: string): string[] {
   const out = ['## Versions', ''];
   if (versions.length === 0) {
     out.push('_None recorded yet. See "Record a paper\'s versions" in /agent/start to add them, with evidence._', '');
@@ -118,7 +120,7 @@ function versionLines(versions: PaperVersion[], canonical: PaperId, origin: stri
   }
   if (versions.length >= 2) {
     const [a, b] = [versions[0], versions[versions.length - 1]];
-    out.push('', `Compare two: ${origin}/versions${paperPath(canonical)}?a=${a.id}&b=${b.id}`);
+    out.push('', `Compare two: ${origin}/versions${path}?a=${a.id}&b=${b.id}`);
   }
   out.push('');
   return out;

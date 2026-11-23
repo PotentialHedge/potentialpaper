@@ -370,7 +370,7 @@ describe('the API', () => {
     expect(res.status).toBe(200);
     const body = await res.json();
     expect(body.title).toBe(ATTENTION.title);
-    expect(body.path).toBe('/abs/1706.03762');
+    expect(body.path).toMatch(/^\/s\/\d+$/);
     expect(body).not.toHaveProperty('id');
   });
 
