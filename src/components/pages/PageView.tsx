@@ -5,10 +5,11 @@ import { type PluginPageData, PluginPageProvider } from '@/components/plugins/Pl
 import { ui } from '@/components/ui';
 import { type GenericSlot, KINDS, type PageKind } from '@/lib/kinds';
 import { ReviewBlur } from '@/components/paper/ReviewBlur';
+import type { ReviewVenue } from '@/server/under-review';
 import type { BuiltPanel } from './common';
 
-function Blurred({ when, children }: { when: boolean; children: ReactNode }) {
-  return when ? <ReviewBlur>{children}</ReviewBlur> : children;
+function Blurred({ venues, children }: { venues: ReviewVenue[]; children: ReactNode }) {
+  return venues.length > 0 ? <ReviewBlur venues={venues}>{children}</ReviewBlur> : children;
 }
 
 /**
@@ -26,7 +27,7 @@ export function PageView({
   actions,
   panels,
   after,
-  underReview = false,
+  reviewAt = [],
 }: {
   kind: PageKind;
   /** For the Analytics tab its owners see (`Analytics.tsx`). */
@@ -37,13 +38,13 @@ export function PageView({
   panels: Record<GenericSlot, BuiltPanel[]>;
   /** After the page, outside it: a paper's demo frames. */
   after?: ReactNode;
-  /** A paper under review: all but its title is blurred until the reader shows it (`ReviewBlur`). */
-  underReview?: boolean;
+  /** The venues a paper is under review at: all but its title is blurred until the reader shows it (`ReviewBlur`). */
+  reviewAt?: ReviewVenue[];
 }) {
   const slot = (name: GenericSlot) => `${kind}.${name}`;
   return (
     <main className={ui.page}>
-      <Blurred when={underReview}>
+      <Blurred venues={reviewAt}>
         <PluginPageProvider data={plugins}>
           <article>
             {header}

@@ -345,16 +345,16 @@ const TEXT_SETTINGS: Record<string, CoreSetting> = {
   },
 };
 
-/** Reviewer mode (`ReviewBlur`): a paper under review is blurred but for its title. */
+/** Reviewer mode (`ReviewBlur`): the venues the reader doesn't review for, whose papers under review aren't blurred. */
 const REVIEW_SETTINGS: Record<string, CoreSetting> = {
-  'review.blur': {
-    schema: z.boolean() as z.ZodType,
-    default: true,
-    title: 'Blur papers under review',
+  'paper.notReviewerAt': {
+    schema: z.array(z.string()) as z.ZodType,
+    default: [],
+    sanitize: (raw) => (Array.isArray(raw) ? raw.filter((v): v is string => typeof v === 'string') : undefined),
+    title: 'Not a reviewer at',
     description:
-      'Show a paper still under review at a venue blurred but for its title, so a reviewer can read it without knowing its authors or what others say about it.',
-    group: 'Text',
-    widget: 'switch',
+      'The venues you don\'t review for, by id ("openreview:ICLR.cc/2027/Conference"). A paper under review at a venue is blurred but for its title, unless you\'re listed as not reviewing there.',
+    group: `${KINDS.paper.title} pages`,
   },
 };
 

@@ -11,7 +11,7 @@ import { getDb } from '@/db';
 import { pageCurrent, pdfDocuments } from '@/db/schema';
 import { findPaper, type FoundPaper } from '@/server/papers';
 import { submissionsOf } from '@/server/submissions';
-import { underReview } from '@/server/under-review';
+import { reviewVenues } from '@/server/under-review';
 import { bibtex, titleLinks } from '@/lib/paper-links';
 import { sortVersions } from '@/lib/versions';
 import { DemoFrames } from './DemoFrames';
@@ -68,30 +68,32 @@ export async function PaperRoute({ scheme, segments }: { scheme: PaperScheme; se
   const canonical = canonicalPaperId(identifiers) ?? identifiers[0];
   const address = { kind: 'paper' as const, id: canonical };
   const pageRow = { id: paper.id, kind: 'paper' as const, key: paper.id };
-  const [[current], submissions, owners, linksFrom, linksTo, scopes, shortId, hasSignals, blurred] = await Promise.all([
-    getDb()
-      .select({
-        pdf: pageCurrent.pdf,
-        thumbnail: pageCurrent.thumbnail,
-        links: pageCurrent.links,
-        versions: pageCurrent.versions,
-        authorHtml: pageCurrent.authorHtml,
-        communityHtml: pageCurrent.communityHtml,
-        authorPlugins: pageCurrent.authorPlugins,
-        cover: pdfDocuments.coverUrl,
-      })
-      .from(pageCurrent)
-      .leftJoin(pdfDocuments, sql`${pdfDocuments.sha256} = ${pageCurrent.pdf} ->> 'sha256'`)
-      .where(eq(pageCurrent.pageId, paper.id)),
-    submissionsOf(paper.id),
-    ownersOf(pageRow, address),
-    pageLinksFrom(paper.id),
-    pageLinksTo(paper.id),
-    scopesOfPage(pageRow),
-    shortIdOf(paper.id),
-    pageHasSignals({ id: paper.id, kind: 'paper' }),
-    underReview(paper.id),
-  ]);
+  const [[current], submissions, owners, linksFrom, linksTo, scopes, shortId, hasSignals, reviewAt] = await Promise.all(
+    [
+      getDb()
+        .select({
+          pdf: pageCurrent.pdf,
+          thumbnail: pageCurrent.thumbnail,
+          links: pageCurrent.links,
+          versions: pageCurrent.versions,
+          authorHtml: pageCurrent.authorHtml,
+          communityHtml: pageCurrent.communityHtml,
+          authorPlugins: pageCurrent.authorPlugins,
+          cover: pdfDocuments.coverUrl,
+        })
+        .from(pageCurrent)
+        .leftJoin(pdfDocuments, sql`${pdfDocuments.sha256} = ${pageCurrent.pdf} ->> 'sha256'`)
+        .where(eq(pageCurrent.pageId, paper.id)),
+      submissionsOf(paper.id),
+      ownersOf(pageRow, address),
+      pageLinksFrom(paper.id),
+      pageLinksTo(paper.id),
+      scopesOfPage(pageRow),
+      shortIdOf(paper.id),
+      pageHasSignals({ id: paper.id, kind: 'paper' }),
+      reviewVenues(paper.id),
+    ],
+  );
   // Shown and shared at its short address, and the page tools at theirs (`/history/s/42`).
   const shown = shortId === null ? address : { ...address, shortId };
   if (owners) owners.claimPath = toolPath('claim', shown);
@@ -153,7 +155,7 @@ export async function PaperRoute({ scheme, segments }: { scheme: PaperScheme; se
     <PageView
       pageId={paper.id}
       kind="paper"
-      underReview={blurred}
+      reviewAt={reviewAt}
       plugins={plugins}
       panels={buildPanels('paper', PAPER_PANELS, props)}
       header={

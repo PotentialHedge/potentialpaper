@@ -2,22 +2,29 @@
 
 import { type ReactNode, useState } from 'react';
 import { ui } from '@/components/ui';
-import { setSetting, useSetting } from '@/lib/settings/client';
+import { setSetting, settingsSnapshot, useSetting } from '@/lib/settings/client';
+import type { ReviewVenue } from '@/server/under-review';
+
+const NOT_REVIEWER = 'paper.notReviewerAt';
 
 /**
  * Reviewer mode: a paper still under review at a venue (`server/under-review.ts`) is shown blurred but for its title,
  * so a reviewer can find it without seeing who wrote it or what others think of it, until they choose to. The page is
- * the same cached HTML for everyone, blurred, and is shown in the browser. "I'm not a reviewer" turns `review.blur` off,
- * so the reader is asked once, not on every paper; it can be turned back on in settings.
+ * the same cached HTML for everyone, blurred, and is shown in the browser. "Show the page" shows this paper only; a
+ * ticked "I'm not a reviewer at <venue>" is kept in `paper.notReviewerAt`, and that venue's papers aren't blurred
+ * again. A paper under review at several venues is blurred until the reader is listed as not reviewing at all of them.
  */
-export function ReviewBlur({ children }: { children: ReactNode }) {
-  const blur = useSetting<boolean>('review.blur');
+export function ReviewBlur({ venues, children }: { venues: ReviewVenue[]; children: ReactNode }) {
+  const notAt = useSetting<string[]>(NOT_REVIEWER);
   const [shown, setShown] = useState(false);
-  if (shown || blur === false) return children;
-  const notReviewer = () => {
+  const [ticked, setTicked] = useState<string[]>([]);
+  if (shown || venues.every((v) => notAt.includes(v.id))) return children;
+  const show = () => {
     setShown(true);
-    setSetting('review.blur', false).catch(() => {
-      // Not saved: this page is shown, and the next one asks again.
+    if (ticked.length === 0) return;
+    const current = (settingsSnapshot().values[NOT_REVIEWER] as string[] | undefined) ?? [];
+    setSetting(NOT_REVIEWER, [...new Set([...current, ...ticked])]).catch(() => {
+      // Not saved: this paper is shown, and the venue's next one asks again.
     });
   };
   return (
@@ -32,10 +39,25 @@ export function ReviewBlur({ children }: { children: ReactNode }) {
         <div className={`${ui.box} max-w-[420px] text-center shadow-lg`}>
           <p className="font-semibold">This paper is under review</p>
           <p className="mt-1 text-subtle">
-            Its page is blurred so you can read it without knowing its authors or what others say about it. You can turn this back on in settings.
+            Its page is blurred so you can read it without knowing its authors or what others say about it.
           </p>
-          <button type="button" className={ui.btn()} onClick={notReviewer}>
-            I&apos;m not a reviewer
+          {venues
+            .filter((v) => !notAt.includes(v.id))
+            .map((v) => (
+              <label
+                key={v.id}
+                className="mt-3 flex cursor-pointer items-center justify-center gap-2 font-sans text-sm"
+              >
+                <input
+                  type="checkbox"
+                  checked={ticked.includes(v.id)}
+                  onChange={(e) => setTicked((t) => (e.target.checked ? [...t, v.id] : t.filter((id) => id !== v.id)))}
+                />
+                I&apos;m not a reviewer at {v.name}
+              </label>
+            ))}
+          <button type="button" className={ui.btn()} onClick={show}>
+            Show the page
           </button>
         </div>
       </div>
