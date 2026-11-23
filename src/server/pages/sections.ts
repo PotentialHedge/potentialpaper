@@ -45,7 +45,11 @@ export async function readSections(
 }
 
 /** `why-it-matters` as a heading: "Why it matters". */
+/** Titles a slug can't spell, as they are written: `tl-dr` is "TL;DR". */
+const SLUG_TITLES: Record<string, string> = { 'tl-dr': 'TL;DR' };
+
 export function slugTitle(slug: string): string {
+  if (SLUG_TITLES[slug]) return SLUG_TITLES[slug];
   const words = slug.replace(/-/g, ' ');
   return words.charAt(0).toUpperCase() + words.slice(1);
 }

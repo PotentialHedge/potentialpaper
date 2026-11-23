@@ -16,7 +16,7 @@ const PAPER = { scheme: 'arxiv', value: '1706.03762' } as const;
 const PNG = Buffer.from('89504e470d0a1a0a0000000d49484452000000010000000108060000001f15c489', 'hex');
 
 const SECTIONS = {
-  'community/10-summary.md': '# Summary\nAttention replaces recurrence.\n',
+  'community/10-tl-dr.md': '# Summary\nAttention replaces recurrence.\n',
   'community/20-critique.md': '# Critique\nQuadratic in length.\n\nAnd memory.\n',
   'community/30-errata.md': '# Errata\nNone yet.\n',
 };
@@ -74,9 +74,9 @@ describe('the web editor workspace', () => {
     // A page without a repo shows the files its first commit starts with: empty sections, prek.toml.
     expect(before.body).toMatchObject({ head: null, signedIn: false });
     expect(before.body.files.map((f: { path: string }) => f.path)).toEqual(
-      expect.arrayContaining(['prek.toml', 'community/10-summary.md', 'owners/10-tl-dr.md']),
+      expect.arrayContaining(['prek.toml', 'community/10-tl-dr.md', 'owners/10-tl-dr.md']),
     );
-    expect(before.body.files.find((f: { path: string }) => f.path === 'community/10-summary.md')).toMatchObject({
+    expect(before.body.files.find((f: { path: string }) => f.path === 'community/10-tl-dr.md')).toMatchObject({
       text: '',
       readonly: 'sign in to edit',
     });
@@ -86,21 +86,21 @@ describe('the web editor workspace', () => {
     const { head } = await started();
     const anonymous = await read();
     expect(anonymous.body.head).toBe(head);
-    const summary = anonymous.body.files.find((f: { path: string }) => f.path === 'community/10-summary.md');
-    expect(summary).toMatchObject({ text: SECTIONS['community/10-summary.md'], readonly: 'sign in to edit' });
+    const summary = anonymous.body.files.find((f: { path: string }) => f.path === 'community/10-tl-dr.md');
+    expect(summary).toMatchObject({ text: SECTIONS['community/10-tl-dr.md'], readonly: 'sign in to edit' });
     expect(anonymous.body.files.map((f: { path: string }) => f.path)).toContain('.potentialpaper/metadata.json');
 
     const ada = await read(await signUp('bob@ethz.ch'));
     expect(ada.body.signedIn).toBe(true);
     const files = Object.fromEntries(ada.body.files.map((f: { path: string; readonly: string | null }) => [f.path, f]));
-    expect(files['community/10-summary.md'].readonly).toBeNull();
+    expect(files['community/10-tl-dr.md'].readonly).toBeNull();
     expect(files['.potentialpaper/metadata.json'].readonly).toMatch(/only the system and admins/);
     expect(ada.body.areas['community/']).toBeNull();
     expect(ada.body.areas['owners/']).toMatch(/confirmed authors/);
 
     const blob = await api('GET', `/workspace/blob?${new URLSearchParams({ ...PAPER, oid: summary.oid })}`);
     expect(blob.status).toBe(200);
-    expect((blob.body as Buffer).toString('utf8')).toBe(SECTIONS['community/10-summary.md']);
+    expect((blob.body as Buffer).toString('utf8')).toBe(SECTIONS['community/10-tl-dr.md']);
     expect((await api('GET', `/workspace/blob?${new URLSearchParams({ ...PAPER, oid: 'f'.repeat(40) })}`)).status).toBe(
       404,
     );
@@ -150,12 +150,12 @@ describe('the web editor workspace', () => {
     const { paperId, ada, head } = await started();
     const bob = await signUp('bob@ethz.ch');
     expect(
-      (await commitFiles(ada, PAPER, head, { 'community/10-summary.md': '# Summary\nAttention is enough.\n' })).status,
+      (await commitFiles(ada, PAPER, head, { 'community/10-tl-dr.md': '# Summary\nAttention is enough.\n' })).status,
     ).toBe(200);
     const late = await commitFiles(bob, PAPER, head, { 'community/30-errata.md': '# Errata\nA typo in eq. 1.\n' });
     expect(late.status).toBe(200);
     expect(late.body.merged).toBe(true);
-    expect(await fileAtHead(paperId, 'community/10-summary.md')).toContain('Attention is enough.');
+    expect(await fileAtHead(paperId, 'community/10-tl-dr.md')).toContain('Attention is enough.');
     expect(await fileAtHead(paperId, 'community/30-errata.md')).toContain('A typo in eq. 1.');
   });
 
@@ -201,11 +201,11 @@ describe('the web editor workspace', () => {
     expect(author.body.error.message).toMatch(/confirmed authors/);
     const nowhere = await commitFiles(ada, PAPER, head, { 'notes.txt': 'hello' });
     expect(nowhere.status).toBe(403);
-    expect((await commitFiles('', PAPER, head, { 'community/10-summary.md': 'x' })).status).toBe(401);
+    expect((await commitFiles('', PAPER, head, { 'community/10-tl-dr.md': 'x' })).status).toBe(401);
 
     const me = await api('GET', '/me', { cookie: ada });
     await getDb().update(accounts).set({ verifiedAt: null }).where(eq(accounts.handle, me.body.handle));
-    expect((await commitFiles(ada, PAPER, head, { 'community/10-summary.md': '# Summary\nx\n' })).status).toBe(403);
+    expect((await commitFiles(ada, PAPER, head, { 'community/10-tl-dr.md': '# Summary\nx\n' })).status).toBe(403);
   });
 
   it('stores a picture for its Git LFS path and gives the pointer to commit', async () => {
@@ -230,7 +230,7 @@ describe('the web editor workspace', () => {
 
     const notLfs = new FormData();
     for (const [k, v] of [...form.entries()]) notLfs.set(k, v);
-    notLfs.set('path', 'community/10-summary.md');
+    notLfs.set('path', 'community/10-tl-dr.md');
     expect((await api('POST', '/workspace/files', { cookie: ada, form: notLfs })).status).toBe(422);
   });
 
@@ -280,7 +280,7 @@ describe('history and revert', () => {
       ada,
       PAPER,
       head,
-      { 'community/10-summary.md': '# Summary\nVandalism.\n' },
+      { 'community/10-tl-dr.md': '# Summary\nVandalism.\n' },
       'Vandalise',
     );
     const good = await commitFiles(ada, PAPER, bad.body.head, { 'community/30-errata.md': '# Errata\nFixed.\n' });
