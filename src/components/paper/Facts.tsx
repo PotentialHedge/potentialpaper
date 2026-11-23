@@ -7,7 +7,7 @@ import { type PaperFacts, VENUE_ROW_LABEL } from '@/lib/paper-facts';
  * disagree. Each row links to where the fact is shown in full: a venue to its page here.
  */
 export function Facts({ facts }: { facts: PaperFacts }) {
-  if (facts.venues.length === 0 && facts.keywords.length === 0) return null;
+  if (facts.venues.length === 0 && facts.keywords.length === 0 && !facts.area) return null;
   return (
     <div className={ui.box}>
       <table className={ui.facts}>
@@ -34,6 +34,12 @@ export function Facts({ facts }: { facts: PaperFacts }) {
               </td>
             </tr>
           ))}
+          {facts.area && (
+            <tr>
+              <th scope="row">Area</th>
+              <td title={`As the authors chose it at ${facts.area.venue}`}>{facts.area.name}</td>
+            </tr>
+          )}
           {facts.keywords.length > 0 && (
             <tr>
               <th scope="row">Keywords</th>

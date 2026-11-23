@@ -19,6 +19,10 @@ export interface FixturePaper {
   /** Empty while the venue is under review. */
   authors: string[];
   keywords: string[];
+  /** The area its authors chose from the venue's list (OpenReview's `primary_area`). */
+  primaryArea?: string;
+  /** Its one-sentence summary (OpenReview's `TLDR`). */
+  tldr?: string;
   /** When it was submitted (ISO 8601), from the scrape's `cdate`, where it has one. */
   submittedAt?: string;
   status: SubmissionStatus | null;

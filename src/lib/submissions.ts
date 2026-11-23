@@ -80,6 +80,10 @@ export interface Submission {
   decision: string | null;
   /** The keywords its authors gave the venue (OpenReview's), from its `submission.json`. */
   keywords: string[];
+  /** The area its authors chose from the venue's list: "reinforcement learning". Not one of the site's categories. */
+  primaryArea: string | null;
+  /** Its one-sentence summary, as its authors gave it. */
+  tldr: string | null;
   url: string | null;
   fetchedAt: Date;
   notes: SubmissionNote[];

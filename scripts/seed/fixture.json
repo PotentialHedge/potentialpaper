@@ -333,7 +333,8 @@
        "createdAt": "2025-11-26T02:22:20.006Z",
        "modifiedAt": "2025-11-26T02:22:20.006Z"
       }
-     ]
+     ],
+     "primaryArea": "applications to computer vision, audio, language, and other modalities"
     },
     {
      "id": "017F77AYeQ",
@@ -470,7 +471,8 @@
        "createdAt": "2025-11-27T03:08:37.284Z",
        "modifiedAt": "2025-11-27T03:08:37.284Z"
       }
-     ]
+     ],
+     "primaryArea": "generative models"
     },
     {
      "id": "023yMrtHQP",
@@ -589,7 +591,8 @@
        "createdAt": "2026-01-06T04:42:30.483Z",
        "modifiedAt": "2026-01-06T04:42:30.483Z"
       }
-     ]
+     ],
+     "primaryArea": "other topics in machine learning (i.e., none of the above)"
     },
     {
      "id": "03Ek1qDZmI",
@@ -728,7 +731,8 @@
        "createdAt": "2025-11-12T20:58:45.966Z",
        "modifiedAt": "2025-11-12T20:58:45.966Z"
       }
-     ]
+     ],
+     "primaryArea": "applications to robotics, autonomy, planning"
     },
     {
      "id": "03MfCNn3pF",
@@ -868,7 +872,9 @@
        "createdAt": "2025-11-19T09:02:03.513Z",
        "modifiedAt": "2025-11-19T09:02:03.513Z"
       }
-     ]
+     ],
+     "primaryArea": "applications to computer vision, audio, language, and other modalities",
+     "tldr": "PersonalQ enables efficient serving of personalized diffusion models at scale through intelligent checkpoint selection and trigger-token-aware quantization that preserves personalization quality while reducing memory footprint."
     },
     {
      "id": "00HNN8O7Ni",
@@ -1087,7 +1093,9 @@
        "createdAt": "2026-01-26T08:51:47.619Z",
        "modifiedAt": "2026-02-06T05:04:44.840Z"
       }
-     ]
+     ],
+     "primaryArea": "neurosymbolic & hybrid AI systems (physics-informed, logic & formal reasoning, etc.)",
+     "tldr": "We propose a deep learning approach for reactive synthesis that first initializes a model with imitation learning and then continues training by reinforcing formally verified solutions."
     },
     {
      "id": "00UQtHqB2k",
@@ -1316,7 +1324,8 @@
        "createdAt": "2026-01-26T08:45:01.833Z",
        "modifiedAt": "2026-02-06T04:59:57.643Z"
       }
-     ]
+     ],
+     "primaryArea": "alignment, fairness, safety, privacy, and societal considerations"
     },
     {
      "id": "03QzvMzxVM",
@@ -1473,7 +1482,9 @@
        "createdAt": "2026-01-26T08:38:55.867Z",
        "modifiedAt": "2026-02-06T04:55:25.663Z"
       }
-     ]
+     ],
+     "primaryArea": "probabilistic methods (Bayesian methods, variational inference, sampling, UQ, etc.)",
+     "tldr": "We introduce Robust-NLL for modeling uncertainty under the presence of outliers."
     },
     {
      "id": "03u504EDJp",
@@ -1672,7 +1683,8 @@
        "createdAt": "2026-01-26T08:33:41.442Z",
        "modifiedAt": "2026-02-06T04:50:54.247Z"
       }
-     ]
+     ],
+     "primaryArea": "learning theory"
     },
     {
      "id": "04h40hEgTj",
@@ -1967,7 +1979,9 @@
        "createdAt": "2026-01-26T08:52:39.417Z",
        "modifiedAt": "2026-02-06T05:05:27.471Z"
       }
-     ]
+     ],
+     "primaryArea": "interpretability and explainable AI",
+     "tldr": "We introduce a new family of toy problems that combine features of linear-regression-style continuous in-context learning (ICL) with discrete associative recall and find distinct learning dynamics for different prediction mechanisms."
     },
     {
      "id": "084SvT55yk",
@@ -2232,7 +2246,8 @@
        "createdAt": "2026-01-26T08:34:01.086Z",
        "modifiedAt": "2026-02-06T06:10:25.546Z"
       }
-     ]
+     ],
+     "primaryArea": "learning on graphs and other geometries & topologies"
     },
     {
      "id": "09YSBymX6O",
@@ -2442,7 +2457,9 @@
        "createdAt": "2026-01-26T08:42:16.839Z",
        "modifiedAt": "2026-02-06T06:10:25.097Z"
       }
-     ]
+     ],
+     "primaryArea": "unsupervised, self-supervised, semi-supervised, and supervised representation learning",
+     "tldr": "We present spatially informed variational autoencoders that use stochastic point processes to learn interpretable spatial patterns from images."
     },
     {
      "id": "0BkvUY61MX",
@@ -2635,7 +2652,9 @@
        "createdAt": "2026-01-26T08:52:43.505Z",
        "modifiedAt": "2026-02-06T06:10:22.666Z"
       }
-     ]
+     ],
+     "primaryArea": "unsupervised, self-supervised, semi-supervised, and supervised representation learning",
+     "tldr": "Scaling laws for multilingual pretraining, finetuning, and language transfer."
     },
     {
      "id": "0CZAimzcVr",
@@ -2894,7 +2913,8 @@
        "createdAt": "2026-01-26T08:40:20.324Z",
        "modifiedAt": "2026-02-06T06:10:21.695Z"
       }
-     ]
+     ],
+     "primaryArea": "optimization"
     },
     {
      "id": "0GNBqoYcAP",
@@ -3148,7 +3168,9 @@
        "createdAt": "2026-01-26T08:41:56.826Z",
        "modifiedAt": "2026-02-06T06:10:17.092Z"
       }
-     ]
+     ],
+     "primaryArea": "transfer learning, meta learning, and lifelong learning",
+     "tldr": "We formalize, bound, and validate in-context environment learning, showing that long-context, diverse-input world models can self-adapt by recognizing or learning new dynamics without parameter updates."
     },
     {
      "id": "0FJYicpOj0",
@@ -3446,7 +3468,9 @@
        "createdAt": "2026-01-26T08:52:05.107Z",
        "modifiedAt": "2026-02-06T06:10:18.936Z"
       }
-     ]
+     ],
+     "primaryArea": "alignment, fairness, safety, privacy, and societal considerations",
+     "tldr": "We introduce the canonical dimension free notion of certifiability suitable to high dimensions and show its utility via a Newton based unlearning algorithm"
     },
     {
      "id": "0jHyEKHDyx",
@@ -3672,7 +3696,9 @@
        "createdAt": "2026-01-26T08:46:59.606Z",
        "modifiedAt": "2026-02-06T06:09:47.173Z"
       }
-     ]
+     ],
+     "primaryArea": "optimization",
+     "tldr": "For the first time, we mechanistically explain why low-precision training with flash attention fails, identifying a vicious cycle of rounding errors and proposing a simple, effective fix."
     },
     {
      "id": "0nvQ5kHXf4",
@@ -3952,7 +3978,9 @@
        "createdAt": "2026-01-26T08:42:56.027Z",
        "modifiedAt": "2026-02-06T06:09:44.091Z"
       }
-     ]
+     ],
+     "primaryArea": "optimization",
+     "tldr": "We propose a novel method that enables training vision transformer models within a low-rank subspace to optimize computational resources, making on-device learning practically feasible."
     },
     {
      "id": "0wSlFpMsGb",
@@ -4253,7 +4281,9 @@
        "createdAt": "2026-07-24T06:33:08.259Z",
        "modifiedAt": "2026-07-24T06:33:08.259Z"
       }
-     ]
+     ],
+     "primaryArea": "datasets and benchmarks",
+     "tldr": "We assemble and release the largest truly open multilingual dataset for LLM pre-training consisting of 2 trillion tokens"
     },
     {
      "id": "5C3LljOEGC",
@@ -4442,7 +4472,9 @@
        "createdAt": "2026-01-26T08:49:16.337Z",
        "modifiedAt": "2026-02-06T06:06:05.132Z"
       }
-     ]
+     ],
+     "primaryArea": "other topics in machine learning (i.e., none of the above)",
+     "tldr": "Efficient hierarchical attention transformers for learning to solve non-linear equations through by computing groebner bases."
     },
     {
      "id": "0FbhKezdBK",
@@ -4475,7 +4507,8 @@
        "createdAt": "2025-11-10T16:07:02.810Z",
        "modifiedAt": "2026-02-12T15:38:55.273Z"
       }
-     ]
+     ],
+     "primaryArea": "other topics in machine learning (i.e., none of the above)"
     },
     {
      "id": "0LKnVeXBGK",
@@ -4510,7 +4543,9 @@
        "createdAt": "2025-10-18T15:10:18.148Z",
        "modifiedAt": "2026-02-12T15:38:55.246Z"
       }
-     ]
+     ],
+     "primaryArea": "learning theory",
+     "tldr": "Provably good and empirically validated algorithm that combines any training and pruning methods to simultaneously optimize efficiency and accuracy"
     },
     {
      "id": "0S8jzilEAL",
@@ -4548,7 +4583,8 @@
        "createdAt": "2025-10-05T07:38:04.264Z",
        "modifiedAt": "2026-02-12T15:38:55.238Z"
       }
-     ]
+     ],
+     "primaryArea": "foundation or frontier models, including LLMs"
     },
     {
      "id": "0ZRne2Nt8t",
@@ -4694,7 +4730,8 @@
        "createdAt": "2026-01-17T03:57:25.417Z",
        "modifiedAt": "2026-02-12T15:38:54.826Z"
       }
-     ]
+     ],
+     "primaryArea": "applications to computer vision, audio, language, and other modalities"
     },
     {
      "id": "0a6WXyNxBG",
@@ -4875,7 +4912,8 @@
        "createdAt": "2026-01-17T03:54:01.464Z",
        "modifiedAt": "2026-02-12T15:38:55.104Z"
       }
-     ]
+     ],
+     "primaryArea": "datasets and benchmarks"
     },
     {
      "id": "053vZMxDB5",
@@ -5131,7 +5169,9 @@
        "createdAt": "2026-01-26T08:34:25.561Z",
        "modifiedAt": "2026-02-06T04:51:28.429Z"
       }
-     ]
+     ],
+     "primaryArea": "applications to robotics, autonomy, planning",
+     "tldr": "We design a Reinforcement Learning framework based on time variables and task decomposition to solve Signal Temporal Logic tasks"
     },
     {
      "id": "0YjO70etNj",
@@ -5380,7 +5420,8 @@
        "createdAt": "2026-01-26T08:45:40.203Z",
        "modifiedAt": "2026-02-06T05:00:39.406Z"
       }
-     ]
+     ],
+     "primaryArea": "optimization"
     },
     {
      "id": "1Q2DotMyQ4",
@@ -5416,7 +5457,9 @@
        "createdAt": "2025-10-07T15:54:24.501Z",
        "modifiedAt": "2026-02-12T15:38:54.281Z"
       }
-     ]
+     ],
+     "primaryArea": "foundation or frontier models, including LLMs",
+     "tldr": "training-free, task-agnostic spatially grounded geometric shape encoding"
     },
     {
      "id": "1tJVBCpVD0",
@@ -5559,7 +5602,9 @@
        "createdAt": "2025-11-14T10:44:17.576Z",
        "modifiedAt": "2025-11-14T10:44:17.576Z"
       }
-     ]
+     ],
+     "primaryArea": "learning on graphs and other geometries & topologies",
+     "tldr": "We generalize the transformation layers, such as fully connected and convolutional layer, into Riemannian spaces, and manifest our framework on ten different geometries, including  three hyperbolic, five SPD, and two Grassmannian geometries."
     },
     {
      "id": "2yWis3aAvj",
@@ -5699,7 +5744,8 @@
        "createdAt": "2025-11-18T15:53:52.248Z",
        "modifiedAt": "2025-11-18T15:53:52.248Z"
       }
-     ]
+     ],
+     "primaryArea": "applications to physical sciences (physics, chemistry, biology, etc.)"
     },
     {
      "id": "0eEtTsnmyo",
@@ -5949,7 +5995,9 @@
        "createdAt": "2026-01-26T08:43:15.669Z",
        "modifiedAt": "2026-02-06T04:58:52.844Z"
       }
-     ]
+     ],
+     "primaryArea": "unsupervised, self-supervised, semi-supervised, and supervised representation learning",
+     "tldr": "We uncover a theoretical bridge between deep one-class classification (e.g., Deep SVDD) and a class of normalizing flows called Uniformly Scaling Flows (USFs)."
     },
     {
      "id": "35KC8ozdIO",
@@ -6111,7 +6159,9 @@
        "createdAt": "2026-01-26T08:53:35.750Z",
        "modifiedAt": "2026-02-06T05:06:10.119Z"
       }
-     ]
+     ],
+     "primaryArea": "foundation or frontier models, including LLMs",
+     "tldr": "We theoretically reveal the importance of diveristy in transformer layers for task-solving performance"
     },
     {
      "id": "4vXNp4wujY",
@@ -6366,7 +6416,9 @@
        "createdAt": "2026-01-26T08:38:14.373Z",
        "modifiedAt": "2026-02-06T04:54:56.276Z"
       }
-     ]
+     ],
+     "primaryArea": "other topics in machine learning (i.e., none of the above)",
+     "tldr": "we proposed a novel weight-only floating-points quantization technique to achieve overall non-integer quantization bit-width  e.g., FP5.3, by encoding multiple quantized weight parameters with Adaptive Mantissa-bit Sharing (AMS)"
     },
     {
      "id": "57bSlUHBfV",
@@ -6485,7 +6537,9 @@
        "createdAt": "2025-11-13T18:11:34.450Z",
        "modifiedAt": "2025-11-13T18:11:34.450Z"
       }
-     ]
+     ],
+     "primaryArea": "applications to computer vision, audio, language, and other modalities",
+     "tldr": "We propose AVRT, a framework that distills reasoning from single-modality teachers to enable efficient supervised fine-tuning, achieving state-of-the-art performance in audio-visual reasoning with minimal RL."
     },
     {
      "id": "5Vih2mSvOo",
@@ -6521,7 +6575,8 @@
        "createdAt": "2025-09-25T18:36:04.908Z",
        "modifiedAt": "2026-02-12T15:11:42.872Z"
       }
-     ]
+     ],
+     "primaryArea": "alignment, fairness, safety, privacy, and societal considerations"
     }
    ]
   },
@@ -7000,7 +7055,9 @@
         "comment": "Thank you for your thoughtful follow-up and thorough reevaluation. We are pleased that our clarifications and additional experiments have largely addressed your concerns. We sincerely appreciate the time you have dedicated to this matter, your constructive feedback, and your consideration."
        }
       }
-     ]
+     ],
+     "primaryArea": "learning on time series and dynamical systems",
+     "tldr": "Shallow autoencoders can detect multivariate time series anomalies beyond global PCA by learning normal conditional relations that reshape low-residual regions and separate relation-violating inputs."
     },
     {
      "id": "002z9w7Cev",
@@ -7196,7 +7253,9 @@
         "comment": "Thanks for the new experiment and the effort!\n\nIn your response to Q4 (Part 2), the LLM writer improves overall accuracy over CPU rules by about 3.2 points with DeepSeek 4.1 Flash and 2.5 points with GPT-5.1, and it costs just $2.26. With such a low cost, what is the advantage of using rules instead of an LLM?"
        }
       }
-     ]
+     ],
+     "primaryArea": "foundation or frontier models, including LLMs",
+     "tldr": "TOMC builds memory for long interaction histories on CPU by executing state, relation, and count operations and packing the results with selected source text; it outperforms six baselines on BEAM with three strong LLM API readers."
     },
     {
      "id": "004w3yx1Yp",
@@ -7421,7 +7480,9 @@
         "comment": "Dear Reviewer nNS3,\n\nThank you for the follow-up, and we are glad the other concerns are addressed.\n\nBLADE takes its mask parameterization from MaskLLM and its optimizer from Lion (Chen et al., 2023), and the paper credits both. What it adds is the finding that the direct port of MaskLLM to blocks fails, the reason it fails, and a design built on that reason.\n\n**The right setup cannot be found by tuning**\n\nIf the optimizer were just a hyperparameter, a careful search on per-block MaskLLM would find it. It does not. We gave AdamW (MaskLLM's optimizer), Adam, Muon, SGD, and Lion each its own search on the first block of Qwen2.5-0.5B. All five converge there, and AdamW wins (71.17% error reduction against 70.85% for Lion). Frozen and carried to the first block of LLaMA-3.1-8B, AdamW learns nothing (0.00%, reverted to the prior mask), and over all 24 blocks of Qwen2.5-0.5B its model ends at a C4 KL divergence of 0.604 against 0.377 for Lion (`Table-7-Page-31`). A tuned port picks the optimizer that fails.\n\n**Why it fails**\n\nThe block-local mask gradient vanishes as the relaxation hardens, by 4× to 525× on that block, and its scale is set by the model: on LLaMA-3.1-8B it is two orders of magnitude smaller than on Qwen2.5-0.5B (`Section-2.3-Page-5`, `Table-8-Page-32`). An optimizer whose step follows the gradient's magnitude ties its learning rate to the scale it was tuned at, so its configuration loses its gain on another model and degrades with depth on the same one. A sign step moves every logit by the same amount at any scale. That is why one configuration, tuned once on a 0.5B model, runs unchanged on every block of every model up to the 20B mixture-of-experts GPT-OSS.\n\n**What else the block-local setting needs**\n\n- *Two stages, not one.* Training the mask and the weights together, with its own 168-trial search, wins the block it was tuned on and none of the other 23, ending 23% worse in held-out KL divergence than BLADE-Full (`Table-16-Page-37`).\n- *Two activation streams.* Each block trains on the compressed model's own activations against the dense model's targets. Removing the dense targets from the weight stage drops LLaMA-3.1-8B at 2:4 from 52.7 to 47.6 average accuracy (`Table-34-Page-61`).\n- *4:8 at scale.* With 70 candidates per group instead of 6, the signal per candidate is diluted further, and the sign step keeps it usable. BLADE learns 4:8 masks for models up to 20B parameters on one GPU, where MaskLLM runs out of memory beyond 640 GB.\n\nIn short, we identify vanishing, model-dependent mask-logit gradients as the obstacle to block-wise mask learning and solve it with a sign-based optimizer; a hyperparameter search over the direct port does not find this solution."
        }
       }
-     ]
+     ],
+     "primaryArea": "other topics in machine learning (i.e., none of the above)",
+     "tldr": "BLADE learns N:M sparsity masks block-by-block with error compensation and weight re-optimization, matching end-to-end learned mask quality (MaskLLM) on a single GPU at ~56x less compute."
     },
     {
      "id": "00ESzocADl",
@@ -7505,7 +7566,9 @@
         "questions_for_authors": "1. What is the definition of `motion correspondence`? If it's a standard terminology, a reference should be provided, along with a brief description. If it's a term the author(s) coined, a detailed explanation should be provided. \n2. Title of section 3.5, what is a `host`? Or it should be a `branch`? \n3. What is the rationale of design specified in eqn (6)?"
        }
       }
-     ]
+     ],
+     "primaryArea": "applications to physical sciences (physics, chemistry, biology, etc.)",
+     "tldr": "WindWeaver uses coarse winds to guide cross-time feature exchange in flow matching, improving multivariate weather super-resolution."
     },
     {
      "id": "00EdGSSJO6",
@@ -7856,7 +7919,9 @@
         "title": "Kind follow-up about our responses"
        }
       }
-     ]
+     ],
+     "primaryArea": "optimization",
+     "tldr": "This paper introduces a pretrain-then-calibrate framework for safe contextual optimization."
     },
     {
      "id": "00HbDo77rR",
@@ -7941,7 +8006,9 @@
         "questions_for_authors": "How does removing the trajectory adjustments change AP?\nIs it correct to assume that removing all 4 adjustments give the 48.6% AP stated in\nTable 1?\nIt would be great to see other combinations. Especially something like: DiffuDINO ->\nDiffuDINO + DA -> DiffuDINO + DA + MAL -> DiffuDINO + DA + MAL + prior ->\nDiffuDINO + DA + MAL + prior + trajectory (yours)"
        }
       }
-     ]
+     ],
+     "primaryArea": "applications to computer vision, audio, language, and other modalities",
+     "tldr": "We further combine diffusion with DETR through self-trajectory denoising from a noisy encoder prior, which reduces exposure bias and, with DETR training practices, surpasses DINO and DiffuDINO on COCO and LVIS under the same 12-epoch schedule."
     },
     {
      "id": "00UknUIfhg",
@@ -8055,7 +8122,9 @@
         "title": "Response to Author"
        }
       }
-     ]
+     ],
+     "primaryArea": "probabilistic methods (Bayesian methods, variational inference, sampling, UQ, etc.)",
+     "tldr": "We identify two efficiency failures that survive recalibration and introduce pooled cost projection, which preserves coverage, bounds added labels, and improves set size under matched budgets in the evaluated tasks."
     },
     {
      "id": "00fJODQVdn",
@@ -8247,7 +8316,8 @@
         "comment": "**3. What are the advantages and methodological contributions of mmSLP relative to BAIT and VTG?**\n\nOn XRF55 with ResNet-18 and RD+RA inputs, normal-activity and sensitive-activity accuracies were **94.50% / 40.16%** for mmSLP, **91.00% / 64.69%** for the radar adaptation of BAIT, and **90.17% / 81.88%** for the radar adaptation of VTG. In this setting, mmSLP reduced sensitive-activity accuracy by **24.53 percentage points** relative to BAIT and **41.72 percentage points** relative to VTG, while achieving higher normal-activity accuracy than either adaptation.\n\n**Comparison with BAIT.** mmSLP builds on BAIT’s perturbation–class binding idea and changes how perturbations are represented and updated for user-specific fine-tuning on radar data. BAIT uses a generator to produce sample-level perturbations and then aggregates them by class. mmSLP directly optimizes one shared perturbation per sensitive activity, combining within-class error minimization with cross-class binding. Before each perturbation update, mmSLP briefly adapts the surrogate model to the user’s support set. It then holds the adapted parameters fixed while updating the perturbations. This accounts for the effect of user-specific fine-tuning without requiring second-order differentiation through the adaptation steps.\n\n**Comparison with VTG.** The radar adaptation of VTG uses a radar gain field for domain augmentation and a frozen surrogate to align perturbations with radar class prototypes. mmSLP targets classification after user-specific fine-tuning. It uses a surrogate adapted to the user’s support set and directly optimizes each perturbation’s ability to shift predictions toward its target sensitive class.\n\nTable 3 examines the two design choices in mmSLP separately. Under the same experimental conditions, replacing direct class-wise optimization with a generator increased sensitive-activity accuracy from **40.16%** to **62.97%**, indicating stronger protection from direct optimization in this setting. Compared with **mmSLP’s own second-order variant**, the first-order update reduced perturbation-generation time from **18.09 to 1.75 minutes per user** and peak GPU memory from **5.38 to 2.61 GiB**. Sensitive-activity accuracy was **40.16% with the first-order update** and **41.88% with the second-order update**. This comparison shows that the first-order update substantially reduced the user-side cost of generating perturbations while maintaining protection.\n\nThank you again for your time and consideration, and we wish you all the best."
        }
       }
-     ]
+     ],
+     "primaryArea": "applications to computer vision, audio, language, and other modalities"
     },
     {
      "id": "00ff1em8j3",
@@ -8376,7 +8446,9 @@
         "title": "Response to Reviewer UYBC"
        }
       }
-     ]
+     ],
+     "primaryArea": "applications to computer vision, audio, language, and other modalities",
+     "tldr": "A novel framework called GASplat, which reconstructs static scene with sparse input containing distractors."
     },
     {
      "id": "01Bz1ei1QQ",
@@ -8458,7 +8530,9 @@
         "questions_for_authors": "For Definition 4.1, would the authors mind clarifying the definition of the symbol \\(S\\)? Does \\(S\\) represent the set of all graphs? Additionally, for the matrix $\\(I \\in \\mathbb{R}^{n \\times r}\\)$, could the authors clarify the definition of \\(r\\)?\n\nI also have a question regarding the expressive power of the proposed method. With the introduction of the new node features, can the expressive power of GNNs be improved beyond the 1-WL or even 3-WL test? If so, could the authors provide further theoretical justification?\n\nBesides real-world graph datasets, have the authors evaluated the proposed method on synthetic datasets specifically designed for WL tests? Additionally, have the authors compared their method with other GNN architectures whose expressive power has been theoretically established beyond 1-WL and up to 3-WL? What are the advantages and disadvantages of the proposed method compared to these approaches?"
        }
       }
-     ]
+     ],
+     "primaryArea": "learning on graphs and other geometries & topologies",
+     "tldr": "We show that GNNs are not invariant to node IDs althought they should, and propose a method to achieve invariance to node IDs."
     },
     {
      "id": "01JgUpQlTW",
@@ -8538,7 +8612,9 @@
         "questions_for_authors": "1. Intervention specification: Please provide the complete rules underlying Weakness 1, distinguishing inherited settings from modifications and specifying the renormalization scope. Does background detection use vision-encoder or post-projector features?\n\n2. Ablation correspondence: What is retained or replaced when FAR and ACD are disabled, and do both branches share the same pruned tokens? How does α = 0 relate to “ACD disabled,” and what configuration differences, if any, explain the corresponding results in Table 6 and Figure 7e?\n\n3. Evaluation and cost protocols: Please specify the evaluation and tuning settings underlying Weakness 2 and any generation/scoring randomness. Paired uncertainty estimates, if available, would help assess robustness. For latency, please report hardware, batch size, output lengths, and timing scope, and reconcile the “no additional computational costs” claim with the acknowledged overhead."
        }
       }
-     ]
+     ],
+     "primaryArea": "foundation or frontier models, including LLMs",
+     "tldr": "pipeline for comprehensive image captioning"
     },
     {
      "id": "01Ys8jhpLK",
@@ -8554,7 +8630,8 @@
      ],
      "status": "under_review",
      "decision": null,
-     "notes": []
+     "notes": [],
+     "primaryArea": "reinforcement learning"
     },
     {
      "id": "01ZA00Buql",
@@ -8567,7 +8644,9 @@
      ],
      "status": "under_review",
      "decision": null,
-     "notes": []
+     "notes": [],
+     "primaryArea": "generative models",
+     "tldr": "Interactive World Model through training free  methods"
     },
     {
      "id": "01f2FYocEa",
@@ -8709,7 +8788,9 @@
         "title": "Response to Reviewer U9YF"
        }
       }
-     ]
+     ],
+     "primaryArea": "applications to robotics, autonomy, planning",
+     "tldr": "We introduce SimpleARM, a training-free, instruction-conditioned memory that maintains and selectively retrieves task-relevant state, including entity relations, progress, and trajectories."
     },
     {
      "id": "01hZuBp7qm",
@@ -8791,7 +8872,8 @@
         "questions_for_authors": "- Figure 14 and Table 2 show substantial backbone-dependent differences on RoomTour. What explains why WAN features improve roughness and metallicity estimation over DINOv2, whereas OpenSora and CogVideoX features do not, despite using the same probing architecture and DINOv2 fusion? What material-specific insight can be drawn from these contrasting results?\n- VidFM-MatHead’s predicted material maps appear to exhibit mild temporal flickering in the supplementary video. Have similar fluctuations been observed in the WAN-only probe?"
        }
       }
-     ]
+     ],
+     "primaryArea": "applications to computer vision, audio, language, and other modalities"
     },
     {
      "id": "gvhGB5w5GZ",
@@ -8865,7 +8947,9 @@
        }
       }
      ],
-     "sample": true
+     "sample": true,
+     "primaryArea": "applications to neuroscience & cognitive science",
+     "tldr": "BrainSaber constructs whole-brain functional atlases by decomposing pretrained fMRI reconstruction into redundant, unique, and synergistic predictive contributions."
     },
     {
      "id": "VpmheXv8ra",
@@ -8935,7 +9019,8 @@
        }
       }
      ],
-     "sample": true
+     "sample": true,
+     "primaryArea": "generative models"
     },
     {
      "id": "wIfzslZuuF",
@@ -9006,7 +9091,9 @@
        }
       }
      ],
-     "sample": true
+     "sample": true,
+     "primaryArea": "foundation or frontier models, including LLMs",
+     "tldr": "ICE uses node-indexed Clifford latent fields, higher-order geometric transport, and protected semantic channels, ranking first in all 30 supervised and few-shot comparisons."
     },
     {
      "id": "sF70kBTBO3",
@@ -9081,7 +9168,9 @@
        }
       }
      ],
-     "sample": true
+     "sample": true,
+     "primaryArea": "foundation or frontier models, including LLMs",
+     "tldr": "PrismQ enables elastic post-training quantization by allocating reconstruction capacity and calibration states according to quantization errors across layers and precisions."
     },
     {
      "id": "g6lX6r2LhO",
@@ -9152,7 +9241,8 @@
        }
       }
      ],
-     "sample": true
+     "sample": true,
+     "primaryArea": "applications to computer vision, audio, language, and other modalities"
     },
     {
      "id": "KrGoNgsVkP",
@@ -9221,7 +9311,8 @@
        }
       }
      ],
-     "sample": true
+     "sample": true,
+     "primaryArea": "generative models"
     },
     {
      "id": "Arptw2Lc8Q",
@@ -9292,7 +9383,9 @@
        }
       }
      ],
-     "sample": true
+     "sample": true,
+     "primaryArea": "generative models",
+     "tldr": "AURORA-LM learns high-capacity, decodable text latents and models their distribution with block-causal diffusion for high-quality continuous text generation."
     },
     {
      "id": "XqM0RjQkhJ",
@@ -9364,7 +9457,8 @@
        }
       }
      ],
-     "sample": true
+     "sample": true,
+     "primaryArea": "learning on time series and dynamical systems"
     },
     {
      "id": "xg7Pa04X0Z",
@@ -9437,7 +9531,9 @@
        }
       }
      ],
-     "sample": true
+     "sample": true,
+     "primaryArea": "foundation or frontier models, including LLMs",
+     "tldr": "We propose CFPP, a lightweight projection method that mitigates preservation–edit conflict in locate-then-edit methods and improves large-scale knowledge editing."
     },
     {
      "id": "lffFL0iK2V",
@@ -9506,7 +9602,8 @@
        }
       }
      ],
-     "sample": true
+     "sample": true,
+     "primaryArea": "optimization"
     },
     {
      "id": "fRd1fmTg0R",
@@ -9578,7 +9675,9 @@
        }
       }
      ],
-     "sample": true
+     "sample": true,
+     "primaryArea": "other topics in machine learning (i.e., none of the above)",
+     "tldr": "We route among specialized portfolio experts instead of directly predicting asset weights, enabling robust adaptation to noisy and non-stationary markets."
     },
     {
      "id": "oGYbb3htR7",
@@ -9651,7 +9750,8 @@
        }
       }
      ],
-     "sample": true
+     "sample": true,
+     "primaryArea": "alignment, fairness, safety, privacy, and societal considerations"
     },
     {
      "id": "oZwghCuPIP",
@@ -9724,7 +9824,8 @@
        }
       }
      ],
-     "sample": true
+     "sample": true,
+     "primaryArea": "generative models"
     },
     {
      "id": "UzFqEEAVQ6",
@@ -9798,7 +9899,9 @@
        }
       }
      ],
-     "sample": true
+     "sample": true,
+     "primaryArea": "alignment, fairness, safety, privacy, and societal considerations",
+     "tldr": "OwlSight is a compact 4B Factor-conditioned CoT monitor for diverse monitoring needs, with strong performance across 11 categories and efficient long-CoT handling via MIL."
     },
     {
      "id": "S5iafft0Rw",
@@ -9869,7 +9972,9 @@
        }
       }
      ],
-     "sample": true
+     "sample": true,
+     "primaryArea": "foundation or frontier models, including LLMs",
+     "tldr": "We replace expensive LLM-as-a-judge with PAJAMA, a new hybrid system that distills LLM evaluation logic into executable Python programs to produce transparent, low-latency verdicts at a fraction of the cost."
     },
     {
      "id": "g39BeXzQAk",
@@ -9940,7 +10045,8 @@
        }
       }
      ],
-     "sample": true
+     "sample": true,
+     "primaryArea": "applications to physical sciences (physics, chemistry, biology, etc.)"
     },
     {
      "id": "I0smGYI9bJ",
@@ -10012,7 +10118,9 @@
        }
       }
      ],
-     "sample": true
+     "sample": true,
+     "primaryArea": "unsupervised, self-supervised, semi-supervised, and supervised representation learning",
+     "tldr": "AMGC transfers multi-granularity structures from shared anchors to samples and integrates the resulting relations through adaptive low-rank consensus learning for incomplete multi-view clustering."
     },
     {
      "id": "HFDcgwr5dU",
@@ -10102,7 +10210,9 @@
        }
       }
      ],
-     "sample": true
+     "sample": true,
+     "primaryArea": "applications to computer vision, audio, language, and other modalities",
+     "tldr": "CAST recovers motion from monocular video for diverse target skeletons by using directly predicted global bone directions to correct composed rotations and mitigate error propagation, improving both matched-rig capture and cross-skeleton animation."
     },
     {
      "id": "zRSPtifHOP",
@@ -10177,7 +10287,8 @@
        }
       }
      ],
-     "sample": true
+     "sample": true,
+     "primaryArea": "other topics in machine learning (i.e., none of the above)"
     },
     {
      "id": "YHHUvyeBkX",
@@ -10253,7 +10364,9 @@
        }
       }
      ],
-     "sample": true
+     "sample": true,
+     "primaryArea": "datasets and benchmarks",
+     "tldr": "CER-Bench shows that scientific retrieval rankings can reverse when relevance labels change, while a PubMed parser bug can silently bind cited-paper IDs to the wrong source, separating arithmetic reproducibility from scientific validity."
     },
     {
      "id": "mEClfxTXs7",
@@ -10325,7 +10438,8 @@
        }
       }
      ],
-     "sample": true
+     "sample": true,
+     "primaryArea": "foundation or frontier models, including LLMs"
     },
     {
      "id": "JQG8LaeAwe",
@@ -10395,7 +10509,9 @@
        }
       }
      ],
-     "sample": true
+     "sample": true,
+     "primaryArea": "learning theory",
+     "tldr": "We establish a probabilistic foundation for reinforcement learning with generative policies, unifying value estimation and policy improvement as two components of a single change of measure."
     },
     {
      "id": "BFKPxCIp6G",
@@ -10466,7 +10582,9 @@
        }
       }
      ],
-     "sample": true
+     "sample": true,
+     "primaryArea": "alignment, fairness, safety, privacy, and societal considerations",
+     "tldr": "LoRo-Mark is a provably lossless and robust agent watermarking framework that enables reliable black-box ownership verification under agent repackaging without degrading normal task performance."
     },
     {
      "id": "lKw86tqYUR",
@@ -10538,7 +10656,8 @@
        }
       }
      ],
-     "sample": true
+     "sample": true,
+     "primaryArea": "applications to physical sciences (physics, chemistry, biology, etc.)"
     },
     {
      "id": "xtc7tcm6Te",
@@ -10607,7 +10726,8 @@
        }
       }
      ],
-     "sample": true
+     "sample": true,
+     "primaryArea": "foundation or frontier models, including LLMs"
     },
     {
      "id": "FARvuE3ais",
@@ -10678,7 +10798,9 @@
        }
       }
      ],
-     "sample": true
+     "sample": true,
+     "primaryArea": "alignment, fairness, safety, privacy, and societal considerations",
+     "tldr": "We study exposure fairness in ranking when the attention curve over positions is unknown."
     },
     {
      "id": "LGmZDkHteM",
@@ -10749,7 +10871,8 @@
        }
       }
      ],
-     "sample": true
+     "sample": true,
+     "primaryArea": "neurosymbolic & hybrid AI systems (physics-informed, logic & formal reasoning, etc.)"
     },
     {
      "id": "BiEg8snWxe",
@@ -10819,7 +10942,9 @@
        }
       }
      ],
-     "sample": true
+     "sample": true,
+     "primaryArea": "learning theory",
+     "tldr": "Local learning with one shared, read-only copy of the terminal readout pretrains billion-parameter language models near backpropagation quality without update locking."
     },
     {
      "id": "JRweZ0yzjD",
@@ -10890,7 +11015,9 @@
        }
       }
      ],
-     "sample": true
+     "sample": true,
+     "primaryArea": "foundation or frontier models, including LLMs",
+     "tldr": "Learning to ask to turn self-verification into correctness-aligned intrinsic rewards that enable stronger test-time reasoning."
     },
     {
      "id": "tAg9zeNc4T",
@@ -10961,7 +11088,8 @@
        }
       }
      ],
-     "sample": true
+     "sample": true,
+     "primaryArea": "other topics in machine learning (i.e., none of the above)"
     },
     {
      "id": "aF08o11NMm",
@@ -11033,7 +11161,9 @@
        }
       }
      ],
-     "sample": true
+     "sample": true,
+     "primaryArea": "interpretability and explainable AI",
+     "tldr": "We identify and trace internal task progress representations in long-horizon tool-use agents, and leverage progress flow deviations to selectively steer agent execution and improve performance."
     },
     {
      "id": "e5TY7nqvjv",
@@ -11108,7 +11238,9 @@
        }
       }
      ],
-     "sample": true
+     "sample": true,
+     "primaryArea": "alignment, fairness, safety, privacy, and societal considerations",
+     "tldr": "We formulate safety-monitor false-alarm auditing as a PU ranking problem under monitor-induced selection and propose a two-stage framework that improves false-alarm prioritization without alarm safety labels or retraining the monitor."
     },
     {
      "id": "oEfbI82QhG",
@@ -11177,7 +11309,9 @@
        }
       }
      ],
-     "sample": true
+     "sample": true,
+     "primaryArea": "applications to computer vision, audio, language, and other modalities",
+     "tldr": "EvLink improves multi-hop GraphRAG retrieval by building source-grounded evidence links between passages and optimizing evidence retrieval."
     },
     {
      "id": "aTZtHUaT5X",
@@ -11247,7 +11381,8 @@
        }
       }
      ],
-     "sample": true
+     "sample": true,
+     "primaryArea": "applications to physical sciences (physics, chemistry, biology, etc.)"
     },
     {
      "id": "lbdjOpFBze",
@@ -11318,7 +11453,8 @@
        }
       }
      ],
-     "sample": true
+     "sample": true,
+     "primaryArea": "interpretability and explainable AI"
     },
     {
      "id": "CDnkuVs7ki",
@@ -11392,7 +11528,9 @@
        }
       }
      ],
-     "sample": true
+     "sample": true,
+     "primaryArea": "interpretability and explainable AI",
+     "tldr": "Adaptive Graph Sparse Autoencoders jointly learn sparse features and their mixed-topology relational structure, allowing flat, single-parent, and multi-parent feature organizations to coexist."
     },
     {
      "id": "bYjgxvhArw",
@@ -11466,7 +11604,8 @@
        }
       }
      ],
-     "sample": true
+     "sample": true,
+     "primaryArea": "other topics in machine learning (i.e., none of the above)"
     },
     {
      "id": "8XSTiawhII",
@@ -11540,7 +11679,9 @@
        }
       }
      ],
-     "sample": true
+     "sample": true,
+     "primaryArea": "applications to neuroscience & cognitive science",
+     "tldr": "We move the decoding unit of fMRI-to-video reconstruction from fixed-length clips to stimulus events, which lets us pool semantics across clips and decode motion as an explicit geometric trajectory."
     },
     {
      "id": "6Uc5KP53cc",
@@ -11611,7 +11752,8 @@
        }
       }
      ],
-     "sample": true
+     "sample": true,
+     "primaryArea": "generative models"
     },
     {
      "id": "hSM0RqHSpo",
@@ -11681,7 +11823,8 @@
        }
       }
      ],
-     "sample": true
+     "sample": true,
+     "primaryArea": "datasets and benchmarks"
     },
     {
      "id": "5QSABMAdjf",
@@ -11753,7 +11896,9 @@
        }
       }
      ],
-     "sample": true
+     "sample": true,
+     "primaryArea": "foundation or frontier models, including LLMs",
+     "tldr": "MemEdit brings fine-grained CRUD operations to parametric agent memory via integrated-gradient attribution and null-space-constrained editing, with a mixture-of-memory-experts design that scales to 10K sequential edits."
     },
     {
      "id": "n60W8VR7Nx",
@@ -11825,7 +11970,9 @@
        }
       }
      ],
-     "sample": true
+     "sample": true,
+     "primaryArea": "datasets and benchmarks",
+     "tldr": "WorldLineBench is the first large-scale video-grounded benchmark for runtime interaction in streaming video generation, evaluating how interventions respond, take effect, and remain stable over long-horizon, multi-round worldlines."
     },
     {
      "id": "vRvlhaux8I",
@@ -11896,7 +12043,9 @@
        }
       }
      ],
-     "sample": true
+     "sample": true,
+     "primaryArea": "applications to robotics, autonomy, planning",
+     "tldr": "A general approach to dynamic robot manipulation that augments VLAs with explicit velocity prediction and coupled position–velocity control."
     },
     {
      "id": "f7PFD39fL5",
@@ -11969,7 +12118,8 @@
        }
       }
      ],
-     "sample": true
+     "sample": true,
+     "primaryArea": "datasets and benchmarks"
     },
     {
      "id": "gvLK56mpAS",
@@ -12038,7 +12188,8 @@
        }
       }
      ],
-     "sample": true
+     "sample": true,
+     "primaryArea": "alignment, fairness, safety, privacy, and societal considerations"
     },
     {
      "id": "DbeG8OmGvK",
@@ -12107,7 +12258,9 @@
        }
       }
      ],
-     "sample": true
+     "sample": true,
+     "primaryArea": "generative models",
+     "tldr": "A video world model for precise editing and flexible referencing in interactable worlds."
     },
     {
      "id": "5ZKVbEvIto",
@@ -12183,7 +12336,8 @@
        }
       }
      ],
-     "sample": true
+     "sample": true,
+     "primaryArea": "foundation or frontier models, including LLMs"
     },
     {
      "id": "uWGxmbo3I9",
@@ -12257,7 +12411,9 @@
        }
       }
      ],
-     "sample": true
+     "sample": true,
+     "primaryArea": "applications to computer vision, audio, language, and other modalities",
+     "tldr": "TutorialGUI improves GUI agents’ generalization to unfamiliar software by transforming official tutorials into executable, extensible skills through replay and exploration, without updating model parameters."
     },
     {
      "id": "GIelavSPz1",
@@ -12332,7 +12488,9 @@
        }
       }
      ],
-     "sample": true
+     "sample": true,
+     "primaryArea": "alignment, fairness, safety, privacy, and societal considerations",
+     "tldr": "AI reviewers often fail to reflect substantive manuscript improvements in their scores, and even modest gains can be easily overturned by negative user framing."
     },
     {
      "id": "i5DBxGr9h9",
@@ -12402,7 +12560,8 @@
        }
       }
      ],
-     "sample": true
+     "sample": true,
+     "primaryArea": "generative models"
     },
     {
      "id": "CIF1Ik9y5b",
@@ -12473,7 +12632,9 @@
        }
       }
      ],
-     "sample": true
+     "sample": true,
+     "primaryArea": "applications to physical sciences (physics, chemistry, biology, etc.)",
+     "tldr": "SCOPE learns from its own discoveries to generate a broader range of high-quality stellarator designs and  sustain exploration."
     },
     {
      "id": "sCZDFv6QCm",
@@ -12545,7 +12706,9 @@
        }
       }
      ],
-     "sample": true
+     "sample": true,
+     "primaryArea": "generative models",
+     "tldr": "We exploit additive and transportable geometric descriptors to enable fragment-wise inference in equivariant diffusion models, improving scalability and constraint preservation in 3D molecular generation."
     },
     {
      "id": "zdk0cjbgp8",
@@ -12619,7 +12782,9 @@
        }
       }
      ],
-     "sample": true
+     "sample": true,
+     "primaryArea": "foundation or frontier models, including LLMs",
+     "tldr": "We evaluate when an LLM system should keep or switch inference strategies by measuring each action's quality and cost before and after input changes."
     },
     {
      "id": "okFLoSa5VC",
@@ -12691,7 +12856,9 @@
        }
       }
      ],
-     "sample": true
+     "sample": true,
+     "primaryArea": "generative models",
+     "tldr": "LumiLens, the first generative framework that internalizes this intricate interplay for monocular video re-rendering that simultaneously controls viewpoint and fine-grained, parametric spatially-varying local illumination."
     },
     {
      "id": "rGpx1j1ae1",
@@ -12760,7 +12927,8 @@
        }
       }
      ],
-     "sample": true
+     "sample": true,
+     "primaryArea": "reinforcement learning"
     },
     {
      "id": "rp5YKEbpSe",
@@ -12831,7 +12999,9 @@
        }
       }
      ],
-     "sample": true
+     "sample": true,
+     "primaryArea": "foundation or frontier models, including LLMs",
+     "tldr": "chain-updated learned geometry of orthogonal task vector then merging for CL."
     },
     {
      "id": "I5d7cn5aHr",
@@ -12903,7 +13073,8 @@
        }
       }
      ],
-     "sample": true
+     "sample": true,
+     "primaryArea": "optimization"
     },
     {
      "id": "OsNEJbIyqp",
@@ -12973,7 +13144,9 @@
        }
       }
      ],
-     "sample": true
+     "sample": true,
+     "primaryArea": "interpretability and explainable AI",
+     "tldr": "We show the widespread presumption of patch-decoding explainability is not an inherent property of Vision Transformers, but an outcome that cannot be assumed to hold a-priori."
     },
     {
      "id": "MLDQKKyxTG",
@@ -13046,7 +13219,9 @@
        }
       }
      ],
-     "sample": true
+     "sample": true,
+     "primaryArea": "applications to neuroscience & cognitive science",
+     "tldr": "We propose connectome-as-policy, a structured policy representation that incorporates biological connectivity priors into reinforcement learning, enabling adaptive embodied behaviors through synaptic optimization within fixed neural circuits."
     },
     {
      "id": "n3FsRSI93g",
@@ -13116,7 +13291,8 @@
        }
       }
      ],
-     "sample": true
+     "sample": true,
+     "primaryArea": "foundation or frontier models, including LLMs"
     },
     {
      "id": "RGt0ht1qbW",
@@ -13187,7 +13363,8 @@
        }
       }
      ],
-     "sample": true
+     "sample": true,
+     "primaryArea": "applications to computer vision, audio, language, and other modalities"
     },
     {
      "id": "6RGCLJolrH",
@@ -13263,7 +13440,9 @@
        }
       }
      ],
-     "sample": true
+     "sample": true,
+     "primaryArea": "foundation or frontier models, including LLMs",
+     "tldr": "A long-term memory system that lets LLM agents maintain overlapping event storylines and retrieve evidence across conversations."
     },
     {
      "id": "Z1M7akkwYB",
@@ -13332,7 +13511,8 @@
        }
       }
      ],
-     "sample": true
+     "sample": true,
+     "primaryArea": "applications to computer vision, audio, language, and other modalities"
     },
     {
      "id": "1Pl7dnC0IV",
@@ -13403,7 +13583,8 @@
        }
       }
      ],
-     "sample": true
+     "sample": true,
+     "primaryArea": "alignment, fairness, safety, privacy, and societal considerations"
     },
     {
      "id": "yaZhkhJEcK",
@@ -13472,7 +13653,8 @@
        }
       }
      ],
-     "sample": true
+     "sample": true,
+     "primaryArea": "neurosymbolic & hybrid AI systems (physics-informed, logic & formal reasoning, etc.)"
     },
     {
      "id": "ts0kgHyBfr",
@@ -13564,7 +13746,9 @@
        }
       }
      ],
-     "sample": true
+     "sample": true,
+     "primaryArea": "datasets and benchmarks",
+     "tldr": "Transition-level audits of LLM self-improvement report statistics whose null was never measured; we measure seven of them, and each inverts a published conclusion."
     },
     {
      "id": "prec6AwNUs",
@@ -13637,7 +13821,8 @@
        }
       }
      ],
-     "sample": true
+     "sample": true,
+     "primaryArea": "foundation or frontier models, including LLMs"
     },
     {
      "id": "GCgSbzlVYB",
@@ -13709,7 +13894,9 @@
        }
       }
      ],
-     "sample": true
+     "sample": true,
+     "primaryArea": "learning on graphs and other geometries & topologies",
+     "tldr": "We introduce a relative Wasserstein angle and projection distance to measure non-Gaussianity, with closed-form solutions in one dimension and a numerical approximation for higher dimensions, validated on synthetic and real datasets."
     },
     {
      "id": "QFIRgU2Gex",
@@ -13780,7 +13967,8 @@
        }
       }
      ],
-     "sample": true
+     "sample": true,
+     "primaryArea": "foundation or frontier models, including LLMs"
     },
     {
      "id": "rCXqpYtxzk",
@@ -13852,7 +14040,9 @@
        }
       }
      ],
-     "sample": true
+     "sample": true,
+     "primaryArea": "foundation or frontier models, including LLMs",
+     "tldr": "TSOrchestra uses a language-model agent to orchestra the weights of time-series foundation models, and it outperforms leading models on both CRPS and MASE across the GIFT-Eval benchmark."
     },
     {
      "id": "68DRTLpAIk",
@@ -13925,7 +14115,9 @@
        }
       }
      ],
-     "sample": true
+     "sample": true,
+     "primaryArea": "learning theory",
+     "tldr": "FedPRS combines support-aware calibration with bounded residual correction for federated long-tailed learning."
     },
     {
      "id": "mp98HbBgPG",
@@ -13994,7 +14186,8 @@
        }
       }
      ],
-     "sample": true
+     "sample": true,
+     "primaryArea": "probabilistic methods (Bayesian methods, variational inference, sampling, UQ, etc.)"
     },
     {
      "id": "jqTtZXbYlN",
@@ -14069,7 +14262,9 @@
        }
       }
      ],
-     "sample": true
+     "sample": true,
+     "primaryArea": "datasets and benchmarks",
+     "tldr": "FullSongEval tests a prevalence-based text–label check using cue and reassignment controls; it accepts reassigned pairs in MusicCaps and MTG-Jamendo and all three Free Music Archive pairings."
     },
     {
      "id": "uWnzcjNJYu",
@@ -14139,7 +14334,8 @@
        }
       }
      ],
-     "sample": true
+     "sample": true,
+     "primaryArea": "applications to computer vision, audio, language, and other modalities"
     },
     {
      "id": "AwjS0mv7WU",
@@ -14230,7 +14426,9 @@
        }
       }
      ],
-     "sample": true
+     "sample": true,
+     "primaryArea": "transfer learning, meta learning, and lifelong learning",
+     "tldr": "FedSAIL shares dominant right subspaces of input-aware action matrices to regularize local LoRA training while preserving client-specific adaptation."
     },
     {
      "id": "LyhTSYKrK7",
@@ -14286,7 +14484,9 @@
        }
       }
      ],
-     "sample": true
+     "sample": true,
+     "primaryArea": "learning on graphs and other geometries & topologies",
+     "tldr": "FR-NLD uses reliability-gated Fisher–Rao directions of neighborhood label distributions to construct class-conditioned messages for heterophilic graph learning."
     },
     {
      "id": "iJrmHpl2M2",
@@ -14356,7 +14556,8 @@
        }
       }
      ],
-     "sample": true
+     "sample": true,
+     "primaryArea": "applications to robotics, autonomy, planning"
     },
     {
      "id": "KjHrTL5pzx",
@@ -14447,7 +14648,9 @@
        }
       }
      ],
-     "sample": true
+     "sample": true,
+     "primaryArea": "datasets and benchmarks",
+     "tldr": "GRACE-Bench evaluates coding agents on 60 Godot game-development tasks, revealing cross-system behavioral failures even when all local functionality checks pass."
     },
     {
      "id": "WOPC9RASkf",
@@ -14516,7 +14719,8 @@
        }
       }
      ],
-     "sample": true
+     "sample": true,
+     "primaryArea": "applications to computer vision, audio, language, and other modalities"
     },
     {
      "id": "f3funFkVzk",
@@ -14592,7 +14796,9 @@
        }
       }
      ],
-     "sample": true
+     "sample": true,
+     "primaryArea": "alignment, fairness, safety, privacy, and societal considerations",
+     "tldr": "We propose a novel sampling-based cloaking method that directly generates unlearnable samples, in contrast to prior optimization-based approaches, while enabling cross-model unlearnability and substantially improving cloaking efficiency."
     },
     {
      "id": "24rOW2ju8X",
@@ -14664,7 +14870,8 @@
        }
       }
      ],
-     "sample": true
+     "sample": true,
+     "primaryArea": "applications to computer vision, audio, language, and other modalities"
     },
     {
      "id": "KNZuXCGd97",
@@ -14751,7 +14958,9 @@
        }
       }
      ],
-     "sample": true
+     "sample": true,
+     "primaryArea": "generative models",
+     "tldr": "We introduce Entropic RNOT, a scalable neural optimal transport framework for learning intrinsic, out-of-sample transport maps on Riemannian manifolds."
     },
     {
      "id": "afc0DiW11W",
@@ -14824,7 +15033,9 @@
        }
       }
      ],
-     "sample": true
+     "sample": true,
+     "primaryArea": "optimization",
+     "tldr": "Finite Newton–Schulz smooths Muon’s polar update into a Lipschitz spectral map, yielding a nonsmooth nonconvex stationarity guarantee that matches the best-known sample complexity through online-to-nonconvex conversion."
     },
     {
      "id": "JUDi2DYb4B",
@@ -14893,7 +15104,9 @@
        }
       }
      ],
-     "sample": true
+     "sample": true,
+     "primaryArea": "unsupervised, self-supervised, semi-supervised, and supervised representation learning",
+     "tldr": "We adapt multimodal models by editing intermediate representations at test time."
     },
     {
      "id": "kL5s1daacQ",
@@ -14964,7 +15177,8 @@
        }
       }
      ],
-     "sample": true
+     "sample": true,
+     "primaryArea": "alignment, fairness, safety, privacy, and societal considerations"
     },
     {
      "id": "1jODyW5N9q",
@@ -15033,7 +15247,8 @@
        }
       }
      ],
-     "sample": true
+     "sample": true,
+     "primaryArea": "reinforcement learning"
     },
     {
      "id": "8khpAoXGXh",
@@ -15105,7 +15320,9 @@
        }
       }
      ],
-     "sample": true
+     "sample": true,
+     "primaryArea": "other topics in machine learning (i.e., none of the above)",
+     "tldr": "Decomposing the error that merging and pruning methods make when compressing a neural network."
     },
     {
      "id": "QCAXD5qKRI",
@@ -15180,7 +15397,9 @@
        }
       }
      ],
-     "sample": true
+     "sample": true,
+     "primaryArea": "interpretability and explainable AI",
+     "tldr": "We derive training-free feature dictionaries from Transformer weights via cumulative SVD, enabling exact residual reconstruction and complementary interpretability to SAEs at lower extraction cost."
     },
     {
      "id": "P20PXj2iW0",
@@ -15252,7 +15471,8 @@
        }
       }
      ],
-     "sample": true
+     "sample": true,
+     "primaryArea": "foundation or frontier models, including LLMs"
     },
     {
      "id": "QSfsjYR6HP",
@@ -15330,7 +15550,9 @@
        }
       }
      ],
-     "sample": true
+     "sample": true,
+     "primaryArea": "applications to robotics, autonomy, planning",
+     "tldr": "A JEPA latent world model can discard the manipulated object from its latent space; predicting contact forces at training time only anchors it back, raising image-only CEM planning success from 2% to 52% (77% with on-policy fine-tuning)."
     },
     {
      "id": "7D0ONz01rz",
@@ -15403,7 +15625,9 @@
        }
       }
      ],
-     "sample": true
+     "sample": true,
+     "primaryArea": "alignment, fairness, safety, privacy, and societal considerations",
+     "tldr": "LASTING improves the persistence of diffusion model unlearning by using low-denoising-loss neighbors of deletion targets to reduce their reappearance during sequential unlearning."
     },
     {
      "id": "uTIoY3tprZ",
@@ -15474,7 +15698,9 @@
        }
       }
      ],
-     "sample": true
+     "sample": true,
+     "primaryArea": "unsupervised, self-supervised, semi-supervised, and supervised representation learning",
+     "tldr": "We empirically show that uncertainty decreases as information grows on average yet often increases for individual samples, and introduce a regularization to address this."
     },
     {
      "id": "BjNMndPsJ1",
@@ -15548,7 +15774,9 @@
        }
       }
      ],
-     "sample": true
+     "sample": true,
+     "primaryArea": "unsupervised, self-supervised, semi-supervised, and supervised representation learning",
+     "tldr": "To enable real-time IMU gesture recognition across devices with minimal labels, GestureLens pre-trains on unlabeled activity data via masked motion tokens, then fine-tunes using a text-guided contrastive classifier."
     },
     {
      "id": "Nkw7Oa9S9R",
@@ -15620,7 +15848,9 @@
        }
       }
      ],
-     "sample": true
+     "sample": true,
+     "primaryArea": "datasets and benchmarks",
+     "tldr": "We introduce SWE-Quality, a benchmark built to evaluate coding agents on the quality of the code they produce; how maintainable, extensible and understandable it is, cheaply and accurately."
     },
     {
      "id": "K0wNaUvnLK",
@@ -15692,7 +15922,9 @@
        }
       }
      ],
-     "sample": true
+     "sample": true,
+     "primaryArea": "probabilistic methods (Bayesian methods, variational inference, sampling, UQ, etc.)",
+     "tldr": "ReMatch identifies residual target misspecification as a source of underdispersion in probabilistic downscaling and mitigates it by aligning training residuals with the test-time regime, improving calibration and accuracy."
     },
     {
      "id": "4Tvfm46q4p",
@@ -15763,7 +15995,9 @@
        }
       }
      ],
-     "sample": true
+     "sample": true,
+     "primaryArea": "neurosymbolic & hybrid AI systems (physics-informed, logic & formal reasoning, etc.)",
+     "tldr": "We propose a learned greedy router that, at each iteration, selects from an ensemble the solver predicted to yield the largest immediate error drop, delivering faster, more stable PDE convergence."
     },
     {
      "id": "I5hl3JId9G",
@@ -15834,7 +16068,9 @@
        }
       }
      ],
-     "sample": true
+     "sample": true,
+     "primaryArea": "infrastructure, software libraries, hardware, systems, etc.",
+     "tldr": "Double-P: Hierarchical Top-P Sparse Attention for Long-Context LLMs"
     },
     {
      "id": "4ZVWEhcgT4",
@@ -15906,7 +16142,9 @@
        }
       }
      ],
-     "sample": true
+     "sample": true,
+     "primaryArea": "infrastructure, software libraries, hardware, systems, etc.",
+     "tldr": "TokenCast forecasts token consumption for entire agent tasks and individual LLM calls before and during execution, using lightweight updates from runtime evidence to support budget management."
     },
     {
      "id": "NZsxSFHE0t",
@@ -15975,7 +16213,8 @@
        }
       }
      ],
-     "sample": true
+     "sample": true,
+     "primaryArea": "applications to robotics, autonomy, planning"
     },
     {
      "id": "tMAI1YEN4g",
@@ -16063,7 +16302,8 @@
        }
       }
      ],
-     "sample": true
+     "sample": true,
+     "primaryArea": "foundation or frontier models, including LLMs"
     },
     {
      "id": "QYoQM33Y3L",
@@ -16134,7 +16374,8 @@
        }
       }
      ],
-     "sample": true
+     "sample": true,
+     "primaryArea": "alignment, fairness, safety, privacy, and societal considerations"
     },
     {
      "id": "o0pNwgXLBr",
@@ -16205,7 +16446,8 @@
        }
       }
      ],
-     "sample": true
+     "sample": true,
+     "primaryArea": "foundation or frontier models, including LLMs"
     },
     {
      "id": "dUDzh4Xgr0",
@@ -16276,7 +16518,9 @@
        }
       }
      ],
-     "sample": true
+     "sample": true,
+     "primaryArea": "applications to robotics, autonomy, planning",
+     "tldr": "WMKD addresses the overlooked question of what a world model should predict for planning in end-to-end autonomous driving."
     },
     {
      "id": "mzf9obZdEx",
@@ -16346,7 +16590,9 @@
        }
       }
      ],
-     "sample": true
+     "sample": true,
+     "primaryArea": "reinforcement learning",
+     "tldr": "This paper presents N-GLU block, a small but expressive architectural block for compute-efficient RL."
     },
     {
      "id": "gz1uCUDsqV",
@@ -16415,7 +16661,9 @@
        }
       }
      ],
-     "sample": true
+     "sample": true,
+     "primaryArea": "datasets and benchmarks",
+     "tldr": "We introduce HypTBench, the first unified benchmark for Hyperbolic Transformers."
     },
     {
      "id": "zl4U97GZ9L",
@@ -16489,7 +16737,8 @@
        }
       }
      ],
-     "sample": true
+     "sample": true,
+     "primaryArea": "optimization"
     },
     {
      "id": "oa49al7XrY",
@@ -16563,7 +16812,8 @@
        }
       }
      ],
-     "sample": true
+     "sample": true,
+     "primaryArea": "foundation or frontier models, including LLMs"
     },
     {
      "id": "JWp43k7nDU",
@@ -16635,7 +16885,9 @@
        }
       }
      ],
-     "sample": true
+     "sample": true,
+     "primaryArea": "interpretability and explainable AI",
+     "tldr": "We show that comparing the \"shape\" of a model's query and key weights—without running the model at all—can predict grokking before it happens and reveal how RL fine-tuning changes attention structure."
     },
     {
      "id": "CDqjC5i0TT",
@@ -16705,7 +16957,8 @@
        }
       }
      ],
-     "sample": true
+     "sample": true,
+     "primaryArea": "learning on time series and dynamical systems"
     },
     {
      "id": "dsG9xtvnpw",
@@ -16778,7 +17031,9 @@
        }
       }
      ],
-     "sample": true
+     "sample": true,
+     "primaryArea": "applications to computer vision, audio, language, and other modalities",
+     "tldr": "CoSEC: Revisiting consensus in co-salient object detection through compact explicit semantic consensus, achieving state-of-the-art performance without task-specific training."
     },
     {
      "id": "uHiucyAxq1",
@@ -16848,7 +17103,8 @@
        }
       }
      ],
-     "sample": true
+     "sample": true,
+     "primaryArea": "generative models"
     },
     {
      "id": "5EFbawgRGl",
@@ -16919,7 +17175,9 @@
        }
       }
      ],
-     "sample": true
+     "sample": true,
+     "primaryArea": "optimization",
+     "tldr": "We propose a graph-aware tiny recursive model with self-relabeling for combinatorial optimization."
     },
     {
      "id": "B9U8OfaHZu",
@@ -16988,7 +17246,9 @@
        }
       }
      ],
-     "sample": true
+     "sample": true,
+     "primaryArea": "learning on time series and dynamical systems",
+     "tldr": "LUMA combines period folding with low-rank forecasting to achieve competitive accuracy on periodic time series with a small parameter budget."
     },
     {
      "id": "qm5Z3S6e4g",
@@ -17078,7 +17338,8 @@
        }
       }
      ],
-     "sample": true
+     "sample": true,
+     "primaryArea": "applications to computer vision, audio, language, and other modalities"
     },
     {
      "id": "QYLUiRLODb",
@@ -17148,7 +17409,8 @@
        }
       }
      ],
-     "sample": true
+     "sample": true,
+     "primaryArea": "applications to computer vision, audio, language, and other modalities"
     },
     {
      "id": "knp3wJXNQl",
@@ -17221,7 +17483,9 @@
        }
       }
      ],
-     "sample": true
+     "sample": true,
+     "primaryArea": "foundation or frontier models, including LLMs",
+     "tldr": "Harness Policy Distillation trains agents with verified actions and runtime control documents, improving end-to-end task success by aligning the Agent Harness Policy."
     },
     {
      "id": "2rFN9LiyVH",
@@ -17294,7 +17558,9 @@
        }
       }
      ],
-     "sample": true
+     "sample": true,
+     "primaryArea": "datasets and benchmarks",
+     "tldr": "Current KV-cache reuse benchmarks overstate accuracy; we provide a cleaner evaluation methodology and a benchmark suite designed to expose true reuse dynamics. Abstract:"
     },
     {
      "id": "u50WFGxUeJ",
@@ -17370,7 +17636,9 @@
        }
       }
      ],
-     "sample": true
+     "sample": true,
+     "primaryArea": "alignment, fairness, safety, privacy, and societal considerations",
+     "tldr": "We introduce, and provide empirical evidence for, a game-theoretic model for jailbreak robustness evaluation, with an Evaluator and a Trainer ; data augmentations are viewed as group actions, and fine-tuning is assumed to generalize only locally."
     },
     {
      "id": "qIccXm5GY9",
@@ -17439,7 +17707,8 @@
        }
       }
      ],
-     "sample": true
+     "sample": true,
+     "primaryArea": "foundation or frontier models, including LLMs"
     },
     {
      "id": "GNVxAMiXKu",
@@ -17513,7 +17782,8 @@
        }
       }
      ],
-     "sample": true
+     "sample": true,
+     "primaryArea": "generative models"
     },
     {
      "id": "0iS4OWHubH",
@@ -17586,7 +17856,8 @@
        }
       }
      ],
-     "sample": true
+     "sample": true,
+     "primaryArea": "datasets and benchmarks"
     },
     {
      "id": "WiFUsSPiMd",
@@ -17659,7 +17930,9 @@
        }
       }
      ],
-     "sample": true
+     "sample": true,
+     "primaryArea": "reinforcement learning",
+     "tldr": "HITRA combines snapshot recall, hierarchical credit, and listwise learning for long-context multi-hop QA, enabling hypothesis recovery, failure attribution, and trajectory ranking with a separable surrogate supporting microbatch training."
     },
     {
      "id": "FZbeFHDNOA",
@@ -17731,7 +18004,9 @@
        }
       }
      ],
-     "sample": true
+     "sample": true,
+     "primaryArea": "learning theory",
+     "tldr": "We show that active function queries enable polynomial-time recovery of all parameters in input-convex multi-layer polynomial networks, with exponentially better dimension dependence than kernel-based methods."
     },
     {
      "id": "L4heLJVter",
@@ -17804,7 +18079,8 @@
        }
       }
      ],
-     "sample": true
+     "sample": true,
+     "primaryArea": "other topics in machine learning (i.e., none of the above)"
     },
     {
      "id": "B7Zc9e8YvD",
@@ -17858,7 +18134,9 @@
        }
       }
      ],
-     "sample": true
+     "sample": true,
+     "primaryArea": "applications to computer vision, audio, language, and other modalities",
+     "tldr": "We propose Normal Guidance for the attention mechanism in MIL which enables transformer-based MIL methods to deliver better slice-level localization than the state-of-the-art."
     },
     {
      "id": "SvbGUo8tLU",
@@ -17929,7 +18207,8 @@
        }
       }
      ],
-     "sample": true
+     "sample": true,
+     "primaryArea": "applications to computer vision, audio, language, and other modalities"
     },
     {
      "id": "rQBeZDPPlM",
@@ -18000,7 +18279,8 @@
        }
       }
      ],
-     "sample": true
+     "sample": true,
+     "primaryArea": "applications to computer vision, audio, language, and other modalities"
     },
     {
      "id": "2zeNxZXat6",
@@ -18079,7 +18359,8 @@
        }
       }
      ],
-     "sample": true
+     "sample": true,
+     "primaryArea": "foundation or frontier models, including LLMs"
     },
     {
      "id": "VpmF3Fi04e",
@@ -18151,7 +18432,9 @@
        }
       }
      ],
-     "sample": true
+     "sample": true,
+     "primaryArea": "optimization",
+     "tldr": "We show that one-epoch overfitting can arise when examples are replayed through sparse embeddings that their own labels helped fit, and introduce UWSR,  that penalizes a weighted sensitivity to sparse embeddings to improve hold-out performance"
     },
     {
      "id": "lcLydt914P",
@@ -18224,7 +18507,9 @@
        }
       }
      ],
-     "sample": true
+     "sample": true,
+     "primaryArea": "applications to physical sciences (physics, chemistry, biology, etc.)",
+     "tldr": "ChronoSync recovers long-horizon coupled PDE dynamics from independently trained conditional diffusion models by synchronizing their probability flows across diffusion and physical time."
     },
     {
      "id": "bI2y08QnFE",
@@ -18299,7 +18584,9 @@
        }
       }
      ],
-     "sample": true
+     "sample": true,
+     "primaryArea": "optimization",
+     "tldr": "a bit shorter TLDR  We exploit lazy training and low-rank Jacobians to approximate gradient descent without repeated network-wide backpropagation."
     },
     {
      "id": "fRpPJorScJ",
@@ -18369,7 +18656,9 @@
        }
       }
      ],
-     "sample": true
+     "sample": true,
+     "primaryArea": "unsupervised, self-supervised, semi-supervised, and supervised representation learning",
+     "tldr": "We propose a Prior-Corrected Anchor Learning method, termed PCAL, which jointly learns view-specific anchor matrices, a shared anchor representation, and discrete clustering assignments within a unified framework."
     },
     {
      "id": "az80j8XH3L",
@@ -18445,7 +18734,9 @@
        }
       }
      ],
-     "sample": true
+     "sample": true,
+     "primaryArea": "applications to computer vision, audio, language, and other modalities",
+     "tldr": "EGRD grades idea novelty from unit and interaction residuals against an explicit set of earlier prior works, trained and evaluated on IdeaDelta, a multi-domain dataset pairing research ideas with temporally admissible priors."
     },
     {
      "id": "yOrQhwjSxW",
@@ -18516,7 +18807,9 @@
        }
       }
      ],
-     "sample": true
+     "sample": true,
+     "primaryArea": "applications to computer vision, audio, language, and other modalities",
+     "tldr": "LRCP is a training-free method that prunes redundant visual tokens via low-rank structure, reducing LVLM inference cost while preserving accuracy."
     },
     {
      "id": "6UGCLVZVJn",
@@ -18585,7 +18878,8 @@
        }
       }
      ],
-     "sample": true
+     "sample": true,
+     "primaryArea": "foundation or frontier models, including LLMs"
     },
     {
      "id": "hLgYRXEkj2",
@@ -18659,7 +18953,9 @@
        }
       }
      ],
-     "sample": true
+     "sample": true,
+     "primaryArea": "foundation or frontier models, including LLMs",
+     "tldr": "We study the mechanism of latent context tokens on online learning problems, and show via theoretical proofs and experiments that it can reason by maintaining a persistent online-learning state."
     },
     {
      "id": "pAAmSO4iVe",
@@ -18732,7 +19028,9 @@
        }
       }
      ],
-     "sample": true
+     "sample": true,
+     "primaryArea": "reinforcement learning",
+     "tldr": "We show that robot learning benefits from tracking task progress step by step: for online reward, VLMs are better used as step completion verifiers than as global scalar progress predictors."
     },
     {
      "id": "w5piJfl2sq",
@@ -18804,7 +19102,9 @@
        }
       }
      ],
-     "sample": true
+     "sample": true,
+     "primaryArea": "applications to computer vision, audio, language, and other modalities",
+     "tldr": "We rethink infrared-visible image fusion through chained semantic diagnosis and reward-driven optimization."
     },
     {
      "id": "oSv1oHYh3f",
@@ -18873,7 +19173,8 @@
        }
       }
      ],
-     "sample": true
+     "sample": true,
+     "primaryArea": "applications to computer vision, audio, language, and other modalities"
     },
     {
      "id": "axAy38CBYk",
@@ -18944,7 +19245,8 @@
        }
       }
      ],
-     "sample": true
+     "sample": true,
+     "primaryArea": "transfer learning, meta learning, and lifelong learning"
     },
     {
      "id": "mHP4jZgHhh",
@@ -19015,7 +19317,8 @@
        }
       }
      ],
-     "sample": true
+     "sample": true,
+     "primaryArea": "foundation or frontier models, including LLMs"
     },
     {
      "id": "DMry9Zh4nw",
@@ -19087,7 +19390,9 @@
        }
       }
      ],
-     "sample": true
+     "sample": true,
+     "primaryArea": "unsupervised, self-supervised, semi-supervised, and supervised representation learning",
+     "tldr": "We introduce WithinVAE, a compact variational visual autoencoder that learns semantic structure from its own EMA teacher while supporting variable-length prefix decoding."
     },
     {
      "id": "vWOvirZbT7",
@@ -19158,7 +19463,9 @@
        }
       }
      ],
-     "sample": true
+     "sample": true,
+     "primaryArea": "alignment, fairness, safety, privacy, and societal considerations",
+     "tldr": "We identify egocentric physical observations as an attack surface for persistent memory poisoning and introduce EgoPoison to trace how malicious scene content propagates through perception, memory writing, retrieval, and later responses or actions."
     },
     {
      "id": "X4WbRy6BGr",
@@ -19245,7 +19552,8 @@
        }
       }
      ],
-     "sample": true
+     "sample": true,
+     "primaryArea": "alignment, fairness, safety, privacy, and societal considerations"
     },
     {
      "id": "tWHhfHzhFk",
@@ -19319,7 +19627,9 @@
        }
       }
      ],
-     "sample": true
+     "sample": true,
+     "primaryArea": "applications to computer vision, audio, language, and other modalities",
+     "tldr": "SceneRoute-AVQA is a scene-conditioned trustworthy fusion framework that enables robust audio-visual question answering under temporal misalignment, cross-video interference, missing modalities, occlusion, and noise."
     },
     {
      "id": "c8pOKbbPaZ",
@@ -19390,7 +19700,9 @@
        }
       }
      ],
-     "sample": true
+     "sample": true,
+     "primaryArea": "foundation or frontier models, including LLMs",
+     "tldr": "We proposed the first graph-based RAG system on real smartphones"
     },
     {
      "id": "erJ21xq8Tv",
@@ -19464,7 +19776,8 @@
        }
       }
      ],
-     "sample": true
+     "sample": true,
+     "primaryArea": "datasets and benchmarks"
     },
     {
      "id": "YrVPJCf6g7",
@@ -19535,7 +19848,8 @@
        }
       }
      ],
-     "sample": true
+     "sample": true,
+     "primaryArea": "reinforcement learning"
     },
     {
      "id": "wWANlpEshG",
@@ -19607,7 +19921,9 @@
        }
       }
      ],
-     "sample": true
+     "sample": true,
+     "primaryArea": "optimization",
+     "tldr": "We propose a framework that learns and applies cross-constraint modeling experience to intelligently exploit mature solvers for VRPs with composite constraints."
     },
     {
      "id": "ElrGCQ9P0b",
@@ -19681,7 +19997,8 @@
        }
       }
      ],
-     "sample": true
+     "sample": true,
+     "primaryArea": "datasets and benchmarks"
     },
     {
      "id": "fPOI1Qx5Bu",
@@ -19771,7 +20088,8 @@
        }
       }
      ],
-     "sample": true
+     "sample": true,
+     "primaryArea": "reinforcement learning"
     },
     {
      "id": "b3lZofUyGC",
@@ -19841,7 +20159,9 @@
        }
       }
      ],
-     "sample": true
+     "sample": true,
+     "primaryArea": "foundation or frontier models, including LLMs",
+     "tldr": "We show that linear-attention models store past information in a shared recurrent state and retrieve it through sparse, specialized read pathways, revealing the mechanism behind their efficient but interference-prone memory."
     },
     {
      "id": "f1oZ3j4ojP",
@@ -19913,7 +20233,9 @@
        }
       }
      ],
-     "sample": true
+     "sample": true,
+     "primaryArea": "transfer learning, meta learning, and lifelong learning",
+     "tldr": "We organize source EEG trials once into a reusable dual-relation hypergraph and learn target-conditioned retrieval of compact source subsets for data-efficient few-shot motor-imagery EEG decoding."
     },
     {
      "id": "UjJscQaOAj",
@@ -19982,7 +20304,9 @@
        }
       }
      ],
-     "sample": true
+     "sample": true,
+     "primaryArea": "learning on time series and dynamical systems",
+     "tldr": "We propose SyncNet, a phase-synchronous modular architecture that improves compositional generalization on SQOOP, revealing that stable decomposition ultimately outweighs synchrony itself."
     },
     {
      "id": "IdWJRzfME7",
@@ -20054,7 +20378,8 @@
        }
       }
      ],
-     "sample": true
+     "sample": true,
+     "primaryArea": "transfer learning, meta learning, and lifelong learning"
     },
     {
      "id": "bh4KmCs0BY",
@@ -20126,7 +20451,9 @@
        }
       }
      ],
-     "sample": true
+     "sample": true,
+     "primaryArea": "interpretability and explainable AI",
+     "tldr": "anguage models usually decide on an answer well before chain-of-thought reasoning ends; detecting this “commitment boundary” enables up to 55% shorter reasoning with little performance loss."
     },
     {
      "id": "zgsRxPmHNV",
@@ -20198,7 +20525,9 @@
        }
       }
      ],
-     "sample": true
+     "sample": true,
+     "primaryArea": "applications to computer vision, audio, language, and other modalities",
+     "tldr": "This paper proposes a framework built upon a dual-view paradigm that generates highly consistent multi-view fashion models."
     },
     {
      "id": "iqwRlfbDQJ",
@@ -20269,7 +20598,8 @@
        }
       }
      ],
-     "sample": true
+     "sample": true,
+     "primaryArea": "reinforcement learning"
     },
     {
      "id": "tC9mVWPA7l",
@@ -20340,7 +20670,9 @@
        }
       }
      ],
-     "sample": true
+     "sample": true,
+     "primaryArea": "applications to neuroscience & cognitive science",
+     "tldr": "When the true behavioral model is unknown and behavioral data are limited, we use an LLM-generated behavioral model pool to build the uncertainty space for behavioral models and optimize the mechanism parameter through sequential experimental design."
     },
     {
      "id": "5shQc8nUYg",
@@ -20415,7 +20747,8 @@
        }
       }
      ],
-     "sample": true
+     "sample": true,
+     "primaryArea": "reinforcement learning"
     },
     {
      "id": "RDvoKny2dc",
@@ -20486,7 +20819,8 @@
        }
       }
      ],
-     "sample": true
+     "sample": true,
+     "primaryArea": "applications to robotics, autonomy, planning"
     },
     {
      "id": "AM9Ed2Hjy1",
@@ -20558,7 +20892,8 @@
        }
       }
      ],
-     "sample": true
+     "sample": true,
+     "primaryArea": "learning on time series and dynamical systems"
     },
     {
      "id": "4DSWFZTwM9",
@@ -20631,7 +20966,8 @@
        }
       }
      ],
-     "sample": true
+     "sample": true,
+     "primaryArea": "foundation or frontier models, including LLMs"
     },
     {
      "id": "gPyIPQEHnP",
@@ -20704,7 +21040,9 @@
        }
       }
      ],
-     "sample": true
+     "sample": true,
+     "primaryArea": "causal reasoning",
+     "tldr": "COSMIC scales ordering-based causal discovery to high dimensions by coupling low-rank Nyström score matching with macro-tier batch peeling under additive noise models."
     },
     {
      "id": "CRr2hflz9i",
@@ -20775,7 +21113,8 @@
        }
       }
      ],
-     "sample": true
+     "sample": true,
+     "primaryArea": "foundation or frontier models, including LLMs"
     },
     {
      "id": "j0eRSyCQY7",
@@ -20847,7 +21186,8 @@
        }
       }
      ],
-     "sample": true
+     "sample": true,
+     "primaryArea": "reinforcement learning"
     },
     {
      "id": "MmCgRukLQO",
@@ -20917,7 +21257,8 @@
        }
       }
      ],
-     "sample": true
+     "sample": true,
+     "primaryArea": "reinforcement learning"
     },
     {
      "id": "yG8Dw5brYg",
@@ -21025,7 +21366,9 @@
        }
       }
      ],
-     "sample": true
+     "sample": true,
+     "primaryArea": "optimization",
+     "tldr": "We provide the high-dimensional minimax bounds, high-probability guarantee and fixed-dimensional refinement for optimizing PL function under heavy-tailed noises."
     },
     {
      "id": "M3pATTw3wq",
@@ -21094,7 +21437,8 @@
        }
       }
      ],
-     "sample": true
+     "sample": true,
+     "primaryArea": "reinforcement learning"
     },
     {
      "id": "1DKigLEdEP",
@@ -21164,7 +21508,9 @@
        }
       }
      ],
-     "sample": true
+     "sample": true,
+     "primaryArea": "applications to robotics, autonomy, planning",
+     "tldr": "We present a geometry-guided framework for 3D instance segmentation of indoor scenes from multi-view image sequences"
     },
     {
      "id": "lMgjnXrWPA",
@@ -21235,7 +21581,9 @@
        }
       }
      ],
-     "sample": true
+     "sample": true,
+     "primaryArea": "applications to computer vision, audio, language, and other modalities",
+     "tldr": "We leverages the advanced forgery perceptual abilities of large-scale commercial models, distilling them into the Chain-of-Thought reasoning processes of smaller, more efficient models through a cold-start and RL mechanism."
     },
     {
      "id": "noyW8zazuP",
@@ -21307,7 +21655,9 @@
        }
       }
      ],
-     "sample": true
+     "sample": true,
+     "primaryArea": "alignment, fairness, safety, privacy, and societal considerations",
+     "tldr": "QICL is a privacy-aware quantum-classical framework for tabular in-context learning that uses a compact privatized interface and candidate-aware few-qubit prediction to balance privacy, communication, and predictive utility."
     },
     {
      "id": "N5sXtJh2bu",
@@ -21376,7 +21726,9 @@
        }
       }
      ],
-     "sample": true
+     "sample": true,
+     "primaryArea": "applications to computer vision, audio, language, and other modalities",
+     "tldr": "RAST anchors each S2S training exchange on one real recording and synthesizes the rest, improving condition-aware responses and expressive speech generation in S2S models."
     },
     {
      "id": "RE0leHUbUp",
@@ -21448,7 +21800,9 @@
        }
       }
      ],
-     "sample": true
+     "sample": true,
+     "primaryArea": "generative models",
+     "tldr": "SourceValue reuses historical source states to preserve sampled instances across autoregressive video returns."
     },
     {
      "id": "a2xndh7TnE",
@@ -21522,7 +21876,9 @@
        }
       }
      ],
-     "sample": true
+     "sample": true,
+     "primaryArea": "probabilistic methods (Bayesian methods, variational inference, sampling, UQ, etc.)",
+     "tldr": "We rethink epistemic uncertainty in node classification through information growth, defining a consistency criterion that graph evidential models fail and introducing graph bootstrap ensembles as candidate consistent epistemic predictors."
     },
     {
      "id": "gnGzF5LGOu",
@@ -21595,7 +21951,8 @@
        }
       }
      ],
-     "sample": true
+     "sample": true,
+     "primaryArea": "alignment, fairness, safety, privacy, and societal considerations"
     },
     {
      "id": "qlbMRilloi",
@@ -21666,7 +22023,9 @@
        }
       }
      ],
-     "sample": true
+     "sample": true,
+     "primaryArea": "applications to computer vision, audio, language, and other modalities",
+     "tldr": "VideoFace combines vision-language modeling with a shared motion tokenizer to reconstruct expressive 3D facial motion from sparse keyframes, with validation on a physical robot."
     },
     {
      "id": "mkFY1wMIM6",
@@ -21740,7 +22099,9 @@
        }
       }
      ],
-     "sample": true
+     "sample": true,
+     "primaryArea": "reinforcement learning",
+     "tldr": "Mean-field Q-learning for large heterogeneous multi-agent systems with common noise, with convergence guarantees, quantified approximation errors, and finite-population performance bounds."
     },
     {
      "id": "QgeyFqrTcl",
@@ -21811,7 +22172,8 @@
        }
       }
      ],
-     "sample": true
+     "sample": true,
+     "primaryArea": "transfer learning, meta learning, and lifelong learning"
     },
     {
      "id": "e4gIZ5LcFm",
@@ -21884,7 +22246,8 @@
        }
       }
      ],
-     "sample": true
+     "sample": true,
+     "primaryArea": "applications to computer vision, audio, language, and other modalities"
     },
     {
      "id": "b20IFhqpuz",
@@ -21954,7 +22317,8 @@
        }
       }
      ],
-     "sample": true
+     "sample": true,
+     "primaryArea": "generative models"
     },
     {
      "id": "XBOHv7Lzyx",
@@ -22026,7 +22390,8 @@
        }
       }
      ],
-     "sample": true
+     "sample": true,
+     "primaryArea": "foundation or frontier models, including LLMs"
     },
     {
      "id": "bKtriz3SuM",
@@ -22096,7 +22461,9 @@
        }
       }
      ],
-     "sample": true
+     "sample": true,
+     "primaryArea": "applications to computer vision, audio, language, and other modalities",
+     "tldr": "Evolving memory programs around capabilities improves overall performance."
     },
     {
      "id": "lAtvtnnHed",
@@ -22167,7 +22534,8 @@
        }
       }
      ],
-     "sample": true
+     "sample": true,
+     "primaryArea": "applications to computer vision, audio, language, and other modalities"
     },
     {
      "id": "F3XzeZEOFM",
@@ -22240,7 +22608,9 @@
        }
       }
      ],
-     "sample": true
+     "sample": true,
+     "primaryArea": "optimization",
+     "tldr": "This paper studies Adam under nonstationary stochastic objectives. We prove finite-time and high-probability tracking and stationarity bounds, revealing when Adam's momentum and adaptivity may reduce noise or possibly lag behind SGD under drift."
     },
     {
      "id": "YcNLnfQGH8",
@@ -22334,7 +22704,8 @@
        }
       }
      ],
-     "sample": true
+     "sample": true,
+     "primaryArea": "foundation or frontier models, including LLMs"
     },
     {
      "id": "O79C6XBzO8",
@@ -22406,7 +22777,8 @@
        }
       }
      ],
-     "sample": true
+     "sample": true,
+     "primaryArea": "foundation or frontier models, including LLMs"
     },
     {
      "id": "ALqCNGClYc",
@@ -22494,7 +22866,9 @@
        }
       }
      ],
-     "sample": true
+     "sample": true,
+     "primaryArea": "applications to computer vision, audio, language, and other modalities",
+     "tldr": "We turn clinical guidelines into executable logic and use it to generate factual and counterfactual training data, improving medical LLM reasoning and producing more faithful clinical explanations."
     },
     {
      "id": "GvNeBMzjj2",
@@ -22567,7 +22941,9 @@
        }
       }
      ],
-     "sample": true
+     "sample": true,
+     "primaryArea": "learning theory",
+     "tldr": "We analyze student convergence under SGD with partially expert teachers to characterize the sample-wise costs of one-hot and teacher supervision, and propose an uncertainty-guided selective distillation method."
     },
     {
      "id": "d0nZ9MTMIS",
@@ -22638,7 +23014,8 @@
        }
       }
      ],
-     "sample": true
+     "sample": true,
+     "primaryArea": "learning on graphs and other geometries & topologies"
     },
     {
      "id": "LazS8eX6C0",
@@ -22713,7 +23090,9 @@
        }
       }
      ],
-     "sample": true
+     "sample": true,
+     "primaryArea": "applications to computer vision, audio, language, and other modalities",
+     "tldr": "A single 3D generator that accepts any combination of inputs, pairing a cross-modally pretrained context encoder, run once, with a lightweight rectified-flow decoder for fast, high-quality generation."
     },
     {
      "id": "SoSbLCz33T",
@@ -22782,7 +23161,8 @@
        }
       }
      ],
-     "sample": true
+     "sample": true,
+     "primaryArea": "foundation or frontier models, including LLMs"
     },
     {
      "id": "TaP1wcx1u4",
@@ -22852,7 +23232,8 @@
        }
       }
      ],
-     "sample": true
+     "sample": true,
+     "primaryArea": "datasets and benchmarks"
     },
     {
      "id": "wUTPgpMcL7",
@@ -22923,7 +23304,8 @@
        }
       }
      ],
-     "sample": true
+     "sample": true,
+     "primaryArea": "applications to computer vision, audio, language, and other modalities"
     },
     {
      "id": "KGkcHTiULD",
@@ -22997,7 +23379,9 @@
        }
       }
      ],
-     "sample": true
+     "sample": true,
+     "primaryArea": "foundation or frontier models, including LLMs",
+     "tldr": "Cost-efficient reasoning via collaboration between a small local solver and a frontier LLM advisor invoked only when needed, achieving frontier-level accuracy at a fraction of the cost."
     },
     {
      "id": "USEjCJWDHx",
@@ -23066,7 +23450,8 @@
        }
       }
      ],
-     "sample": true
+     "sample": true,
+     "primaryArea": "foundation or frontier models, including LLMs"
     },
     {
      "id": "wGVaYLMJvE",
@@ -23135,7 +23520,8 @@
        }
       }
      ],
-     "sample": true
+     "sample": true,
+     "primaryArea": "reinforcement learning"
     },
     {
      "id": "tcrFPCrKGe",
@@ -23209,7 +23595,9 @@
        }
       }
      ],
-     "sample": true
+     "sample": true,
+     "primaryArea": "applications to robotics, autonomy, planning",
+     "tldr": "We make explicit physical hypotheses the compulsory communication interface between interacting entities in end-to-end driving, reducing shortcut sensitivity while improving planning across architectures."
     },
     {
      "id": "FX1zPakTc4",
@@ -23281,7 +23669,8 @@
        }
       }
      ],
-     "sample": true
+     "sample": true,
+     "primaryArea": "applications to computer vision, audio, language, and other modalities"
     },
     {
      "id": "cT1RKn40jF",
@@ -23354,7 +23743,9 @@
        }
       }
      ],
-     "sample": true
+     "sample": true,
+     "primaryArea": "optimization",
+     "tldr": "A tight convex relaxation of N:M sparsity enables exact block projections, certified mask hardening, and joint allocation of the sparsity budget across an LLM."
     },
     {
      "id": "45k9l8zWbL",
@@ -23444,7 +23835,9 @@
        }
       }
      ],
-     "sample": true
+     "sample": true,
+     "primaryArea": "optimization",
+     "tldr": "HapBO harnesses an LLM to warm-start an optimization loop using a landscaping language to create a structured prior and a novel robust prior injection method."
     },
     {
      "id": "KKWlUurqfH",
@@ -23517,7 +23910,8 @@
        }
       }
      ],
-     "sample": true
+     "sample": true,
+     "primaryArea": "foundation or frontier models, including LLMs"
     },
     {
      "id": "eLvp9bvgj8",
@@ -23589,7 +23983,9 @@
        }
       }
      ],
-     "sample": true
+     "sample": true,
+     "primaryArea": "applications to computer vision, audio, language, and other modalities",
+     "tldr": "MatDuet reconstructs procedural materials from text or a target image, using a generative video model as a virtual gonioreflectometer and an agent-gradient loop that alternates program synthesis with differentiable fitting."
     },
     {
      "id": "ZoEPY8bqJo",
@@ -23663,7 +24059,9 @@
        }
       }
      ],
-     "sample": true
+     "sample": true,
+     "primaryArea": "alignment, fairness, safety, privacy, and societal considerations",
+     "tldr": "We propose GAVEL, a two-pass evidence-latent architecture that audits long-horizon agent trajectories for sparse, delayed, and compositional safety risks."
     },
     {
      "id": "kgFMhJvQ2l",
@@ -23734,7 +24132,8 @@
        }
       }
      ],
-     "sample": true
+     "sample": true,
+     "primaryArea": "alignment, fairness, safety, privacy, and societal considerations"
     },
     {
      "id": "qtxASgNl5l",
@@ -23804,7 +24203,8 @@
        }
       }
      ],
-     "sample": true
+     "sample": true,
+     "primaryArea": "causal reasoning"
     },
     {
      "id": "931DtY1PZz",
@@ -23877,7 +24277,9 @@
        }
       }
      ],
-     "sample": true
+     "sample": true,
+     "primaryArea": "applications to computer vision, audio, language, and other modalities",
+     "tldr": "MSR-Track improves infrared anti-UAV tracking by refining search tokens and enhancing multi-scale spatial responses, mitigating search representation dilution with little additional computation."
     },
     {
      "id": "ijzD68LDjM",
@@ -23948,7 +24350,8 @@
        }
       }
      ],
-     "sample": true
+     "sample": true,
+     "primaryArea": "alignment, fairness, safety, privacy, and societal considerations"
     },
     {
      "id": "Va1BrMitr7",
@@ -24023,7 +24426,9 @@
        }
       }
      ],
-     "sample": true
+     "sample": true,
+     "primaryArea": "infrastructure, software libraries, hardware, systems, etc.",
+     "tldr": "BranchMind validates branch-scoped evidence receipts, retaining all 32 stable observations (versus 7 for whole-file hashing) and reducing receiver work across 54 paired branch cells."
     },
     {
      "id": "77cznAkMrh",
@@ -24094,7 +24499,9 @@
        }
       }
      ],
-     "sample": true
+     "sample": true,
+     "primaryArea": "applications to computer vision, audio, language, and other modalities",
+     "tldr": "We propose FrameBlend, a simple yet effective plug-and-play method that selectively recomputes query-relevant KV caches at query time. It improves accuracy across diverse streaming video understanding frameworks while reducing idle-time prefill cost."
     },
     {
      "id": "LMFie3a4sh",
@@ -24170,7 +24577,9 @@
        }
       }
      ],
-     "sample": true
+     "sample": true,
+     "primaryArea": "datasets and benchmarks",
+     "tldr": "We construct a security-impact-validated RTL vulnerability dataset and study whether validation-derived Security Traces improve module-level vulnerability detection and cross-design generalization with LLMs."
     },
     {
      "id": "GjQwm3SKFE",
@@ -24242,7 +24651,9 @@
        }
       }
      ],
-     "sample": true
+     "sample": true,
+     "primaryArea": "applications to physical sciences (physics, chemistry, biology, etc.)",
+     "tldr": "Masking the evidence a MIL model has already found forces it to recover tokamak disruption precursors from discharge labels alone, a median 185 ms before the discharge ends."
     },
     {
      "id": "r71dbOzl4i",
@@ -24313,7 +24724,9 @@
        }
       }
      ],
-     "sample": true
+     "sample": true,
+     "primaryArea": "applications to physical sciences (physics, chemistry, biology, etc.)",
+     "tldr": "We turn converged PINN solutions into reusable physics kernels, so that solving a large wave system costs $\\mathcal{O}(\\log N)$instead of $\\mathcal{O}(N)$ in the number of sources."
     },
     {
      "id": "4IVbz5H9ER",
@@ -24382,7 +24795,9 @@
        }
       }
      ],
-     "sample": true
+     "sample": true,
+     "primaryArea": "optimization",
+     "tldr": "Propose an agent harness evolution architecture based on competition and design a fitness function including behavioral diversity and generalization judging by llm."
     },
     {
      "id": "yRZcNTWqpQ",
@@ -24451,7 +24866,9 @@
        }
       }
      ],
-     "sample": true
+     "sample": true,
+     "primaryArea": "reinforcement learning",
+     "tldr": "EviWeave-Agent jointly optimizes evidence acquisition and answer release using source-dependence modeling, improving coverage while reducing factual risk and query cost on CorruptEvidenceBench under six corruption and dependence conditions."
     },
     {
      "id": "7lEI9Sk1hu",
@@ -24523,7 +24940,8 @@
        }
       }
      ],
-     "sample": true
+     "sample": true,
+     "primaryArea": "generative models"
     },
     {
      "id": "A6bCqWjHTd",
@@ -24595,7 +25013,8 @@
        }
       }
      ],
-     "sample": true
+     "sample": true,
+     "primaryArea": "learning theory"
     },
     {
      "id": "KCPCt1tqiR",
@@ -24684,7 +25103,8 @@
        }
       }
      ],
-     "sample": true
+     "sample": true,
+     "primaryArea": "generative models"
     },
     {
      "id": "JFtht8go1O",
@@ -24753,7 +25173,9 @@
        }
       }
      ],
-     "sample": true
+     "sample": true,
+     "primaryArea": "reinforcement learning",
+     "tldr": "RLTB unifies heterogeneous behavioral requirements into a joint target region and derives adaptive output-level learning signals to guide language-model post-training toward it."
     },
     {
      "id": "fNtuKhJqlN",
@@ -24823,7 +25245,8 @@
        }
       }
      ],
-     "sample": true
+     "sample": true,
+     "primaryArea": "applications to computer vision, audio, language, and other modalities"
     },
     {
      "id": "UMC5Pox5IC",
@@ -24894,7 +25317,9 @@
        }
       }
      ],
-     "sample": true
+     "sample": true,
+     "primaryArea": "applications to computer vision, audio, language, and other modalities",
+     "tldr": "Treating inter-joint distances as an explicit state that is denoised jointly with motion, rather than as a loss, improves text-to-motion diffusion across backbones."
     },
     {
      "id": "qYz5XH0jf7",
@@ -24969,7 +25394,9 @@
        }
       }
      ],
-     "sample": true
+     "sample": true,
+     "primaryArea": "unsupervised, self-supervised, semi-supervised, and supervised representation learning",
+     "tldr": "We present a softmax formulation for codebooks beyond one-hot that improves the performance of error correcting output codes in multiclass classification tasks."
     },
     {
      "id": "sXAa9qlMpr",
@@ -25040,7 +25467,8 @@
        }
       }
      ],
-     "sample": true
+     "sample": true,
+     "primaryArea": "alignment, fairness, safety, privacy, and societal considerations"
     },
     {
      "id": "i4U0mlO3QB",
@@ -25113,7 +25541,8 @@
        }
       }
      ],
-     "sample": true
+     "sample": true,
+     "primaryArea": "transfer learning, meta learning, and lifelong learning"
     },
     {
      "id": "GHvtfQG7T1",
@@ -25185,7 +25614,9 @@
        }
       }
      ],
-     "sample": true
+     "sample": true,
+     "primaryArea": "optimization",
+     "tldr": "PRISM optimizes LLM-driven algorithm design by selecting key instances while preserving search dynamics in algorithm space, thereby drastically reducing evaluation overhead and ensuring high search performance."
     },
     {
      "id": "8B5VOeLWKv",
@@ -25258,7 +25689,9 @@
        }
       }
      ],
-     "sample": true
+     "sample": true,
+     "primaryArea": "learning on time series and dynamical systems",
+     "tldr": "LG-Transformer uses a pretrained LLM as a neural architecture search controller to discover stronger Transformer variants for time-series forecasting, achieving the best MSE in 29/32 benchmark settings with no extra inference-time cost."
     },
     {
      "id": "YhXJ3plAGO",
@@ -25329,7 +25762,9 @@
        }
       }
      ],
-     "sample": true
+     "sample": true,
+     "primaryArea": "applications to computer vision, audio, language, and other modalities",
+     "tldr": "We introduce a comprehensive benchmark (EXConan-Bench) and an evidence-grounded multi-agent framework (EXConan) to systematically evaluate and significantly enhance the extreme weather reasoning capabilities of LLMs."
     },
     {
      "id": "JbJE3PUxmS",
@@ -25403,7 +25838,9 @@
        }
       }
      ],
-     "sample": true
+     "sample": true,
+     "primaryArea": "generative models",
+     "tldr": "InfiniDream enables open-ended procedural 3D world generation by creating novel, photorealistic, editable, and diverse assets and composing them into rich 3D worlds through semantic planning and deterministic placement."
     },
     {
      "id": "VRLUtnC2oZ",
@@ -25475,7 +25912,9 @@
        }
       }
      ],
-     "sample": true
+     "sample": true,
+     "primaryArea": "applications to computer vision, audio, language, and other modalities",
+     "tldr": "A systematic study of various design choices for Full Duplex Speech Language Models, including architecture, objectives, and data."
     },
     {
      "id": "m7eXg7gXJ6",
@@ -25545,7 +25984,8 @@
        }
       }
      ],
-     "sample": true
+     "sample": true,
+     "primaryArea": "applications to computer vision, audio, language, and other modalities"
     },
     {
      "id": "scDDtMm52e",
@@ -25616,7 +26056,8 @@
        }
       }
      ],
-     "sample": true
+     "sample": true,
+     "primaryArea": "applications to computer vision, audio, language, and other modalities"
     },
     {
      "id": "jt2IDpyS7m",
@@ -25691,7 +26132,8 @@
        }
       }
      ],
-     "sample": true
+     "sample": true,
+     "primaryArea": "reinforcement learning"
     },
     {
      "id": "q4tWsuruGG",
@@ -25778,7 +26220,8 @@
        }
       }
      ],
-     "sample": true
+     "sample": true,
+     "primaryArea": "applications to computer vision, audio, language, and other modalities"
     },
     {
      "id": "wvCpXCIcGi",
@@ -25847,7 +26290,9 @@
        }
       }
      ],
-     "sample": true
+     "sample": true,
+     "primaryArea": "applications to computer vision, audio, language, and other modalities",
+     "tldr": "Preserving Message Separability for Geometrically Robust Image Watermarking"
     },
     {
      "id": "wT2k544flc",
@@ -25920,7 +26365,9 @@
        }
       }
      ],
-     "sample": true
+     "sample": true,
+     "primaryArea": "alignment, fairness, safety, privacy, and societal considerations",
+     "tldr": "SKILLLITE is an evidence-guided framework for malicious Agent Skill auditing that grounds security evidence and performs structured risk adjudication with compact LLMs."
     },
     {
      "id": "cHq8QbhuMN",
@@ -25992,7 +26439,9 @@
        }
       }
      ],
-     "sample": true
+     "sample": true,
+     "primaryArea": "foundation or frontier models, including LLMs",
+     "tldr": "Past decisions can erode an LLM agent's adherence to its stated policy; we characterise, causally localise, and trace this to distillation."
     },
     {
      "id": "g6iNMYbM79",
@@ -26077,7 +26526,9 @@
        }
       }
      ],
-     "sample": true
+     "sample": true,
+     "primaryArea": "neurosymbolic & hybrid AI systems (physics-informed, logic & formal reasoning, etc.)",
+     "tldr": "PI-NCA builds conservation into neural cellular automata by predicting fluxes instead of unconstrained state changes. In certain cases it even achieves competitive accuracy with up to 112 times fewer parameters and 8.3 times faster training."
     },
     {
      "id": "vdf3GYk3zH",
@@ -26147,7 +26598,9 @@
        }
       }
      ],
-     "sample": true
+     "sample": true,
+     "primaryArea": "other topics in machine learning (i.e., none of the above)",
+     "tldr": "Exploit annotated data without human identities to group human experts for cluster-based learning to defer"
     },
     {
      "id": "ncW49XcaoI",
@@ -26218,7 +26671,9 @@
        }
       }
      ],
-     "sample": true
+     "sample": true,
+     "primaryArea": "applications to computer vision, audio, language, and other modalities",
+     "tldr": "We developed a framework to estimate 3D volumes from single view 2D images by adapting a posterior-rectified flow matching approach."
     },
     {
      "id": "uULkzHLVUt",
@@ -26291,7 +26746,9 @@
        }
       }
      ],
-     "sample": true
+     "sample": true,
+     "primaryArea": "learning theory",
+     "tldr": "Models can learn core features before using them, and escaping shortcut dominance depends on how effectively corrective evidence is transported into decision change."
     },
     {
      "id": "Ngg5l67vYL",
@@ -26360,7 +26817,8 @@
        }
       }
      ],
-     "sample": true
+     "sample": true,
+     "primaryArea": "foundation or frontier models, including LLMs"
     },
     {
      "id": "aEeLDdvs1d",
@@ -26431,7 +26889,8 @@
        }
       }
      ],
-     "sample": true
+     "sample": true,
+     "primaryArea": "foundation or frontier models, including LLMs"
     },
     {
      "id": "2OqvhO9Zoc",
@@ -26501,7 +26960,9 @@
        }
       }
      ],
-     "sample": true
+     "sample": true,
+     "primaryArea": "interpretability and explainable AI",
+     "tldr": "InDe-X is a retraining-free interventional framework that resolves the representational failure of scalar interaction indices by auditing deep networks through uniqueness, redundancy, and synergy profiles."
     },
     {
      "id": "n9I1GnUsDu",
@@ -26572,7 +27033,8 @@
        }
       }
      ],
-     "sample": true
+     "sample": true,
+     "primaryArea": "optimization"
     },
     {
      "id": "QqTpTgiGDz",
@@ -26645,7 +27107,8 @@
        }
       }
      ],
-     "sample": true
+     "sample": true,
+     "primaryArea": "learning on time series and dynamical systems"
     },
     {
      "id": "ZRp8ojPOnx",
@@ -26719,7 +27182,9 @@
        }
       }
      ],
-     "sample": true
+     "sample": true,
+     "primaryArea": "foundation or frontier models, including LLMs",
+     "tldr": "Black-box lineage fingerprints of Qwen3's post-training branches are strong within a scale but do not transfer across scales; both faces share one cause — degenerate separators (output termination, problem difficulty), not lineage."
     },
     {
      "id": "BKQTOdKMqB",
@@ -26791,7 +27256,9 @@
        }
       }
      ],
-     "sample": true
+     "sample": true,
+     "primaryArea": "reinforcement learning",
+     "tldr": "We introduce a reinforcement learning framework that jointly learns visual reference revision and subsequent reasoning from downstream task utility while preserving the task’s intended object."
     },
     {
      "id": "h1CI7whx6E",
@@ -26862,7 +27329,8 @@
        }
       }
      ],
-     "sample": true
+     "sample": true,
+     "primaryArea": "applications to robotics, autonomy, planning"
     },
     {
      "id": "dHKm7EbLhx",
@@ -26936,7 +27404,9 @@
        }
       }
      ],
-     "sample": true
+     "sample": true,
+     "primaryArea": "alignment, fairness, safety, privacy, and societal considerations",
+     "tldr": "We introduce canonical paraphrasing, prove that its ideal form eliminates semantic-preserving steganography, and show that a practical approximation substantially reduces hidden-message recovery"
     },
     {
      "id": "Yi6uDVGgpF",
@@ -27010,7 +27480,9 @@
        }
       }
      ],
-     "sample": true
+     "sample": true,
+     "primaryArea": "alignment, fairness, safety, privacy, and societal considerations",
+     "tldr": "LLM agents have propensity to evade runtime monitors when oversight conflicts with task completion, even without malicious goals, explicit evasion instructions, or specialized training."
     },
     {
      "id": "JWrXINrH0I",
@@ -27083,7 +27555,9 @@
        }
       }
      ],
-     "sample": true
+     "sample": true,
+     "primaryArea": "learning on graphs and other geometries & topologies",
+     "tldr": "We separate local graph distillation error into an irreducible information limit and a learner-dependent realization gap, and characterize how graph locality, unresolved uncertainty, and predictive sensitivity determine this boundary."
     },
     {
      "id": "CjcfTtwzfF",
@@ -27156,7 +27630,9 @@
        }
       }
      ],
-     "sample": true
+     "sample": true,
+     "primaryArea": "applications to computer vision, audio, language, and other modalities",
+     "tldr": "We propose GroundPO for reasoning-intensive visual grounding, following a simple principle: internalize the knowledge before teaching the policy, which mitigates PrivShift in privileged on-policy distillation."
     },
     {
      "id": "rP19FOoQ4e",
@@ -27233,7 +27709,9 @@
        }
       }
      ],
-     "sample": true
+     "sample": true,
+     "primaryArea": "foundation or frontier models, including LLMs",
+     "tldr": "We show inherited large tokenizers waste capacity in small LMs; PAATRA trims vocabulary and reinvests saved parameters into transformer width, improving bits-per-byte by up to 5.4% over full-vocabulary baselines at matched parameter budgets."
     },
     {
      "id": "ocjMMuRqQi",
@@ -27304,7 +27782,8 @@
        }
       }
      ],
-     "sample": true
+     "sample": true,
+     "primaryArea": "applications to neuroscience & cognitive science"
     },
     {
      "id": "GNBNfrOQXy",
@@ -27376,7 +27855,9 @@
        }
       }
      ],
-     "sample": true
+     "sample": true,
+     "primaryArea": "foundation or frontier models, including LLMs",
+     "tldr": "Aggregate accuracy can conceal functional changes after Audio-Visual LLM fine-tuning; we characterize this ambiguity with sharp bounds and resolve it through paired evaluation."
     },
     {
      "id": "7pPILYMhZn",
@@ -27447,7 +27928,9 @@
        }
       }
      ],
-     "sample": true
+     "sample": true,
+     "primaryArea": "learning on time series and dynamical systems",
+     "tldr": "LATF-AD detects heterogeneous time series anomalies by learning a locally adaptive, sparse fusion of complementary time-frequency views to reconstruct normal signal dynamics."
     },
     {
      "id": "5aMUZIy1hu",
@@ -27516,7 +27999,9 @@
        }
       }
      ],
-     "sample": true
+     "sample": true,
+     "primaryArea": "interpretability and explainable AI",
+     "tldr": "computing exact Shapley value for ML models with multiplicative structure in log(d) parallel time"
     },
     {
      "id": "9BLs1bdv7N",
@@ -27587,7 +28072,8 @@
        }
       }
      ],
-     "sample": true
+     "sample": true,
+     "primaryArea": "infrastructure, software libraries, hardware, systems, etc."
     },
     {
      "id": "KyroQoSqjr",
@@ -27656,7 +28142,8 @@
        }
       }
      ],
-     "sample": true
+     "sample": true,
+     "primaryArea": "interpretability and explainable AI"
     },
     {
      "id": "E78ZlxZ1aF",
@@ -27729,7 +28216,8 @@
        }
       }
      ],
-     "sample": true
+     "sample": true,
+     "primaryArea": "foundation or frontier models, including LLMs"
     },
     {
      "id": "gfFIJ2GxLO",
@@ -27801,7 +28289,8 @@
        }
       }
      ],
-     "sample": true
+     "sample": true,
+     "primaryArea": "datasets and benchmarks"
     },
     {
      "id": "kVsP0mVFHA",
@@ -27875,7 +28364,8 @@
        }
       }
      ],
-     "sample": true
+     "sample": true,
+     "primaryArea": "interpretability and explainable AI"
     },
     {
      "id": "vdxNcKuCKd",
@@ -27944,7 +28434,8 @@
        }
       }
      ],
-     "sample": true
+     "sample": true,
+     "primaryArea": "datasets and benchmarks"
     },
     {
      "id": "jOAoSa58hc",
@@ -28018,7 +28509,9 @@
        }
       }
      ],
-     "sample": true
+     "sample": true,
+     "primaryArea": "applications to robotics, autonomy, planning",
+     "tldr": "ActAtlas builds an adaptive graph of execution anchors from demonstrations and conditions a diffusion policy on both anchor content and transition relations, enabling context-aware long-horizon robot manipulation."
     },
     {
      "id": "MbatJIvcFs",
@@ -28087,7 +28580,8 @@
        }
       }
      ],
-     "sample": true
+     "sample": true,
+     "primaryArea": "foundation or frontier models, including LLMs"
     },
     {
      "id": "vsh53iMl9J",
@@ -28158,7 +28652,8 @@
        }
       }
      ],
-     "sample": true
+     "sample": true,
+     "primaryArea": "foundation or frontier models, including LLMs"
     },
     {
      "id": "KMXlKKogU0",
@@ -28229,7 +28724,8 @@
        }
       }
      ],
-     "sample": true
+     "sample": true,
+     "primaryArea": "generative models"
     },
     {
      "id": "e8tYFmI6d8",
@@ -28301,7 +28797,9 @@
        }
       }
      ],
-     "sample": true
+     "sample": true,
+     "primaryArea": "alignment, fairness, safety, privacy, and societal considerations",
+     "tldr": "PHASE demonstrates that retrieval relevance and generation-time influence are not equivalent, enabling targeted steering of frozen retrieval-augmented diffusion models through generation-aware manipulation of the retrieved conditioning packet."
     },
     {
      "id": "sRfyumXnai",
@@ -28373,7 +28871,9 @@
        }
       }
      ],
-     "sample": true
+     "sample": true,
+     "primaryArea": "generative models",
+     "tldr": "We introduce PD-CDS, a training-free, low-complexity algorithm for guiding diffusion models with provable convergence guarantees based on constrained optimization and duality"
     },
     {
      "id": "gPpkDECaC9",
@@ -28449,7 +28949,9 @@
        }
       }
      ],
-     "sample": true
+     "sample": true,
+     "primaryArea": "foundation or frontier models, including LLMs",
+     "tldr": "We introduce a shared agentic controller that adaptively retrieves and verifies cybersecurity evidence across RAG and GraphRAG, enabling a controlled comparison of agentic control and graph-structured retrieval."
     },
     {
      "id": "vnrcYsCQMQ",
@@ -28520,7 +29022,9 @@
        }
       }
      ],
-     "sample": true
+     "sample": true,
+     "primaryArea": "datasets and benchmarks",
+     "tldr": "We introduce a benchmark for evaluating timbre diversity in voice design and a group based reinforcement learning method that improves conditional and  distributional diversity while preserving instruction adherence and speech quality."
     },
     {
      "id": "rhDsVEcHhW",
@@ -28591,7 +29095,9 @@
        }
       }
      ],
-     "sample": true
+     "sample": true,
+     "primaryArea": "foundation or frontier models, including LLMs",
+     "tldr": "We rethink on-policy distillation from a single training query (one-shot OPD), analyzing it from both the data and algorithm perspectives."
     },
     {
      "id": "DBFIcHXVE3",
@@ -28663,7 +29169,9 @@
        }
       }
      ],
-     "sample": true
+     "sample": true,
+     "primaryArea": "alignment, fairness, safety, privacy, and societal considerations",
+     "tldr": "We study certified unlearning from a distilled student model in the black-box teacher setting, where information about the forget samples propogates through teacher predictions"
     },
     {
      "id": "PX6ZnlmaRh",
@@ -28735,7 +29243,8 @@
        }
       }
      ],
-     "sample": true
+     "sample": true,
+     "primaryArea": "interpretability and explainable AI"
     },
     {
      "id": "5oBtwoit2F",
@@ -28827,7 +29336,9 @@
        }
       }
      ],
-     "sample": true
+     "sample": true,
+     "primaryArea": "applications to robotics, autonomy, planning",
+     "tldr": "VLA-Fabric enables complete arm-local VLA policies to explicitly interact, transfers the same coordination paradigm across VLA architectures, and scales from two to four arms in simulation and on real robots."
     },
     {
      "id": "zazRyWBzke",
@@ -28896,7 +29407,8 @@
        }
       }
      ],
-     "sample": true
+     "sample": true,
+     "primaryArea": "foundation or frontier models, including LLMs"
     },
     {
      "id": "xLkfjG1wVy",
@@ -28968,7 +29480,9 @@
        }
       }
      ],
-     "sample": true
+     "sample": true,
+     "primaryArea": "transfer learning, meta learning, and lifelong learning",
+     "tldr": "We introduce ELO, an efficient long-horizon meta-training algorithm for learned optimization."
     },
     {
      "id": "IkYmTAyPXZ",
@@ -29037,7 +29551,8 @@
        }
       }
      ],
-     "sample": true
+     "sample": true,
+     "primaryArea": "applications to robotics, autonomy, planning"
     },
     {
      "id": "h26MTAVbRa",
@@ -29115,7 +29630,8 @@
        }
       }
      ],
-     "sample": true
+     "sample": true,
+     "primaryArea": "generative models"
     },
     {
      "id": "BtlwC1vGkY",
@@ -29186,7 +29702,9 @@
        }
       }
      ],
-     "sample": true
+     "sample": true,
+     "primaryArea": "datasets and benchmarks",
+     "tldr": "A Unified and Controlled Benchmark for Dynamic Vehicle Routing Problem."
     },
     {
      "id": "rgyTEcX4kI",
@@ -29284,7 +29802,8 @@
        }
       }
      ],
-     "sample": true
+     "sample": true,
+     "primaryArea": "reinforcement learning"
     },
     {
      "id": "faN4iOC3eN",
@@ -29357,7 +29876,9 @@
        }
       }
      ],
-     "sample": true
+     "sample": true,
+     "primaryArea": "datasets and benchmarks",
+     "tldr": "TenonBench tests whether VLMs can infer feasible motions and necessary disassembly dependencies from images, using solver-labeled mortise-and-tenon assemblies and paired perception–reasoning questions."
     },
     {
      "id": "lljDXfRMCo",
@@ -29429,7 +29950,9 @@
        }
       }
      ],
-     "sample": true
+     "sample": true,
+     "primaryArea": "unsupervised, self-supervised, semi-supervised, and supervised representation learning",
+     "tldr": "Multimodal contrastive learning can denoise cross-modal similarity without fully denoising the individual encoders: nuisance interactions vanish from the learned score while encoder-level nuisance persists throughout finite-time training."
     },
     {
      "id": "TwZI1k8xKz",
@@ -29503,7 +30026,8 @@
        }
       }
      ],
-     "sample": true
+     "sample": true,
+     "primaryArea": "unsupervised, self-supervised, semi-supervised, and supervised representation learning"
     },
     {
      "id": "RNk8W4EZpu",
@@ -29576,7 +30100,9 @@
        }
       }
      ],
-     "sample": true
+     "sample": true,
+     "primaryArea": "datasets and benchmarks",
+     "tldr": "A benchmark where simulation cost forces distribution shift: trees and neural models swap places between far width and a held-out family, graph networks fall behind as circuits widen, and certified near-zero controls expose spurious output."
     },
     {
      "id": "untGC2eNiN",
@@ -29649,7 +30175,9 @@
        }
       }
      ],
-     "sample": true
+     "sample": true,
+     "primaryArea": "datasets and benchmarks",
+     "tldr": "We introduce a framework for evaluating how well LLM agents identify users' tasks before executing them across domains, find that humans do better, and study how belief-state planning and post-training can close the gap."
     },
     {
      "id": "sBdsAbahrX",
@@ -29722,7 +30250,9 @@
        }
       }
      ],
-     "sample": true
+     "sample": true,
+     "primaryArea": "probabilistic methods (Bayesian methods, variational inference, sampling, UQ, etc.)",
+     "tldr": "Parallel transport is not universally beneficial for inference on vector bundles. Bundle-GEM enables transport-aware likelihood inference and reveals when transport helps or hurts through a bias–variance–holonomy trade-off."
     },
     {
      "id": "2wtiLzDgGs",
@@ -29795,7 +30325,9 @@
        }
       }
      ],
-     "sample": true
+     "sample": true,
+     "primaryArea": "interpretability and explainable AI",
+     "tldr": "A single direction in an LLM’s unembedding encodes the unigram prior, which the models defaults to when uncertain."
     },
     {
      "id": "71Uv3exC3Z",
@@ -29866,7 +30398,9 @@
        }
       }
      ],
-     "sample": true
+     "sample": true,
+     "primaryArea": "generative models",
+     "tldr": "LLM-generated conversations collapse onto common interaction patterns; sampling their latent move structure with a GFlowNet recovers rare but valid patterns and yields more useful synthetic training data."
     },
     {
      "id": "cU2J4QwlZP",
@@ -29941,7 +30475,9 @@
        }
       }
      ],
-     "sample": true
+     "sample": true,
+     "primaryArea": "unsupervised, self-supervised, semi-supervised, and supervised representation learning",
+     "tldr": "CAIRN upgrades the numerical core of representer explanations: Lanczos replaces dense eigendecomposition (26X less working memory), effective-dimension guides landmarks, and provides exact certificates quantify approximation error."
     },
     {
      "id": "uggzfUoAgS",
@@ -30030,7 +30566,9 @@
        }
       }
      ],
-     "sample": true
+     "sample": true,
+     "primaryArea": "optimization",
+     "tldr": "Adaptive ZO optimization is robust but wasteful. Since well-tuned ZO-SGD matches ZO-Adam's performance, we propose MEAZO, a single-state adaptive method that retains robustness without optimizer-state memory."
     },
     {
      "id": "1SOwFByqYJ",
@@ -30125,7 +30663,9 @@
        }
       }
      ],
-     "sample": true
+     "sample": true,
+     "primaryArea": "generative models",
+     "tldr": "The width a diffusion transformer needs is set by the rank of what its output layer emits: velocity is full rank, so width must match the token dimension; the clean token is not."
     },
     {
      "id": "ZS8gEyBcfw",
@@ -30195,7 +30735,8 @@
        }
       }
      ],
-     "sample": true
+     "sample": true,
+     "primaryArea": "alignment, fairness, safety, privacy, and societal considerations"
     },
     {
      "id": "rPqJplyOA7",
@@ -30266,7 +30807,8 @@
        }
       }
      ],
-     "sample": true
+     "sample": true,
+     "primaryArea": "datasets and benchmarks"
     },
     {
      "id": "XMU7cFnVis",
@@ -30339,7 +30881,9 @@
        }
       }
      ],
-     "sample": true
+     "sample": true,
+     "primaryArea": "other topics in machine learning (i.e., none of the above)",
+     "tldr": "We formulate unbiased dataset pruning as a linear optimization and develop a practical, label-free selection method that reduces sampling variance while preserving unbiasedness."
     },
     {
      "id": "mrNSMqMbWd",
@@ -30412,7 +30956,9 @@
        }
       }
      ],
-     "sample": true
+     "sample": true,
+     "primaryArea": "neurosymbolic & hybrid AI systems (physics-informed, logic & formal reasoning, etc.)",
+     "tldr": "LEVER is a proof search framework that performs optimization of cost objectives during search, instead of as a post-hoc refactoring method, and admits explicit cost-quality trade-offs."
     },
     {
      "id": "fKwdzIHxPU",
@@ -30482,7 +31028,8 @@
        }
       }
      ],
-     "sample": true
+     "sample": true,
+     "primaryArea": "generative models"
     },
     {
      "id": "f04xXh3ia7",
@@ -30553,7 +31100,8 @@
        }
       }
      ],
-     "sample": true
+     "sample": true,
+     "primaryArea": "applications to physical sciences (physics, chemistry, biology, etc.)"
     },
     {
      "id": "U1jYFEBnxw",
@@ -30625,7 +31173,9 @@
        }
       }
      ],
-     "sample": true
+     "sample": true,
+     "primaryArea": "generative models",
+     "tldr": "A single Tsallis parameter q interpolates SFT and RLVR; high q escapes cold start fast but memorizes label noise, while intermediate q trains reasoning models from answers alone with no annotated rationales."
     },
     {
      "id": "gWVQlRxcOn",
@@ -30698,7 +31248,8 @@
        }
       }
      ],
-     "sample": true
+     "sample": true,
+     "primaryArea": "applications to physical sciences (physics, chemistry, biology, etc.)"
     },
     {
      "id": "0M0AWlE6Ep",
@@ -30768,7 +31319,9 @@
        }
       }
      ],
-     "sample": true
+     "sample": true,
+     "primaryArea": "foundation or frontier models, including LLMs",
+     "tldr": "The Computational Reasoning Machine elicits computational reasoning (causal dependency structures, procedural abstraction, task concurrency), enabling improved task-performance over pure streams of natural language tokens."
     },
     {
      "id": "gX9kCOLOYW",
@@ -30857,7 +31410,9 @@
        }
       }
      ],
-     "sample": true
+     "sample": true,
+     "primaryArea": "applications to computer vision, audio, language, and other modalities",
+     "tldr": "We uncover hidden perception constraints that naturally emerge in task-aware compression and show that distribution matching on to a target distribution enhances classification accuracy."
     },
     {
      "id": "ikSpc3snDa",
@@ -30930,7 +31485,8 @@
        }
       }
      ],
-     "sample": true
+     "sample": true,
+     "primaryArea": "applications to robotics, autonomy, planning"
     },
     {
      "id": "r2MXRcI9D4",
@@ -30999,7 +31555,8 @@
        }
       }
      ],
-     "sample": true
+     "sample": true,
+     "primaryArea": "transfer learning, meta learning, and lifelong learning"
     },
     {
      "id": "aCOHtW0Nu8",
@@ -31071,7 +31628,8 @@
        }
       }
      ],
-     "sample": true
+     "sample": true,
+     "primaryArea": "reinforcement learning"
     },
     {
      "id": "4ukcD6HlDV",
@@ -31164,7 +31722,9 @@
        }
       }
      ],
-     "sample": true
+     "sample": true,
+     "primaryArea": "applications to computer vision, audio, language, and other modalities",
+     "tldr": "We adapt variable-length masked diffusion and flow matching methods from other domains to non-autoregressive speech-to-speech translation, with and without a large pretrained   diffusion language model."
     },
     {
      "id": "GLXMDkCqeP",
@@ -31237,7 +31797,9 @@
        }
       }
      ],
-     "sample": true
+     "sample": true,
+     "primaryArea": "other topics in machine learning (i.e., none of the above)",
+     "tldr": "We achieve state-of-the-art results on data selection and indiscriminate data poisoning benchmarks using a single framework of scalable metagradient descent."
     },
     {
      "id": "GCTffGTIqV",
@@ -31309,7 +31871,8 @@
        }
       }
      ],
-     "sample": true
+     "sample": true,
+     "primaryArea": "unsupervised, self-supervised, semi-supervised, and supervised representation learning"
     },
     {
      "id": "7CPeybXNyC",
@@ -31378,7 +31941,8 @@
        }
       }
      ],
-     "sample": true
+     "sample": true,
+     "primaryArea": "datasets and benchmarks"
     },
     {
      "id": "8PwfqisLIA",
@@ -31448,7 +32012,8 @@
        }
       }
      ],
-     "sample": true
+     "sample": true,
+     "primaryArea": "foundation or frontier models, including LLMs"
     },
     {
      "id": "zi37IRFqop",
@@ -31519,7 +32084,8 @@
        }
       }
      ],
-     "sample": true
+     "sample": true,
+     "primaryArea": "learning on time series and dynamical systems"
     },
     {
      "id": "ey7td7M46e",
@@ -31592,7 +32158,9 @@
        }
       }
      ],
-     "sample": true
+     "sample": true,
+     "primaryArea": "applications to computer vision, audio, language, and other modalities",
+     "tldr": "We improve sketch-to-photo retrieval by compressing redundant regional evidence while learning predictive spatial representations that preserve discriminative scene structure."
     },
     {
      "id": "oaiiIZuomP",
@@ -31665,7 +32233,9 @@
        }
       }
      ],
-     "sample": true
+     "sample": true,
+     "primaryArea": "foundation or frontier models, including LLMs",
+     "tldr": "The output of instruction-tuned LLMs degrades significantly in the presence of constraints that alter the form of the response such as tone or format. This behavior originates during the reinforcement learning stages and can be steered at inference."
     },
     {
      "id": "Cb53xcJeBc",
@@ -31774,7 +32344,9 @@
        }
       }
      ],
-     "sample": true
+     "sample": true,
+     "primaryArea": "neurosymbolic & hybrid AI systems (physics-informed, logic & formal reasoning, etc.)",
+     "tldr": "A principled approach for fast automatic autoformalization evaluation for faithfulness given a ground truth."
     },
     {
      "id": "du0X1iX2Og",
@@ -31848,7 +32420,9 @@
        }
       }
      ],
-     "sample": true
+     "sample": true,
+     "primaryArea": "learning theory",
+     "tldr": "Sparse observations restore PDE target identifiability when they span the ambiguity space, separating failures caused by missing information from failures of optimization."
     },
     {
      "id": "P9tPg5GAyt",
@@ -31921,7 +32495,9 @@
        }
       }
      ],
-     "sample": true
+     "sample": true,
+     "primaryArea": "alignment, fairness, safety, privacy, and societal considerations",
+     "tldr": "A study if AI safety evaluation and restoration with post-training reasoning models."
     },
     {
      "id": "jyqMYODUvr",
@@ -31993,7 +32569,9 @@
        }
       }
      ],
-     "sample": true
+     "sample": true,
+     "primaryArea": "reinforcement learning",
+     "tldr": "SAPO stabilizes cold-start neural scheduling by smoothing early preference targets and using the validation-best policy as a moving reference for late-stage refinement, without adding inference overhead."
     },
     {
      "id": "ldwxTbOUR0",
@@ -32063,7 +32641,9 @@
        }
       }
      ],
-     "sample": true
+     "sample": true,
+     "primaryArea": "reinforcement learning",
+     "tldr": "TreeHCA is a framework that uses hindsight aware sampling with Hindsight credit assignment to train multi turn LLM agents."
     },
     {
      "id": "FTwTdy3Tw4",
@@ -32132,7 +32712,8 @@
        }
       }
      ],
-     "sample": true
+     "sample": true,
+     "primaryArea": "unsupervised, self-supervised, semi-supervised, and supervised representation learning"
     },
     {
      "id": "nM3treiqZO",
@@ -32203,7 +32784,8 @@
        }
       }
      ],
-     "sample": true
+     "sample": true,
+     "primaryArea": "unsupervised, self-supervised, semi-supervised, and supervised representation learning"
     },
     {
      "id": "HluT8KQsAM",
@@ -32274,7 +32856,8 @@
        }
       }
      ],
-     "sample": true
+     "sample": true,
+     "primaryArea": "probabilistic methods (Bayesian methods, variational inference, sampling, UQ, etc.)"
     },
     {
      "id": "jvvsy9Wmhv",
@@ -32344,7 +32927,9 @@
        }
       }
      ],
-     "sample": true
+     "sample": true,
+     "primaryArea": "foundation or frontier models, including LLMs",
+     "tldr": "We propose Teacher Top-$K$ OPD with renormalization which enables effective cross-origin distillation by supervising teacher-preferred tokens, outperforming prior baselines by up to 10.4 points."
     },
     {
      "id": "fcQaMnBdzB",
@@ -32419,7 +33004,9 @@
        }
       }
      ],
-     "sample": true
+     "sample": true,
+     "primaryArea": "foundation or frontier models, including LLMs",
+     "tldr": "Retrospection-only fine-tuning improves coding agents on tasks with no observed base-model successes, without directly training on their actions."
     },
     {
      "id": "FbtT0tsMiH",
@@ -32492,7 +33079,8 @@
        }
       }
      ],
-     "sample": true
+     "sample": true,
+     "primaryArea": "applications to robotics, autonomy, planning"
     },
     {
      "id": "zwWYQIQ982",
@@ -32567,7 +33155,9 @@
        }
       }
      ],
-     "sample": true
+     "sample": true,
+     "primaryArea": "probabilistic methods (Bayesian methods, variational inference, sampling, UQ, etc.)",
+     "tldr": "We introduce two uncertainty signals for LLM judgments: Self-Brier measures confident disagreement, and Formal Semantic Entropy measures variation among solver-clustered formalizations."
     },
     {
      "id": "RnhqiqxVYo",
@@ -32640,7 +33230,9 @@
        }
       }
      ],
-     "sample": true
+     "sample": true,
+     "primaryArea": "interpretability and explainable AI",
+     "tldr": "ATCG replaces flat classifier heads with per-class trait hierarchies that produce sparse barcodes, enabling sample-level auditing of decision evidence and cohort-level localization of intra-class shifts with little loss in accuracy."
     },
     {
      "id": "p1VFx4UQc6",
@@ -32709,7 +33301,8 @@
        }
       }
      ],
-     "sample": true
+     "sample": true,
+     "primaryArea": "learning theory"
     },
     {
      "id": "KibEdYe883",
@@ -32782,7 +33375,9 @@
        }
       }
      ],
-     "sample": true
+     "sample": true,
+     "primaryArea": "interpretability and explainable AI",
+     "tldr": "A linear activation steering method that improves performance by computing context-dependent steering strengths. It enables selective steering of multiple behaviors within a single generation, and its directions double as concept monitors."
     },
     {
      "id": "4CW0fo6577",
@@ -32851,7 +33446,9 @@
        }
       }
      ],
-     "sample": true
+     "sample": true,
+     "primaryArea": "learning on graphs and other geometries & topologies",
+     "tldr": "On standard temporal link-prediction benchmarks, most of the gain credited to graph structure is memory and recency; we give a test that separates the three for any structural feature."
     },
     {
      "id": "kv1FHvuNKX",
@@ -32925,7 +33522,9 @@
        }
       }
      ],
-     "sample": true
+     "sample": true,
+     "primaryArea": "foundation or frontier models, including LLMs",
+     "tldr": "ReGround reuses experience under changing authority, with conditional search savings and explicit limits in grounding and completion."
     },
     {
      "id": "44DCgJCLTS",
@@ -32995,7 +33594,8 @@
        }
       }
      ],
-     "sample": true
+     "sample": true,
+     "primaryArea": "reinforcement learning"
     },
     {
      "id": "LAJYJMIEpn",
@@ -33068,7 +33668,9 @@
        }
       }
      ],
-     "sample": true
+     "sample": true,
+     "primaryArea": "applications to robotics, autonomy, planning",
+     "tldr": "PoleWM factors direct visual prediction into nonlinear, prefix-conditioned action responses with a shared analytic pole basis, improving goal-reaching control under a matched evaluation."
     },
     {
      "id": "3gcgGEIExx",
@@ -33139,7 +33741,9 @@
        }
       }
      ],
-     "sample": true
+     "sample": true,
+     "primaryArea": "applications to computer vision, audio, language, and other modalities",
+     "tldr": "Broad semantic and visual coverage enables data-free quantization to better preserve CLIP's zero-shot generalization"
     },
     {
      "id": "bPjTK6oJ12",
@@ -33213,7 +33817,9 @@
        }
       }
      ],
-     "sample": true
+     "sample": true,
+     "primaryArea": "unsupervised, self-supervised, semi-supervised, and supervised representation learning",
+     "tldr": "WorldPrior internalizes observation-side multimodal priors from a frozen VLM into latent world models during training, improving forecasting and goal-conditioned control while removing the VLM entirely at inference."
     },
     {
      "id": "dtcX6uohfX",
@@ -33286,7 +33892,8 @@
        }
       }
      ],
-     "sample": true
+     "sample": true,
+     "primaryArea": "reinforcement learning"
     },
     {
      "id": "dxNgY9vhAt",
@@ -33357,7 +33964,9 @@
        }
       }
      ],
-     "sample": true
+     "sample": true,
+     "primaryArea": "learning theory",
+     "tldr": "We develop Bellman-centric algorithms for (generalized) linear bandits with memory, separating memory-induced error from statistical estimation error and achieving near-optimal regret in the leading terms."
     },
     {
      "id": "B80tdjv9e6",
@@ -33431,7 +34040,9 @@
        }
       }
      ],
-     "sample": true
+     "sample": true,
+     "primaryArea": "interpretability and explainable AI",
+     "tldr": "Adding a paired intervention-response term to post-training pruning keeps pruned networks' responses to interchange interventions closer to the original."
     },
     {
      "id": "A5n8QnKTzi",
@@ -33504,7 +34115,9 @@
        }
       }
      ],
-     "sample": true
+     "sample": true,
+     "primaryArea": "foundation or frontier models, including LLMs",
+     "tldr": "RA-MoE improves multilingual MoE adaptation by aligning target-language routing on correctness-asymmetric examples toward successful English task-expert patterns in middle layers."
     },
     {
      "id": "RYcgKdEbb2",
@@ -33574,7 +34187,9 @@
        }
       }
      ],
-     "sample": true
+     "sample": true,
+     "primaryArea": "learning on time series and dynamical systems",
+     "tldr": "InRelCast infers in context, from observed transitions in the look-back window, how the target responds to future exogenous conditions, and outperforms state-of-the-art baselines in-domain and in zero-shot transfer."
     },
     {
      "id": "Hmj6QYzDZY",
@@ -33663,7 +34278,9 @@
        }
       }
      ],
-     "sample": true
+     "sample": true,
+     "primaryArea": "applications to computer vision, audio, language, and other modalities",
+     "tldr": "Through an encoder-free design and tool calling, we unleash the value of raw point clouds and effectively alleviate the representation bottleneck in prior methods."
     },
     {
      "id": "Hx3GpkaQ5T",
@@ -33737,7 +34354,9 @@
        }
       }
      ],
-     "sample": true
+     "sample": true,
+     "primaryArea": "datasets and benchmarks",
+     "tldr": "MuLA-Bench is a 16-language long-form audio benchmark showing that difficulty is conditional: language rankings vary across domains and tasks, acoustic gaps depend on the requested operation, and precise clock grounding remains fragile."
     },
     {
      "id": "5dYgD6deHQ",
@@ -33810,7 +34429,8 @@
        }
       }
      ],
-     "sample": true
+     "sample": true,
+     "primaryArea": "foundation or frontier models, including LLMs"
     },
     {
      "id": "JhKbGJ5VSq",
@@ -33886,7 +34506,9 @@
        }
       }
      ],
-     "sample": true
+     "sample": true,
+     "primaryArea": "applications to robotics, autonomy, planning",
+     "tldr": "Physics-based sphere packing builds tetrahedral meshes whose interior nodes persist through large shape changes, enabling inversion-free morphing and gradient-based soft-robot morphology optimization with a differentiable GPU simulator."
     },
     {
      "id": "f2paz56JwW",
@@ -33961,7 +34583,9 @@
        }
       }
      ],
-     "sample": true
+     "sample": true,
+     "primaryArea": "applications to robotics, autonomy, planning",
+     "tldr": "Behavior cloning builds control while reorganizing how a VLA's visual information is represented, read, and passed to its action expert; old readouts can fail even when the underlying spatial information remains recoverable."
     },
     {
      "id": "C9L6zvvJuT",
@@ -34032,7 +34656,9 @@
        }
       }
      ],
-     "sample": true
+     "sample": true,
+     "primaryArea": "applications to physical sciences (physics, chemistry, biology, etc.)",
+     "tldr": "scMeanFlow enables fast, high-quality, and controllable scRNA-seq synthesis through one-step MeanFlow-based latent generation."
     },
     {
      "id": "9BBLakjWp0",
@@ -34102,7 +34728,8 @@
        }
       }
      ],
-     "sample": true
+     "sample": true,
+     "primaryArea": "generative models"
     },
     {
      "id": "13GGonC35f",
@@ -34171,7 +34798,8 @@
        }
       }
      ],
-     "sample": true
+     "sample": true,
+     "primaryArea": "applications to computer vision, audio, language, and other modalities"
     },
     {
      "id": "Qask3lw679",
@@ -34240,7 +34868,8 @@
        }
       }
      ],
-     "sample": true
+     "sample": true,
+     "primaryArea": "applications to computer vision, audio, language, and other modalities"
     },
     {
      "id": "yCaNmK8zeb",
@@ -34309,7 +34938,9 @@
        }
       }
      ],
-     "sample": true
+     "sample": true,
+     "primaryArea": "unsupervised, self-supervised, semi-supervised, and supervised representation learning",
+     "tldr": "We align frozen cryoEM and protein foundation models to directly identify and localize proteins in cryoEM maps without atomic model building."
     },
     {
      "id": "HlptbuElqt",
@@ -34384,7 +35015,9 @@
        }
       }
      ],
-     "sample": true
+     "sample": true,
+     "primaryArea": "causal reasoning",
+     "tldr": "We propose neighborhood-guided flow matching for learning conditional potential outcome distributions, using locally borrowed outcome endpoints and balanced representations to improve distributional learning under uneven treatment support."
     },
     {
      "id": "cqXalXAFzJ",
@@ -34459,7 +35092,9 @@
        }
       }
      ],
-     "sample": true
+     "sample": true,
+     "primaryArea": "foundation or frontier models, including LLMs",
+     "tldr": "We introduce Distributed Evidence Memory (DEM), which defers memory admission, conflict resolution, and retrieval stopping to query time, improving evidence coverage and reliability for long-term LLM agent memory."
     },
     {
      "id": "Eqer8Pslei",
@@ -34530,7 +35165,8 @@
        }
       }
      ],
-     "sample": true
+     "sample": true,
+     "primaryArea": "foundation or frontier models, including LLMs"
     },
     {
      "id": "Vn1J9kOXhk",
@@ -34602,7 +35238,8 @@
        }
       }
      ],
-     "sample": true
+     "sample": true,
+     "primaryArea": "neurosymbolic & hybrid AI systems (physics-informed, logic & formal reasoning, etc.)"
     },
     {
      "id": "0KPnCyklLF",
@@ -34695,7 +35332,9 @@
        }
       }
      ],
-     "sample": true
+     "sample": true,
+     "primaryArea": "learning theory",
+     "tldr": "Local interventions may identify an untested reuse decision yet require prohibitive samples; targeted proper-subset measurements can remove this growth without testing the target itself."
     },
     {
      "id": "Ahf43tq8Bo",
@@ -34769,7 +35408,9 @@
        }
       }
      ],
-     "sample": true
+     "sample": true,
+     "primaryArea": "optimization",
+     "tldr": "We warm-start diffusion networks with a cheap layerwise closed-form fit (LCF) so training needs fewer steps than Xavier."
     },
     {
      "id": "2uHtGeBXMx",
@@ -34847,7 +35488,8 @@
        }
       }
      ],
-     "sample": true
+     "sample": true,
+     "primaryArea": "probabilistic methods (Bayesian methods, variational inference, sampling, UQ, etc.)"
     },
     {
      "id": "tGHRRANk4Q",
@@ -34918,7 +35560,8 @@
        }
       }
      ],
-     "sample": true
+     "sample": true,
+     "primaryArea": "learning theory"
     },
     {
      "id": "mhJjOeX7oY",
@@ -34987,7 +35630,8 @@
        }
       }
      ],
-     "sample": true
+     "sample": true,
+     "primaryArea": "foundation or frontier models, including LLMs"
     },
     {
      "id": "0sOJWA5OVj",
@@ -35058,7 +35702,9 @@
        }
       }
      ],
-     "sample": true
+     "sample": true,
+     "primaryArea": "applications to computer vision, audio, language, and other modalities",
+     "tldr": "MILES retains topic-relevant events and uses an LLM to select news timeline milestones from a bounded candidate pool."
     },
     {
      "id": "60P72cEHev",
@@ -35131,7 +35777,9 @@
        }
       }
      ],
-     "sample": true
+     "sample": true,
+     "primaryArea": "alignment, fairness, safety, privacy, and societal considerations",
+     "tldr": "TAPER balances privacy and task utility in tool-using LLM agents through public–protected evidence routing, joint privacy–utility verification and repair, and selective release."
     },
     {
      "id": "nieoP8KEVJ",
@@ -35201,7 +35849,9 @@
        }
       }
      ],
-     "sample": true
+     "sample": true,
+     "primaryArea": "unsupervised, self-supervised, semi-supervised, and supervised representation learning",
+     "tldr": "Reinforcement learning method for developing self evolving models for social understanding"
     },
     {
      "id": "v5mDkIlzJH",
@@ -35275,7 +35925,8 @@
        }
       }
      ],
-     "sample": true
+     "sample": true,
+     "primaryArea": "transfer learning, meta learning, and lifelong learning"
     },
     {
      "id": "LBJGNAXYao",
@@ -35346,7 +35997,8 @@
        }
       }
      ],
-     "sample": true
+     "sample": true,
+     "primaryArea": "applications to physical sciences (physics, chemistry, biology, etc.)"
     },
     {
      "id": "2APPwggQrd",
@@ -35417,7 +36069,8 @@
        }
       }
      ],
-     "sample": true
+     "sample": true,
+     "primaryArea": "learning on time series and dynamical systems"
     },
     {
      "id": "bvzIULyEgg",
@@ -35489,7 +36142,8 @@
        }
       }
      ],
-     "sample": true
+     "sample": true,
+     "primaryArea": "foundation or frontier models, including LLMs"
     },
     {
      "id": "07nrkcmOOq",
@@ -35563,7 +36217,9 @@
        }
       }
      ],
-     "sample": true
+     "sample": true,
+     "primaryArea": "datasets and benchmarks",
+     "tldr": "ParticleBench evaluates LLM agents on long-horizon computational tasks in experimental particle physics using executable solutions and independent, task-specific verification."
     },
     {
      "id": "UmMCqIJ8VZ",
@@ -35636,7 +36292,9 @@
        }
       }
      ],
-     "sample": true
+     "sample": true,
+     "primaryArea": "interpretability and explainable AI",
+     "tldr": "We show that the errors left by a fixed regressor can form a lower-dimensional structured learning problem that can be corrected with explicit analytical rules while preserving an auditable prediction process."
     },
     {
      "id": "wuGYygOIVR",
@@ -35705,7 +36363,8 @@
        }
       }
      ],
-     "sample": true
+     "sample": true,
+     "primaryArea": "generative models"
     },
     {
      "id": "rc7VmuKMT0",
@@ -35776,7 +36435,8 @@
        }
       }
      ],
-     "sample": true
+     "sample": true,
+     "primaryArea": "applications to robotics, autonomy, planning"
     },
     {
      "id": "KJM6j45H3c",
@@ -35847,7 +36507,8 @@
        }
       }
      ],
-     "sample": true
+     "sample": true,
+     "primaryArea": "foundation or frontier models, including LLMs"
     },
     {
      "id": "svU3aOGOw8",
@@ -35920,7 +36581,9 @@
        }
       }
      ],
-     "sample": true
+     "sample": true,
+     "primaryArea": "alignment, fairness, safety, privacy, and societal considerations",
+     "tldr": "Online alignment of language models to user-specific preferences via bandit learning of reward trade-offs."
     },
     {
      "id": "42MJx8tcSN",
@@ -35989,7 +36652,8 @@
        }
       }
      ],
-     "sample": true
+     "sample": true,
+     "primaryArea": "generative models"
     },
     {
      "id": "sGMdDN52rB",
@@ -36059,7 +36723,8 @@
        }
       }
      ],
-     "sample": true
+     "sample": true,
+     "primaryArea": "foundation or frontier models, including LLMs"
     },
     {
      "id": "gZLHfSkiuA",
@@ -36133,7 +36798,8 @@
        }
       }
      ],
-     "sample": true
+     "sample": true,
+     "primaryArea": "applications to computer vision, audio, language, and other modalities"
     },
     {
      "id": "EHUjd6KEst",
@@ -36204,7 +36870,8 @@
        }
       }
      ],
-     "sample": true
+     "sample": true,
+     "primaryArea": "applications to computer vision, audio, language, and other modalities"
     },
     {
      "id": "2LIXTEtIJN",
@@ -36276,7 +36943,8 @@
        }
       }
      ],
-     "sample": true
+     "sample": true,
+     "primaryArea": "applications to robotics, autonomy, planning"
     },
     {
      "id": "tyAJldRpPG",
@@ -36346,7 +37014,8 @@
        }
       }
      ],
-     "sample": true
+     "sample": true,
+     "primaryArea": "learning theory"
     },
     {
      "id": "9pLlsv1dAk",
@@ -36420,7 +37089,9 @@
        }
       }
      ],
-     "sample": true
+     "sample": true,
+     "primaryArea": "foundation or frontier models, including LLMs",
+     "tldr": "Choosing which MoE expert channels to read needs no calibration data: ranking decides quality, and a weight-only sketch reader matches or beats the strongest calibrated method at equal memory reads."
     },
     {
      "id": "MRRGGGGiux",
@@ -36511,7 +37182,9 @@
        }
       }
      ],
-     "sample": true
+     "sample": true,
+     "primaryArea": "learning theory",
+     "tldr": "We introduce the concept of metric robustness and prove that the generalization gap of the resultant robust classifiers can be bounded by the generalization gap of the learned metric."
     },
     {
      "id": "ojnmlXUtnV",
@@ -36583,7 +37256,9 @@
        }
       }
      ],
-     "sample": true
+     "sample": true,
+     "primaryArea": "infrastructure, software libraries, hardware, systems, etc.",
+     "tldr": "miniTE diagnoses and bridges cross-engine execution gaps in native NVFP4 RL, sustaining long-horizon learning on Qwen3-30B-A3B while reaching 1.39× BF16 learner throughput."
     },
     {
      "id": "VKsrPVzzN8",
@@ -36692,7 +37367,9 @@
        }
       }
      ],
-     "sample": true
+     "sample": true,
+     "primaryArea": "foundation or frontier models, including LLMs",
+     "tldr": "Multi-resolution causal convolution improves equal-token language-modeling loss in a controlled matrix, but does not establish a wall-clock efficiency advantage."
     },
     {
      "id": "8oJ9ENxyvf",
@@ -36763,7 +37440,8 @@
        }
       }
      ],
-     "sample": true
+     "sample": true,
+     "primaryArea": "optimization"
     },
     {
      "id": "HP3a4PPHm3",
@@ -36835,7 +37513,9 @@
        }
       }
      ],
-     "sample": true
+     "sample": true,
+     "primaryArea": "alignment, fairness, safety, privacy, and societal considerations",
+     "tldr": "FAM improves robustness to post-processing and generator shifts by locating frequency cues that each detector over-relies on and weakening those cues during fine-tuning."
     },
     {
      "id": "FnqT5msL4I",
@@ -36905,7 +37585,8 @@
        }
       }
      ],
-     "sample": true
+     "sample": true,
+     "primaryArea": "generative models"
     },
     {
      "id": "Zra9QuUaTi",
@@ -36977,7 +37658,9 @@
        }
       }
      ],
-     "sample": true
+     "sample": true,
+     "primaryArea": "foundation or frontier models, including LLMs",
+     "tldr": "We analyze Transformers from a group-theoretic view and establish that they struggle in periodicity generalization, supported by experiments."
     },
     {
      "id": "HL675ONPJm",
@@ -37049,7 +37732,8 @@
        }
       }
      ],
-     "sample": true
+     "sample": true,
+     "primaryArea": "generative models"
     },
     {
      "id": "oE8sV1Ilum",
@@ -37122,7 +37806,9 @@
        }
       }
      ],
-     "sample": true
+     "sample": true,
+     "primaryArea": "applications to physical sciences (physics, chemistry, biology, etc.)",
+     "tldr": "MolLedger is a graph neural network that provides chemically-grounded attributions without sacrificing performance via an additive head with a global context vector and an auxiliary loss anchoring per-atom scores to physical properties."
     },
     {
      "id": "lkoLXuV8LT",
@@ -37193,7 +37879,9 @@
        }
       }
      ],
-     "sample": true
+     "sample": true,
+     "primaryArea": "infrastructure, software libraries, hardware, systems, etc.",
+     "tldr": "We propose HEART, a Harness Engineering framework built on Agent-native, Reusable Tool Primitives, where each tool is wrapped by an LLM-based interface enabling natural language communication between agents and tools."
     },
     {
      "id": "alH8ukm0BQ",
@@ -37264,7 +37952,8 @@
        }
       }
      ],
-     "sample": true
+     "sample": true,
+     "primaryArea": "foundation or frontier models, including LLMs"
     },
     {
      "id": "liEvUBGNSL",
@@ -37333,7 +38022,8 @@
        }
       }
      ],
-     "sample": true
+     "sample": true,
+     "primaryArea": "other topics in machine learning (i.e., none of the above)"
     },
     {
      "id": "Pezz4qs7vo",
@@ -37422,7 +38112,8 @@
        }
       }
      ],
-     "sample": true
+     "sample": true,
+     "primaryArea": "applications to computer vision, audio, language, and other modalities"
     },
     {
      "id": "tNuq7zPdL6",
@@ -37491,7 +38182,8 @@
        }
       }
      ],
-     "sample": true
+     "sample": true,
+     "primaryArea": "datasets and benchmarks"
     },
     {
      "id": "pvEZO0Mdu1",
@@ -37561,7 +38253,8 @@
        }
       }
      ],
-     "sample": true
+     "sample": true,
+     "primaryArea": "foundation or frontier models, including LLMs"
     },
     {
      "id": "UHsukrJxjp",
@@ -37630,7 +38323,9 @@
        }
       }
      ],
-     "sample": true
+     "sample": true,
+     "primaryArea": "generative models",
+     "tldr": "AtlasFlow removes the stored-cut seam of frozen panorama diffusion models by fusing two opposite-chart velocities with exact half-turn equivariance, at no cost in image quality, plus an 18K-parameter adapter that improves local geometry."
     },
     {
      "id": "OQH6sJ4sN8",
@@ -37702,7 +38397,8 @@
        }
       }
      ],
-     "sample": true
+     "sample": true,
+     "primaryArea": "foundation or frontier models, including LLMs"
     },
     {
      "id": "jn2evjrONr",
@@ -37773,7 +38469,8 @@
        }
       }
      ],
-     "sample": true
+     "sample": true,
+     "primaryArea": "optimization"
     },
     {
      "id": "Z7BQZUgzsZ",
@@ -37846,7 +38543,8 @@
        }
       }
      ],
-     "sample": true
+     "sample": true,
+     "primaryArea": "learning on time series and dynamical systems"
     },
     {
      "id": "NfCZJAaQdb",
@@ -37919,7 +38617,9 @@
        }
       }
      ],
-     "sample": true
+     "sample": true,
+     "primaryArea": "datasets and benchmarks",
+     "tldr": "We introduce a field-aware audit of nine video anomaly understanding benchmarks that reveals video–text alignment failures and guides annotation revision to improve downstream performance."
     },
     {
      "id": "V85HiwBLlj",
@@ -37990,7 +38690,8 @@
        }
       }
      ],
-     "sample": true
+     "sample": true,
+     "primaryArea": "applications to physical sciences (physics, chemistry, biology, etc.)"
     },
     {
      "id": "KdX3ITKCSj",
@@ -38063,7 +38764,8 @@
        }
       }
      ],
-     "sample": true
+     "sample": true,
+     "primaryArea": "optimization"
     },
     {
      "id": "vCJtlrWM46",
@@ -38217,7 +38919,9 @@
        }
       }
      ],
-     "resubmission": true
+     "resubmission": true,
+     "primaryArea": "probabilistic methods (Bayesian methods, variational inference, sampling, UQ, etc.)",
+     "tldr": "Uniformly scaling flows bridge normalizing flows and deep one-class learning: MLE induces density-aligned latent-radius scoring. Drop-in replacements improve stability and performance in tabular and image anomaly detection."
     },
     {
      "id": "G5EhnpRWXn",
@@ -38338,7 +39042,9 @@
        }
       }
      ],
-     "resubmission": true
+     "resubmission": true,
+     "primaryArea": "probabilistic methods (Bayesian methods, variational inference, sampling, UQ, etc.)",
+     "tldr": "We theoretically reveal the importance of diveristy in transformer layers for task-solving performance"
     },
     {
      "id": "dZVIGLXkqO",
@@ -38420,7 +39126,9 @@
        }
       }
      ],
-     "resubmission": true
+     "resubmission": true,
+     "primaryArea": "other topics in machine learning (i.e., none of the above)",
+     "tldr": "we proposed a novel weight-only floating-points quantization technique to achieve overall non-integer quantization bit-width  e.g., FP5.3, by encoding multiple quantized weight parameters with Adaptive Mantissa-bit Sharing (AMS)"
     },
     {
      "id": "A3bMBp8vfy",
@@ -38503,7 +39211,9 @@
        }
       }
      ],
-     "resubmission": true
+     "resubmission": true,
+     "primaryArea": "applications to computer vision, audio, language, and other modalities",
+     "tldr": "AVRT merges reasoning traces from separate audio and visual teachers for supervised fine-tuning before reinforcement learning, improving audio-visual reasoning over RL alone."
     },
     {
      "id": "fBfpcyw9yp",
@@ -38587,7 +39297,9 @@
        }
       }
      ],
-     "resubmission": true
+     "resubmission": true,
+     "primaryArea": "optimization",
+     "tldr": "We provide the first algorithms for the computation of Wasserstein barycenters under the constraints of differential privacy."
     }
    ]
   },

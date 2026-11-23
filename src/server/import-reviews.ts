@@ -4,6 +4,7 @@ import {
   FORMS_SCHEMA,
   formsFilePath,
   MAX_KEYWORDS,
+  MAX_TLDR,
   NOTE_SCHEMA,
   noteFilePath,
   reviewsKey,
@@ -69,6 +70,10 @@ export interface SubmissionInput {
   decision: string | null;
   /** The keywords its authors gave the source. */
   keywords?: string[];
+  /** The area its authors chose from the venue's list: "reinforcement learning". */
+  primaryArea?: string | null;
+  /** Its one-sentence summary, as its authors gave it. */
+  tldr?: string | null;
   /**
    * Where it is presented, for a venue held in several places at once: "Sydney". Kept in its version's entry beside
    * the decision. A source that doesn't know it (OpenReview) leaves it out, and the entry keeps the one it has.
@@ -128,6 +133,12 @@ export function cleanKeywords(keywords: readonly string[] | undefined): { keywor
   return out.length > 0 ? { keywords: out } : {};
 }
 
+/** One line of the source's text, as a file keeps it: spaces collapsed, cut to `max`; left out when blank. */
+function cleanText<K extends string>(key: K, value: string | null | undefined, max: number): { [P in K]?: string } {
+  const text = value?.replace(/\s+/g, ' ').trim().slice(0, max);
+  return (text ? { [key]: text } : {}) as { [P in K]?: string };
+}
+
 const nonEmpty = (value: string, fallback: string) => (value.trim() ? value : fallback);
 
 /** A submission's folder as the source gives it: each file's path and its content. */
@@ -141,6 +152,8 @@ export function submissionFiles(venue: VenueInput, input: SubmissionInput): Map<
       venue: { id: venue.id, name: venue.name, url: venue.url },
       number: input.number,
       ...cleanKeywords(input.keywords),
+      ...cleanText('primaryArea', input.primaryArea, 300),
+      ...cleanText('tldr', input.tldr, MAX_TLDR),
       url: input.url,
       license: venue.license,
     }),

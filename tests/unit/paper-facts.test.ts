@@ -35,6 +35,8 @@ const submission = (venueId: string, name: string, externalId: string, keywords:
   status: null,
   decision: null,
   keywords,
+  primaryArea: null,
+  tldr: null,
   url: null,
   fetchedAt: new Date(),
   notes: [],
@@ -71,6 +73,25 @@ describe('paperFacts', () => {
     ]);
     expect(facts.published?.venue).toBe('NeurIPS 2026');
     expect(facts.firstDate).toBe('2025-09-19');
+  });
+
+  it('takes the area and the TL;DR from the newest submission that has them', () => {
+    const withArea = paperFacts({
+      paper: { title: 'A paper', authors: [], abstract: null },
+      versions: [],
+      submissions: [
+        { ...submission('NeurIPS.cc/2026/Conference', 'NeurIPS 2026', 'B2', []), primaryArea: null, tldr: 'Newer.' },
+        {
+          ...submission('ICLR.cc/2026/Conference', 'ICLR 2026', 'A1', []),
+          primaryArea: 'reinforcement learning',
+          tldr: 'Older.',
+        },
+      ],
+      identifiers: [],
+      pdf: null,
+    });
+    expect(withArea.area).toEqual({ name: 'Reinforcement learning', venue: 'ICLR 2026' });
+    expect(withArea.tldr).toBe('Newer.');
   });
 
   it("keeps each venue's keywords once, whatever their case", () => {

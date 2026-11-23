@@ -132,6 +132,8 @@ async function papers(fixture: Fixture) {
         decision: p.decision,
         site: p.site,
         keywords: p.keywords,
+        primaryArea: p.primaryArea,
+        tldr: p.tldr,
         submittedAt: p.submittedAt ? new Date(p.submittedAt) : null,
         url: forumUrl(p.id),
         notes: p.notes.map((n) => ({

@@ -37,6 +37,13 @@ export interface PaperFacts {
   /** The earliest date of any version: when the work was first made public or submitted. */
   firstDate: string | null;
   keywords: string[];
+  /**
+   * The area its authors chose from its newest venue's list, with that venue: a fact about the submission, shown as
+   * the venue words it, never one of the site's categories.
+   */
+  area: { name: string; venue: string } | null;
+  /** Its one-sentence summary, from its newest submission that has one. */
+  tldr: string | null;
   /** Its addresses elsewhere: arXiv, DOI, OpenReview. */
   identifiers: { label: string; url: string }[];
   pdf: string | null;
@@ -59,6 +66,13 @@ function venuePaths(submissions: readonly Submission[]): Map<string, string> {
       paths.set(reviewsKey(s.venue.id.slice(0, colon), s.externalId), keyedPagePath('venue', place.edition.key));
   }
   return paths;
+}
+
+/** Submissions come newest first (`server/submissions.ts`). */
+function areaOf(submissions: readonly Submission[]): PaperFacts['area'] {
+  const s = submissions.find((x) => x.primaryArea);
+  if (!s?.primaryArea) return null;
+  return { name: s.primaryArea.charAt(0).toUpperCase() + s.primaryArea.slice(1), venue: s.venue.name };
 }
 
 export function paperFacts({
@@ -103,6 +117,8 @@ export function paperFacts({
     published: venues.find((v) => v.status === 'accepted') ?? null,
     firstDate: sorted.find((v) => v.date)?.date ?? null,
     keywords,
+    area: areaOf(submissions),
+    tldr: submissions.find((s) => s.tldr)?.tldr ?? null,
     identifiers: identifiers.flatMap(sourceLinks).filter((l) => l.label !== 'PDF'),
     pdf,
   };
@@ -152,6 +168,8 @@ export function paperJsonLd(facts: PaperFacts, url: string, siteUrl: string): Re
     url,
     ...(facts.authors.length > 0 ? { author: facts.authors.map((name) => ({ '@type': 'Person', name })) } : {}),
     ...(facts.abstract ? { abstract: facts.abstract } : {}),
+    ...(facts.tldr ? { description: facts.tldr } : {}),
+    ...(facts.area ? { about: { '@type': 'Thing', name: facts.area.name } } : {}),
     ...(facts.firstDate ? { datePublished: facts.firstDate } : {}),
     ...(facts.keywords.length > 0 ? { keywords: facts.keywords.join(', ') } : {}),
     ...(venue

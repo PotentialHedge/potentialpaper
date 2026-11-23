@@ -87,7 +87,8 @@ export async function paperMetadata(scheme: PaperScheme, segments: string[]): Pr
   const { paper, identifiers } = found;
   const canonical = canonicalPaperId(identifiers);
   const [preview, shortId, facts] = await Promise.all([previewOfPage(paper.id), shortIdOf(paper.id), factsOf(found)]);
-  const description = paper.abstract?.slice(0, DESCRIPTION_LENGTH);
+  // The authors' own one-sentence summary says it best, where they gave one.
+  const description = (facts.tldr ?? paper.abstract)?.slice(0, DESCRIPTION_LENGTH);
   return {
     title: `${paper.title} · PotentialPaper`,
     description,

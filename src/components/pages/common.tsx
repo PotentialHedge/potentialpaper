@@ -53,21 +53,22 @@ const STATS = (
   </>
 );
 
-const ASK: Partial<Record<OwnersInfo['claim'], { question: string; action: string; join: string; pitch: ReactNode }>> = {
-  authors: {
-    question: 'Are you an author?',
-    action: 'Claim this paper',
-    join: 'also an author?',
-    pitch: <>to see who&apos;s reading it, {STATS}, and to write about it here.</>,
-  },
-  organisers: {
-    question: 'Organise this venue?',
-    action: 'Claim it',
-    join: 'also organising?',
-    pitch: <>to see who&apos;s reading it, {STATS}, and to write here.</>,
-  },
-  domain: { question: 'A member?', action: 'See how', join: 'how to join', pitch: 'to write here.' },
-};
+const ASK: Partial<Record<OwnersInfo['claim'], { question: string; action: string; join: string; pitch: ReactNode }>> =
+  {
+    authors: {
+      question: 'Are you an author?',
+      action: 'Claim this paper',
+      join: 'also an author?',
+      pitch: <>to see who&apos;s reading it, {STATS}, and to write about it here.</>,
+    },
+    organisers: {
+      question: 'Organise this venue?',
+      action: 'Claim it',
+      join: 'also organising?',
+      pitch: <>to see who&apos;s reading it, {STATS}, and to write here.</>,
+    },
+    domain: { question: 'A member?', action: 'See how', join: 'how to join', pitch: 'to write here.' },
+  };
 
 /** The invitation in a community part nobody has started, by kind: its title and what to write. */
 const COMMUNITY_INVITE: Partial<Record<PageKind, { title: string; hint: string }>> = {
@@ -111,7 +112,11 @@ export function Sections({ kind, address, ownersHtml, communityHtml, owners }: P
               <p className="min-w-0 flex-1 basis-64 text-muted">
                 <strong className="text-ink">{ask.question}</strong> {ask.action} {ask.pitch}
               </p>
-              <a href={owners.claimPath ?? undefined} rel="nofollow" className={ui.btn({ ghost: true, inline: true, flush: true })}>
+              <a
+                href={owners.claimPath ?? undefined}
+                rel="nofollow"
+                className={ui.btn({ ghost: true, inline: true, flush: true })}
+              >
                 {ask.action}
               </a>
             </div>

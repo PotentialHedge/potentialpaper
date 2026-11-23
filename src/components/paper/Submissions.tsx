@@ -278,4 +278,3 @@ export function SubmissionsSection({ submissions, paperPath }: { submissions: Su
     </Fold>
   );
 }
-

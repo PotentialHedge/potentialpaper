@@ -97,6 +97,10 @@ export const ImportSubmissionsBody = z.object({
         status: z.enum(SUBMISSION_STATUSES).nullable(),
         decision: z.string().max(1000).nullable(),
         keywords: z.array(z.string().max(200)).max(100).optional(),
+        /** The area its authors chose from the venue's list: OpenReview's `primary_area`. */
+        primaryArea: z.string().max(1000).nullish(),
+        /** Its one-sentence summary: OpenReview's `TLDR`. */
+        tldr: z.string().max(5000).nullish(),
         /** Where it is presented, for a venue held in several places at once: "Sydney". */
         site: z.string().max(200).nullish(),
         submittedAt: z.iso.datetime({ offset: true }).nullish(),

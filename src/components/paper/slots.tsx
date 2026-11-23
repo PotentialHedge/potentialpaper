@@ -40,15 +40,29 @@ export interface PanelProps extends PageCommon {
 }
 
 /** Its Markdown and TeX rendered, with "Abstract." run into its first paragraph. */
-function Abstract({ paper }: PanelProps) {
+function Abstract({ paper, facts }: PanelProps) {
+  const tldr = facts.tldr && (
+    <p className="mb-3">
+      <b>TL;DR.</b> {facts.tldr}
+    </p>
+  );
   if (!paper.abstract) {
     return (
-      <p>
-        <b>Abstract.</b> <span className="text-muted italic">We can&apos;t show this paper&apos;s abstract here.</span>
-      </p>
+      <>
+        {tldr}
+        <p>
+          <b>Abstract.</b>{' '}
+          <span className="text-muted italic">We can&apos;t show this paper&apos;s abstract here.</span>
+        </p>
+      </>
     );
   }
-  return <AbstractText text={paper.abstract} />;
+  return (
+    <>
+      {tldr}
+      <AbstractText text={paper.abstract} />
+    </>
+  );
 }
 
 /** The picture, and the PDF with where our copy came from. The paper's addresses elsewhere are under its title. */

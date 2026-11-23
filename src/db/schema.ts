@@ -798,6 +798,10 @@ export const submissions = pgTable(
       .array()
       .notNull()
       .default(sql`'{}'::text[]`),
+    /** The area its authors chose from the venue's list, from `submission.json`. */
+    primaryArea: text('primary_area'),
+    /** Its one-sentence summary, from `submission.json`. */
+    tldr: text('tldr'),
     url: text('url'),
     /** When its folder in the repo last changed: an import that finds nothing new commits nothing. */
     fetchedAt: timestamp('fetched_at', { withTimezone: true, mode: 'date' }).notNull(),

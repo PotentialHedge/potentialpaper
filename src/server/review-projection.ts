@@ -191,6 +191,8 @@ export async function projectReviews(database: Database, paperId: string, head: 
           status,
           decision,
           keywords: s.keywords ?? [],
+          primaryArea: s.primaryArea ?? null,
+          tldr: s.tldr ?? null,
           url: s.url,
           fetchedAt: item.changedAt,
         })
@@ -202,6 +204,8 @@ export async function projectReviews(database: Database, paperId: string, head: 
             status,
             decision,
             keywords: s.keywords ?? [],
+            primaryArea: s.primaryArea ?? null,
+            tldr: s.tldr ?? null,
             url: s.url,
             fetchedAt: item.changedAt,
           },

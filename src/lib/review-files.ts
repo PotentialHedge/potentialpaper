@@ -100,6 +100,7 @@ export const FORMS_SCHEMA = 'forms/1';
 export const NOTE_SCHEMA = 'review/1';
 
 const MAX_SHORT = 500;
+export const MAX_TLDR = 1000;
 const MAX_URL = 2000;
 
 const shortText = (max = MAX_SHORT) => z.string().min(1).max(max);
@@ -160,6 +161,13 @@ export const submissionFileSchema = z
     keywords: z.array(shortText(200)).max(MAX_KEYWORDS).optional().meta({
       description: 'The keywords its authors gave the source, as they wrote them.',
     }),
+    primaryArea: shortText(300).optional().meta({
+      description:
+        'The area its authors chose from the venue\'s own list: "reinforcement learning". A fact about the submission, not one of the site\'s categories.',
+    }),
+    tldr: shortText(MAX_TLDR)
+      .optional()
+      .meta({ description: 'Its one-sentence summary, as its authors gave the source.' }),
     url: httpsUrl.meta({ description: 'Where it is at the source, linked from its credit.' }),
     license,
   })
@@ -218,6 +226,8 @@ export interface SubmissionFile {
   venue: { id: string; name: string; url: string | null };
   number: number | null;
   keywords?: string[];
+  primaryArea?: string;
+  tldr?: string;
   url: string;
   license: string;
 }
