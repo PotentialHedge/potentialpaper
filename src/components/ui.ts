@@ -57,7 +57,7 @@ export const ui = {
     'border border-frame bg-card empty:hidden [&>*]:border-0 [&>*]:bg-transparent [&>*+*]:border-t [&>*+*]:border-rule',
   /** An infobox's facts: a label column and a value column, a row each, as Wikipedia's `th`/`td`. */
   facts:
-    'w-full border-collapse text-left align-top [&_td]:py-1 [&_td]:align-top [&_th]:w-[38%] [&_th]:py-1 [&_th]:pr-3 [&_th]:align-top [&_th]:font-semibold [&_th]:text-ink',
+    'w-full border-collapse text-left align-top [&_td]:py-1 [&_td]:align-top [&_th]:w-px [&_th]:whitespace-nowrap [&_th]:py-1 [&_th]:pr-3 [&_th]:align-top [&_th]:font-semibold [&_th]:text-ink',
   /**
    * A text field. 16px on a phone: iOS Safari zooms the page into any field
    * set smaller when it is focused. Every text input and textarea carries
