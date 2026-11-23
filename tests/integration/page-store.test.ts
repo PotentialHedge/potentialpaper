@@ -41,7 +41,9 @@ import { closePool, resetDatabase } from './helpers';
 const byBytes = (a: string, b: string) => Buffer.compare(Buffer.from(a), Buffer.from(b));
 const STARTER_PATHS = starterFiles().map(([path]) => path);
 const firstPaths = (...own: string[]) =>
-  [...new Set(['.gitattributes', '.potentialpaper/metadata.json', 'paper.json', ...STARTER_PATHS, ...own])].sort(byBytes);
+  [...new Set(['.gitattributes', '.potentialpaper/metadata.json', 'paper.json', ...STARTER_PATHS, ...own])].sort(
+    byBytes,
+  );
 
 const NO_LIMIT = { burst: 100_000, perSecond: 1000 };
 const ARXIV = { scheme: 'arxiv', value: '1706.03762' } as const;
