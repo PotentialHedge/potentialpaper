@@ -75,6 +75,11 @@ export function shortPath(shortId: number): string {
   return `/s/${shortId}`;
 }
 
+/** The "Add it?" page of a paper new to us (`app/new/paper`): it, and the papers here it may be a version of. */
+export function newPaperPath({ scheme, value }: PaperId): string {
+  return `/new/paper?${new URLSearchParams({ id: `${scheme}:${value}` })}`;
+}
+
 export const PATH_PREFIX: Record<PaperScheme, string> = { arxiv: '/abs', doi: '/doi', openreview: '/openreview' };
 
 /** The page of an identifier. Slashes in old arXiv ids and in DOIs stay path separators. */

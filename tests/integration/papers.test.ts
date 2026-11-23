@@ -8,9 +8,9 @@ import { pages, paperIdentifiers, papers } from '@/db/schema';
 import { importSubmissions } from '@/server/import-submissions';
 import { SourceUnavailable, type PaperSource, type SourcePaper } from '@/server/paper-sources/types';
 import { paperGate, shortGate } from '@/server/paper-gate';
-import { lookupPaper, savePaper, startVersions } from '@/server/papers';
+import { describePaper, lookupPaper, savePaper, startVersions } from '@/server/papers';
 import { currentVersions } from '@/server/versions';
-import { searchPapers, topVenues } from '@/server/search';
+import { searchPapers, similarPapers, topVenues } from '@/server/search';
 import { closePool, ORIGIN, resetDatabase } from './helpers';
 
 beforeEach(resetDatabase);
@@ -46,6 +46,30 @@ function fakeSource(answer: () => Promise<SourcePaper | null>, burst = 100): Pap
     calls: () => calls,
   };
 }
+
+describe('describing a paper new to us', () => {
+  it('says what the source says without adding it, and adding it then asks no more', async () => {
+    const arxiv = fakeSource(async () => ATTENTION);
+    const described = await describePaper(ID, { sources: { arxiv } });
+    expect(described.status === 'described' && described.paper.title).toBe(ATTENTION.title);
+    expect(await getDb().select().from(papers)).toHaveLength(0);
+    const added = await lookupPaper(ID, { sources: { arxiv } });
+    expect(added.status).toBe('found');
+    expect(arxiv.calls()).toBe(1);
+    expect((await describePaper(ID, { sources: { arxiv } })).status).toBe('found');
+  });
+
+  it('finds papers with titles like it, reworded', async () => {
+    await savePaper({ ...ATTENTION, identifiers: [{ scheme: 'doi', value: '10.1/attention' }] });
+    await savePaper({
+      ...ATTENTION,
+      title: 'Deep Residual Learning',
+      identifiers: [{ scheme: 'doi', value: '10.1/resnet' }],
+    });
+    const similar = await similarPapers('Attention is all you need, revisited');
+    expect(similar.map((p) => p.title)).toEqual(['Attention Is All You Need']);
+  });
+});
 
 describe('looking up a paper', () => {
   it('makes the row on the first visit, and never asks the source again', async () => {

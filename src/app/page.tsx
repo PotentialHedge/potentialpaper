@@ -8,7 +8,7 @@ import { InstitutionStrip } from '@/components/InstitutionStrip';
 import { redirect } from 'next/navigation';
 import { FilterIcon, MoreIcon } from '@/components/icons';
 import { Pager } from '@/components/Pager';
-import { PaperCard, PaperRow } from '@/components/paper/PaperRow';
+import { PaperCard, PaperRow, type RowLink } from '@/components/paper/PaperRow';
 import { RowPlugins } from '@/components/plugins/RowPlugins';
 import { SearchMatches } from '@/components/paper/SearchMatches';
 import { SearchSyntax } from '@/components/paper/SearchSyntax';
@@ -16,12 +16,13 @@ import { Popover, PopoverClose, PopoverContent, PopoverTrigger } from '@/compone
 import { SearchInput } from '@/components/SearchInput';
 import { ui } from '@/components/ui';
 import { DISMISSED_COOKIE, parseDismissed } from '@/lib/announcements';
-import { paperIdFromText, paperPath, shortPath, sourceLinks } from '@/lib/paper-ids';
+import { newPaperPath, paperIdFromText, paperPath, shortPath, sourceLinks } from '@/lib/paper-ids';
 import { parseSearch } from '@/lib/query';
 import { normalizeSearch, SEARCH_MAX_LENGTH, SEARCH_SORTS, type SearchSort } from '@/lib/search';
 import { institutionNames } from '@/server/affiliations';
 import { currentAnnouncements } from '@/server/announcements';
 import { viewerFromHeaders } from '@/server/auth';
+import { findPaper, PAPER_SOURCES } from '@/server/papers';
 import { siteUrl } from '@/server/site';
 import { SEARCH_PAGE_SIZE, searchPapers, topVenues, type SearchFilter, type SearchHit } from '@/server/search';
 
@@ -84,9 +85,10 @@ export default async function Home({
   const sp = await searchParams;
   const q = normalizeSearch(one(sp.q));
 
-  // An identifier goes straight to its page, which fetches the paper if it is new to us.
+  // An identifier goes straight to its page. One new to us is shown first, with papers like it, to be added
+  // (`app/new/paper`): it may be another version of one already here.
   const id = q && paperIdFromText(q);
-  if (id) redirect(paperPath(id));
+  if (id) redirect(PAPER_SOURCES[id.scheme] && !(await findPaper(id)) ? newPaperPath(id) : paperPath(id));
 
   // The search syntax (`lib/query.ts`). A `venue:` in the query says where to look, so the page's own
   // filter steps aside.
@@ -441,6 +443,25 @@ function hitIdentifier(hit: SearchHit): string {
   return `${hit.scheme}:${hit.value}`;
 }
 
+/**
+ * The link beside a row: the PDF, ours or arXiv's; or, with none, the paper's page at its source, so every row
+ * leads somewhere outside.
+ */
+function rowLink(hit: SearchHit): RowLink | null {
+  const pdf = hit.pdf ?? sourceLinks(hit).find((link) => link.label === 'PDF')?.url;
+  if (pdf) return { label: 'pdf', url: pdf };
+  const [page] = sourceLinks(hit);
+  if (!page) return null;
+  switch (hit.scheme) {
+    case 'arxiv':
+      return { label: 'arXiv', url: page.url };
+    case 'openreview':
+      return { label: 'forum', url: page.url, title: 'On OpenReview' };
+    case 'doi':
+      return { label: 'doi', url: page.url, title: `doi:${hit.value}` };
+  }
+}
+
 function Row({ hit, detailed }: { hit: SearchHit; detailed: boolean }) {
   const props = {
     paper: hitIdentifier(hit),
@@ -448,7 +469,7 @@ function Row({ hit, detailed }: { hit: SearchHit; detailed: boolean }) {
     authors: hit.authors,
     venue: hit.venue,
     year: hit.year,
-    pdf: hit.pdf ?? sourceLinks(hit).find((link) => link.label === 'PDF')?.url ?? null,
+    link: rowLink(hit),
     href: shortPath(hit.shortId),
   };
   return (

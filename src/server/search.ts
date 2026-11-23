@@ -398,3 +398,31 @@ export async function topVenues(limit = 8, database: Database = getDb()): Promis
   `);
   return rows.map((r) => r.venue);
 }
+
+/** A paper whose title is like another's, as the "Add it?" page lists them (`app/new/paper`). */
+export interface SimilarPaper {
+  shortId: number;
+  title: string;
+  authors: string[];
+  venue: string | null;
+  year: number | null;
+}
+
+/**
+ * Papers whose titles are like `title`, most alike first: the papers a new one may be another version of, which
+ * often has its title reworded. Trigram similarity, which `papers_title_trgm_idx` serves.
+ */
+export async function similarPapers(title: string, limit = 5, database: Database = getDb()): Promise<SimilarPaper[]> {
+  const text = title.replace(/\s+/g, ' ').trim().slice(0, 300);
+  if (text.length < 3) return [];
+  const { rows } = await database.execute<SimilarPaper & Record<string, unknown>>(sql`
+    select pg.short_id as "shortId", p.title, p.authors, p.venue, p.year
+      from papers p
+      join pages pg on pg.id = p.id
+     where p.merged_into is null
+       and (p.title % ${text} or ${text} <% p.title)
+     order by greatest(similarity(p.title, ${text}), word_similarity(${text}, p.title)) desc, p.id
+     limit ${limit}
+  `);
+  return rows;
+}

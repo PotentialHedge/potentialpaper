@@ -1,10 +1,33 @@
 import Link from 'next/link';
 import { RowActions, RowNote } from '@/components/plugins/RowPlugins';
 
+/** The link beside a paper in a list: `[pdf]`, or with no PDF its page at its source, such as `[arXiv]`. */
+export interface RowLink {
+  label: string;
+  url: string;
+  /** Said on hover, when the label alone is terse: "On OpenReview". */
+  title?: string;
+}
+
+function SourceLink({ link }: { link: RowLink }) {
+  return (
+    <a
+      href={link.url}
+      title={link.title}
+      className="relative z-10 text-accent"
+      rel="noopener noreferrer"
+      target="_blank"
+    >
+      [{link.label}]
+    </a>
+  );
+}
+
 /**
- * One paper in a list: its PDF link, title and authors, venue and year. The whole row is one target: the
- * title's link is stretched over the row (`after:inset-0`), since a row that is itself a link could not hold
- * the PDF link, which sits above the stretched one, in a column of its own at the left so titles align.
+ * One paper in a list: its PDF link (or, with no PDF, its page at its source), title and authors, venue and year.
+ * The whole row is one target: the title's link is stretched over the row (`after:inset-0`), since a row that is
+ * itself a link could not hold the PDF link, which sits above the stretched one, in a column of its own at the left
+ * so titles align.
  *
  * Under `RowPlugins` (`paper` given), a plugin's note on the paper takes the venue's place, and the year's column
  * widens by `--row-actions` for the ⋯ of the plugins' row commands, when there are any.
@@ -15,7 +38,7 @@ export function PaperRow({
   authors,
   venue,
   year,
-  pdf,
+  link,
   href,
 }: {
   /** Its identifier (`arxiv:1706.03762`), which plugins' notes name it by. */
@@ -24,18 +47,12 @@ export function PaperRow({
   authors: string[];
   venue: string | null;
   year: number | null;
-  pdf: string | null;
+  link: RowLink | null;
   href: string;
 }) {
   return (
-    <div className="relative grid grid-cols-[34px_1fr_150px_calc(40px_+_var(--row-actions,0px))] items-center gap-x-3.5 border-b border-dotted border-rule-strong py-2 hover:bg-highlight narrow:grid-cols-[34px_1fr_calc(40px_+_var(--row-actions,0px))]">
-      <span className="font-sans text-xs">
-        {pdf && (
-          <a href={pdf} className="relative z-10 text-accent" rel="noopener noreferrer" target="_blank">
-            [pdf]
-          </a>
-        )}
-      </span>
+    <div className="relative grid grid-cols-[44px_1fr_150px_calc(40px_+_var(--row-actions,0px))] items-center gap-x-3.5 border-b border-dotted border-rule-strong py-2 hover:bg-highlight narrow:grid-cols-[44px_1fr_calc(40px_+_var(--row-actions,0px))]">
+      <span className="font-sans text-xs">{link && <SourceLink link={link} />}</span>
       <span className="min-w-0 leading-[1.35]">
         {/* At most two lines; the whole title on hover. */}
         <Link href={href} className="line-clamp-2 after:absolute after:inset-0 hover:no-underline" title={title}>
@@ -78,7 +95,7 @@ export function PaperCard({
   abstract,
   venue,
   year,
-  pdf,
+  link,
   cover,
   href,
 }: {
@@ -89,7 +106,7 @@ export function PaperCard({
   abstract: string | null;
   venue: string | null;
   year: number | null;
-  pdf: string | null;
+  link: RowLink | null;
   cover: string | null;
   href: string;
 }) {
@@ -135,11 +152,7 @@ export function PaperCard({
           ) : (
             [venue, year].filter(Boolean).join(' · ')
           )}
-          {pdf && (
-            <a href={pdf} className="relative z-10 text-accent" rel="noopener noreferrer" target="_blank">
-              [pdf]
-            </a>
-          )}
+          {link && <SourceLink link={link} />}
           {paper && <RowActions paper={paper} />}
         </div>
       </div>
