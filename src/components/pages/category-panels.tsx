@@ -83,9 +83,9 @@ function MemberList({ title, links, search }: { title: string; links: PageLink[]
 
 /**
  * What is in it, as a Wikipedia category lists it: its subcategories, then its other pages, each by name, with a link
- * to search its papers (the home page's category filter).
+ * to search its papers (the home page, `category:"<name>"` filled in).
  */
-export function CategoryMembers({ category, pageKey }: KindPanelProps) {
+export function CategoryMembers({ category, name }: KindPanelProps) {
   if (!category) return null;
   if (category.subcategories.length + category.pages.length === 0) {
     return <p className={ui.empty}>Nothing is in this category yet. Add a page to it from that page.</p>;
@@ -98,7 +98,7 @@ export function CategoryMembers({ category, pageKey }: KindPanelProps) {
         links={category.pages}
         search={
           category.pages.some((link) => link.page.kind === 'paper')
-            ? `/?category=${encodeURIComponent(pageKey)}`
+            ? `/?${new URLSearchParams({ q: `category:"${name.replaceAll('"', '')}"` })}`
             : undefined
         }
       />

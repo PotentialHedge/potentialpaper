@@ -62,8 +62,6 @@ export interface SearchFilter {
   q?: string | null;
   /** One venue, exactly. */
   venue?: string | null;
-  /** One category, by its slug: the papers in it directly (`page_members`, `in-category`). */
-  category?: string | null;
   sort?: SearchSort;
   /** Only the papers this account follows. */
   followedBy?: string | null;
@@ -278,7 +276,6 @@ type Found = Omit<SearchHit, 'matches' | 'matchCount'> & { id: string };
 async function readPage(
   {
     venue,
-    category,
     sort = 'relevance',
     page = 1,
     limit = SEARCH_PAGE_SIZE,
@@ -296,7 +293,6 @@ async function readPage(
     [
       sql`p.merged_into is null`,
       ...(venue ? [sql`p.venue = ${venue}`] : []),
-      ...(category ? [inCategory(sql`cp.key = ${category}`)] : []),
       ...(followedBy ? [followed(followedBy)] : []),
       ...(authoredBy ? [authored(authoredBy)] : []),
       ...(exceptFollowedBy ? [sql`not ${followed(exceptFollowedBy)}`] : []),
@@ -401,33 +397,4 @@ export async function topVenues(limit = 8, database: Database = getDb()): Promis
     limit ${limit}
   `);
   return rows.map((r) => r.venue);
-}
-
-/** The categories with the most papers, for the home page's filter: their slugs and names. */
-export async function topCategories(
-  limit = 8,
-  database: Database = getDb(),
-): Promise<{ slug: string; name: string }[]> {
-  const { rows } = await database.execute<{ slug: string; name: string }>(sql`
-    select cp.key as slug, coalesce(cc.kind_file ->> 'name', cp.key) as name
-    from page_members m
-    join pages cp on cp.id = m.scope_page_id
-    join papers p on p.id = m.paper_id
-    left join page_current cc on cc.page_id = cp.id
-    where m.via = ${CATEGORY_LABEL} and cp.kind = 'category' and cp.merged_into is null and p.merged_into is null
-    group by cp.key, cc.kind_file
-    order by count(*) desc, name
-    limit ${limit}
-  `);
-  return rows;
-}
-
-/** A category's name, by its slug; `null` if there is none. */
-export async function categoryName(slug: string, database: Database = getDb()): Promise<string | null> {
-  const { rows } = await database.execute<{ name: string }>(sql`
-    select coalesce(cc.kind_file ->> 'name', cp.key) as name
-    from pages cp left join page_current cc on cc.page_id = cp.id
-    where cp.kind = 'category' and cp.key = ${slug}
-  `);
-  return rows[0]?.name ?? null;
 }

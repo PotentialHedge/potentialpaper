@@ -23,15 +23,7 @@ import { institutionNames } from '@/server/affiliations';
 import { currentAnnouncements } from '@/server/announcements';
 import { viewerFromHeaders } from '@/server/auth';
 import { siteUrl } from '@/server/site';
-import {
-  categoryName,
-  SEARCH_PAGE_SIZE,
-  searchPapers,
-  topCategories,
-  topVenues,
-  type SearchFilter,
-  type SearchHit,
-} from '@/server/search';
+import { SEARCH_PAGE_SIZE, searchPapers, topVenues, type SearchFilter, type SearchHit } from '@/server/search';
 
 export const dynamic = 'force-dynamic';
 
@@ -101,9 +93,6 @@ export default async function Home({
   const parsed = q ? parseSearch(q) : null;
   const venue = normalizeSearch(one(sp.venue));
   const venueFilter = parsed?.fields.has('venue') ? null : venue;
-  // A category, by its slug, as a category's page links here; a `category:` in the query steps it aside too.
-  const category = normalizeSearch(one(sp.category));
-  const categoryFilter = parsed?.fields.has('category') ? null : category;
   // Compact rows by default; detailed shows each paper's cover and abstract. `abstracts=1` is the old name.
   const detailed = one(sp.view) === 'detailed' || one(sp.abstracts) === '1';
 
@@ -120,32 +109,23 @@ export default async function Home({
   // followed papers and positions: same venue and sort, each paged on its own, and none repeated. A paper both
   // theirs and followed is under My papers. Not while searching, nor when the list is already only followed papers.
   const pins = me !== null && !q && !onlyFollowed;
-  const browse = { venue, category, sort };
-  const [all, mine, followed, topVenueList, topCategoryList, chosenCategory, announced, institutions] =
-    await Promise.all([
-      pageOf(sp.page, SEARCH_PAGE_SIZE, {
-        q,
-        venue: venueFilter,
-        category: categoryFilter,
-        sort,
-        followedBy: onlyFollowed ? me : null,
-        exceptAuthoredBy: pins ? me : null,
-        exceptFollowedBy: pins ? me : null,
-      }),
-      pins ? pageOf(sp.mpage, MINE_PAGE, { ...browse, authoredBy: me }) : null,
-      pins ? pageOf(sp.fpage, FOLLOWING_PAGE, { ...browse, followedBy: me, exceptAuthoredBy: me }) : null,
-      topVenues(),
-      topCategories(),
-      category ? categoryName(category) : null,
-      currentAnnouncements(viewer !== null),
-      institutionNames(),
-    ]);
+  const browse = { venue, sort };
+  const [all, mine, followed, topVenueList, announced, institutions] = await Promise.all([
+    pageOf(sp.page, SEARCH_PAGE_SIZE, {
+      q,
+      venue: venueFilter,
+      sort,
+      followedBy: onlyFollowed ? me : null,
+      exceptAuthoredBy: pins ? me : null,
+      exceptFollowedBy: pins ? me : null,
+    }),
+    pins ? pageOf(sp.mpage, MINE_PAGE, { ...browse, authoredBy: me }) : null,
+    pins ? pageOf(sp.fpage, FOLLOWING_PAGE, { ...browse, followedBy: me, exceptAuthoredBy: me }) : null,
+    topVenues(),
+    currentAnnouncements(viewer !== null),
+    institutionNames(),
+  ]);
   const venues = venue && !topVenueList.includes(venue) ? [...topVenueList, venue] : topVenueList;
-  const categories =
-    category && !topCategoryList.some((c) => c.slug === category)
-      ? [...topCategoryList, { slug: category, name: chosenCategory ?? category }]
-      : topCategoryList;
-  const categoryLabel = category ? (chosenCategory ?? category) : null;
   const cookieJar = await cookies();
   const mineOpen = cookieJar.get(MINE_COOKIE)?.value !== '0';
   const followingOpen = cookieJar.get(FOLLOWING_COOKIE)?.value !== '0';
@@ -160,13 +140,12 @@ export default async function Home({
     const params = new URLSearchParams({
       ...(q ? { q } : {}),
       ...(venue ? { venue } : {}),
-      ...(category ? { category } : {}),
       sort,
       ...(onlyFollowed ? { following: '1' } : {}),
       ...(detailed ? { view: 'detailed' } : {}),
       ...patch,
     });
-    for (const key of ['q', 'venue', 'category', 'view']) if (!params.get(key)) params.delete(key);
+    for (const key of ['q', 'venue', 'view']) if (!params.get(key)) params.delete(key);
     if (params.get('following') === '0') params.delete('following');
     // The default sort stays out of the address, and relevance is gone with the search.
     const chosen = params.get('sort');
@@ -181,9 +160,7 @@ export default async function Home({
     `${href({ ...pages, [key]: String(p) })}${anchor}`;
 
   // Shown on the ⋯ trigger when not the defaults, since the row doesn't show them.
-  const moreLabel = [MENU_SORTS.includes(sort) && sort, venue, categoryLabel, onlyFollowed && '★']
-    .filter(Boolean)
-    .join(', ');
+  const moreLabel = [MENU_SORTS.includes(sort) && sort, venue, onlyFollowed && '★'].filter(Boolean).join(', ');
   const viewLink = (v: 'compact' | 'detailed') => (
     <Link
       href={href({ view: v === 'detailed' ? 'detailed' : '' })}
@@ -223,7 +200,6 @@ export default async function Home({
       {/* A plain GET form, so search works without JavaScript. */}
       <form action="/" method="get" role="search" className="mt-5 flex gap-2">
         {venue && <input type="hidden" name="venue" value={venue} />}
-        {category && <input type="hidden" name="category" value={category} />}
         {onlyFollowed && <input type="hidden" name="following" value="1" />}
         {detailed && <input type="hidden" name="view" value="detailed" />}
         <SearchInput
@@ -259,9 +235,7 @@ export default async function Home({
             className="relative hidden cursor-pointer px-2.5 text-muted hover:text-accent narrow:flex narrow:items-center"
           >
             <FilterIcon className="size-5" />
-            {(venue || category || onlyFollowed) && (
-              <span className="absolute top-1.5 right-1.5 size-1.5 rounded-full bg-accent" />
-            )}
+            {(venue || onlyFollowed) && <span className="absolute top-1.5 right-1.5 size-1.5 rounded-full bg-accent" />}
           </PopoverTrigger>
           <PopoverContent align="end" className="flex max-h-[70vh] flex-col gap-3 overflow-y-auto text-[13px]">
             <div>
@@ -293,25 +267,6 @@ export default async function Home({
                 ))}
               </div>
             </div>
-            {categories.length > 0 && (
-              <div>
-                <h3 className={ui.boxHeading}>Category</h3>
-                <div className="flex flex-wrap gap-x-4 gap-y-2">
-                  <PopoverClose asChild>
-                    <Link href={href({ category: '' })} className={category ? '' : ON}>
-                      all categories
-                    </Link>
-                  </PopoverClose>
-                  {categories.map((c) => (
-                    <PopoverClose key={c.slug} asChild>
-                      <Link href={href({ category: c.slug })} className={c.slug === category ? ON : ''}>
-                        {c.name}
-                      </Link>
-                    </PopoverClose>
-                  ))}
-                </div>
-              </div>
-            )}
             {viewer && (
               <PopoverClose asChild>
                 <Link href={href({ following: onlyFollowed ? '0' : '1' })} className={onlyFollowed ? ON : ''}>
@@ -343,8 +298,7 @@ export default async function Home({
       {q && (
         <div className="mt-2 font-sans text-[13px] text-muted">
           {all.total.toLocaleString('en')} {all.total === 1 ? 'result' : 'results'} for “{q}”
-          {venueFilter && <> in {venueFilter}</>}
-          {categoryFilter && <> in the category {categoryLabel}</>}. <Link href={href({ q: '' })}>clear</Link>
+          {venueFilter && <> in {venueFilter}</>}. <Link href={href({ q: '' })}>clear</Link>
         </div>
       )}
 
@@ -370,7 +324,7 @@ export default async function Home({
           {/* Not a flex box: an icon alone gives a flex item no text baseline, and the row aligns on
               baselines. Inline, `align-middle` centres the dots on the text's x-height. */}
           <PopoverTrigger
-            title="More sorts and filters: venue, category, following"
+            title="More sorts and filters: venue, following"
             className="-my-1 cursor-pointer px-1 py-1 text-ink hover:text-accent"
           >
             {moreLabel}
@@ -393,23 +347,6 @@ export default async function Home({
               <PopoverClose key={v} asChild>
                 <Link href={href({ venue: v })} className={v === venue ? ON : ''}>
                   {v}
-                </Link>
-              </PopoverClose>
-            ))}
-            {categories.length > 0 && (
-              <PopoverClose asChild>
-                <Link
-                  href={href({ category: '' })}
-                  className={`mt-1 border-t border-rule pt-1.5 ${category ? '' : ON}`}
-                >
-                  all categories
-                </Link>
-              </PopoverClose>
-            )}
-            {categories.map((c) => (
-              <PopoverClose key={c.slug} asChild>
-                <Link href={href({ category: c.slug })} className={c.slug === category ? ON : ''}>
-                  {c.name}
                 </Link>
               </PopoverClose>
             ))}

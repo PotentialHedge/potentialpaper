@@ -13,7 +13,7 @@ export function GET() {
 
 ## Read the site
 
-- [Home](${origin}/): papers, searchable with \`?q=\` (\`category:<name>\` keeps a category's papers; \`?category=<slug>\` does too)
+- [Home](${origin}/): papers, searchable with \`?q=\` (\`category:"<name>"\` keeps a category's papers)
 - A paper: \`${origin}/abs/<arXiv id>\`, \`${origin}/doi/<doi>\`, \`${origin}/openreview/<id>\`
 - A paper for agents: the same address with \`/agent\` in front, e.g. [${origin}/agent/abs/1706.03762](${origin}/agent/abs/1706.03762)
 - A page's history as git: \`git clone ${origin}/git/<scheme>/<id>.git\` (a paper), \`${origin}/git/<kind>/<key>.git\` (any other kind). Every page's tools are its address behind the tool's name: \`${origin}/history/v/iclr/2027\`, \`/code/…\` (the web editor), \`/claim/…\`. A page's owners (a paper's confirmed authors, a venue's organisers, an org's members, a person) write its \`owners/\`; anyone verified its \`community/\`. A paper's other identifiers redirect to its canonical address
