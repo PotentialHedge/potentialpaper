@@ -58,11 +58,18 @@ const ASK: Partial<Record<OwnersInfo['claim'], { question: string; action: strin
   domain: { question: 'A member?', action: 'See how', join: 'how to join', pitch: 'to write here.' },
 };
 
-/** What to write in a community part nobody has started, by kind. */
-const COMMUNITY_HINT: Partial<Record<PageKind, string>> = {
-  paper: ': a summary, why it matters, critique, errata, reproductions',
-  category: ': what it is, its key ideas, its history and its open problems',
+/** The invitation in a community part nobody has started, by kind: its title and what to write. */
+const COMMUNITY_INVITE: Partial<Record<PageKind, { title: string; hint: string }>> = {
+  paper: {
+    title: 'Be the first to write about this paper',
+    hint: 'Add a summary, why it matters, a critique, errata or a reproduction.',
+  },
+  category: {
+    title: 'Be the first to write about this topic',
+    hint: 'Add what it is, its key ideas, its history or its open problems.',
+  },
 };
+const INVITE = { title: 'Be the first to write here', hint: 'Anything that helps the next reader.' };
 
 function Html({ html }: { html: string }) {
   return <div className="md" dangerouslySetInnerHTML={{ __html: html }} />;
@@ -151,13 +158,7 @@ export function Sections({ kind, address, ownersHtml, communityHtml, owners }: P
           {communityHtml ? (
             <Html html={communityHtml} />
           ) : (
-            <p className={ui.empty}>
-              {both ? 'Nothing from the community yet.' : 'Nobody has written anything here yet.'}{' '}
-              <a href={EDIT} rel="nofollow">
-                Start it
-              </a>
-              {COMMUNITY_HINT[kind] ?? ''}.
-            </p>
+            <CommunityInvite kind={kind} />
           )}
           {kind === 'paper' && (
             <div className={`${ui.fine} mt-3 font-sans`}>
@@ -173,6 +174,21 @@ export function Sections({ kind, address, ownersHtml, communityHtml, owners }: P
         </div>
       )}
     </section>
+  );
+}
+
+/** A community part nobody has started: an invitation to write the first of it, not an empty room. */
+function CommunityInvite({ kind }: { kind: PageKind }) {
+  const { title, hint } = COMMUNITY_INVITE[kind] ?? INVITE;
+  return (
+    <div className="flex flex-wrap items-center gap-x-4 gap-y-2 border border-dashed border-frame px-4 py-3 font-sans text-[13px]">
+      <p className="min-w-0 flex-1 basis-64 text-muted">
+        <strong className="text-ink">{title}.</strong> {hint}
+      </p>
+      <a href={EDIT} rel="nofollow" className={ui.btn({ inline: true, flush: true })}>
+        Start writing
+      </a>
+    </div>
   );
 }
 
