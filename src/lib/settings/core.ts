@@ -251,6 +251,12 @@ const githubSource = z.string().refine((text) => parsePluginSource(text)?.kind =
   message: 'a plugin source: github:<owner>/<repo>[/<folder>][@<ref>]',
 });
 
+/** The plugins every reader has unless the site's settings change `plugins.default`: the paper map and scores. */
+export const DEFAULT_PLUGINS: readonly string[] = [
+  'github:benedict-armstrong/potentialpaper-paper-map@v0.7.0',
+  'github:benedict-armstrong/potentialpaper-score-standing@v0.3.2',
+];
+
 const PLUGIN_SETTINGS: Record<string, CoreSetting> = {
   plugins: {
     schema: z.record(githubSource, pluginEntrySchema) as z.ZodType,
@@ -263,7 +269,8 @@ const PLUGIN_SETTINGS: Record<string, CoreSetting> = {
   },
   'plugins.default': {
     schema: z.array(githubSource).max(50) as z.ZodType,
-    default: [],
+    // On for everyone, signed in or not, until the site's settings say otherwise.
+    default: DEFAULT_PLUGINS,
     title: 'Plugins for everyone',
     description:
       'Set by the site: plugin sources ("github:<owner>/<repo>[@<ref>]") installed for every reader, who can turn one off in their own "plugins".',

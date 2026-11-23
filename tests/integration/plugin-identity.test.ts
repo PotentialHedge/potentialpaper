@@ -71,7 +71,11 @@ afterAll(async () => {
   rmSync(store, { recursive: true, force: true });
   await closePool();
 });
-beforeEach(resetDatabase);
+// No site default plugins (the paper map and scores, `DEFAULT_PLUGINS`): each test installs its own.
+beforeEach(async () => {
+  await resetDatabase();
+  await saveSiteSettings('{ "plugins.default": [] }');
+});
 
 describe('identity tokens', () => {
   it("signs a token for an approved plugin that its backend verifies, and that no other plugin's accepts", async () => {

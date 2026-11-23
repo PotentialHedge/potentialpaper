@@ -106,7 +106,11 @@ afterAll(async () => {
   rmSync(store, { recursive: true, force: true });
   await closePool();
 });
-beforeEach(resetDatabase);
+// No site default plugins (the paper map and scores, `DEFAULT_PLUGINS`): each test installs its own.
+beforeEach(async () => {
+  await resetDatabase();
+  await saveSiteSettings('{ "plugins.default": [] }');
+});
 afterEach(() => vi.unstubAllGlobals());
 
 const installed = async (cookie?: string, page?: string) =>
