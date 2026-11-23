@@ -1,7 +1,8 @@
 import type { PageFacts } from '@/lib/infobox-facts';
 import type { ComponentType } from 'react';
 import { ui } from '@/components/ui';
-import { type KeyedKind, pagePath } from '@/lib/kinds';
+import { type KeyedKind, KINDS, pagePath } from '@/lib/kinds';
+import { AddFactRow, OwnFactRows } from './OwnFacts';
 import type { OrgOverview } from '@/server/org-pages';
 import type { ScopePaper } from '@/server/page-members';
 import type { UserPageView } from '@/server/user-pages';
@@ -65,16 +66,36 @@ const COMMON: Record<string, ComponentType<KindPanelProps>> = {
 };
 
 /** Each kind's panels by id: every kind's, and its own. */
+/**
+ * The top of a category's or an org's infobox: the rows its owners and community added (`facts.jsonl`), and "Add a
+ * row". A venue's are in its About (`VenueAbout`), under the rows its `venue.json` gives.
+ */
+function OwnFacts({ kind, own, address }: KindPanelProps) {
+  return (
+    <div className={ui.box}>
+      {own && (
+        <table className={ui.facts}>
+          <tbody>
+            <OwnFactRows facts={own} ownersTitle={KINDS[kind].owners?.title ?? 'the owners'} />
+          </tbody>
+        </table>
+      )}
+      <AddFactRow pagePath={pagePath(address)} />
+    </div>
+  );
+}
+
 export const KIND_PANELS: Record<KeyedKind, Record<string, ComponentType<KindPanelProps>>> = {
   // Its editions, its review scores, its submissions by status.
   venue: { ...COMMON, about: VenueAbout, editions: VenueEditions, scores: VenueScores, papers: VenuePapers },
   // Its article, then what is in it: its subcategories and its other pages, as a Wikipedia category lists them.
-  category: { ...COMMON, about: CategoryAbout, members: CategoryMembers },
+  category: { ...COMMON, about: CategoryAbout, members: CategoryMembers, facts: OwnFacts },
   // Where it sits, its departments and labs, the people who show it as their institution, its venues, and
   // its papers, rolled up from its departments.
   org: {
     ...COMMON,
     about: OrgAbout,
+    facts: OwnFacts,
     departments: OrgDepartments,
     people: OrgPeople,
     venues: OrgVenues,

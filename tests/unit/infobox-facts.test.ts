@@ -44,12 +44,15 @@ describe('infobox rows', () => {
     expect('problem' in parseFacts(row({ label: 'A', value: 'b', url: 'javascript:alert(1)' }), 'paper')).toBe(true);
   });
 
-  it("is each part's facts.jsonl on papers and venues, written by that part's writers", () => {
+  it("is each part's facts.jsonl on every kind with a repo, written by that part's writers", () => {
     expect(isFactsPath('community/facts.jsonl', 'paper')).toBe(true);
     expect(isFactsPath('owners/facts.jsonl', 'venue')).toBe(true);
-    expect(isFactsPath('community/facts.jsonl', 'category')).toBe(false);
+    expect(isFactsPath('community/facts.jsonl', 'category')).toBe(true);
+    expect(isFactsPath('owners/facts.jsonl', 'org')).toBe(true);
+    // A category has no owners' part.
+    expect(isFactsPath('owners/facts.jsonl', 'category')).toBe(false);
     expect(layoutProblem('community/facts.jsonl', 'paper')).toBeNull();
-    expect(layoutProblem('community/facts.jsonl', 'category')).not.toBeNull();
+    expect(layoutProblem('community/facts.jsonl', 'category')).toBeNull();
     expect(contentProblem('community/facts.jsonl', row({ label: 'Area', value: 'x' }), 'paper')).toMatch(
       /fills in itself/,
     );

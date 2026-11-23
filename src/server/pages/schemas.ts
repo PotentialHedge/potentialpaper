@@ -189,7 +189,7 @@ export const PAGE_SCHEMAS = {
     writable: true,
     format: 'jsonl',
     index: (fact) => [{ kind: 'fact', text: words(fact.label, fact.value), fields: { label: fact.label } }],
-    render: { panel: 'Facts', slots: ['paper.aside', 'venue.aside'] },
+    render: { panel: 'Facts', slots: ['paper.aside', 'venue.aside', 'category.aside', 'org.aside'] },
   }),
   authorPlugins: fileType({
     title: 'Author section plugins',
