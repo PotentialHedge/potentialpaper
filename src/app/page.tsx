@@ -183,11 +183,7 @@ export default async function Home({
               verified researchers write the community&apos;s, and labeled links show how papers connect: which ones
               extend, replicate or contradict each other. Every change is a git commit, made in the browser, with git,
               or by your AI agent. Any arXiv link works here too: change the domain of{' '}
-              <span className={ui.mono}>arxiv.org/abs/1706.03762</span> to this site&apos;s.{' '}
-              <Link href="/welcome" className="text-accent">
-                Join with your institutional email
-              </Link>
-              . The code is{' '}
+              <span className={ui.mono}>arxiv.org/abs/1706.03762</span> to this site&apos;s. The code is{' '}
               <a href={REPO_URL} className="text-accent" rel="noopener noreferrer">
                 on GitHub
               </a>
