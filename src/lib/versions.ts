@@ -45,7 +45,10 @@ export interface VersionSubmission {
   status?: SubmissionStatus;
   /** As the venue words it: "Accept (Poster)", "Reject". */
   decision?: string;
-  /** Where it is presented, for a venue held in several places at once: "Sydney". */
+  /**
+   * Where it is presented, for a venue held in several places at once: "Sydney". With a venue page that lists
+   * `locations`, one of them or its first part ("Sydney" for "Sydney, Australia"), kept and shown in that short form.
+   */
   site?: string;
   /** Its number at the venue. */
   number?: number;
@@ -172,9 +175,10 @@ const versionShape = {
           decision: text(MAX_VERSION_DECISION)
             .optional()
             .meta({ description: 'The decision as the venue words it: "Accept (Poster)", "Reject".' }),
-          site: text(MAX_SITE)
-            .optional()
-            .meta({ description: 'Where it is presented, for a venue held in several places at once: "Sydney".' }),
+          site: text(MAX_SITE).optional().meta({
+            description:
+              'Where it is presented, for a venue held in several places at once: "Sydney". With a venue page that lists locations, one of them or its first part ("Sydney" for "Sydney, Australia").',
+          }),
           number: z.number().int().positive().optional().meta({ description: 'Its number at the venue.' }),
           url: httpUrl(MAX_URL).optional().meta({ description: 'Where it is at the venue: its forum.' }),
           reviews: z.string().regex(REVIEWS_KEY).optional().meta({
@@ -372,21 +376,42 @@ export function venueOf(submission: Pick<VersionSubmission, 'venue' | 'page'>): 
 }
 
 /**
- * The submissions with each one naming a venue page given that page's name as `venue`, as the page shows them;
- * `names` maps a page's key to its name. Pure: the projection reads the names (`server/pages/projections.ts`).
+ * The submissions with each one naming a venue page given that page's name as `venue`, and its `site` in the short
+ * form the page's locations give it (`siteAt`), as the page shows them; `names` maps a page's key to its name, and
+ * `locations` to its `locations`. Pure: the projection reads both (`server/pages/projections.ts`).
  */
 export function withVenueNames<T extends Pick<PaperVersion, 'submissions'>>(
   versions: readonly T[],
   names: ReadonlyMap<string, string>,
+  locations: ReadonlyMap<string, readonly string[]> = new Map(),
 ): T[] {
+  const shown = (s: VersionSubmission, page: string): VersionSubmission => {
+    // A site the page's locations no longer have (they changed after it was written) shows as written, until the
+    // next import or edit puts it right.
+    const site = s.site && (siteAt(s.site, locations.get(page)) ?? s.site);
+    return { ...s, venue: names.get(page) ?? page, ...(site ? { site } : {}) };
+  };
   return versions.map((version) =>
     version.submissions?.some((s) => s.page)
-      ? {
-          ...version,
-          submissions: version.submissions.map((s) => (s.page ? { ...s, venue: names.get(s.page) ?? s.page } : s)),
-        }
+      ? { ...version, submissions: version.submissions.map((s) => (s.page ? shown(s, s.page) : s)) }
       : version,
   );
+}
+
+/**
+ * A submission's `site` as kept, given its venue page's `locations` ("Sydney, Australia"): the short form, the
+ * location's first comma-separated part as the page words it ("Sydney"), for a site that is a location or its short
+ * form in any case. `null` when it is neither; the site as given when the page lists no locations.
+ */
+export function siteAt(site: string, locations: readonly string[] | undefined): string | null {
+  const plain = (text: string) => text.replace(/\s+/g, ' ').trim().toLowerCase();
+  const wanted = plain(site);
+  if (!locations || locations.length === 0) return site;
+  for (const location of locations) {
+    const short = location.split(',')[0].trim();
+    if (wanted === plain(location) || wanted === plain(short)) return short;
+  }
+  return null;
 }
 
 /** The venue pages a version's submissions name, by key. */

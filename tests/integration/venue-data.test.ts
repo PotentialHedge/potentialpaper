@@ -136,4 +136,57 @@ describe("a venue's page", () => {
       venue: 'ICLR 2027 (Rio)',
     });
   });
+  it("takes a site that is one of the venue page's locations, and refuses one that isn't", async () => {
+    await venueWithForms(SOURCE, 'ICLR 2027', FORMS);
+    const { person, admin } = await people();
+    const edition = (await findKeyedPage(getDb(), 'venue', 'iclr/2027'))!;
+    const locate = async (locations: string[]) =>
+      commitPage(
+        edition.id,
+        await readHead(getDb(), edition.id),
+        admin,
+        [{ path: 'venue.json', content: JSON.stringify({ name: 'ICLR 2027', sources: [SOURCE], locations }) }],
+        'Locations',
+      );
+    await locate(['Rio de Janeiro, Brazil', 'Singapore']);
+    const id = await paper();
+    const edit = async (site: string, note?: string) =>
+      setVersions(id, person, {
+        baseOid: await readHead(getDb(), id),
+        versions: [
+          {
+            label: 'Conference version',
+            kind: 'camera-ready' as const,
+            ...(note ? { note } : {}),
+            submissions: [{ page: 'iclr/2027', status: 'accepted' as const, site }],
+          },
+        ],
+        evidence: ['https://e.org'],
+      });
+    const shownSite = async () => {
+      const [row] = await getDb()
+        .select({ versions: pageCurrent.versions })
+        .from(pageCurrent)
+        .where(eq(pageCurrent.pageId, id));
+      return row.versions![0].submissions![0].site;
+    };
+
+    await expect(edit('Lisbon')).rejects.toMatchObject({
+      status: 422,
+      message: expect.stringMatching(
+        /the site "Lisbon" is not one of iclr\/2027's locations; give one of "Rio de Janeiro, Brazil", "Rio de Janeiro", "Singapore"/,
+      ),
+    });
+    // The full location, in any case: shown in its short form.
+    await edit('rio de janeiro, brazil');
+    expect((await versionsAt(id)).versions[0].submissions![0].site).toBe('rio de janeiro, brazil');
+    expect(await shownSite()).toBe('Rio de Janeiro');
+
+    // The venue's locations change: its commit isn't refused, the paper shows its site as written, and an edit that
+    // leaves the entry as it was isn't refused either.
+    await locate(['Singapore']);
+    await edit('rio de janeiro, brazil', 'Final.');
+    expect(await shownSite()).toBe('rio de janeiro, brazil');
+    await expect(edit('Rio de Janeiro')).rejects.toMatchObject({ status: 422 });
+  });
 });

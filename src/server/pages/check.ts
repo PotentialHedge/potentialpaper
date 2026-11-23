@@ -1,11 +1,11 @@
 import { randomBytes } from 'node:crypto';
 import { and, eq, inArray } from 'drizzle-orm';
-import { accounts, authorClaims, botGrants, commitIdentities, pages, papers } from '@/db/schema';
-import { isUnderDomain, KINDS, orgFileSchema, type PageKind, partsOf } from '@/lib/kinds';
+import { accounts, authorClaims, botGrants, commitIdentities, pageCurrent, pages, papers } from '@/db/schema';
+import { isUnderDomain, KINDS, orgFileSchema, type PageKind, partsOf, venueFileSchema } from '@/lib/kinds';
 import { parseReviewPath, SUBMISSION_FILE } from '@/lib/review-files';
 import { cleanEvidence } from '@/lib/evidence';
 import { MAX_LINKS, parseLinkFile } from '@/lib/paper-links';
-import { MAX_VERSIONS, parseVersionFile } from '@/lib/versions';
+import { MAX_VERSIONS, parseVersionFile, siteAt, type VersionSubmission } from '@/lib/versions';
 import { ApiError } from '../api/errors';
 import { checkDemos } from '../demos/attach';
 import { findLfsObjects, PDF_TYPE } from '../lfs';
@@ -499,29 +499,64 @@ async function checkOrgDomains(db: Reader, check: TreeCheck): Promise<void> {
   }
 }
 
-/** A version's submission that names a venue page (`"page"`) names one there is (`lib/versions.ts`). */
+/** A version file's submissions; none for a file that isn't one or doesn't parse. */
+async function submissionsIn(path: string, blob: string | undefined, text: TextOf): Promise<VersionSubmission[]> {
+  const id = versionIdOf(path);
+  if (!blob || !id) return [];
+  const parsed = parseVersionFile(id, (await text(blob)) ?? '');
+  return 'version' in parsed ? (parsed.version.submissions ?? []) : [];
+}
+
+/** A submission as text that ignores key order. */
+const entryText = (entry: VersionSubmission) =>
+  JSON.stringify(Object.fromEntries(Object.entries(entry).sort(([a], [b]) => (a < b ? -1 : 1))));
+
+/**
+ * A version's submission that names a venue page (`"page"`) names one there is (`lib/versions.ts`), and a `site` the
+ * commit adds or changes is one of the page's `locations`, where it lists any (`siteAt`). An entry the commit leaves
+ * as it was (in any version) isn't checked again, so a venue's locations can change without its papers' versions being refused.
+ */
 async function checkVenuePages(db: Reader, check: TreeCheck, changed: readonly string[]): Promise<void> {
   const named = new Map<string, string>();
+  const sited: { path: string; page: string; site: string; text: string }[] = [];
   for (const path of changed) {
-    const blob = check.after.get(path);
-    const id = versionIdOf(path);
-    if (!blob || !id) continue;
-    const parsed = parseVersionFile(id, (await check.text(blob)) ?? '');
-    if (!('version' in parsed)) continue;
-    for (const entry of parsed.version.submissions ?? []) if (entry.page) named.set(entry.page, path);
+    for (const entry of await submissionsIn(path, check.after.get(path), check.text)) {
+      if (!entry.page) continue;
+      named.set(entry.page, path);
+      if (entry.site) sited.push({ path, page: entry.page, site: entry.site, text: entryText(entry) });
+    }
   }
   if (named.size === 0) return;
+  // An entry the parent already had, in any version, is left as it was.
+  const was = new Set<string>();
+  if (sited.length > 0) {
+    for (const [path, blob] of check.before) {
+      for (const entry of await submissionsIn(path, blob, check.text)) was.add(entryText(entry));
+    }
+  }
   const found = await db
-    .select({ key: pages.key })
+    .select({ key: pages.key, kindFile: pageCurrent.kindFile })
     .from(pages)
+    .leftJoin(pageCurrent, eq(pageCurrent.pageId, pages.id))
     .where(and(eq(pages.kind, 'venue'), inArray(pages.key, [...named.keys()])));
-  const known = new Set(found.map((row) => row.key));
+  const known = new Map(found.map((row) => [row.key, venueFileSchema.safeParse(row.kindFile).data?.locations ?? []]));
   for (const [key, path] of named) {
     if (known.has(key)) continue;
     throw new ApiError(
       422,
       'validation_error',
       `${path}: there is no venue page ${key} (/v/${key}); name the venue by its page's key, or by "venue" when it has no page`,
+      { path },
+    );
+  }
+  for (const { path, page, site, text } of sited) {
+    const locations = known.get(page)!;
+    if (was.has(text) || siteAt(site, locations) !== null) continue;
+    const allowed = locations.flatMap((l) => [l, l.split(',')[0].trim()]);
+    throw new ApiError(
+      422,
+      'validation_error',
+      `${path}: the site "${site}" is not one of ${page}'s locations; give one of ${[...new Set(allowed)].map((a) => `"${a}"`).join(', ')}`,
       { path },
     );
   }
@@ -534,14 +569,8 @@ async function importedSubmissions(
 ): Promise<Map<string, { entry: string; path: string }>> {
   const entries = new Map<string, { entry: string; path: string }>();
   for (const [path, blob] of files) {
-    const id = versionIdOf(path);
-    if (!id) continue;
-    const parsed = parseVersionFile(id, (await text(blob)) ?? '');
-    if (!('version' in parsed)) continue;
-    for (const entry of parsed.version.submissions ?? []) {
-      if (!entry.reviews) continue;
-      const sorted = Object.fromEntries(Object.entries(entry).sort(([a], [b]) => (a < b ? -1 : 1)));
-      entries.set(entry.reviews, { entry: JSON.stringify(sorted), path });
+    for (const entry of await submissionsIn(path, blob, text)) {
+      if (entry.reviews) entries.set(entry.reviews, { entry: entryText(entry), path });
     }
   }
   return entries;

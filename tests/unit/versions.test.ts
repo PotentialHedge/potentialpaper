@@ -13,12 +13,14 @@ import {
   versionStanding,
   venuePagesOf,
   withVenueNames,
+  siteAt,
   type PaperVersion,
 } from '@/lib/versions';
 import { encodeCommit, parseCommit, type Commit } from '@/server/pages/git-objects';
 import { contentProblem, pathDenied, versionPath, type Roles } from '@/server/pages/rules';
 import { attachPdf, attachSubmission, mergeFoundVersions } from '@/server/versions';
 import { versionChanges, versionsIn } from '@/server/pages/content';
+import { versionEntry } from '@/server/import-reviews';
 
 const SHA = 'a'.repeat(64);
 
@@ -221,6 +223,51 @@ describe('versions/<id>.json', () => {
     expect(versionStanding(shown[0])).toBe('NeurIPS 2026');
     // A page with no name yet shows its key.
     expect(withVenueNames(versions, new Map())[0].submissions![0].venue).toBe('neurips/2026');
+  });
+
+  it("keeps a site in the short form of its venue page's locations", () => {
+    const locations = ['Sydney, Australia', 'Atlanta, USA', 'Paris, France'];
+    expect(siteAt('Sydney', locations)).toBe('Sydney');
+    expect(siteAt('sydney', locations)).toBe('Sydney');
+    expect(siteAt('  atlanta,   usa ', locations)).toBe('Atlanta');
+    expect(siteAt('PARIS, FRANCE', locations)).toBe('Paris');
+    expect(siteAt('Melbourne', locations)).toBeNull();
+    expect(siteAt('Australia', locations)).toBeNull();
+    // A page that lists no locations takes any site, as given.
+    expect(siteAt('Sydney, NSW', [])).toBe('Sydney, NSW');
+    expect(siteAt('Sydney, NSW', undefined)).toBe('Sydney, NSW');
+    // Shown in that form; a site its locations no longer have shows as written.
+    const versions: PaperVersion[] = [
+      {
+        id: 'v_a',
+        label: 'x',
+        kind: 'camera-ready',
+        submissions: [
+          { page: 'neurips/2026', site: 'atlanta, usa' },
+          { page: 'neurips/2026', site: 'Vancouver' },
+        ],
+      },
+    ];
+    const shown = withVenueNames(versions, new Map(), new Map([['neurips/2026', locations]]));
+    expect(shown[0].submissions!.map((s) => s.site)).toEqual(['Atlanta', 'Vancouver']);
+    // An import keeps it in that form, and leaves out one that is none of them rather than be refused.
+    const input = { externalId: 'x', paper: { scheme: 'arxiv' as const, value: '2601.00001' }, number: 1 };
+    const entry = (site: string) =>
+      versionEntry(
+        { edition: { key: 'neurips/2026' } } as never,
+        'openreview',
+        {
+          ...input,
+          status: 'accepted',
+          decision: null,
+          site,
+          url: 'https://openreview.net/forum?id=x',
+          notes: [],
+        },
+        locations,
+      ).site;
+    expect(entry('atlanta, usa')).toBe('Atlanta');
+    expect(entry('Melbourne')).toBeUndefined();
   });
 
   it('records an imported submission by its venue page, over a hand-written one at its forum', () => {

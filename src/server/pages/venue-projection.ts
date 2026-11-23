@@ -17,6 +17,9 @@ import { readText, type Reader } from './repo';
  * - **A version's submission that names a venue page** (`"page": "neurips/2026"`) is shown with the page's name, filled
  *   in as its `venue` when the paper's `page_current.versions` is written. When a venue page's name changes, the
  *   `venue-names` consumer writes its papers' again (`server/venue-names.ts`).
+ * - **Its site** (`"site": "Sydney"`) is one of the page's `locations` where it lists any (`pages/check.ts`), kept and
+ *   shown in the short form, the location's first part (`siteAt`). A site its locations no longer have shows as
+ *   written; the venue's commit isn't refused for it, and the next import puts it right.
  */
 
 /** Each source's forms on a venue page, from its `forms.json`; none when it has none, or one that doesn't parse. */
@@ -53,19 +56,33 @@ export async function writeVenueRows(
   }
 }
 
-/** The names of the venue pages these keys name; a key with no page is left out. */
-export async function venuePageNames(db: Reader, keys: readonly string[]): Promise<Map<string, string>> {
-  if (keys.length === 0) return new Map();
+/** The venue pages these keys name, with their names and `locations`; a key with no page is left out. */
+export async function venuePageNames(
+  db: Reader,
+  keys: readonly string[],
+): Promise<{ names: Map<string, string>; locations: Map<string, string[]> }> {
+  if (keys.length === 0) return { names: new Map(), locations: new Map() };
   const rows = await db
-    .select({ key: pages.key, name: sql<string>`coalesce(${pageCurrent.name}, ${pages.key})` })
+    .select({
+      key: pages.key,
+      name: sql<string>`coalesce(${pageCurrent.name}, ${pages.key})`,
+      kindFile: pageCurrent.kindFile,
+    })
     .from(pages)
     .leftJoin(pageCurrent, eq(pageCurrent.pageId, pages.id))
     .where(and(eq(pages.kind, 'venue'), inArray(pages.key, [...keys])));
-  return new Map(rows.map((row) => [row.key, row.name]));
+  const locations = new Map<string, string[]>();
+  for (const row of rows) {
+    const parsed = venueFileSchema.safeParse(row.kindFile);
+    if (parsed.success && parsed.data.locations?.length) locations.set(row.key, parsed.data.locations);
+  }
+  return { names: new Map(rows.map((row) => [row.key, row.name])), locations };
 }
 
-/** The versions with each submission that names a venue page showing that page's name. */
+/** The versions with each submission that names a venue page showing that page's name, and its site's short form. */
 export async function resolveVenueNames(db: Reader, versions: PaperVersion[]): Promise<PaperVersion[]> {
   const keys = venuePagesOf(versions);
-  return keys.length === 0 ? versions : withVenueNames(versions, await venuePageNames(db, keys));
+  if (keys.length === 0) return versions;
+  const { names, locations } = await venuePageNames(db, keys);
+  return withVenueNames(versions, names, locations);
 }

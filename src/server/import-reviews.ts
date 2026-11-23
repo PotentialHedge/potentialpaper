@@ -22,8 +22,16 @@ import { gitObject } from './pages/git-objects';
 import { readVersions, versionChanges } from './pages/content';
 import { readCommit, readFiles, readFolder, readHead, readText } from './pages/repo';
 import { findKeyedPage } from './pages/kinds';
+import { venuePageNames } from './pages/venue-projection';
 import { attachSubmission } from './versions';
-import { MAX_SITE, MAX_VERSION_DECISION, MAX_VENUE, type VersionSubmission } from '@/lib/versions';
+import {
+  MAX_SITE,
+  MAX_VERSION_DECISION,
+  MAX_VENUE,
+  type PaperVersion,
+  siteAt,
+  type VersionSubmission,
+} from '@/lib/versions';
 import { syncVenuePages } from './venue-pages';
 import { findPaper } from './papers';
 import type { RateLimitConfig } from './ratelimit';
@@ -82,7 +90,8 @@ export interface SubmissionInput {
   tldr?: string | null;
   /**
    * Where it is presented, for a venue held in several places at once: "Sydney". Kept in its version's entry beside
-   * the decision. A source that doesn't know it (OpenReview) leaves it out, and the entry keeps the one it has.
+   * the decision, in the short form of its venue page's locations, or left out when it is none of them (`versionEntry`).
+   * A source that doesn't know it (OpenReview) leaves it out, and the entry keeps the one it has.
    */
   site?: string | null;
   /** When it was submitted, as the source says: OpenReview's `cdate`. Its version is dated by it. */
@@ -214,9 +223,13 @@ export function versionEntry(
   place: Pick<VenuePlace, 'edition'>,
   source: string,
   input: SubmissionInput,
+  locations: readonly string[] = [],
 ): VersionSubmission & { url: string; reviews: string; page: string } {
   const decision = input.decision?.replace(/\s+/g, ' ').trim().slice(0, MAX_VERSION_DECISION);
-  const site = input.site?.replace(/\s+/g, ' ').trim().slice(0, MAX_SITE);
+  // As the page's locations word it, in their short form; a site that is none of them is left out, so an import is
+  // never refused for how a source spells it.
+  const given = input.site?.replace(/\s+/g, ' ').trim().slice(0, MAX_SITE);
+  const site = given && siteAt(given, locations);
   return {
     page: place.edition.key,
     ...(input.status ? { status: input.status } : {}),
@@ -227,6 +240,20 @@ export function versionEntry(
     reviews: reviewsKey(source, input.externalId),
     evidence: [input.url],
   };
+}
+
+/**
+ * The versions with the imported entry's site, which it may keep from before when the source gives none, in the short
+ * form of its venue's locations, or left out when they no longer have it: they changed after it was written.
+ */
+function keptSite(versions: PaperVersion[], reviews: string, locations: readonly string[]): PaperVersion[] {
+  for (const entry of versions.flatMap((v) => v.submissions ?? [])) {
+    if (entry.reviews !== reviews || !entry.site) continue;
+    const site = siteAt(entry.site, locations);
+    if (site) entry.site = site;
+    else delete entry.site;
+  }
+  return versions;
 }
 
 const blobId = (content: string) => gitObject('blob', Buffer.from(content)).oid;
@@ -244,6 +271,7 @@ function describe(venue: VenueInput, input: SubmissionInput, changes: FileChange
 async function importOne(
   venue: VenueInput,
   place: VenuePlace,
+  locations: readonly string[],
   input: SubmissionInput,
   actor: Actor,
   options: ImportOptions,
@@ -265,8 +293,9 @@ async function importOne(
   // What the venue decided goes in the version the submission is of, the one place a decision is kept.
   const before = tree ? await readVersions(database, paperId, await readFiles(database, paperId, tree)) : [];
   const date = input.submittedAt ? input.submittedAt.toISOString().slice(0, 10) : undefined;
-  const entry = versionEntry(place, venue.source, input);
-  changes.push(...versionChanges(before, attachSubmission(before, entry, { date, label: venueLabel(venue) })));
+  const entry = versionEntry(place, venue.source, input, locations);
+  const after = keptSite(attachSubmission(before, entry, { date, label: venueLabel(venue) }), entry.reviews, locations);
+  changes.push(...versionChanges(before, after));
   if (changes.length === 0) return { status: 'unchanged', paperId };
   const isNew = !held?.has(submissionFilePath(venue.source, input.externalId));
   const result = await commitPage(paperId, head, actor, changes, describe(venue, input, changes, isNew), {
@@ -328,6 +357,7 @@ export async function importReviews(
   const place = placeOf(venue);
   await syncVenuePages({ venues: [{ id: place.source, name: venue.name }], database });
   await writeVenueForms(venue, place, database);
+  const locations = (await venuePageNames(database, [place.edition.key])).locations.get(place.edition.key) ?? [];
   const actor = options.actor ?? (await botActor(OPENREVIEW_BOT, database));
   const all = [...new Map([...input].map((s) => [s.externalId, s])).values()];
   const result: ImportResult = {
@@ -345,7 +375,9 @@ export async function importReviews(
     while (next < all.length) {
       const item = all[next++];
       try {
-        const { status, paperId } = await withRetry(() => importOne(venue, place, item, actor, options, database));
+        const { status, paperId } = await withRetry(() =>
+          importOne(venue, place, locations, item, actor, options, database),
+        );
         if (status === 'committed' && paperId) result.changed.push(paperId);
         if (status === 'skipped') result.skipped += 1;
         else {
