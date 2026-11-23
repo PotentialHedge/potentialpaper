@@ -84,8 +84,8 @@ function authorLine(names: string[]): string {
 }
 
 /**
- * One paper in the detailed list: a picture of its first page beside the title, authors, abstract, venue
- * and year. As in `PaperRow`, the title's link covers the card, picture included, and opens the paper's
+ * One paper in the detailed list: a picture of its first page beside the title, authors, its TL;DR (or else the
+ * start of its abstract), venue and year. As in `PaperRow`, the title's link covers the card, picture included, and opens the paper's
  * page. A paper with no cover gets a blank title page instead, so the column stays even. The frame is A4.
  */
 export function PaperCard({
@@ -93,6 +93,7 @@ export function PaperCard({
   title,
   authors,
   abstract,
+  tldr = null,
   venue,
   year,
   link,
@@ -104,6 +105,8 @@ export function PaperCard({
   title: string;
   authors: string[];
   abstract: string | null;
+  /** Its one-sentence summary, shown in the abstract's place when it has one. */
+  tldr?: string | null;
   venue: string | null;
   year: number | null;
   link: RowLink | null;
@@ -137,8 +140,16 @@ export function PaperCard({
           {title}
         </Link>
         <div className="mt-0.5 font-sans text-xs text-muted">{authorLine(authors)}</div>
-        {abstract && (
-          <p className="mt-1.5 line-clamp-3 text-[13px] leading-snug text-subtle narrow:line-clamp-2">{abstract}</p>
+        {(tldr || abstract) && (
+          <p className="mt-1.5 line-clamp-3 text-[13px] leading-snug text-subtle narrow:line-clamp-2">
+            {tldr ? (
+              <>
+                <b className="font-semibold">TL;DR.</b> {tldr}
+              </>
+            ) : (
+              abstract
+            )}
+          </p>
         )}
         <div className="mt-1.5 flex flex-wrap items-baseline gap-x-2 font-sans text-xs text-muted">
           {paper ? (

@@ -24,6 +24,8 @@ export interface SearchHit {
   title: string;
   authors: string[];
   abstract: string | null;
+  /** Its one-sentence summary, from its newest submission that has one (`submission.json`). */
+  tldr: string | null;
   year: number | null;
   venue: string | null;
   /** The copy this site hosts: its newest version's PDF. */
@@ -306,7 +308,11 @@ async function readPage(
     database.execute<{ total: number }>(sql`select count(*)::int as total from papers p where ${where}`),
     database.execute<Found & Record<string, unknown>>(sql`
       select p.id, i.scheme, i.value, pg.short_id as "shortId", p.title, p.authors, left(p.abstract, 400) as abstract, p.year, p.venue,
-             c.pdf ->> 'url' as pdf, coalesce(c.thumbnail ->> 'url', pd.cover_url) as cover
+             c.pdf ->> 'url' as pdf, coalesce(c.thumbnail ->> 'url', pd.cover_url) as cover,
+             (select s.tldr from submissions s where s.paper_id = p.id and s.tldr is not null
+               order by (select min(n.created_at) from submission_notes n where n.submission_id = s.id) desc nulls last,
+                        s.fetched_at desc
+               limit 1) as tldr
       from unnest(array(
         select p.id from papers p
         left join page_current c on c.page_id = p.id
@@ -346,8 +352,20 @@ async function withMatches(
 ): Promise<SearchHit[]> {
   const wanted = scopes.files.length > 0 ? wantedWords(node) : null;
   // The paper's id stays inside: addresses use its identifiers.
-  const bare = ({ scheme, value, shortId, title, authors, abstract, year, venue, pdf, cover }: Found): SearchHit => ({
-    ...{ scheme, value, shortId, title, authors, abstract, year, venue, pdf, cover },
+  const bare = ({
+    scheme,
+    value,
+    shortId,
+    title,
+    authors,
+    abstract,
+    tldr,
+    year,
+    venue,
+    pdf,
+    cover,
+  }: Found): SearchHit => ({
+    ...{ scheme, value, shortId, title, authors, abstract, tldr, year, venue, pdf, cover },
     matches: [],
     matchCount: 0,
   });

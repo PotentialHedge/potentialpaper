@@ -15,6 +15,8 @@ import { SearchSyntax } from '@/components/paper/SearchSyntax';
 import { Popover, PopoverClose, PopoverContent, PopoverTrigger } from '@/components/Popover';
 import { SearchInput } from '@/components/SearchInput';
 import { ui } from '@/components/ui';
+import { ViewChoice } from '@/components/ViewChoice';
+import { HOME_VIEW_COOKIE, homeView, type HomeView } from '@/lib/home-view';
 import { DISMISSED_COOKIE, parseDismissed } from '@/lib/announcements';
 import { newPaperPath, paperIdFromText, paperPath, shortPath, sourceLinks } from '@/lib/paper-ids';
 import { parseSearch } from '@/lib/query';
@@ -91,8 +93,6 @@ export default async function Home({
   const parsed = q ? parseSearch(q) : null;
   const venue = normalizeSearch(one(sp.venue));
   const venueFilter = parsed?.fields.has('venue') ? null : venue;
-  // Compact rows by default; detailed shows each paper's cover and abstract. `abstracts=1` is the old name.
-  const detailed = one(sp.view) === 'detailed' || one(sp.abstracts) === '1';
 
   // A search sorts by relevance unless another sort is asked for; relevance needs a search.
   const defaultSort: SearchSort = q ? 'relevance' : 'activity';
@@ -125,6 +125,8 @@ export default async function Home({
   ]);
   const venues = venue && !topVenueList.includes(venue) ? [...topVenueList, venue] : topVenueList;
   const cookieJar = await cookies();
+  // Compact rows by default; detailed shows each paper's cover and TL;DR or abstract. The choice is remembered.
+  const detailed = homeView(one(sp.view), one(sp.abstracts), cookieJar.get(HOME_VIEW_COOKIE)?.value) === 'detailed';
   const mineOpen = cookieJar.get(MINE_COOKIE)?.value !== '0';
   const followingOpen = cookieJar.get(FOLLOWING_COOKIE)?.value !== '0';
   const dismissed = new Set(parseDismissed(cookieJar.get(DISMISSED_COOKIE)?.value));
@@ -140,7 +142,6 @@ export default async function Home({
       ...(venue ? { venue } : {}),
       sort,
       ...(onlyFollowed ? { following: '1' } : {}),
-      ...(detailed ? { view: 'detailed' } : {}),
       ...patch,
     });
     for (const key of ['q', 'venue', 'view']) if (!params.get(key)) params.delete(key);
@@ -159,13 +160,8 @@ export default async function Home({
 
   // Shown on the ⋯ trigger when not the defaults, since the row doesn't show them.
   const moreLabel = [MENU_SORTS.includes(sort) && sort, venue, onlyFollowed && '★'].filter(Boolean).join(', ');
-  const viewLink = (v: 'compact' | 'detailed') => (
-    <Link
-      href={href({ view: v === 'detailed' ? 'detailed' : '' })}
-      className={detailed === (v === 'detailed') ? ON : ''}
-    >
-      {v}
-    </Link>
+  const viewLink = (v: HomeView) => (
+    <ViewChoice view={v} href={href({})} className={detailed === (v === 'detailed') ? ON : ''} />
   );
 
   return (
@@ -197,7 +193,6 @@ export default async function Home({
       <form action="/" method="get" role="search" className="mt-5 flex gap-2">
         {venue && <input type="hidden" name="venue" value={venue} />}
         {onlyFollowed && <input type="hidden" name="following" value="1" />}
-        {detailed && <input type="hidden" name="view" value="detailed" />}
         <SearchInput
           name="q"
           defaultValue={q ?? ''}
@@ -468,7 +463,11 @@ function Row({ hit, detailed }: { hit: SearchHit; detailed: boolean }) {
   };
   return (
     <>
-      {detailed ? <PaperCard {...props} abstract={hit.abstract} cover={hit.cover} /> : <PaperRow {...props} />}
+      {detailed ? (
+        <PaperCard {...props} abstract={hit.abstract} tldr={hit.tldr} cover={hit.cover} />
+      ) : (
+        <PaperRow {...props} />
+      )}
       <SearchMatches matches={hit.matches} count={hit.matchCount} />
     </>
   );
