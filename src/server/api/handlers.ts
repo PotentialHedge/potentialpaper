@@ -56,6 +56,7 @@ import { getDb } from '@/db';
 import { refreshPageIds, refreshPages, refreshPaperPages } from '../pages/refresh';
 import { fetchPdf, storeFile } from '../files';
 import { mergeFoundVersions, setVersions, versionsAt } from '../versions';
+import { resolveVenueNames } from '../pages/venue-projection';
 import { consume, type RateLimitConfig } from '../ratelimit';
 import { sortVersions, type VersionPdf } from '@/lib/versions';
 import { setFirstPassword, startOnboarding } from '../onboarding';
@@ -409,7 +410,9 @@ export const getVersions = route(async (req) => {
   const { scheme, value } = parseQuery(req, S.PaperQuery);
   const { paper } = await knownPaper(scheme, value);
   const { head, versions } = await versionsAt(paper.id);
-  return respond(S.VersionsResponse, { head, versions: sortVersions(versions) });
+  // A submission naming a venue page comes with the page's name; sent back, only the page is kept.
+  const named = await resolveVenueNames(getDb(), versions);
+  return respond(S.VersionsResponse, { head, versions: sortVersions(named) });
 });
 
 /** Replaces the paper's versions, merged with whatever changed since `baseOid`. */
