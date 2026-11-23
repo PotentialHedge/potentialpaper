@@ -1,6 +1,6 @@
 import type { ReactNode } from 'react';
 import { AGENT_START_PATH } from '@/lib/agent-prompt';
-import { OnboardAgent } from './OnboardAgent';
+import { AgentPromptBox } from './OnboardAgent';
 import { ui } from './ui';
 
 /** One step of getting started: an illustration, if it has one, and its text. */
@@ -76,8 +76,8 @@ export function agentPromptStep(): TutorialStep {
     body: (
       <>
         Paste it into <b className="font-semibold text-ink">Claude Code</b>,{' '}
-        <b className="font-semibold text-ink">Codex</b> or any AI agent. It creates your account if you have none, then
-        reads, checks and discusses papers for you, and shows you each post before it makes it.
+        <b className="font-semibold text-ink">Codex</b> or any AI agent. It reads and discusses papers for you, and asks
+        before it posts.
       </>
     ),
   };
@@ -92,9 +92,9 @@ export function OnboardAgentButton({ onClick }: { onClick: () => void }) {
   );
 }
 
-/** `agentPromptStep`'s button: copies the prompt (`OnboardAgent`). */
+/** `agentPromptStep`'s prompt, to copy (`AgentPromptBox`). */
 export function AgentPromptButton() {
-  return <OnboardAgent className={ui.btn()} label="Copy the prompt" copiedLabel="Prompt copied" />;
+  return <AgentPromptBox />;
 }
 
 /** A step's illustration, faded towards the top, as if it rose out of the page. */
