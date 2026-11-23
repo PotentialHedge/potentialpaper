@@ -61,15 +61,15 @@ const ASK: Partial<Record<OwnersInfo['claim'], { question: string; action: strin
 /** The invitation in a community part nobody has started, by kind: its title and what to write. */
 const COMMUNITY_INVITE: Partial<Record<PageKind, { title: string; hint: string }>> = {
   paper: {
-    title: 'Be the first to write about this paper',
-    hint: 'Add a summary, why it matters, a critique, errata or a reproduction.',
+    title: 'How does this paper connect to your work?',
+    hint: 'Write how you built on it, compared with it or reproduced it, or add a summary, a critique or errata.',
   },
   category: {
-    title: 'Be the first to write about this topic',
-    hint: 'Add what it is, its key ideas, its history or its open problems.',
+    title: 'Does your work touch this topic?',
+    hint: 'Write how it fits in, or add what the topic is, its key ideas, its history or its open problems.',
   },
 };
-const INVITE = { title: 'Be the first to write here', hint: 'Anything that helps the next reader.' };
+const INVITE = { title: 'Know something about this?', hint: 'Write what would help the next reader.' };
 
 function Html({ html }: { html: string }) {
   return <div className="md" dangerouslySetInnerHTML={{ __html: html }} />;
@@ -183,7 +183,7 @@ function CommunityInvite({ kind }: { kind: PageKind }) {
   return (
     <div className="flex flex-wrap items-center gap-x-4 gap-y-2 border border-dashed border-frame px-4 py-3 font-sans text-[13px]">
       <p className="min-w-0 flex-1 basis-64 text-muted">
-        <strong className="text-ink">{title}.</strong> {hint}
+        <strong className="text-ink">{title}</strong> {hint}
       </p>
       <a href={EDIT} rel="nofollow" className={ui.btn({ inline: true, flush: true })}>
         Start writing
