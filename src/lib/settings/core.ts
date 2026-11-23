@@ -345,9 +345,23 @@ const TEXT_SETTINGS: Record<string, CoreSetting> = {
   },
 };
 
+/** Reviewer mode (`ReviewBlur`): a paper under review is blurred but for its title. */
+const REVIEW_SETTINGS: Record<string, CoreSetting> = {
+  'review.blur': {
+    schema: z.boolean() as z.ZodType,
+    default: true,
+    title: 'Blur papers under review',
+    description:
+      'Show a paper still under review at a venue blurred but for its title, so a reviewer can read it without knowing its authors or what others say about it.',
+    group: 'Text',
+    widget: 'switch',
+  },
+};
+
 export const CORE_SETTINGS: Record<string, CoreSetting> = {
   ...NAV_SETTINGS,
   ...TEXT_SETTINGS,
+  ...REVIEW_SETTINGS,
   ...Object.fromEntries(PANEL_KINDS.flatMap((kind) => Object.entries(kindSettings(kind)))),
   ...USER_SETTINGS,
   ...PLUGIN_SETTINGS,
