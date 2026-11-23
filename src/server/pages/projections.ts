@@ -5,6 +5,7 @@ import { KINDS, OWNERS_DIR, pageName } from '@/lib/kinds';
 import { FACTS_FILE, parseFacts, type PageFacts } from '@/lib/infobox-facts';
 import { AUTHOR_PLUGINS_PATH, type AuthorPanel, parseAuthorPlugins } from '@/lib/plugins/author-plugins';
 import { pageDemoSources } from '../demos/attach';
+import { followAuthors } from './follow-authors';
 import { readLinks, readThumbnail, readVersions } from './content';
 import { listedVenue, paperRowOf, parsePaperFile } from '@/lib/paper-file';
 import { paperPdfOf, type PaperVersion } from '@/lib/versions';
@@ -131,6 +132,7 @@ async function readFacts(db: Reader, page: PageRow, files: ReadonlyMap<string, s
 /**
  * A paper's row says what its `paper.json` says, and where its versions say it went (`listedVenue`). A file that
  * doesn't parse leaves the row as it was: the rules (`check.ts`) let none in, so that is a repo from before them.
+ * Claims follow the authors to where their names are now (`followAuthors`).
  */
 async function writePaperRow(
   tx: Writer,
@@ -144,6 +146,7 @@ async function writePaperRow(
     .update(papers)
     .set({ ...(file ? paperRowOf(file) : {}), ...listedVenue(versions) })
     .where(eq(papers.id, page.id));
+  if (file) await followAuthors(tx, page.id, file.authors);
 }
 
 /** Makes `page_current` say what the commit at the head says, and a paper's row what its files say. */
