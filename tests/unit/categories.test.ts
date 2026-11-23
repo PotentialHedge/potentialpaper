@@ -45,6 +45,12 @@ describe('keywords', () => {
     expect(cleanKeywords(undefined)).toEqual({});
     expect(cleanKeywords(Array.from({ length: 40 }, (_, i) => `k${i}`)).keywords).toHaveLength(30);
   });
+
+  it('splits a field holding several, as some authors type them', () => {
+    expect(cleanKeywords(['Dexterous manipulation;Offline2Online safe RL; ', 'SSM'])).toEqual({
+      keywords: ['Dexterous manipulation', 'Offline2Online safe RL', 'SSM'],
+    });
+  });
 });
 
 describe('page protection', () => {

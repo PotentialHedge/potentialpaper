@@ -111,11 +111,14 @@ export interface ImportOptions {
 /** A bot importing on its own schedule: our scripts, run by an admin, not a request. */
 export const IMPORT_RATE_LIMIT: RateLimitConfig = { burst: 1_000, perSecond: 1_000 };
 
-/** The keywords as a file keeps them: trimmed, each once, no blank ones, at most `MAX_KEYWORDS`; none left out. */
+/**
+ * The keywords as a file keeps them: trimmed, each once, no blank ones, at most `MAX_KEYWORDS`. Authors who typed
+ * several into one of OpenReview's fields, "Dexterous manipulation;Offline2Online safe RL", get them split.
+ */
 export function cleanKeywords(keywords: readonly string[] | undefined): { keywords?: string[] } {
   const seen = new Set<string>();
   const out: string[] = [];
-  for (const raw of keywords ?? []) {
+  for (const raw of (keywords ?? []).flatMap((k) => k.split(';'))) {
     const keyword = raw.replace(/\s+/g, ' ').trim().slice(0, 200);
     if (!keyword || seen.has(keyword.toLowerCase())) continue;
     seen.add(keyword.toLowerCase());

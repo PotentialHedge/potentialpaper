@@ -51,10 +51,9 @@ function Abstract({ paper }: PanelProps) {
   return <AbstractText text={paper.abstract} />;
 }
 
+/** The picture, and the PDF with where our copy came from. The paper's addresses elsewhere are under its title. */
 function ReadThePaper({ identifiers, pdf, picture, canonical, address }: PanelProps) {
-  // The PDF and its credit already link the file and its source, which are often the paper's own there.
-  const links = identifiers.flatMap(sourceLinks).filter(({ url }) => url !== pdf?.source && url !== pdf?.url);
-  const opens = pdf?.url ?? links[0]?.url;
+  const opens = pdf?.url ?? identifiers.flatMap(sourceLinks)[0]?.url;
   // A plain <img>, not next/image: a GIF has to stay animated, and the bytes are already sized for this.
   // The caption is the alt text; a picture set before that, with alt text of its own, keeps it.
   const image = picture && (
@@ -81,30 +80,21 @@ function ReadThePaper({ identifiers, pdf, picture, canonical, address }: PanelPr
           </figcaption>
         </figure>
       )}
-      <ul className="space-y-1">
-        {pdf && (
-          <li>
-            <a href={pdf.url} rel="noopener" className={ui.hyperref}>
-              PDF
-            </a>{' '}
-            {pdf.source && (
-              <span className={ui.fine}>
-                {pdf.license ? `${pdf.license}, from` : 'from'}{' '}
-                <a href={pdf.source} rel="noopener" className={ui.hyperref}>
-                  {sourceName(pdf.source)}
-                </a>
-              </span>
-            )}
-          </li>
-        )}
-        {links.map(({ label, url }) => (
-          <li key={url}>
-            <a href={url} rel="noopener" className={ui.hyperref}>
-              {label}
-            </a>
-          </li>
-        ))}
-      </ul>
+      {pdf && (
+        <p>
+          <a href={pdf.url} rel="noopener" className={ui.hyperref}>
+            PDF
+          </a>{' '}
+          {pdf.source && (
+            <span className={ui.fine}>
+              {pdf.license ? `${pdf.license}, from` : 'from'}{' '}
+              <a href={pdf.source} rel="noopener" className={ui.hyperref}>
+                {sourceName(pdf.source)}
+              </a>
+            </span>
+          )}
+        </p>
+      )}
     </div>
   );
 }
