@@ -23,17 +23,19 @@ export function CategoryAbout({ category }: KindPanelProps) {
   if (mergedFrom.length > 0) {
     facts.push(<>Merged with {mergedFrom.map((key) => formatIdentifier({ kind: 'category', key })).join(', ')}</>);
   }
-  facts.push(<a href="/new/category">New category</a>);
+  if (facts.length === 0 && !protection) return null;
   return (
     <div>
-      <p className={`${ui.fine} text-center`}>
-        {facts.map((fact, i) => (
-          <span key={i}>
-            {i > 0 && ' · '}
-            {fact}
-          </span>
-        ))}
-      </p>
+      {facts.length > 0 && (
+        <p className={`${ui.fine} text-center`}>
+          {facts.map((fact, i) => (
+            <span key={i}>
+              {i > 0 && ' · '}
+              {fact}
+            </span>
+          ))}
+        </p>
+      )}
       {protection && (
         <p className={`${ui.fine} text-center`}>
           Protected: {protectionWords(protection.level)}
