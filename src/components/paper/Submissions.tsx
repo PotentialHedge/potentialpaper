@@ -3,7 +3,6 @@ import { SubmissionPanels } from '@/components/plugins/NestedPanels';
 import { ui } from '@/components/ui';
 import { sourceName } from '@/lib/paper-ids';
 import {
-  formatScore,
   formOf,
   noteLabel,
   scoreTable,
@@ -280,38 +279,3 @@ export function SubmissionsSection({ submissions, paperPath }: { submissions: Su
   );
 }
 
-/** One line per submission beside the page, with the mean of its first score, out of its most when known. */
-export function SubmissionsBox({ submissions, paperPath }: { submissions: Submission[]; paperPath: string }) {
-  if (submissions.length === 0) return null;
-  return (
-    <div className={ui.box}>
-      <div className={ui.boxHeadingRow}>
-        <h2 className={ui.runIn}>Submissions</h2>
-        <AddMissing what="submission" paperPath={paperPath} compact />
-      </div>
-      <ul className="space-y-1.5">
-        {submissions.map((submission) => {
-          const table = scoreTable(submission);
-          const mean = table?.means[0];
-          return (
-            <li key={submission.venue.id}>
-              <a href="#submissions" className="font-semibold text-ink">
-                {submission.venue.name}
-              </a>
-              <div className="text-muted">{standing(submission) || 'No decision yet'}</div>
-              {table && mean !== null && mean !== undefined && (
-                <div className={ui.kv}>
-                  <span>Mean {table.columns[0].label.toLowerCase()}</span>
-                  <span className="font-mono text-[13px]">
-                    {formatScore(mean)}
-                    {table.columns[0].max !== undefined && <span className="text-faint">/{table.columns[0].max}</span>}
-                  </span>
-                </div>
-              )}
-            </li>
-          );
-        })}
-      </ul>
-    </div>
-  );
-}

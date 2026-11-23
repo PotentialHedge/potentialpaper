@@ -23,6 +23,8 @@ export interface FixturePaper {
   submittedAt?: string;
   status: SubmissionStatus | null;
   decision: string | null;
+  /** Where it is presented, for a venue held in several places at once: "Sydney" (from acceptodds' listing). */
+  site?: string;
   notes: (FixtureNote | NoteInput)[];
   /** Added to fill out the venue's score distribution, with its reviewers' scores only (`seed:acceptodds-reviews` in `potentialpaper-tools`). */
   sample?: boolean;

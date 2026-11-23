@@ -31,39 +31,88 @@ const date = (iso: string) =>
     timeZone: 'UTC',
   });
 
-/** What the venue file says: its dates, its own site, and where its submissions come from. */
+/**
+ * What the venue file says, as the top of its infobox: its dates, where it is held, its own site, and where its
+ * submissions come from. The venue's JSON-LD (`venueJsonLd`) says the same, from the same file.
+ */
 export function VenueAbout({ kindFile }: KindPanelProps) {
   if (!kindFile) return null;
   const venue = kindFile as VenueFile;
   const dates = [venue.dates?.start, venue.dates?.end].filter((d): d is string => Boolean(d)).map(date);
+  const locations = venue.locations ?? [];
   const sources = venue.sources ?? [];
-  if (dates.length === 0 && !venue.url && sources.length === 0) return null;
+  if (dates.length === 0 && locations.length === 0 && !venue.url && sources.length === 0) return null;
   return (
-    <p className={`${ui.fine} text-center`}>
-      {dates.length > 0 && <span>{dates.join(' to ')}</span>}
-      {venue.url && (
-        <span>
-          {dates.length > 0 && ' · '}
-          <a href={venue.url}>{new URL(venue.url).host}</a>
-        </span>
-      )}
-      {sources.length > 0 && (
-        <span>
-          {(dates.length > 0 || venue.url) && ' · '}
-          Submissions from{' '}
-          {sources.map((source, i) => {
-            const url = sourceUrl(source);
-            return (
-              <span key={source}>
-                {i > 0 && ', '}
-                {url ? <a href={url}>{sourceTitle(source)}</a> : <span className={ui.mono}>{source}</span>}
-              </span>
-            );
-          })}
-        </span>
-      )}
-    </p>
+    <div className={ui.box}>
+      <table className={ui.facts}>
+        <tbody>
+          {dates.length > 0 && (
+            <tr>
+              <th scope="row">Dates</th>
+              <td>{dates.join(' to ')}</td>
+            </tr>
+          )}
+          {locations.length > 0 && (
+            <tr>
+              <th scope="row">{locations.length > 1 ? 'Locations' : 'Location'}</th>
+              <td>
+                {locations.map((l) => (
+                  <div key={l}>{l}</div>
+                ))}
+              </td>
+            </tr>
+          )}
+          {venue.url && (
+            <tr>
+              <th scope="row">Website</th>
+              <td>
+                <a href={venue.url} className="text-accent">
+                  {new URL(venue.url).host}
+                </a>
+              </td>
+            </tr>
+          )}
+          {sources.length > 0 && (
+            <tr>
+              <th scope="row">Submissions</th>
+              <td>
+                {sources.map((source, i) => {
+                  const url = sourceUrl(source);
+                  return (
+                    <span key={source}>
+                      {i > 0 && ', '}
+                      {url ? (
+                        <a href={url} className="text-accent">
+                          {sourceTitle(source)}
+                        </a>
+                      ) : (
+                        <span className={ui.mono}>{source}</span>
+                      )}
+                    </span>
+                  );
+                })}
+              </td>
+            </tr>
+          )}
+        </tbody>
+      </table>
+    </div>
   );
+}
+
+/** schema.org's `Event` for an edition, from its venue file, for search engines. */
+export function venueJsonLd(venue: VenueFile, url: string): Record<string, unknown> {
+  const locations = venue.locations ?? [];
+  return {
+    '@context': 'https://schema.org',
+    '@type': 'Event',
+    name: venue.name,
+    url,
+    ...(venue.dates?.start ? { startDate: venue.dates.start } : {}),
+    ...(venue.dates?.end ? { endDate: venue.dates.end } : {}),
+    ...(locations.length > 0 ? { location: locations.map((name) => ({ '@type': 'Place', name, address: name })) } : {}),
+    ...(venue.url ? { sameAs: venue.url } : {}),
+  };
 }
 
 /** "3,704 accepted of 11,672", or the total alone before decisions. */

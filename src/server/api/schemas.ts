@@ -213,6 +213,8 @@ const VersionSubmissionSchema = z.object({
   venue: z.string().max(1000),
   status: z.enum(SUBMISSION_STATUSES).optional(),
   decision: z.string().max(1000).optional(),
+  /** Where it is presented, for a venue held in several places at once: "Sydney". */
+  site: z.string().max(1000).optional(),
   number: z.number().int().optional(),
   url: z.string().max(2000).optional(),
   /** Set by the bot that imported the venue's reviews; only it and admins change such an entry. */

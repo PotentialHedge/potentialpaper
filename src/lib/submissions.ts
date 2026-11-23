@@ -78,6 +78,8 @@ export interface Submission {
   status: SubmissionStatus | null;
   /** The decision as the venue words it: "Accept (Poster)". */
   decision: string | null;
+  /** The keywords its authors gave the venue (OpenReview's), from its `submission.json`. */
+  keywords: string[];
   url: string | null;
   fetchedAt: Date;
   notes: SubmissionNote[];

@@ -97,6 +97,8 @@ export const ImportSubmissionsBody = z.object({
         status: z.enum(SUBMISSION_STATUSES).nullable(),
         decision: z.string().max(1000).nullable(),
         keywords: z.array(z.string().max(200)).max(100).optional(),
+        /** Where it is presented, for a venue held in several places at once: "Sydney". */
+        site: z.string().max(200).nullish(),
         submittedAt: z.iso.datetime({ offset: true }).nullish(),
         url: Url,
         notes: z.array(Note).max(MAX_NOTES),

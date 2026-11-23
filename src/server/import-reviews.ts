@@ -20,7 +20,7 @@ import { gitObject } from './pages/git-objects';
 import { readVersions, versionChanges } from './pages/content';
 import { readCommit, readFiles, readFolder, readHead } from './pages/repo';
 import { attachSubmission } from './versions';
-import { MAX_VERSION_DECISION, MAX_VENUE, type VersionSubmission } from '@/lib/versions';
+import { MAX_SITE, MAX_VERSION_DECISION, MAX_VENUE, type VersionSubmission } from '@/lib/versions';
 import { findPaper } from './papers';
 import type { RateLimitConfig } from './ratelimit';
 
@@ -69,6 +69,11 @@ export interface SubmissionInput {
   decision: string | null;
   /** The keywords its authors gave the source. */
   keywords?: string[];
+  /**
+   * Where it is presented, for a venue held in several places at once: "Sydney". Kept in its version's entry beside
+   * the decision. A source that doesn't know it (OpenReview) leaves it out, and the entry keeps the one it has.
+   */
+  site?: string | null;
   /** When it was submitted, as the source says: OpenReview's `cdate`. Its version is dated by it. */
   submittedAt?: Date | null;
   url: string;
@@ -169,10 +174,12 @@ export function versionEntry(
   input: SubmissionInput,
 ): VersionSubmission & { url: string; reviews: string } {
   const decision = input.decision?.replace(/\s+/g, ' ').trim().slice(0, MAX_VERSION_DECISION);
+  const site = input.site?.replace(/\s+/g, ' ').trim().slice(0, MAX_SITE);
   return {
     venue: venue.name.trim().slice(0, MAX_VENUE) || venue.id.slice(0, MAX_VENUE),
     ...(input.status ? { status: input.status } : {}),
     ...(decision ? { decision } : {}),
+    ...(site ? { site } : {}),
     ...(input.number !== null && input.number > 0 ? { number: input.number } : {}),
     url: input.url,
     reviews: reviewsKey(venue.source, input.externalId),

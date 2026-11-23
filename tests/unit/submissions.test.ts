@@ -46,6 +46,7 @@ function submission(notes: SubmissionNote[], forms: VenueForms = { Official_Revi
     number: 1,
     status: 'under_review',
     decision: null,
+    keywords: [],
     url: null,
     fetchedAt: new Date(),
     notes,

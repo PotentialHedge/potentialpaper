@@ -11,6 +11,7 @@ import { getDb } from '@/db';
 import { pageCurrent, pdfDocuments } from '@/db/schema';
 import { findPaper, type FoundPaper } from '@/server/papers';
 import { submissionsOf } from '@/server/submissions';
+import { citationTags, paperFacts, paperJsonLd } from '@/lib/paper-facts';
 import { reviewVenues } from '@/server/under-review';
 import { bibtex, titleLinks } from '@/lib/paper-links';
 import { sortVersions } from '@/lib/versions';
@@ -41,15 +42,58 @@ const load = cache(async (scheme: PaperScheme, segments: string[]): Promise<Foun
 
 const DESCRIPTION_LENGTH = 200;
 
+/** The page as last committed, read once for the page and its metadata alike. */
+const loadCurrent = cache(async (paperId: string) => {
+  const [row] = await getDb()
+    .select({
+      pdf: pageCurrent.pdf,
+      thumbnail: pageCurrent.thumbnail,
+      links: pageCurrent.links,
+      versions: pageCurrent.versions,
+      authorHtml: pageCurrent.authorHtml,
+      communityHtml: pageCurrent.communityHtml,
+      authorPlugins: pageCurrent.authorPlugins,
+      cover: pdfDocuments.coverUrl,
+    })
+    .from(pageCurrent)
+    .leftJoin(pdfDocuments, sql`${pdfDocuments.sha256} = ${pageCurrent.pdf} ->> 'sha256'`)
+    .where(eq(pageCurrent.pageId, paperId));
+  return row;
+});
+
+const loadSubmissions = cache((paperId: string) => submissionsOf(paperId));
+
+/** What the infobox, the JSON-LD and the meta tags say (`lib/paper-facts.ts`), from one read of each source. */
+async function factsOf({ paper, identifiers }: FoundPaper) {
+  const [current, submissions] = await Promise.all([loadCurrent(paper.id), loadSubmissions(paper.id)]);
+  return paperFacts({
+    paper,
+    versions: current?.versions ?? [],
+    submissions,
+    identifiers,
+    pdf: current?.pdf?.url ?? null,
+  });
+}
+
+/** `citation_*` pairs as Next's `other` metadata: a repeated name as a list. */
+function metaTags(pairs: [string, string][]): Record<string, string[]> {
+  const out: Record<string, string[]> = {};
+  for (const [name, value] of pairs) (out[name] ??= []).push(value);
+  return out;
+}
+
 export async function paperMetadata(scheme: PaperScheme, segments: string[]): Promise<Metadata> {
-  const { paper, identifiers } = await load(scheme, segments);
+  const found = await load(scheme, segments);
+  const { paper, identifiers } = found;
   const canonical = canonicalPaperId(identifiers);
-  const [preview, shortId] = await Promise.all([previewOfPage(paper.id), shortIdOf(paper.id)]);
+  const [preview, shortId, facts] = await Promise.all([previewOfPage(paper.id), shortIdOf(paper.id), factsOf(found)]);
   const description = paper.abstract?.slice(0, DESCRIPTION_LENGTH);
   return {
     title: `${paper.title} · PotentialPaper`,
     description,
     ...(preview && previewMetadata(paper.title, description, preview)),
+    // For Google Scholar, from the same facts as the infobox.
+    other: metaTags(citationTags(facts)),
     // The paper's address is its short one (`proxy.ts`), and so is the page as an agent reads it, with the agents'
     // discussion (`app/agent/s/[n]`).
     alternates: {
@@ -64,36 +108,22 @@ export async function paperMetadata(scheme: PaperScheme, segments: string[]): Pr
 }
 
 export async function PaperRoute({ scheme, segments }: { scheme: PaperScheme; segments: string[] }) {
-  const { paper, identifiers } = await load(scheme, segments);
+  const found = await load(scheme, segments);
+  const { paper, identifiers } = found;
   const canonical = canonicalPaperId(identifiers) ?? identifiers[0];
   const address = { kind: 'paper' as const, id: canonical };
   const pageRow = { id: paper.id, kind: 'paper' as const, key: paper.id };
-  const [[current], submissions, owners, linksFrom, linksTo, scopes, shortId, hasSignals, reviewAt] = await Promise.all(
-    [
-      getDb()
-        .select({
-          pdf: pageCurrent.pdf,
-          thumbnail: pageCurrent.thumbnail,
-          links: pageCurrent.links,
-          versions: pageCurrent.versions,
-          authorHtml: pageCurrent.authorHtml,
-          communityHtml: pageCurrent.communityHtml,
-          authorPlugins: pageCurrent.authorPlugins,
-          cover: pdfDocuments.coverUrl,
-        })
-        .from(pageCurrent)
-        .leftJoin(pdfDocuments, sql`${pdfDocuments.sha256} = ${pageCurrent.pdf} ->> 'sha256'`)
-        .where(eq(pageCurrent.pageId, paper.id)),
-      submissionsOf(paper.id),
-      ownersOf(pageRow, address),
-      pageLinksFrom(paper.id),
-      pageLinksTo(paper.id),
-      scopesOfPage(pageRow),
-      shortIdOf(paper.id),
-      pageHasSignals({ id: paper.id, kind: 'paper' }),
-      reviewVenues(paper.id),
-    ],
-  );
+  const [current, submissions, owners, linksFrom, linksTo, scopes, shortId, hasSignals, reviewAt] = await Promise.all([
+    loadCurrent(paper.id),
+    loadSubmissions(paper.id),
+    ownersOf(pageRow, address),
+    pageLinksFrom(paper.id),
+    pageLinksTo(paper.id),
+    scopesOfPage(pageRow),
+    shortIdOf(paper.id),
+    pageHasSignals({ id: paper.id, kind: 'paper' }),
+    reviewVenues(paper.id),
+  ]);
   // Shown and shared at its short address, and the page tools at theirs (`/history/s/42`).
   const shown = shortId === null ? address : { ...address, shortId };
   if (owners) owners.claimPath = toolPath('claim', shown);
@@ -125,7 +155,9 @@ export async function PaperRoute({ scheme, segments }: { scheme: PaperScheme; se
     submissions,
     versions: sortVersions(current?.versions ?? []),
     canonical,
+    facts: await factsOf(found),
   };
+  const url = `${siteUrl()}${pagePath(shown)}`;
   // What the page's plugins are told about it (`components/plugins/`).
   const plugins: PluginPageData = {
     kind: 'paper',
@@ -133,7 +165,7 @@ export async function PaperRoute({ scheme, segments }: { scheme: PaperScheme; se
       kind: 'paper',
       identifier: formatIdentifier(address),
       address: pagePath(shown),
-      url: `${siteUrl()}${pagePath(shown)}`,
+      url,
       name: paper.title,
     },
     scopes,
@@ -159,44 +191,53 @@ export async function PaperRoute({ scheme, segments }: { scheme: PaperScheme; se
       plugins={plugins}
       panels={buildPanels('paper', PAPER_PANELS, props)}
       header={
-        <PageHeader title={paper.title}>
-          <p className="mt-4 text-center">
-            {paper.authors.length > 0 ? (
-              // A confirmed author's name links to their page, unless they turned that off.
-              paper.authors.map((name, i) => {
-                const href = owners?.people.find((p) => p.authorIndex === i)?.href;
-                return (
-                  <Fragment key={i}>
-                    {i > 0 && ', '}
-                    {href ? (
-                      <a
-                        href={href}
-                        className="text-ink underline decoration-rule-strong underline-offset-4 hover:decoration-ink"
-                      >
-                        {name}
-                      </a>
-                    ) : (
-                      name
-                    )}
-                  </Fragment>
-                );
-              })
-            ) : (
-              <span className="text-muted italic">Anonymous authors</span>
-            )}
-          </p>
-          {about && <p className="mt-2.5 text-center text-xs text-faint">{about}</p>}
-          <nav
-            className="mt-2.5 flex flex-wrap justify-center gap-x-3 font-sans text-[13px]"
-            aria-label="The paper elsewhere"
-          >
-            {titleLinks({ ...linkSources, extra: current?.links ?? [] }).map((l, i) => (
-              <a key={i} href={l.url} className="text-accent" rel="noopener noreferrer" target="_blank">
-                [{l.label}]
-              </a>
-            ))}
-          </nav>
-        </PageHeader>
+        <>
+          {/* For search engines, from the same facts as the infobox (`lib/paper-facts.ts`). */}
+          <script
+            type="application/ld+json"
+            dangerouslySetInnerHTML={{
+              __html: JSON.stringify(paperJsonLd(props.facts, url, siteUrl())).replace(/</g, '\\u003c'),
+            }}
+          />
+          <PageHeader title={paper.title}>
+            <p className="mt-4 text-center">
+              {paper.authors.length > 0 ? (
+                // A confirmed author's name links to their page, unless they turned that off.
+                paper.authors.map((name, i) => {
+                  const href = owners?.people.find((p) => p.authorIndex === i)?.href;
+                  return (
+                    <Fragment key={i}>
+                      {i > 0 && ', '}
+                      {href ? (
+                        <a
+                          href={href}
+                          className="text-ink underline decoration-rule-strong underline-offset-4 hover:decoration-ink"
+                        >
+                          {name}
+                        </a>
+                      ) : (
+                        name
+                      )}
+                    </Fragment>
+                  );
+                })
+              ) : (
+                <span className="text-muted italic">Anonymous authors</span>
+              )}
+            </p>
+            {about && <p className="mt-2.5 text-center text-xs text-faint">{about}</p>}
+            <nav
+              className="mt-2.5 flex flex-wrap justify-center gap-x-3 font-sans text-[13px]"
+              aria-label="The paper elsewhere"
+            >
+              {titleLinks({ ...linkSources, extra: current?.links ?? [] }).map((l, i) => (
+                <a key={i} href={l.url} className="text-accent" rel="noopener noreferrer" target="_blank">
+                  [{l.label}]
+                </a>
+              ))}
+            </nav>
+          </PageHeader>
+        </>
       }
       actions={
         <PageActions

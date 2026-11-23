@@ -5,7 +5,9 @@ import { notFound, redirect } from 'next/navigation';
 import { cache } from 'react';
 import { getDb } from '@/db';
 import { pageCurrent } from '@/db/schema';
-import { type KeyedKind, keyedPagePath, keyProblem, KINDS, pageName, pagePath } from '@/lib/kinds';
+import { type KeyedKind, keyedPagePath, keyProblem, KINDS, pageName, pagePath, venueFileSchema } from '@/lib/kinds';
+import { siteUrl } from '@/server/site';
+import { venueJsonLd } from './venue-panels';
 import { linksFrom, linksTo } from '@/server/page-links';
 import { scopeMemberCount, scopePapers } from '@/server/page-members';
 import { cloneAddresses } from '@/server/pages/clone';
@@ -106,6 +108,8 @@ export async function KeyedPageRoute({ kind, segments }: { kind: KeyedKind; segm
     ownersOf(page, address),
   ]);
   const summary = summaries.get(page.id)!;
+  const parsedVenue = kind === 'venue' ? venueFileSchema.safeParse(current?.kindFile) : null;
+  const venue = parsedVenue?.success ? parsedVenue.data : null;
   const props: KindPanelProps = {
     kind,
     address,
@@ -130,9 +134,20 @@ export async function KeyedPageRoute({ kind, segments }: { kind: KeyedKind; segm
       plugins={{ kind, page: summary, scopes, facts }}
       panels={buildPanels(kind, KIND_PANELS[kind], props, (id) => presentPanel(props, id))}
       header={
-        <PageHeader eyebrow={KINDS[kind].title} title={props.name}>
-          {user && <UserByline user={user} />}
-        </PageHeader>
+        <>
+          {venue && (
+            // For search engines, from the same venue file as its infobox (`venue-panels.tsx`).
+            <script
+              type="application/ld+json"
+              dangerouslySetInnerHTML={{
+                __html: JSON.stringify(venueJsonLd(venue, `${siteUrl()}${pagePath(address)}`)).replace(/</g, '\\u003c'),
+              }}
+            />
+          )}
+          <PageHeader eyebrow={KINDS[kind].title} title={props.name}>
+            {user && <UserByline user={user} />}
+          </PageHeader>
+        </>
       }
       actions={
         <PageActions

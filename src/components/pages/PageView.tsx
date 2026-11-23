@@ -61,7 +61,9 @@ export function PageView({
                     {/* The sidebar floats, so what is below it in the main column takes the full width; on a phone
                       it goes under the main column. */}
                     <div className="flow-root narrow:flex narrow:flex-col">
-                      <aside className="float-right mb-4 ml-8 w-[300px] space-y-3 narrow:order-last narrow:float-none narrow:mt-8 narrow:ml-0 narrow:w-auto">
+                      <aside
+                        className={`${ui.infobox} float-right mb-4 ml-8 w-[300px] narrow:order-last narrow:float-none narrow:mt-8 narrow:ml-0 narrow:w-auto`}
+                      >
                         <ArrangedPanels kind={kind} slot={slot('aside')} panels={panels.aside} />
                       </aside>
                       <div>

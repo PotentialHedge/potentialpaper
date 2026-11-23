@@ -32,6 +32,7 @@ export async function submissionsOf(paperId: string, database: Database = getDb(
     number: submission.number,
     status: submission.status,
     decision: submission.decision,
+    keywords: submission.keywords,
     url: submission.url,
     fetchedAt: submission.fetchedAt,
     notes: notes

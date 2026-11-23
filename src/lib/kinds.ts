@@ -67,6 +67,10 @@ export const venueFileSchema = z
       .strictObject({ start: date.optional(), end: date.optional() })
       .optional()
       .meta({ description: "An edition's dates, YYYY-MM-DD." }),
+    locations: z.array(shortText(200)).max(10).optional().meta({
+      description:
+        'Where an edition is held: ["Vienna, Austria"], or each of its sites for one held in several places at once: ["Sydney, Australia", "Atlanta, USA", "Paris, France"]. A paper\'s own site there is in its version\'s submission ("site").',
+    }),
     url: https.optional().meta({ description: "The venue's own site." }),
     sources: z
       .array(z.string().regex(/^[a-z0-9-]+:\S+$/, 'a source id, like openreview:ICLR.cc/2027/Conference'))

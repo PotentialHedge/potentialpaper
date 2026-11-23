@@ -49,6 +49,16 @@ export const ui = {
   badge: 'ml-1 rounded-[3px] border border-[#bbb] px-1 align-[1px] font-sans text-[11px] text-muted',
   box: 'border border-frame bg-card p-3.5 font-sans text-sm',
   /**
+   * A page's side column as one infobox, as Wikipedia's: one frame, its panels sections of it, divided by a rule. Each
+   * panel still draws its own `box`; inside the infobox that box loses its frame. The reader still hides and orders the
+   * sections (`ArrangedPanels`). Not drawn when every section is empty.
+   */
+  infobox:
+    'border border-frame bg-card empty:hidden [&>*]:border-0 [&>*]:bg-transparent [&>*+*]:border-t [&>*+*]:border-rule',
+  /** An infobox's facts: a label column and a value column, a row each, as Wikipedia's `th`/`td`. */
+  facts:
+    'w-full border-collapse text-left align-top [&_td]:py-1 [&_td]:align-top [&_th]:w-[38%] [&_th]:py-1 [&_th]:pr-3 [&_th]:align-top [&_th]:font-semibold [&_th]:text-ink',
+  /**
    * A text field. 16px on a phone: iOS Safari zooms the page into any field
    * set smaller when it is focused. Every text input and textarea carries
    * `narrow:text-base` for the same reason.

@@ -130,6 +130,7 @@ async function papers(fixture: Fixture) {
         number: p.number,
         status: p.status,
         decision: p.decision,
+        site: p.site,
         keywords: p.keywords,
         submittedAt: p.submittedAt ? new Date(p.submittedAt) : null,
         url: forumUrl(p.id),

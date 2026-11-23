@@ -36,6 +36,8 @@ export interface VersionSubmission {
   status?: SubmissionStatus;
   /** As the venue words it: "Accept (Poster)", "Reject". */
   decision?: string;
+  /** Where it is presented, for a venue held in several places at once: "Sydney". */
+  site?: string;
   /** Its number at the venue. */
   number?: number;
   /** Where it is at the venue: its forum. */
@@ -92,6 +94,7 @@ export const MAX_VERSION_ABSTRACT = 6000;
 export const MAX_VERSION_NOTE = 2000;
 export const MAX_SUBMISSIONS = 10;
 export const MAX_VENUE = 200;
+export const MAX_SITE = 100;
 const MAX_URL = 2000;
 
 /**
@@ -146,6 +149,9 @@ const versionShape = {
         decision: text(MAX_VERSION_DECISION)
           .optional()
           .meta({ description: 'The decision as the venue words it: "Accept (Poster)", "Reject".' }),
+        site: text(MAX_SITE)
+          .optional()
+          .meta({ description: 'Where it is presented, for a venue held in several places at once: "Sydney".' }),
         number: z.number().int().positive().optional().meta({ description: 'Its number at the venue.' }),
         url: httpUrl(MAX_URL).optional().meta({ description: 'Where it is at the venue: its forum.' }),
         reviews: z.string().regex(REVIEWS_KEY).optional().meta({

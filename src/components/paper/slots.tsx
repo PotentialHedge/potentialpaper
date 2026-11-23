@@ -10,7 +10,9 @@ import { Comments } from './Comments';
 import { PictureDrop } from './PictureDrop';
 import type { Submission } from '@/lib/submissions';
 import type { PdfPointer } from '@/server/pages/rules';
-import { SubmissionsBox, SubmissionsSection } from './Submissions';
+import { SubmissionsSection } from './Submissions';
+import { Facts } from './Facts';
+import type { PaperFacts } from '@/lib/paper-facts';
 import { VersionsBox, VersionsSection } from './Versions';
 import type { PaperVersion } from '@/lib/versions';
 
@@ -33,6 +35,8 @@ export interface PanelProps extends PageCommon {
   versions: PaperVersion[];
   /** The identifier the page's API calls name the paper by. */
   canonical: PaperId;
+  /** What the infobox, the JSON-LD and the meta tags say about it (`lib/paper-facts.ts`). */
+  facts: PaperFacts;
 }
 
 /** Its Markdown and TeX rendered, with "Abstract." run into its first paragraph. */
@@ -109,8 +113,8 @@ function Submissions({ submissions, address }: PanelProps) {
   return <SubmissionsSection submissions={submissions} paperPath={pagePath(address)} />;
 }
 
-function SubmissionsAside({ submissions, address }: PanelProps) {
-  return <SubmissionsBox submissions={submissions} paperPath={pagePath(address)} />;
+function FactsAside({ facts }: PanelProps) {
+  return <Facts facts={facts} />;
 }
 
 function Versions({ versions, paper, address }: PanelProps) {
@@ -131,8 +135,8 @@ export const PAPER_PANELS: Record<PanelId<'paper'>, ComponentType<PanelProps>> =
   abstract: Abstract,
   sections: Sections,
   read: ReadThePaper,
+  facts: FactsAside,
   'versions-box': VersionsAside,
-  'submissions-box': SubmissionsAside,
   categories: Categories,
   links: Links,
   backlinks: Backlinks,
