@@ -19,7 +19,10 @@ export const MAX_FACTS_PER_FILE = 30;
 export const MAX_FACT_LABEL = 40;
 export const MAX_FACT_VALUE = 300;
 
-/** The labels each kind's infobox shows from where its facts are kept, which a row can't take. Lower case. */
+/**
+ * The labels a row can't take, lower case: the ones each kind's infobox shows from where its facts are kept, and where
+ * a paper was sent, which its Versions box shows.
+ */
 export const BUILT_IN_LABELS: Partial<Record<PageKind, readonly string[]>> = {
   paper: [
     'accepted at',

@@ -5,7 +5,7 @@ import { AGENT_POST_KINDS } from '@/lib/agent-posts';
 import { AGENT_START_PATH } from '@/lib/agent-prompt';
 import { agentPaperPath, paperPath, shortPath, type PaperId } from '@/lib/paper-ids';
 import { titleLinks } from '@/lib/paper-links';
-import { paperFacts, type PaperFacts, VENUE_ROW_LABEL } from '@/lib/paper-facts';
+import { paperFacts, type PaperFacts } from '@/lib/paper-facts';
 import type { FactLine } from '@/lib/infobox-facts';
 import { sortVersions, versionStanding, type PaperVersion } from '@/lib/versions';
 import type { FieldValue, Submission } from '@/lib/submissions';
@@ -115,9 +115,10 @@ export async function agentPaperMarkdown(found: FoundPaper, canonical: PaperId, 
 /** The paper page's infobox, from the same facts (`lib/paper-facts.ts`), with the rows people added and where. */
 function infoboxLines(facts: PaperFacts): string[] {
   const rows: string[] = [];
-  for (const v of facts.venues) {
+  const v = facts.published;
+  if (v) {
     const detail = [v.presentation, v.site && `in ${v.site}`].filter(Boolean).join(', ');
-    rows.push(`- ${VENUE_ROW_LABEL[v.status ?? 'unknown']}: ${v.venue}${detail ? ` (${detail})` : ''}`);
+    rows.push(`- Accepted at: ${v.venue}${detail ? ` (${detail})` : ''}`);
   }
   if (facts.area) rows.push(`- Area: ${facts.area.name} (as the authors chose it at ${facts.area.venue})`);
   if (facts.keywords.length > 0) rows.push(`- Keywords: ${facts.keywords.join(', ')}`);

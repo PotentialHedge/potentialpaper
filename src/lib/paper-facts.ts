@@ -130,16 +130,6 @@ export function paperFacts({
   };
 }
 
-/** What a submission came to, as an infobox row's label: "Accepted at". */
-export const VENUE_ROW_LABEL: Record<SubmissionStatus | 'unknown', string> = {
-  accepted: 'Accepted at',
-  under_review: 'Under review at',
-  rejected: 'Rejected at',
-  withdrawn: 'Withdrawn from',
-  desk_rejected: 'Desk rejected at',
-  unknown: 'Submitted to',
-};
-
 /** `YYYY-MM-DD` as Google Scholar asks for it: `YYYY/MM/DD`, as much of it as is known. */
 function scholarDate(date: string): string {
   return date.replace(/-/g, '/');
