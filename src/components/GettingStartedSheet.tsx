@@ -149,3 +149,27 @@ export function GettingStartedSheet({
     </Sheet>
   );
 }
+
+/**
+ * The home page's [onboard your agent], for a viewer past the tour: the tour's agent screen (`agentPromptStep`) on
+ * its own, in the same modal or bottom sheet, whose button copies the prompt.
+ */
+export function OnboardAgentSheet() {
+  const [open, setOpen] = useState(false);
+  const step = agentPromptStep();
+  return (
+    <Sheet open={open} onOpenChange={setOpen}>
+      <SheetTrigger type="button" className="cursor-pointer font-sans text-base font-semibold text-accent">
+        [onboard your agent]
+      </SheetTrigger>
+      <SheetContent onDismiss={() => setOpen(false)}>
+        {step.art && <TutorialArt>{step.art}</TutorialArt>}
+        <SheetTitle className={`mt-4 ${STEP_TITLE}`}>{step.title}</SheetTitle>
+        <TutorialText step={step} />
+        <div className="mt-6">
+          <AgentPromptButton />
+        </div>
+      </SheetContent>
+    </Sheet>
+  );
+}
