@@ -4,7 +4,12 @@ import { ArrangedTabs } from '@/components/ArrangedTabs';
 import { type PluginPageData, PluginPageProvider } from '@/components/plugins/PluginPage';
 import { ui } from '@/components/ui';
 import { type GenericSlot, KINDS, type PageKind } from '@/lib/kinds';
+import { ReviewBlur } from '@/components/paper/ReviewBlur';
 import type { BuiltPanel } from './common';
+
+function Blurred({ when, children }: { when: boolean; children: ReactNode }) {
+  return when ? <ReviewBlur>{children}</ReviewBlur> : children;
+}
 
 /**
  * Every kind of page, laid out the same way (`lib/kinds.ts`): its header and the actions under it, then the page
@@ -21,6 +26,7 @@ export function PageView({
   actions,
   panels,
   after,
+  underReview = false,
 }: {
   kind: PageKind;
   /** For the Analytics tab its owners see (`Analytics.tsx`). */
@@ -31,41 +37,45 @@ export function PageView({
   panels: Record<GenericSlot, BuiltPanel[]>;
   /** After the page, outside it: a paper's demo frames. */
   after?: ReactNode;
+  /** A paper under review: all but its title is blurred until the reader shows it (`ReviewBlur`). */
+  underReview?: boolean;
 }) {
   const slot = (name: GenericSlot) => `${kind}.${name}`;
   return (
     <main className={ui.page}>
-      <PluginPageProvider data={plugins}>
-        <article>
-          {header}
-          {actions}
-          <ArrangedTabs
-            kind={kind}
-            slot={slot('tabs')}
-            panels={panels.tabs}
-            pageId={pageId}
-            lead={{
-              title: KINDS[kind].title,
-              node: (
-                <>
-                  {/* The sidebar floats, so what is below it in the main column takes the full width; on a phone
+      <Blurred when={underReview}>
+        <PluginPageProvider data={plugins}>
+          <article>
+            {header}
+            {actions}
+            <ArrangedTabs
+              kind={kind}
+              slot={slot('tabs')}
+              panels={panels.tabs}
+              pageId={pageId}
+              lead={{
+                title: KINDS[kind].title,
+                node: (
+                  <>
+                    {/* The sidebar floats, so what is below it in the main column takes the full width; on a phone
                       it goes under the main column. */}
-                  <div className="flow-root narrow:flex narrow:flex-col">
-                    <aside className="float-right mb-4 ml-8 w-[300px] space-y-3 narrow:order-last narrow:float-none narrow:mt-8 narrow:ml-0 narrow:w-auto">
-                      <ArrangedPanels kind={kind} slot={slot('aside')} panels={panels.aside} />
-                    </aside>
-                    <div>
-                      <ArrangedPanels kind={kind} slot={slot('main')} panels={panels.main} />
+                    <div className="flow-root narrow:flex narrow:flex-col">
+                      <aside className="float-right mb-4 ml-8 w-[300px] space-y-3 narrow:order-last narrow:float-none narrow:mt-8 narrow:ml-0 narrow:w-auto">
+                        <ArrangedPanels kind={kind} slot={slot('aside')} panels={panels.aside} />
+                      </aside>
+                      <div>
+                        <ArrangedPanels kind={kind} slot={slot('main')} panels={panels.main} />
+                      </div>
                     </div>
-                  </div>
-                  <ArrangedPanels kind={kind} slot={slot('body')} panels={panels.body} />
-                </>
-              ),
-            }}
-          />
-        </article>
-      </PluginPageProvider>
-      {after}
+                    <ArrangedPanels kind={kind} slot={slot('body')} panels={panels.body} />
+                  </>
+                ),
+              }}
+            />
+          </article>
+        </PluginPageProvider>
+        {after}
+      </Blurred>
     </main>
   );
 }

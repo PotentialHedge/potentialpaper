@@ -11,6 +11,7 @@ import { getDb } from '@/db';
 import { pageCurrent, pdfDocuments } from '@/db/schema';
 import { findPaper, type FoundPaper } from '@/server/papers';
 import { submissionsOf } from '@/server/submissions';
+import { underReview } from '@/server/under-review';
 import { bibtex, titleLinks } from '@/lib/paper-links';
 import { sortVersions } from '@/lib/versions';
 import { DemoFrames } from './DemoFrames';
@@ -67,7 +68,7 @@ export async function PaperRoute({ scheme, segments }: { scheme: PaperScheme; se
   const canonical = canonicalPaperId(identifiers) ?? identifiers[0];
   const address = { kind: 'paper' as const, id: canonical };
   const pageRow = { id: paper.id, kind: 'paper' as const, key: paper.id };
-  const [[current], submissions, owners, linksFrom, linksTo, scopes, shortId, hasSignals] = await Promise.all([
+  const [[current], submissions, owners, linksFrom, linksTo, scopes, shortId, hasSignals, blurred] = await Promise.all([
     getDb()
       .select({
         pdf: pageCurrent.pdf,
@@ -89,6 +90,7 @@ export async function PaperRoute({ scheme, segments }: { scheme: PaperScheme; se
     scopesOfPage(pageRow),
     shortIdOf(paper.id),
     pageHasSignals({ id: paper.id, kind: 'paper' }),
+    underReview(paper.id),
   ]);
   // Shown and shared at its short address, and the page tools at theirs (`/history/s/42`).
   const shown = shortId === null ? address : { ...address, shortId };
@@ -151,6 +153,7 @@ export async function PaperRoute({ scheme, segments }: { scheme: PaperScheme; se
     <PageView
       pageId={paper.id}
       kind="paper"
+      underReview={blurred}
       plugins={plugins}
       panels={buildPanels('paper', PAPER_PANELS, props)}
       header={
