@@ -52,6 +52,15 @@ refused), then `scripts/purge-edge-cache.sh`. `-- --dry-run` lists what it would
 go to its `paper.json`; until a paper is moved, edits to it are refused), then `scripts/purge-edge-cache.sh`.
 `-- --dry-run` lists what it would change. It is safe to run again.
 
+## Layout 7: a venue's name and forms on its page
+
+**Once, when deploying the move to it** (`LAYOUT_VERSION` 7): straight after `dc up -d app worker`, run
+`dc run --rm tools npm run pages:migrate-venue-data` (venue pages first, each gaining a `forms.json`; then a system
+commit per paper: its `submission.json`s become `submission/2`, their `forms.json`s go, and imported version entries
+name the venue's page; then every page's projection is rebuilt), then `scripts/purge-edge-cache.sh`. Until a paper is
+moved, the review projection skips its `submission/1` files, so run it straight away. `-- --dry-run` lists what it
+would change. It is safe to run again.
+
 ## PDF ingest
 
 The `ingest` service runs `npm run pdfs:ingest -- --watch` from the tools image (which has poppler): every

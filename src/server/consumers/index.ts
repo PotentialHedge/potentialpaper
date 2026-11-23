@@ -3,6 +3,7 @@ import { membersConsumer, syncDueAffiliations } from '../page-members';
 import { reviewsConsumer } from '../review-projection';
 import { recomputeDueScopes, scopeStatsConsumer } from '../scope-stats';
 import { searchConsumer } from '../search-index';
+import { venueNamesConsumer } from '../venue-names';
 import type { Consumer } from './types';
 import type { WorkerTask } from './worker';
 
@@ -12,7 +13,8 @@ export type { Consumer, ConsumerContext } from './types';
  * Every consumer the `worker` service runs, in no particular order (each has its own cursor): the search index
  * (`search-index.ts`), the review projection (`review-projection.ts`), which fills the tables the Submissions
  * panel reads, the link index (`page-links.ts`, "what links here"), and membership of the pages above the paper
- * (`page-members.ts`), and score statistics of those pages (`scope-stats.ts`), whose consumer only marks scopes; the
+ * (`page-members.ts`), and score statistics of those pages (`scope-stats.ts`), whose consumer only marks scopes, and the venue names papers show
+ * (`venue-names.ts`), written again when a venue page's name changes; the
  * reviews and members consumers mark them too, and `WORKER_TASKS` recomputes the marked ones. An org's papers also
  * come from claims, addresses and PDFs, outside any repo; `WORKER_TASKS` brings those up to date too.
  */
@@ -22,6 +24,7 @@ export const CONSUMERS: readonly Consumer[] = [
   linksConsumer,
   membersConsumer,
   scopeStatsConsumer,
+  venueNamesConsumer,
 ];
 
 /** What the worker does after each pass of the consumers. */

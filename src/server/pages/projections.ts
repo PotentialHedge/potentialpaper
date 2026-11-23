@@ -1,6 +1,6 @@
 import { eq, notInArray, sql } from 'drizzle-orm';
 import { getDb, type Database } from '@/db';
-import { authorClaims, commitIdentities, pageCurrent, pageRefs, pageRevisions, papers } from '@/db/schema';
+import { authorClaims, commitIdentities, pageCurrent, pageRefs, pageRevisions, pages, papers } from '@/db/schema';
 import { KINDS, OWNERS_DIR, pageName } from '@/lib/kinds';
 import { FACTS_FILE, parseFacts, type PageFacts } from '@/lib/infobox-facts';
 import { AUTHOR_PLUGINS_PATH, type AuthorPanel, parseAuthorPlugins } from '@/lib/plugins/author-plugins';
@@ -14,6 +14,7 @@ import { mustPage, type PageRow } from './kinds';
 import { demoRefs } from './markdown';
 import { changedFiles, readCommit, readFiles, readHead, readText, toBytes, type Reader } from './repo';
 import { partSource, readSections, renderPart } from './sections';
+import { resolveVenueNames, writeVenueRows } from './venue-projection';
 
 /**
  * The rows that can be derived from the objects (DESIGN.md §4.5). A commit and a rebuild both come through
@@ -154,7 +155,8 @@ export async function writeCurrent(tx: Writer, pageId: string, head: string, com
   const files = await readFiles(tx, pageId, commit.tree);
   const thumbnail = await readThumbnail(tx, pageId, files);
   const links = await readLinks(tx, pageId, files);
-  const versions = await readVersions(tx, pageId, files);
+  // A submission naming a venue page shows the page's name (`venue-projection.ts`).
+  const versions = await resolveVenueNames(tx, await readVersions(tx, pageId, files));
   // Every PDF is a version's: the page shows the newest.
   const pdf = paperPdfOf(versions);
   // The owners' part, `owners/`, goes in the `author_*` columns.
@@ -171,6 +173,7 @@ export async function writeCurrent(tx: Writer, pageId: string, head: string, com
     files,
     markdown.flatMap((s) => demoRefs(s.text)),
   );
+  const kind = await readKindFile(tx, page, files);
   const row = {
     head: toBytes(head),
     authorMarkdown: partSource(author),
@@ -183,7 +186,7 @@ export async function writeCurrent(tx: Writer, pageId: string, head: string, com
     versions: versions.length > 0 ? versions : null,
     authorPlugins: await readAuthorPlugins(tx, page, files),
     facts: await readFacts(tx, page, files),
-    ...(await readKindFile(tx, page, files)),
+    ...kind,
     updatedAt: commit.at,
   };
   await tx
@@ -191,6 +194,22 @@ export async function writeCurrent(tx: Writer, pageId: string, head: string, com
     .values({ pageId, ...row })
     .onConflictDoUpdate({ target: pageCurrent.pageId, set: row });
   await writePaperRow(tx, page, files, versions);
+  // The `venues` rows of the sources a venue page lists are its projection.
+  if (page.kind === 'venue') await writeVenueRows(tx, pageId, kind.kindFile, files);
+}
+
+/**
+ * Writes a page's `page_current` (and a paper's row) again at the head it is at, for what it shows from other pages:
+ * the names of the venue pages its versions name (`server/venue-names.ts`). Nothing in its repo changed.
+ */
+export async function reprojectCurrent(pageId: string, database: Database = getDb()): Promise<boolean> {
+  return database.transaction(async (tx) => {
+    await lockPage(tx, pageId);
+    const head = await readHead(tx, pageId);
+    if (!head) return false;
+    await writeCurrent(tx, pageId, head, await readCommit(tx, pageId, head));
+    return true;
+  });
 }
 
 /** Replaces one page's projection rows with what its objects say, atomically. */
@@ -222,8 +241,14 @@ export async function rebuildAllPages(
   database: Database = getDb(),
   onPage?: (pageId: string, commits: number) => void,
 ): Promise<{ pages: number; commits: number }> {
-  const refs = await database.select({ pageId: pageRefs.pageId }).from(pageRefs);
-  const ids = refs.map((ref) => ref.pageId);
+  const refs = await database
+    .select({ pageId: pageRefs.pageId, kind: pages.kind })
+    .from(pageRefs)
+    .innerJoin(pages, eq(pages.id, pageRefs.pageId));
+  // Venue pages first: a paper shows the names of the venue pages its versions name (`venue-projection.ts`).
+  const ids = [...refs.filter((ref) => ref.kind === 'venue'), ...refs.filter((ref) => ref.kind !== 'venue')].map(
+    (ref) => ref.pageId,
+  );
   const orphan = <T extends typeof pageRevisions | typeof pageCurrent>(table: T) =>
     ids.length > 0 ? notInArray(table.pageId, ids) : sql`true`;
   await database.delete(pageRevisions).where(orphan(pageRevisions));

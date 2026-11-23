@@ -19,10 +19,13 @@ import { readCommit, readFiles, readHead, readText } from '@/server/pages/repo';
 import { findPaper } from '@/server/papers';
 import { projectReviews, reviewsConsumer } from '@/server/review-projection';
 import { submissionsOf } from '@/server/submissions';
-import { setVersions, versionsAt } from '@/server/versions';
-import { closePool, resetDatabase } from './helpers';
+import { currentVersions, setVersions, versionsAt } from '@/server/versions';
+import { closePool, grantVenuesBot, resetDatabase } from './helpers';
 
-beforeEach(resetDatabase);
+beforeEach(async () => {
+  await resetDatabase();
+  await grantVenuesBot();
+});
 afterAll(closePool);
 
 const VENUE: VenueInput = {
@@ -33,7 +36,13 @@ const VENUE: VenueInput = {
   forms: { Official_Review: { label: 'Official review', fields: [{ key: 'rating', label: 'Rating' }] } },
   license: 'CC-BY-4.0',
 };
-const SHOWN_VENUE = { id: 'openreview:Test.cc/2027/Conference', name: 'Test 2027', url: null, forms: VENUE.forms };
+const SHOWN_VENUE = {
+  id: 'openreview:Test.cc/2027/Conference',
+  name: 'Test 2027',
+  // The venue's row is its page's projection: the source's own page for the venue.
+  url: 'https://openreview.net/group?id=Test.cc%2F2027%2FConference',
+  forms: VENUE.forms,
+};
 const OPTIONS = { rateLimit: IMPORT_RATE_LIMIT };
 
 function review(externalId: string, rating: number, replyTo: string | null = null): NoteInput {
@@ -118,7 +127,6 @@ describe('importing reviews', () => {
     });
     const held = await files(paper);
     expect([...held.keys()].filter((path) => path.startsWith('reviews/')).sort()).toEqual([
-      'reviews/openreview/forum1/forms.json',
       'reviews/openreview/forum1/notes/a.json',
       'reviews/openreview/forum1/notes/b.json',
       'reviews/openreview/forum1/notes/c.json',
@@ -247,9 +255,12 @@ describe('importing reviews', () => {
         kind: 'submitted',
         label: 'Test 2027',
         url: 'https://openreview.net/forum?id=forum1',
-        submissions: [{ venue: 'Test 2027', status: 'under_review', reviews: 'openreview/forum1' }],
+        // The venue by its page, which keeps its name; the page shows it.
+        submissions: [{ page: 'test/2027', status: 'under_review', reviews: 'openreview/forum1' }],
       },
     ]);
+    expect(versions[0].submissions![0]).not.toHaveProperty('venue');
+    expect((await currentVersions(paper))[0].submissions![0]).toMatchObject({ page: 'test/2027', venue: 'Test 2027' });
     const [{ verifiedAt: _v, ...rest }] = await getDb()
       .insert(accounts)
       .values({ handle: 'a-person', verifiedAt: new Date() })

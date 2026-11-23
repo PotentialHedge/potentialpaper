@@ -5,9 +5,11 @@ import { type FieldValue, NOTE_KINDS, type NoteKind, type VenueForms } from './s
  * A venue's submissions and what it published about them, as files in the paper's repo (DESIGN.md §3, §4.3,
  * §4.8), written only by the bot granted their source (`rules.ts`):
  *
- *   reviews/<source>/<submission>/submission.json   the submission: venue, number, keywords, link
- *   reviews/<source>/<submission>/forms.json        the venue's forms, which say how to show its notes
+ *   reviews/<source>/<submission>/submission.json   the submission: its venue's id, number, keywords, link
  *   reviews/<source>/<submission>/notes/<id>.json   one review, meta-review, decision or comment
+ *
+ * What the venue is (its name, and its forms, which say how to show its notes) is kept once, on the venue's own page:
+ * its `venue.json` and `forms.json` (`VENUE_FORMS_FILE`), by the source's id for the venue.
  *
  * `<source>` is the bot's source (`openreview`); `<submission>` and a note's `<id>` are the source's ids,
  * lower-cased, since a clone on a Mac or Windows can't hold two names that differ only in case. The ids as the
@@ -32,10 +34,11 @@ export const REVIEW_ID_SLUG = /^[a-z0-9_-]+$/;
 const MAX_ID_SLUG = 100;
 
 export const SUBMISSION_FILE = 'submission.json';
-export const FORMS_FILE = 'forms.json';
 export const NOTES_DIR = 'notes';
+/** A venue page's forms, by the id of each source it lists (`venueFormsFileSchema`). */
+export const VENUE_FORMS_FILE = 'forms.json';
 
-export type ReviewFileKind = 'submission' | 'forms' | 'note';
+export type ReviewFileKind = 'submission' | 'note';
 
 export interface ReviewPath {
   source: string;
@@ -48,14 +51,13 @@ export interface ReviewPath {
 
 const slug = (value: string, pattern: RegExp, max: number) => pattern.test(value) && value.length <= max;
 
-/** What a path under `reviews/` is, or `null` if it is none of the three files. */
+/** What a path under `reviews/` is, or `null` if it is neither a submission nor a note. */
 export function parseReviewPath(path: string): ReviewPath | null {
   const parts = path.split('/');
   if (parts[0] !== REVIEWS_DIR || parts.length < 4) return null;
   const [, source, submission, ...rest] = parts;
   if (!slug(source, REVIEW_SOURCE, MAX_SOURCE) || !slug(submission, REVIEW_ID_SLUG, MAX_ID_SLUG)) return null;
   if (rest.length === 1 && rest[0] === SUBMISSION_FILE) return { source, submission, kind: 'submission' };
-  if (rest.length === 1 && rest[0] === FORMS_FILE) return { source, submission, kind: 'forms' };
   if (rest.length === 2 && rest[0] === NOTES_DIR && rest[1].endsWith('.json')) {
     const note = rest[1].slice(0, -'.json'.length);
     if (slug(note, REVIEW_ID_SLUG, MAX_ID_SLUG)) return { source, submission, kind: 'note', note };
@@ -87,16 +89,12 @@ export function submissionFilePath(source: string, submissionId: string): string
   return `${submissionDir(source, submissionId)}/${SUBMISSION_FILE}`;
 }
 
-export function formsFilePath(source: string, submissionId: string): string {
-  return `${submissionDir(source, submissionId)}/${FORMS_FILE}`;
-}
-
 export function noteFilePath(source: string, submissionId: string, noteId: string): string {
   return `${submissionDir(source, submissionId)}/${NOTES_DIR}/${reviewSlug(noteId)}.json`;
 }
 
-export const SUBMISSION_SCHEMA = 'submission/1';
-export const FORMS_SCHEMA = 'forms/1';
+export const SUBMISSION_SCHEMA = 'submission/2';
+export const VENUE_FORMS_SCHEMA = 'venue-forms/1';
 export const NOTE_SCHEMA = 'review/1';
 
 const MAX_SHORT = 500;
@@ -153,10 +151,11 @@ export const submissionFileSchema = z
     venue: z
       .strictObject({
         id: shortText(200).meta({ description: 'The source\'s id for the venue: "ICLR.cc/2027/Conference".' }),
-        name: shortText(200).meta({ description: 'The venue as people say it: "ICLR 2027".' }),
-        url: httpsUrl.nullable().meta({ description: "The venue's page at the source." }),
       })
-      .meta({ description: 'Where it was submitted.' }),
+      .meta({
+        description:
+          "Where it was submitted. The venue's name and forms are on its page, whose venue.json lists the source's id.",
+      }),
     number: z.number().int().nullable().meta({ description: "The submission's number at the venue, if it has one." }),
     keywords: z.array(shortText(200)).max(MAX_KEYWORDS).optional().meta({
       description: 'The keywords its authors gave the source, as they wrote them.',
@@ -174,23 +173,41 @@ export const submissionFileSchema = z
   .meta({
     title: 'Submission',
     description:
-      "A submission of the paper to a venue, imported by the bot granted reviews/<source>/. Its notes are in notes/ beside it, and the venue's forms in forms.json. What the venue decided is in the version it is of: the entry in versions/<id>.json whose reviews names this folder.",
+      "A submission of the paper to a venue, imported by the bot granted reviews/<source>/. Its notes are in notes/ beside it; the venue's name and forms are on the venue's page. What the venue decided is in the version it is of: the entry in versions/<id>.json whose reviews names this folder.",
   });
 
-/** A `reviews/<source>/<submission>/forms.json`. */
-export const formsFileSchema = z
+/** One source's forms on a venue page. */
+const sourceFormsSchema = z.strictObject({
+  forms: z
+    .record(z.string().min(1).max(200), noteFormSchema)
+    .meta({ description: 'How to show each kind of note, by the source\'s name for it: "Official_Review".' }),
+  url: httpsUrl.meta({ description: 'Where the forms come from at the source.' }),
+  license,
+});
+
+/**
+ * A venue page's `forms.json`: how the notes of each source it lists are shown. Written by the system as it imports
+ * the venue's reviews, and by admins; the `venues` table's `forms` are its projection.
+ */
+export const venueFormsFileSchema = z
   .strictObject({
-    schema: z.literal(FORMS_SCHEMA).meta({ description: `The shape of this file: "${FORMS_SCHEMA}".` }),
-    forms: z
-      .record(z.string().min(1).max(200), noteFormSchema)
-      .meta({ description: 'How to show each kind of note, by the source\'s name for it: "Official_Review".' }),
-    url: httpsUrl.meta({ description: 'Where the forms come from at the source.' }),
-    license,
+    schema: z.literal(VENUE_FORMS_SCHEMA).meta({ description: `The shape of this file: "${VENUE_FORMS_SCHEMA}".` }),
+    sources: z
+      .record(
+        z
+          .string()
+          .regex(/^[a-z0-9-]+:\S+$/)
+          .max(300),
+        sourceFormsSchema,
+      )
+      .meta({
+        description: 'The forms of each source the venue.json lists, by its id: "openreview:ICLR.cc/2027/Conference".',
+      }),
   })
   .meta({
     title: 'Venue forms',
     description:
-      "How the venue's notes are shown: labels, field order, score ranges and summary columns. A field no form names is shown by what its value looks like.",
+      "How the venue's notes are shown: labels, field order, score ranges and summary columns, for each source of its notes. A field no form names is shown by what its value looks like.",
   });
 
 /** A `reviews/<source>/<submission>/notes/<id>.json`. */
@@ -223,7 +240,7 @@ export const noteFileSchema = z
 export interface SubmissionFile {
   schema: typeof SUBMISSION_SCHEMA;
   id: string;
-  venue: { id: string; name: string; url: string | null };
+  venue: { id: string };
   number: number | null;
   keywords?: string[];
   primaryArea?: string;
@@ -232,11 +249,16 @@ export interface SubmissionFile {
   license: string;
 }
 
-export interface FormsFile {
-  schema: typeof FORMS_SCHEMA;
+export interface SourceForms {
   forms: VenueForms;
   url: string;
   license: string;
+}
+
+export interface VenueFormsFile {
+  schema: typeof VENUE_FORMS_SCHEMA;
+  /** By the source's id for the venue: `openreview:ICLR.cc/2027/Conference`. */
+  sources: Record<string, SourceForms>;
 }
 
 export interface NoteFile {
@@ -256,14 +278,12 @@ export interface NoteFile {
 /** Each kind of file's definition. Typed against the shapes `lib/submissions.ts` shows. */
 export const REVIEW_FILE_SCHEMAS: {
   submission: z.ZodType<SubmissionFile>;
-  forms: z.ZodType<FormsFile>;
   note: z.ZodType<NoteFile>;
-} = { submission: submissionFileSchema, forms: formsFileSchema, note: noteFileSchema };
+} = { submission: submissionFileSchema, note: noteFileSchema };
 
 /** A file's schema, from its own `"schema"` field: what a reader says when it meets a newer one. */
 const KNOWN_SCHEMAS: Record<ReviewFileKind, string> = {
   submission: SUBMISSION_SCHEMA,
-  forms: FORMS_SCHEMA,
   note: NOTE_SCHEMA,
 };
 
@@ -279,17 +299,10 @@ export function zodProblem(error: z.ZodError): string {
   return `has a bad “${where}”: ${issue.message}`;
 }
 
-type ReviewFileOf<K extends ReviewFileKind> = K extends 'submission'
-  ? SubmissionFile
-  : K extends 'forms'
-    ? FormsFile
-    : NoteFile;
+type ReviewFileOf<K extends ReviewFileKind> = K extends 'submission' ? SubmissionFile : NoteFile;
 
-/** The file, or why it isn't one of its kind. */
-export function parseReviewFile<K extends ReviewFileKind>(
-  kind: K,
-  text: string,
-): { file: ReviewFileOf<K> } | { problem: string } {
+/** A JSON object naming `schema` as its shape, checked against `type`; or why it isn't. */
+function parseSchemaFile<T>(text: string, schema: string, type: z.ZodType<T>): { file: T } | { problem: string } {
   let value: unknown;
   try {
     value = JSON.parse(text);
@@ -298,21 +311,45 @@ export function parseReviewFile<K extends ReviewFileKind>(
   }
   if (value === null || typeof value !== 'object' || Array.isArray(value)) return { problem: 'is not a JSON object' };
   const named = (value as { schema?: unknown }).schema;
-  if (named !== KNOWN_SCHEMAS[kind]) {
+  if (named !== schema) {
     return {
       problem:
         typeof named === 'string'
-          ? `says “"schema": "${named}"”, which this site doesn't know; it reads "${KNOWN_SCHEMAS[kind]}"`
-          : `needs “"schema": "${KNOWN_SCHEMAS[kind]}"”`,
+          ? `says “"schema": "${named}"”, which this site doesn't know; it reads "${schema}"`
+          : `needs “"schema": "${schema}"”`,
     };
   }
-  const parsed = REVIEW_FILE_SCHEMAS[kind].safeParse(value);
+  const parsed = type.safeParse(value);
   if (!parsed.success) return { problem: zodProblem(parsed.error) };
-  return { file: parsed.data as ReviewFileOf<K> };
+  return { file: parsed.data };
+}
+
+/** The file, or why it isn't one of its kind. */
+export function parseReviewFile<K extends ReviewFileKind>(
+  kind: K,
+  text: string,
+): { file: ReviewFileOf<K> } | { problem: string } {
+  return parseSchemaFile(text, KNOWN_SCHEMAS[kind], REVIEW_FILE_SCHEMAS[kind] as z.ZodType<ReviewFileOf<K>>);
+}
+
+/** A venue page's `forms.json`, or why it isn't one. */
+export function parseVenueFormsFile(text: string): { file: VenueFormsFile } | { problem: string } {
+  return parseSchemaFile(text, VENUE_FORMS_SCHEMA, venueFormsFileSchema as z.ZodType<VenueFormsFile>);
+}
+
+/**
+ * The venue page's `forms.json` with `source`'s forms set to these; `null` when it already says so. `existing` is the
+ * file's text, or `null` when the page has none (or one that doesn't parse, which this replaces).
+ */
+export function withSourceForms(existing: string | null, source: string, forms: SourceForms): string | null {
+  const parsed = existing === null ? null : parseVenueFormsFile(existing);
+  const file: VenueFormsFile = parsed && 'file' in parsed ? parsed.file : { schema: VENUE_FORMS_SCHEMA, sources: {} };
+  const next = encodeReviewFile({ ...file, sources: { ...file.sources, [source]: forms } });
+  return next === existing ? null : next;
 }
 
 /** A file as committed: a field to a line, so a change shows as the lines it changed. */
-export function encodeReviewFile(file: SubmissionFile | FormsFile | NoteFile): string {
+export function encodeReviewFile(file: SubmissionFile | VenueFormsFile | NoteFile): string {
   return `${JSON.stringify(file, null, 2)}\n`;
 }
 

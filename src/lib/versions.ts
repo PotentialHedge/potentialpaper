@@ -8,6 +8,7 @@
  */
 import { z } from 'zod';
 import { evidenceProblem, MAX_EVIDENCE } from './evidence';
+import { keyProblem } from './kinds';
 import { httpUrl } from './paper-links';
 import { STATUS_LABELS, SUBMISSION_STATUSES, type SubmissionStatus } from './submissions';
 
@@ -31,8 +32,16 @@ export const VERSION_KIND_LABELS: Record<VersionKind, string> = {
  * that imports the venue's reviews names their folder in `reviews`; only that bot and admins change such an entry.
  */
 export interface VersionSubmission {
-  /** The venue as people say it: "ICLR 2027", "SPIGM @ ICML 2026". */
-  venue: string;
+  /**
+   * The venue as people say it: "ICLR 2027", "SPIGM @ ICML 2026", for a venue with no page here. An entry naming a
+   * venue page (`page`) has none in its file; the projection fills it in from the page's name (`page_current.versions`).
+   */
+  venue?: string;
+  /**
+   * The venue's page, by its key: `neurips/2026`. Its name is kept there once, and shown here. Exactly one of `venue`
+   * and `page` is in a file; an imported entry (one with `reviews`) names its venue's page.
+   */
+  page?: string;
   status?: SubmissionStatus;
   /** As the venue words it: "Accept (Poster)", "Reject". */
   decision?: string;
@@ -140,26 +149,43 @@ const versionShape = {
     .meta({ description: 'When it was submitted, or made public: YYYY, YYYY-MM or YYYY-MM-DD.' }),
   submissions: z
     .array(
-      z.strictObject({
-        venue: text(MAX_VENUE).meta({ description: 'The venue as people say it: "ICLR 2027".' }),
-        status: z
-          .enum(SUBMISSION_STATUSES)
-          .optional()
-          .meta({ description: `Where it stands there: ${SUBMISSION_STATUSES.join(', ')}.` }),
-        decision: text(MAX_VERSION_DECISION)
-          .optional()
-          .meta({ description: 'The decision as the venue words it: "Accept (Poster)", "Reject".' }),
-        site: text(MAX_SITE)
-          .optional()
-          .meta({ description: 'Where it is presented, for a venue held in several places at once: "Sydney".' }),
-        number: z.number().int().positive().optional().meta({ description: 'Its number at the venue.' }),
-        url: httpUrl(MAX_URL).optional().meta({ description: 'Where it is at the venue: its forum.' }),
-        reviews: z.string().regex(REVIEWS_KEY).optional().meta({
-          description:
-            'The folder of its imported reviews, <source>/<submission> under reviews/. Set by the bot that imports them; only it and admins change this entry.',
+      z
+        .strictObject({
+          venue: text(MAX_VENUE)
+            .optional()
+            .meta({ description: 'The venue as people say it: "ICLR 2027", for a venue with no page here.' }),
+          page: z
+            .string()
+            .max(MAX_VENUE)
+            .refine((key) => keyProblem('venue', key) === null, {
+              message: 'is not a venue page key, like neurips/2026',
+            })
+            .optional()
+            .meta({
+              description:
+                'The venue\'s page here, by its key: "neurips/2026" for /v/neurips/2026. The page shows its name. Give this or "venue", not both.',
+            }),
+          status: z
+            .enum(SUBMISSION_STATUSES)
+            .optional()
+            .meta({ description: `Where it stands there: ${SUBMISSION_STATUSES.join(', ')}.` }),
+          decision: text(MAX_VERSION_DECISION)
+            .optional()
+            .meta({ description: 'The decision as the venue words it: "Accept (Poster)", "Reject".' }),
+          site: text(MAX_SITE)
+            .optional()
+            .meta({ description: 'Where it is presented, for a venue held in several places at once: "Sydney".' }),
+          number: z.number().int().positive().optional().meta({ description: 'Its number at the venue.' }),
+          url: httpUrl(MAX_URL).optional().meta({ description: 'Where it is at the venue: its forum.' }),
+          reviews: z.string().regex(REVIEWS_KEY).optional().meta({
+            description:
+              'The folder of its imported reviews, <source>/<submission> under reviews/. Set by the bot that imports them; only it and admins change this entry.',
+          }),
+          evidence: evidenceSchema.optional(),
+        })
+        .refine((s) => (s.venue === undefined) !== (s.page === undefined), {
+          message: 'names its venue by “venue” or “page”, one of the two',
         }),
-        evidence: evidenceSchema.optional(),
-      }),
     )
     .max(MAX_SUBMISSIONS)
     .optional()
@@ -181,7 +207,7 @@ const FIELD_PROBLEMS: Record<string, string> = {
   label: `needs a label of 1 to ${MAX_VERSION_LABEL} characters`,
   kind: `needs a kind: ${VERSION_KINDS.join(', ')}`,
   date: 'needs a date as YYYY, YYYY-MM or YYYY-MM-DD',
-  submissions: `has a bad submission: each needs a venue, and a status of ${SUBMISSION_STATUSES.join(', ')}`,
+  submissions: `has a bad submission: each needs a venue (“venue”, or a venue page's key as “page”), and a status of ${SUBMISSION_STATUSES.join(', ')}`,
   title: 'has a bad title',
   abstract: 'has a bad abstract',
   note: 'has a bad note',
@@ -337,11 +363,43 @@ export function submissionStanding(submission: Pick<VersionSubmission, 'status' 
   return submission.decision ?? status;
 }
 
+/**
+ * The venue's name as a submission shows it: `venue`, which the projection fills in from the page an entry names, or
+ * the page's key where it has not been.
+ */
+export function venueOf(submission: Pick<VersionSubmission, 'venue' | 'page'>): string {
+  return submission.venue ?? submission.page ?? '';
+}
+
+/**
+ * The submissions with each one naming a venue page given that page's name as `venue`, as the page shows them;
+ * `names` maps a page's key to its name. Pure: the projection reads the names (`server/pages/projections.ts`).
+ */
+export function withVenueNames<T extends Pick<PaperVersion, 'submissions'>>(
+  versions: readonly T[],
+  names: ReadonlyMap<string, string>,
+): T[] {
+  return versions.map((version) =>
+    version.submissions?.some((s) => s.page)
+      ? {
+          ...version,
+          submissions: version.submissions.map((s) => (s.page ? { ...s, venue: names.get(s.page) ?? s.page } : s)),
+        }
+      : version,
+  );
+}
+
+/** The venue pages a version's submissions name, by key. */
+export function venuePagesOf(versions: readonly Pick<PaperVersion, 'submissions'>[]): string[] {
+  return [...new Set(versions.flatMap((v) => (v.submissions ?? []).flatMap((s) => (s.page ? [s.page] : []))))];
+}
+
 /** "ICLR 2027: Accepted · Poster", each of a version's submissions, or `null` for a version sent nowhere. */
 export function versionStanding(version: Pick<PaperVersion, 'submissions'>): string | null {
   const parts = (version.submissions ?? []).map((s) => {
+    const name = venueOf(s);
     const standing = submissionStanding(s);
-    return standing ? `${s.venue}: ${standing}` : s.venue;
+    return standing ? `${name}: ${standing}` : name;
   });
   return parts.length > 0 ? parts.join('; ') : null;
 }

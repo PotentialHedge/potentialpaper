@@ -153,16 +153,14 @@ categories, "introduced by", roll-up, sortable papers, venues and orgs boxes, "m
 - Embedding clusters as suggested new categories, from the map's vectors.
 - Workshops and tracks as venue children with their own sources.
 - Following a page of any kind for the feed and notifications.
-- **A venue's name, kept once** (from the audit of 2026-11-23). Today it is in `venue.json`'s `name`, each version
-  entry's `venue`, each `submission.json`'s `venue.name` and `venues.name` (its projection). `papers.venue` is now a
-  projection of the versions. The fix: a version entry names a venue page (`"page": "neurips/2026"`) in place of
-  `venue` when there is one, and shows that page's name; `submission.json` keeps only `venue.id`, and `venues.name`
-  comes from the venue's page, or its source for a venue with none. Needs a page for every venue a bot imports
-  (workshops and tracks too, the item above), and page names resolved wherever versions are shown.
-- **A venue's forms, kept once** (the same audit). `forms.json` is in every submission's folder, and `venues.forms`
-  is whichever import ran last, so a venue that changes its forms mid-cycle shows the newer ones for older notes. The
-  fix: the forms in the venue's page, one file per form version, each submission's folder naming the one its notes
-  follow; `venues.forms` then has no last writer.
+- ~~**A venue's name, kept once**~~ **Done 2026-11-23 (layout 7).** A version entry names a venue page
+  (`"page": "neurips/2026"`, exactly one of it and `venue`), and `page_current.versions` shows it with the page's name
+  as `venue` (`server/pages/venue-projection.ts`); the `venue-names` consumer writes a paper's again when the page is
+  renamed. `submission.json` keeps only `venue.id` (`submission/2`), and `venues` is a projection of venue pages. An
+  import refuses a venue with no page (workshops and tracks wait for the item above).
+- ~~**A venue's forms, kept once**~~ **Done 2026-11-23 (layout 7),** more simply than proposed: one `forms.json` on the
+  venue's page, by source, which an import writes as the system; no `forms.json` per submission. A venue that changes
+  its forms mid-cycle still shows the newer ones for older notes; versioned forms would be a later change.
 
 ## Open questions
 

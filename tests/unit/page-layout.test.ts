@@ -1,7 +1,9 @@
 import { describe, expect, it } from 'vitest';
 import { linkChanges, versionChanges } from '@/server/pages/content';
 import { htmlProblem, renderHtmlSection } from '@/server/pages/html';
-import { planLayout, planLfs, planOwners } from '@/server/pages/layout-migration';
+import { planLayout, planLfs, planOwners, planVenueData } from '@/server/pages/layout-migration';
+import { parseReviewFile, parseVenueFormsFile } from '@/lib/review-files';
+import { parseVersionFile } from '@/lib/versions';
 import {
   contentProblem,
   GITATTRIBUTES,
@@ -352,5 +354,112 @@ describe('the move to owners/', () => {
       planOwners('category', new Map([['.potentialpaper/metadata.json', '{"layout":3}']])).map((c) => c.path),
     ).toEqual(['.potentialpaper/metadata.json']);
     expect(planOwners('paper', new Map([['.potentialpaper/metadata.json', '{"layout":4}']]))).toEqual([]);
+  });
+});
+
+describe('the move to venue pages (layout 7)', () => {
+  const SOURCE = 'openreview:ICLR.cc/2027/Conference';
+  const FORMS = {
+    forms: {
+      Official_Review: { label: 'Official review', fields: [{ key: 'rating', label: 'Rating', type: 'score' }] },
+    },
+    url: 'https://openreview.net/group?id=ICLR.cc/2027/Conference',
+    license: 'CC-BY-4.0',
+  };
+  const context = {
+    forms: new Map([[SOURCE, FORMS as never]]),
+    pageOf: (source: string) => (source === SOURCE ? 'iclr/2027' : null),
+  };
+  const metadata = (kind: string) => `{\n  "layout": 6,\n  "kind": "${kind}",\n  "key": "k"\n}\n`;
+
+  it("gives a venue page its sources' forms", () => {
+    const venue = new Map([
+      ['.potentialpaper/metadata.json', metadata('venue')],
+      ['venue.json', JSON.stringify({ name: 'ICLR 2027', sources: [SOURCE, 'openreview:Other/2027/Conference'] })],
+    ]);
+    const changes = planVenueData({ kind: 'venue' }, venue, context);
+    expect(changes.map((c) => c.path)).toEqual(['.potentialpaper/metadata.json', 'forms.json']);
+    expect(layoutVersionOf(changes[0].content!)).toBe(7);
+    expect(parseVenueFormsFile(changes[1].content!)).toEqual({
+      file: { schema: 'venue-forms/1', sources: { [SOURCE]: FORMS } },
+    });
+    // The series, which lists no source, only says its layout; a page at layout 7 is left alone.
+    expect(
+      planVenueData(
+        { kind: 'venue' },
+        new Map([
+          ['.potentialpaper/metadata.json', metadata('venue')],
+          ['venue.json', '{"name":"ICLR"}'],
+        ]),
+        context,
+      ).map((c) => c.path),
+    ).toEqual(['.potentialpaper/metadata.json']);
+    expect(
+      planVenueData({ kind: 'venue' }, new Map([['.potentialpaper/metadata.json', '{"layout":7}']]), context),
+    ).toEqual([]);
+  });
+
+  it("keeps a paper's submissions by their venue's id, and names the venue's page", () => {
+    const submission = {
+      schema: 'submission/1',
+      id: 'Abc',
+      venue: {
+        id: 'ICLR.cc/2027/Conference',
+        name: 'ICLR 2027',
+        url: 'https://openreview.net/group?id=ICLR.cc/2027/Conference',
+      },
+      number: 7,
+      url: 'https://openreview.net/forum?id=Abc',
+      license: 'CC-BY-4.0',
+    };
+    const workshop = {
+      ...submission,
+      id: 'Def',
+      venue: { id: 'ICLR.cc/2027/Workshop/X', name: 'X @ ICLR', url: null },
+    };
+    const forum = 'https://openreview.net/forum?id=Abc';
+    const version = {
+      kind: 'submitted',
+      label: 'ICLR 2027',
+      submissions: [
+        { venue: 'ICLR 2027', status: 'accepted', url: forum, reviews: 'openreview/abc' },
+        { venue: 'X @ ICLR', reviews: 'openreview/def' },
+        { venue: 'NeurIPS 2026' },
+      ],
+    };
+    const paper = new Map([
+      ['.potentialpaper/metadata.json', metadata('paper')],
+      ['reviews/openreview/abc/submission.json', JSON.stringify(submission)],
+      ['reviews/openreview/abc/forms.json', JSON.stringify({ schema: 'forms/1', ...FORMS })],
+      ['reviews/openreview/def/submission.json', JSON.stringify(workshop)],
+      ['versions/v_a.json', JSON.stringify(version)],
+    ]);
+    const changes = new Map(planVenueData({ kind: 'paper' }, paper, context).map((c) => [c.path, c.content]));
+    expect([...changes.keys()].sort()).toEqual([
+      '.potentialpaper/metadata.json',
+      'reviews/openreview/abc/forms.json',
+      'reviews/openreview/abc/submission.json',
+      'reviews/openreview/def/submission.json',
+      'versions/v_a.json',
+    ]);
+    expect(changes.get('reviews/openreview/abc/forms.json')).toBeNull();
+    const moved = parseReviewFile('submission', changes.get('reviews/openreview/abc/submission.json')!);
+    expect(moved).toEqual({
+      file: { ...submission, schema: 'submission/2', venue: { id: 'ICLR.cc/2027/Conference' } },
+    });
+    const parsed = parseVersionFile('v_a', changes.get('versions/v_a.json')!);
+    expect('version' in parsed && parsed.version.submissions).toEqual([
+      { page: 'iclr/2027', status: 'accepted', url: forum, reviews: 'openreview/abc' },
+      // A venue with no page, and one nobody imported, keep their names.
+      { venue: 'X @ ICLR', reviews: 'openreview/def' },
+      { venue: 'NeurIPS 2026' },
+    ]);
+    // Done: nothing more to move.
+    const after = new Map(paper);
+    for (const [path, content] of changes) {
+      if (content === null) after.delete(path);
+      else after.set(path, content);
+    }
+    expect(planVenueData({ kind: 'paper' }, after, context)).toEqual([]);
   });
 });

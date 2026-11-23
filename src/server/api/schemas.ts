@@ -210,7 +210,10 @@ export const VersionPdf = z.object({
 });
 
 const VersionSubmissionSchema = z.object({
-  venue: z.string().max(1000),
+  /** The venue as people say it, for a venue with no page here. Read back filled in from the page's name. */
+  venue: z.string().max(1000).optional(),
+  /** The venue's page by its key, `neurips/2026`, in place of `venue`. */
+  page: z.string().max(200).optional(),
   status: z.enum(SUBMISSION_STATUSES).optional(),
   decision: z.string().max(1000).optional(),
   /** Where it is presented, for a venue held in several places at once: "Sydney". */

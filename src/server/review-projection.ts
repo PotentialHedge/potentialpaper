@@ -2,7 +2,6 @@ import { and, eq, notInArray, sql } from 'drizzle-orm';
 import type { Database } from '@/db';
 import { submissionNotes, submissions, venues } from '@/db/schema';
 import {
-  type FormsFile,
   type NoteFile,
   parseReviewFile,
   parseReviewPath,
@@ -19,14 +18,14 @@ import { markPaperScopes } from './scope-stats';
 
 /**
  * The review projection (DESIGN.md §4.9): the `reviews` outbox consumer, which brings a page's rows in
- * `submissions` and `submission_notes`, and the forms of their `venues`, up to a commit, from the files a bot
+ * `submissions` and `submission_notes` up to a commit, from the files a bot
  * wrote under `reviews/<source>/<submission>/` (`lib/review-files.ts`), with each one's status and decision from
  * its entry in the version it is of (`lib/versions.ts`, the one place a decision is kept). The Submissions panel reads only these
  * tables (`submissions.ts`), so it shows what the repo says once the worker has caught up.
  *
- * A venue's id is `<source>:<the source's venue id>` (`openreview:ICLR.cc/2027/Conference`). Its forms are
- * those of the last page projected that has a `forms.json`: an import writes the same forms into every
- * submission of a venue. `fetched_at` is when the submission's folder last changed (its newest commit up to
+ * A venue's id is `<source>:<the source's venue id>` (`openreview:ICLR.cc/2027/Conference`). Its `venues` row, name
+ * and forms, is its venue page's projection (`venue-projection.ts`); this only makes a bare row, named by its id, where
+ * there is none yet, which a submission's row needs to refer to. `fetched_at` is when the submission's folder last changed (its newest commit up to
  * this head), since an import that finds nothing new commits nothing.
  *
  * Rows of a submission whose folder is gone go, so a bot taking one down removes it. Re-running at the same head
@@ -38,7 +37,6 @@ interface Folder {
   source: string;
   dir: string;
   submission?: string;
-  forms?: string;
   notes: string[];
 }
 
@@ -55,7 +53,6 @@ function reviewFolders(files: ReadonlyMap<string, string>): Map<string, Folder> 
       folders.set(dir, folder);
     }
     if (parsed.kind === 'submission') folder.submission = blob;
-    else if (parsed.kind === 'forms') folder.forms = blob;
     else folder.notes.push(blob);
   }
   return folders;
@@ -86,7 +83,6 @@ interface Projected {
   submission: SubmissionFile;
   /** Its entry in its version, which says what the venue decided. */
   entry: VersionSubmission | null;
-  forms: FormsFile | null;
   notes: NoteFile[];
   changedAt: Date;
 }
@@ -118,7 +114,7 @@ async function changedAt(
   return new Map(rows.map((row) => [row.dir, new Date(row.at)]));
 }
 
-/** Brings `paperId`'s submissions, notes and their venues' forms up to commit `head`. */
+/** Brings `paperId`'s submissions and notes up to commit `head`. */
 export async function projectReviews(database: Database, paperId: string, head: string): Promise<ProjectReport> {
   const commit = await readCommit(database, paperId, head);
   const folders = reviewFolders(await readFolder(database, paperId, commit.tree, REVIEWS_DIR));
@@ -126,9 +122,7 @@ export async function projectReviews(database: Database, paperId: string, head: 
   const entries = folders.size > 0 ? await versionEntries(database, paperId, commit.tree) : new Map();
   const fallback = commit.at;
   // Every review file in one read.
-  const blobs = [...folders.values()].flatMap((f) =>
-    [f.submission, f.forms, ...f.notes].filter((b) => b !== undefined),
-  );
+  const blobs = [...folders.values()].flatMap((f) => [f.submission, ...f.notes].filter((b) => b !== undefined));
   const bodies = blobs.length > 0 ? await pageRepo(database, paperId).read(blobs) : new Map();
   const textOf = (blob: string | undefined) => (blob ? (bodies.get(blob)?.body.toString('utf8') ?? null) : null);
 
@@ -140,11 +134,6 @@ export async function projectReviews(database: Database, paperId: string, head: 
     if (text === null) continue;
     const submission = parseReviewFile('submission', text);
     if (!('file' in submission)) continue;
-    let forms: FormsFile | null = null;
-    if (folder.forms) {
-      const parsed = parseReviewFile('forms', textOf(folder.forms) ?? '');
-      if ('file' in parsed) forms = parsed.file;
-    }
     const notes: NoteFile[] = [];
     for (const blob of folder.notes) {
       const parsed = parseReviewFile('note', textOf(blob) ?? '');
@@ -154,7 +143,6 @@ export async function projectReviews(database: Database, paperId: string, head: 
       venueId: `${folder.source}:${submission.file.venue.id}`,
       submission: submission.file,
       entry: entries.get(reviewsKey(folder.source, submission.file.id)) ?? null,
-      forms,
       notes,
       changedAt: times.get(folder.dir) ?? fallback,
     });
@@ -166,18 +154,7 @@ export async function projectReviews(database: Database, paperId: string, head: 
     const report: ProjectReport = { submissions: 0, notes: 0, removed: 0 };
     const kept: string[] = [];
     for (const item of projected) {
-      const { venue } = item.submission;
-      await tx
-        .insert(venues)
-        .values({ id: item.venueId, name: venue.name, url: venue.url, forms: item.forms?.forms ?? {} })
-        .onConflictDoUpdate({
-          target: venues.id,
-          set: {
-            name: venue.name,
-            url: venue.url,
-            ...(item.forms ? { forms: item.forms.forms } : {}),
-          },
-        });
+      await tx.insert(venues).values({ id: item.venueId, name: item.venueId }).onConflictDoNothing();
       const s = item.submission;
       const status = item.entry?.status ?? null;
       const decision = item.entry?.decision ?? null;

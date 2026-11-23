@@ -7,7 +7,7 @@ import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it, vi } 
 import { getDb } from '@/db';
 import { accounts } from '@/db/schema';
 import { pluginBaseUrl } from '@/lib/plugins/origin';
-import { encodeReviewFile, formsFilePath, noteFilePath, submissionFilePath, type NoteFile } from '@/lib/review-files';
+import { encodeReviewFile, noteFilePath, submissionFilePath, type NoteFile } from '@/lib/review-files';
 import { ensureBot, grantBot, OPENREVIEW_BOT } from '@/server/bots';
 import { CONSUMERS } from '@/server/consumers';
 import { runConsumer } from '@/server/consumers/run';
@@ -351,6 +351,25 @@ describe('the page routes plugins read', () => {
       [
         { path: 'venue.json', content: JSON.stringify({ name: 'ICLR 2027', sources: [`openreview:${venueId}`] }) },
         { path: 'community/10-about.md', content: 'The 2027 edition.\n' },
+        {
+          // The venue's forms mark the rating a score, which is what its statistics count.
+          path: 'forms.json',
+          content: encodeReviewFile({
+            schema: 'venue-forms/1',
+            sources: {
+              [`openreview:${venueId}`]: {
+                forms: {
+                  Official_Review: {
+                    label: 'Official review',
+                    fields: [{ key: 'rating', label: 'Rating', type: 'score' }],
+                  },
+                },
+                url: 'https://openreview.net/group?id=ICLR.cc/2027/Conference',
+                license: 'CC-BY-4.0',
+              },
+            },
+          }),
+        },
       ],
       'Venue',
     );
@@ -364,26 +383,11 @@ describe('the page routes plugins read', () => {
         {
           path: submissionFilePath('openreview', 'forum1'),
           content: encodeReviewFile({
-            schema: 'submission/1',
+            schema: 'submission/2',
             id: 'forum1',
-            venue: { id: venueId, name: 'ICLR 2027', url: null },
+            venue: { id: venueId },
             number: 1,
             url: 'https://openreview.net/forum?id=forum1',
-            license: 'CC-BY-4.0',
-          }),
-        },
-        {
-          // The venue's forms mark the rating a score, which is what its statistics count.
-          path: formsFilePath('openreview', 'forum1'),
-          content: encodeReviewFile({
-            schema: 'forms/1',
-            forms: {
-              Official_Review: {
-                label: 'Official review',
-                fields: [{ key: 'rating', label: 'Rating', type: 'score' }],
-              },
-            },
-            url: 'https://openreview.net/group?id=ICLR.cc/2027/Conference',
             license: 'CC-BY-4.0',
           }),
         },

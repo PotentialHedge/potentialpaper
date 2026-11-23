@@ -19,7 +19,6 @@ import { ApiError } from '@/server/api/errors';
 import type { Actor } from '@/server/pages/check';
 import { findPage } from '@/server/pages/kinds';
 import { createCategory, linkPageToCategory } from '@/server/category-pages';
-import { syncVenuePages } from '@/server/venue-pages';
 import { FIXTURE_PATH, type Fixture } from './fixture';
 
 const forumUrl = (forum: string) => `https://openreview.net/forum?id=${forum}`;
@@ -245,10 +244,9 @@ async function main() {
   const fixture = JSON.parse(readFileSync(FIXTURE_PATH, 'utf8')) as Fixture;
   const people = new Map<string, Account>();
   for (const p of PEOPLE) people.set(p.handle, await person(p));
+  // Each import makes its venue's pages, whose `venues` rows are their projection.
   await papers(fixture);
-  // The venue pages come from the `venues` table, which the reviews consumer fills.
   await project();
-  await syncVenuePages();
   const dev = people.get('dev')!;
   await merges(fixture, { kind: 'account', accountId: dev.id, isAdmin: true });
   await categories(fixture, { kind: 'account', accountId: dev.id, isAdmin: false });

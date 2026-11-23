@@ -1,5 +1,5 @@
 import { randomBytes } from 'node:crypto';
-import { and, eq } from 'drizzle-orm';
+import { and, eq, inArray } from 'drizzle-orm';
 import { accounts, authorClaims, botGrants, commitIdentities, pages, papers } from '@/db/schema';
 import { isUnderDomain, KINDS, orgFileSchema, type PageKind, partsOf } from '@/lib/kinds';
 import { parseReviewPath, SUBMISSION_FILE } from '@/lib/review-files';
@@ -499,6 +499,34 @@ async function checkOrgDomains(db: Reader, check: TreeCheck): Promise<void> {
   }
 }
 
+/** A version's submission that names a venue page (`"page"`) names one there is (`lib/versions.ts`). */
+async function checkVenuePages(db: Reader, check: TreeCheck, changed: readonly string[]): Promise<void> {
+  const named = new Map<string, string>();
+  for (const path of changed) {
+    const blob = check.after.get(path);
+    const id = versionIdOf(path);
+    if (!blob || !id) continue;
+    const parsed = parseVersionFile(id, (await check.text(blob)) ?? '');
+    if (!('version' in parsed)) continue;
+    for (const entry of parsed.version.submissions ?? []) if (entry.page) named.set(entry.page, path);
+  }
+  if (named.size === 0) return;
+  const found = await db
+    .select({ key: pages.key })
+    .from(pages)
+    .where(and(eq(pages.kind, 'venue'), inArray(pages.key, [...named.keys()])));
+  const known = new Set(found.map((row) => row.key));
+  for (const [key, path] of named) {
+    if (known.has(key)) continue;
+    throw new ApiError(
+      422,
+      'validation_error',
+      `${path}: there is no venue page ${key} (/v/${key}); name the venue by its page's key, or by "venue" when it has no page`,
+      { path },
+    );
+  }
+}
+
 /** Each version's submission that names imported reviews, by its `reviews`, as text that ignores key order. */
 async function importedSubmissions(
   files: FileTree,
@@ -613,7 +641,10 @@ export async function checkTree(db: Reader, check: TreeCheck): Promise<string[]>
   // Pages of other kinds have no title links, PDFs, pictures or demos (`lib/kinds.ts`'s file types).
   if (kind !== 'paper') return [];
   if (changed.some(isLinkPath)) await checkLinkLabels(after, text);
-  if (changed.some((path) => versionIdOf(path))) await checkImportedSubmissions(check);
+  if (changed.some((path) => versionIdOf(path))) {
+    await checkImportedSubmissions(check);
+    await checkVenuePages(db, check, changed);
+  }
   await checkLfsFiles(changed, after, text, db);
   return checkDemos(db, {
     pageId: check.pageId,

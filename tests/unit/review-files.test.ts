@@ -4,7 +4,9 @@ import {
   noteFilePath,
   parseReviewFile,
   parseReviewPath,
+  parseVenueFormsFile,
   submissionFilePath,
+  withSourceForms,
   type NoteFile,
   type SubmissionFile,
 } from '@/lib/review-files';
@@ -12,13 +14,9 @@ import { contentProblem, grantCovers, grantProblem, layoutProblem, pathDenied } 
 import { fileTypeOf, indexFile, pageJsonSchema } from '@/server/pages/schemas';
 
 const SUBMISSION: SubmissionFile = {
-  schema: 'submission/1',
+  schema: 'submission/2',
   id: 'dskf2Ppd9o',
-  venue: {
-    id: 'ICLR.cc/2027/Conference',
-    name: 'ICLR 2027',
-    url: 'https://openreview.net/group?id=ICLR.cc/2027/Conference',
-  },
+  venue: { id: 'ICLR.cc/2027/Conference' },
   number: 1234,
   url: 'https://openreview.net/forum?id=dskf2Ppd9o',
   license: 'CC-BY-4.0',
@@ -46,21 +44,23 @@ const NOTE: NoteFile = {
 const roles = { system: false, admin: false, verified: true, owner: false, claimed: false };
 
 describe('review paths', () => {
-  it('knows the three files of a submission folder', () => {
+  it('knows the two files of a submission folder', () => {
     expect(submissionFilePath('openreview', 'dskf2Ppd9o')).toBe('reviews/openreview/dskf2ppd9o/submission.json');
     expect(noteFilePath('openreview', 'dskf2Ppd9o', 'AbC123xyz')).toBe(
       'reviews/openreview/dskf2ppd9o/notes/abc123xyz.json',
     );
-    expect(parseReviewPath('reviews/openreview/dskf2ppd9o/forms.json')).toEqual({
+    expect(parseReviewPath('reviews/openreview/dskf2ppd9o/submission.json')).toEqual({
       source: 'openreview',
       submission: 'dskf2ppd9o',
-      kind: 'forms',
+      kind: 'submission',
     });
     expect(parseReviewPath('reviews/openreview/dskf2ppd9o/notes/abc.json')).toMatchObject({
       kind: 'note',
       note: 'abc',
     });
     for (const bad of [
+      // A venue's forms are on its page.
+      'reviews/openreview/dskf2ppd9o/forms.json',
       'reviews/openreview/dskf2ppd9o/other.json',
       'reviews/OpenReview/x/submission.json',
       'reviews/openreview/Upper/submission.json',
@@ -102,19 +102,17 @@ describe('review files', () => {
   it('reads a valid file of each kind', () => {
     expect(parseReviewFile('submission', encodeReviewFile(SUBMISSION))).toEqual({ file: SUBMISSION });
     expect(parseReviewFile('note', encodeReviewFile(NOTE))).toEqual({ file: NOTE });
-    const forms = {
-      schema: 'forms/1',
-      forms: {
-        Official_Review: {
-          label: 'Official review',
-          fields: [{ key: 'rating', label: 'Rating', type: 'score', max: 10 }],
-          summary: ['rating'],
-        },
-      },
-      url: 'https://openreview.net/group?id=ICLR.cc/2027/Conference',
-      license: 'CC-BY-4.0',
-    };
-    expect(contentProblem('reviews/openreview/x/forms.json', JSON.stringify(forms))).toBeNull();
+  });
+
+  it("keeps a submission's venue by its id alone", () => {
+    const old = { ...SUBMISSION, schema: 'submission/1', venue: { id: 'ICLR.cc/2027/Conference', name: 'ICLR 2027' } };
+    expect(contentProblem('reviews/openreview/x/submission.json', JSON.stringify(old))).toMatch(/submission\/1/);
+    expect(
+      contentProblem(
+        'reviews/openreview/x/submission.json',
+        JSON.stringify({ ...SUBMISSION, venue: { id: 'x', name: 'ICLR 2027' } }),
+      ),
+    ).toBe('has an unknown field “venue.name”');
   });
 
   it('says what is wrong with one that is not', () => {
@@ -146,12 +144,12 @@ describe('the file type registry', () => {
     expect(doc.kind).toBe('note');
     expect(doc.text).toContain('Masked diffusion, recursively.');
     expect(doc.fields).toMatchObject({ noteKind: 'review', signature: 'Reviewer B3x7', rating: 8, confidence: 4 });
-    expect(
-      indexFile(
-        'reviews/openreview/x/forms.json',
-        '{"schema":"forms/1","forms":{},"url":"https://a.org","license":"x"}',
-      ),
-    ).toEqual([]);
+    expect(fileTypeOf('reviews/openreview/x/forms.json')).toBeNull();
+    expect(fileTypeOf('forms.json')).toBe('venueForms');
+    expect(indexFile('reviews/openreview/x/submission.json', JSON.stringify(SUBMISSION))![0]).toMatchObject({
+      kind: 'submission',
+      fields: { venue: 'ICLR.cc/2027/Conference', number: 1234 },
+    });
     expect(indexFile('reviews/openreview/x/notes/a.json', '{}')).toBeNull();
   });
 
@@ -159,5 +157,54 @@ describe('the file type registry', () => {
     const note = pageJsonSchema('note') as { properties: { schema: { const?: string } }; required: string[] };
     expect(note.properties.schema.const).toBe('review/1');
     expect(note.required).toEqual(expect.arrayContaining(['schema', 'id', 'kind', 'content', 'license', 'url']));
+  });
+});
+
+const SOURCE = 'openreview:ICLR.cc/2027/Conference';
+const FORMS = {
+  forms: {
+    Official_Review: {
+      label: 'Official review',
+      fields: [{ key: 'rating', label: 'Rating', type: 'score' as const, max: 10 }],
+      summary: ['rating'],
+    },
+  },
+  url: 'https://openreview.net/group?id=ICLR.cc/2027/Conference',
+  license: 'CC-BY-4.0',
+};
+
+describe("a venue page's forms", () => {
+  it("holds each source's forms, and only a venue page has it", () => {
+    const text = withSourceForms(null, SOURCE, FORMS)!;
+    expect(parseVenueFormsFile(text)).toEqual({ file: { schema: 'venue-forms/1', sources: { [SOURCE]: FORMS } } });
+    expect(contentProblem('forms.json', text, 'venue')).toBeNull();
+    expect(layoutProblem('forms.json', 'venue')).toBeNull();
+    expect(layoutProblem('forms.json', 'org')).not.toBeNull();
+    expect(layoutProblem('forms.json', 'paper')).not.toBeNull();
+    expect(contentProblem('forms.json', JSON.stringify({ schema: 'forms/1', sources: {} }), 'venue')).toMatch(
+      /forms\/1.*doesn't know/,
+    );
+    expect(
+      contentProblem('forms.json', JSON.stringify({ schema: 'venue-forms/1', sources: { ICLR: FORMS } }), 'venue'),
+    ).toMatch(/sources/);
+  });
+
+  it('changes only when the forms do, and keeps the other sources', () => {
+    const text = withSourceForms(null, SOURCE, FORMS)!;
+    expect(withSourceForms(text, SOURCE, FORMS)).toBeNull();
+    const other = 'openreview:ICLR.cc/2027/Workshop/X';
+    const both = withSourceForms(text, other, { ...FORMS, license: 'CC0-1.0' })!;
+    const parsed = parseVenueFormsFile(both);
+    expect('file' in parsed && Object.keys(parsed.file.sources)).toEqual([SOURCE, other]);
+  });
+
+  it('is written by the system, admins and a bot granted it, not by its organisers', () => {
+    expect(pathDenied('forms.json', { ...roles, system: true, verified: false }, 'venue')).toBeNull();
+    expect(pathDenied('forms.json', { ...roles, admin: true }, 'venue')).toBeNull();
+    expect(pathDenied('forms.json', { ...roles, grants: ['forms.json'] }, 'venue')).toBeNull();
+    expect(pathDenied('forms.json', { ...roles, owner: true, claimed: true }, 'venue')).toMatch(/only the system/);
+    expect(grantProblem('forms.json', 'venue')).toBeNull();
+    expect(grantProblem('venue.json', 'venue')).toBeNull();
+    expect(grantProblem('community/**', 'venue')).not.toBeNull();
   });
 });

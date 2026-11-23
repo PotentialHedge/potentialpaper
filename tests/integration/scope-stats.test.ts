@@ -2,7 +2,7 @@ import { eq } from 'drizzle-orm';
 import { afterAll, beforeEach, describe, expect, it } from 'vitest';
 import { getDb } from '@/db';
 import { pageCurrent, pdfDocuments, scopeState, scopeStats, venues } from '@/db/schema';
-import { encodeReviewFile, formsFilePath, noteFilePath, submissionFilePath } from '@/lib/review-files';
+import { encodeReviewFile, noteFilePath, submissionFilePath } from '@/lib/review-files';
 import type { SubmissionStatus } from '@/lib/submissions';
 import * as papersRoute from '@/app/api/v1/pages/[identifier]/papers/route';
 import * as scoresRoute from '@/app/api/v1/pages/[identifier]/scores/route';
@@ -25,7 +25,7 @@ import {
   venuePagesOf,
 } from '@/server/scope-stats';
 import { syncVenuePages, VENUES_BOT, venueScoreStats } from '@/server/venue-pages';
-import { api, closePool, ORIGIN, resetDatabase, submittedVersion } from './helpers';
+import { api, closePool, ORIGIN, resetDatabase, submittedVersion, venueWithForms } from './helpers';
 
 /**
  * Data for plugins (`handoffs/plugins.md` Phase 4): the score statistics of a scope (A, `scope_stats`, kept up by the
@@ -72,6 +72,7 @@ async function submitted(venue: string, status: SubmissionStatus | null, ratings
   const bot = await ensureBot(OPENREVIEW_BOT);
   await grantBot(OPENREVIEW_BOT, 'reviews/openreview/**', { grantedBy: 'system' });
   const id = venue.slice('openreview:'.length);
+  await venueWithForms(venue, id.includes('2027') ? 'ICLR 2027' : 'ICLR 2026', FORMS);
   const license = 'CC-BY-4.0';
   await commitPage(
     paperId,
@@ -81,9 +82,9 @@ async function submitted(venue: string, status: SubmissionStatus | null, ratings
       {
         path: submissionFilePath('openreview', forum),
         content: encodeReviewFile({
-          schema: 'submission/1',
+          schema: 'submission/2',
           id: forum,
-          venue: { id, name: id.includes('2027') ? 'ICLR 2027' : 'ICLR 2026', url: null },
+          venue: { id },
           number: papers,
           url: `https://openreview.net/forum?id=${forum}`,
           license,
@@ -95,10 +96,6 @@ async function submitted(venue: string, status: SubmissionStatus | null, ratings
         status,
         status === 'accepted' ? 'Accept (Poster)' : status === 'rejected' ? 'Reject' : null,
       ),
-      {
-        path: formsFilePath('openreview', forum),
-        content: encodeReviewFile({ schema: 'forms/1', forms: FORMS, url: 'https://openreview.net/group', license }),
-      },
       ...ratings.map((rating, i) => ({
         path: noteFilePath('openreview', forum, `r${i}`),
         content: encodeReviewFile({

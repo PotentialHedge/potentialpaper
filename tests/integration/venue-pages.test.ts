@@ -84,9 +84,9 @@ async function submitted(
       {
         path: submissionFilePath('openreview', forum),
         content: encodeReviewFile({
-          schema: 'submission/1',
+          schema: 'submission/2',
           id: forum,
-          venue: { id, name: id.startsWith('ICLR.cc/2027') ? 'ICLR 2027' : 'ICLR 2026', url: null },
+          venue: { id },
           number: papers,
           url: `https://openreview.net/forum?id=${forum}`,
           license: 'CC-BY-4.0',

@@ -334,3 +334,33 @@ export function submittedVersion(
     }),
   };
 }
+
+/**
+ * A venue's series and edition pages, with its forms in the edition's `forms.json`, as an import makes them: where a
+ * venue's name and forms are kept (`venues` is their projection). `source` is `openreview:<group>`.
+ */
+export async function venueWithForms(source: string, name: string, forms: import('@/lib/submissions').VenueForms) {
+  const { venuePlace } = await import('@/lib/venues');
+  const { syncVenuePages } = await import('@/server/venue-pages');
+  const { writeVenueForms } = await import('@/server/import-reviews');
+  const { getDb } = await import('@/db');
+  await grantVenuesBot();
+  const place = venuePlace(source, name);
+  if (!place) throw new Error(`${source} has no venue page`);
+  await syncVenuePages({ venues: [{ id: source, name }] });
+  const colon = source.indexOf(':');
+  await writeVenueForms(
+    { source: source.slice(0, colon), id: source.slice(colon + 1), name, url: null, forms, license: 'CC-BY-4.0' },
+    place,
+    getDb(),
+  );
+  return place;
+}
+
+/** The `venues` bot with its grant (migration `0035`), which an import needs to make its venue's pages. */
+export async function grantVenuesBot() {
+  const { ensureBot, grantBot } = await import('@/server/bots');
+  const { VENUES_BOT } = await import('@/server/venue-pages');
+  await ensureBot(VENUES_BOT);
+  await grantBot(VENUES_BOT, 'venue.json', { grantedBy: 'system', kind: 'venue' });
+}

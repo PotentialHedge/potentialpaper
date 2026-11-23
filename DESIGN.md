@@ -114,8 +114,8 @@ paper_identifiers(scheme, value, paper_id, pk(scheme, value))   -- arxiv, doi, o
   which requires attribution and a link on every one we show.
 - **Submissions and their reviews are imported by bots into the page's repo** (decided 2026-11-16; until
   it is built they are in the `submissions` and `submission_notes` tables). Each source writes
-  `reviews/<source>/<submission>/` (§4.3): the submission (venue, number, keywords, link; its decision is in the
-  version it is of, above), the venue's forms, and one file per note: reviews, meta-reviews, decisions and comments,
+  `reviews/<source>/<submission>/` (§4.3): the submission (its venue's id, number, keywords, link; its decision is
+  in the version it is of, above) and one file per note: reviews, meta-reviews, decisions and comments,
   threaded by `reply_to`, each with its license and link. Only notes the source shows everyone are
   imported. Only that source's bot writes its folder, nobody edits them on the site, and a re-import
   commits only what changed, so a reviewer raising a score is a commit in the page's history. The
@@ -210,8 +210,7 @@ thumbnail.gif                   the paper's picture, in place of its PDF's first
                                 .png, .jpg, .gif, .webp or .avif, named for its type, one a page)
 thumbnail.json                  the picture's words: { "alt", "caption" }
 demos/<name>/index.html         a demo kept in the page, with the files it loads beside it
-reviews/<source>/<submission>/submission.json   a bot's import: the submission (§3, §4.8)
-reviews/<source>/<submission>/forms.json        the venue's forms for its notes
+reviews/<source>/<submission>/submission.json   a bot's import: the submission, its venue by id (§3, §4.8)
 reviews/<source>/<submission>/notes/<id>.json   one review, decision or comment
 extensions/<id>/...             reserved: data owned by one extension (section 10)
 ```
@@ -247,6 +246,14 @@ decided by an admin); a series' organisers also own its editions. They write `ow
 their own handle's identity, since organising is a public role.
 A venue's page also shows its review scores (`scores`, from `scope_stats`, §10): the first score field as a
 histogram stacked by outcome, and every field's median, middle half and medians by decision, per venue on a series.
+**A venue's name and forms are kept once, on its page** (layout 7, 2026-11-23). Its `venue.json` has the name, and its
+`forms.json` (`{ "schema": "venue-forms/1", "sources": { "<source id>": { forms, url, license } } }`, written by the
+system as an import runs, and by admins) how each source's notes are shown. The `venues` table is their projection,
+a row per source the page lists, written with the page's commit (`server/pages/venue-projection.ts`). A paper's
+`submission.json` names only its venue's id, and its version's entry names the edition's page
+(`"page": "iclr/2027"`, in place of `"venue"`, which stays for venues with no page); `page_current.versions` shows the
+page's name there, and the `venue-names` consumer (§4.9) writes a paper's again when the page is renamed. An import
+makes the venue's pages if they're missing, and refuses a venue that has none (tracks and workshops, for now).
 
 **User pages** (built in `handoffs/pages.md` Phase 3; without a repo since 2026-11-21). Every account has a page at
 `/u/<handle>`, keyed by its handle and made with the account by a trigger on `accounts` (migration `0037`). A handle

@@ -51,9 +51,9 @@ async function commit(paper: string, actor: Actor, changes: FileChange[]): Promi
 
 const submission = (id: string) =>
   encodeReviewFile({
-    schema: 'submission/1',
+    schema: 'submission/2',
     id,
-    venue: { id: 'ICLR.cc/2027/Conference', name: 'ICLR 2027', url: null },
+    venue: { id: 'ICLR.cc/2027/Conference' },
     number: 7,
     url: `https://openreview.net/forum?id=${id}`,
     license: 'CC-BY-4.0',

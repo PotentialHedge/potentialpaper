@@ -4,7 +4,14 @@ import { KINDS, OWNERS_DIR, PAGE_KINDS, type PageKind, partsOf } from '@/lib/kin
 import { LINKS_FILE, parseLabeledLinks } from '@/lib/labeled-links';
 import { FACTS_FILE, parseFacts } from '@/lib/infobox-facts';
 import { parseLinkFile } from '@/lib/paper-links';
-import { parseReviewPath, parseReviewFile, REVIEWS_DIR, reviewSourceOf } from '@/lib/review-files';
+import {
+  parseReviewPath,
+  parseReviewFile,
+  parseVenueFormsFile,
+  REVIEWS_DIR,
+  reviewSourceOf,
+  VENUE_FORMS_FILE,
+} from '@/lib/review-files';
 import { parseVersionFile, VERSION_ID, type VersionPdf } from '@/lib/versions';
 import { AUTHOR_PLUGINS_PATH, parseAuthorPlugins } from '@/lib/plugins/author-plugins';
 import { htmlProblem } from './html';
@@ -36,6 +43,7 @@ import { htmlProblem } from './html';
  * kind file, and `extensions/`. The rest above is a paper's own. Other kinds today:
  *
  *   venue.json, category.json, org.json or profile.json   the kind file (`lib/kinds.ts`)
+ *   forms.json                      a venue's forms for its notes, by source (`lib/review-files.ts`)
  *   owners/                         the owners' sections, where the kind has owners; community/ on all but a user's
  *   <part>/links.jsonl              that part's labeled links
  *   <part>/facts.jsonl              that part's rows of the infobox (papers and venues)
@@ -65,8 +73,11 @@ const SYSTEM_PATHS = new Set([METADATA_PATH]);
  *      wiped and reseeded.
  *   6  a paper's title, authors and abstract are in `paper.json`, and its `metadata.json` says only the layout, the
  *      kind and the key, as every other kind's does: no copy of the paper that could go stale (`planPaperFile`)
+ *   7  a venue's name and forms are kept once, on its page: a venue page's `forms.json` holds its forms by source, a
+ *      `submission.json` names only the venue's id (`submission/2`) and has no `forms.json` beside it, and an
+ *      imported version entry names the venue's page (`"page"`) in place of its name (`planVenueData`)
  */
-export const LAYOUT_VERSION = 6;
+export const LAYOUT_VERSION = 7;
 
 /** The layout a page's `metadata.json` says it has; `null` if it says none, as the first layout's doesn't. */
 export function layoutVersionOf(metadata: string | undefined): number | null {
@@ -313,7 +324,8 @@ function kindLayout(kind: PageKind): string {
   const parts = partsOf(kind).map((part) => `${part}/`);
   const sections = `${parts.join(' and ')} (sections named like 10-summary.md or 20-results.html, links.jsonl${(KINDS[kind].fileTypes as readonly string[]).includes('fact') ? ', facts.jsonl' : ''}${kind === 'paper' ? `; ${OWNERS_DIR}/ also plugins.json` : ''})`;
   if (kind !== 'paper') {
-    return `${kind} pages hold .gitattributes, prek.toml, ${METADATA_PATH}, ${KINDS[kind].kindFile}, ${sections} and extensions/`;
+    const forms = kind === 'venue' ? `, ${VENUE_FORMS_FILE}` : '';
+    return `${kind} pages hold .gitattributes, prek.toml, ${METADATA_PATH}, ${KINDS[kind].kindFile}${forms}, ${sections} and extensions/`;
   }
   return (
     `pages hold .gitattributes, prek.toml, .potentialpaper/ (metadata.json), paper.json, ${sections}, ` +
@@ -323,8 +335,8 @@ function kindLayout(kind: PageKind): string {
 }
 
 const REVIEWS_LAYOUT =
-  'reviews/<source>/<submission>/ holds submission.json, forms.json and notes/<id>.json, each name a lower-case ' +
-  'slug (letters, digits, - and _)';
+  'reviews/<source>/<submission>/ holds submission.json and notes/<id>.json, each name a lower-case ' +
+  "slug (letters, digits, - and _); the venue's forms are on its page";
 
 const CONFIRM = 'confirm an institutional email address first';
 const METADATA_ONLY = 'the system only writes the metadata';
@@ -383,6 +395,19 @@ function kindFileRule(kind: Exclude<PageKind, 'paper'>): PathRule {
     },
   };
 }
+
+/**
+ * A venue's forms (`forms.json`): what its source published about how to show its notes, so the system writes them as
+ * it imports the venue's reviews, and admins and a bot granted the file may; its organisers don't.
+ */
+const VENUE_FORMS_RULE: PathRule = {
+  covers: (path) => path === VENUE_FORMS_FILE,
+  layout: fine,
+  denied: (roles, path) =>
+    roles.system || roles.admin || may.granted(roles, path)
+      ? null
+      : `only the system, admins and a bot granted ${VENUE_FORMS_FILE} change a venue's forms, as its source gives them`,
+};
 
 /** The rules of a paper's own files, beyond every kind's. */
 const PAPER_RULES: PathRule[] = [
@@ -471,6 +496,7 @@ function rulesOf(kind: PageKind): PathRule[] {
     ...(owners ? [partRule(kind, OWNERS_DIR, may.owners(ownersRefusal))] : []),
     ...(community ? [partRule(kind, 'community', may.verified)] : []),
     ...(kind === 'paper' ? PAPER_RULES : [kindFileRule(kind)]),
+    ...(kind === 'venue' ? [VENUE_FORMS_RULE] : []),
     // Data owned by one extension (DESIGN.md §10). Nobody can act as one until extensions exist.
     {
       covers: (path) => path.startsWith('extensions/'),
@@ -575,10 +601,16 @@ export function grantCovers(pattern: string, path: string): boolean {
 /**
  * Why a bot can't be granted this pattern on pages of this kind, or `null`. On papers, a source's folder of imported
  * reviews, `reviews/<source>/**`; on venues and orgs, the kind file (the `venues` and `orgs` bots of
- * `handoffs/pages.md`); no bot writes category or user pages. Extensions' folders come with them (DESIGN.md §10).
+ * `handoffs/pages.md`), and on venues also their forms; no bot writes category or user pages. Extensions' folders come
+ * with them (DESIGN.md §10).
  */
 export function grantProblem(pattern: string, kind: PageKind = 'paper'): string | null {
-  if (kind === 'venue' || kind === 'org') {
+  if (kind === 'venue') {
+    return pattern === KINDS.venue.kindFile || pattern === VENUE_FORMS_FILE
+      ? null
+      : `on venue pages a bot can be granted ${KINDS.venue.kindFile} or ${VENUE_FORMS_FILE}`;
+  }
+  if (kind === 'org') {
     return pattern === KINDS[kind].kindFile ? null : `on ${kind} pages a bot can be granted ${KINDS[kind].kindFile}`;
   }
   if (kind !== 'paper') return `no bot writes ${kind} pages`;
@@ -760,6 +792,10 @@ export function contentProblem(path: string, content: string, kind: PageKind = '
       return null;
     }
     if (path === METADATA_PATH) return kindMetadataProblem(content, kind);
+    if (kind === 'venue' && path === VENUE_FORMS_FILE) {
+      const parsed = parseVenueFormsFile(content);
+      return 'problem' in parsed ? parsed.problem : null;
+    }
     return path.endsWith('.json') ? jsonProblem(content, false) : null;
   }
   if (path === THUMBNAIL_PATH) {

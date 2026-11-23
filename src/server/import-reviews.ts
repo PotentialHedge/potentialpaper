@@ -1,8 +1,6 @@
 import { getDb, type Database } from '@/db';
 import {
   encodeReviewFile,
-  FORMS_SCHEMA,
-  formsFilePath,
   MAX_KEYWORDS,
   MAX_TLDR,
   NOTE_SCHEMA,
@@ -11,24 +9,32 @@ import {
   submissionDir,
   SUBMISSION_SCHEMA,
   submissionFilePath,
+  VENUE_FORMS_FILE,
+  withSourceForms,
 } from '@/lib/review-files';
+import { sourceUrl, type VenuePlace, venuePlace } from '@/lib/venues';
 import type { PaperId } from '@/lib/paper-ids';
 import type { FieldValue, NoteKind, SubmissionStatus, VenueForms } from '@/lib/submissions';
 import { ApiError } from './api/errors';
 import { botActor, OPENREVIEW_BOT } from './bots';
-import { type Actor, commitPage, type FileChange } from './pages/commit';
+import { type Actor, commitPage, type FileChange, SYSTEM_ACTOR } from './pages/commit';
 import { gitObject } from './pages/git-objects';
 import { readVersions, versionChanges } from './pages/content';
-import { readCommit, readFiles, readFolder, readHead } from './pages/repo';
+import { readCommit, readFiles, readFolder, readHead, readText } from './pages/repo';
+import { findKeyedPage } from './pages/kinds';
 import { attachSubmission } from './versions';
 import { MAX_SITE, MAX_VERSION_DECISION, MAX_VENUE, type VersionSubmission } from '@/lib/versions';
+import { syncVenuePages } from './venue-pages';
 import { findPaper } from './papers';
 import type { RateLimitConfig } from './ratelimit';
 
 /**
  * Adding a venue's submissions and what it published about them, from any source, as files in each paper's
  * repo (`lib/review-files.ts`, DESIGN.md §4.3), committed through `commitPage` by the bot granted the source
- * (`openreview`), one commit per submission. A submission is attached to the paper one of its identifiers
+ * (`openreview`), one commit per submission. What the venue is goes on its own page, kept once: the import makes
+ * the venue's series and edition pages if they aren't there (`venue-pages.ts`), and writes the venue's forms into the
+ * edition's `forms.json` as the system; each submission names the venue by its id, and its version's entry names
+ * the edition's page. A venue that has no page (a track, a workshop, `lib/venues.ts`) is refused. A submission is attached to the paper one of its identifiers
  * names (the paper it was merged into, if it was); one whose paper we don't have is skipped.
  *
  * Safe to run again, and how a run that stopped is resumed: each run writes a submission's folder as the source
@@ -149,7 +155,7 @@ export function submissionFiles(venue: VenueInput, input: SubmissionInput): Map<
     encodeReviewFile({
       schema: SUBMISSION_SCHEMA,
       id: input.externalId,
-      venue: { id: venue.id, name: venue.name, url: venue.url },
+      venue: { id: venue.id },
       number: input.number,
       ...cleanKeywords(input.keywords),
       ...cleanText('primaryArea', input.primaryArea, 300),
@@ -157,10 +163,6 @@ export function submissionFiles(venue: VenueInput, input: SubmissionInput): Map<
       url: input.url,
       license: venue.license,
     }),
-  );
-  files.set(
-    formsFilePath(venue.source, input.externalId),
-    encodeReviewFile({ schema: FORMS_SCHEMA, forms: venue.forms, url: venue.url ?? input.url, license: venue.license }),
   );
   // A source can list a note twice, as a scan and a lookup both return it: the last one stands.
   for (const note of input.notes) {
@@ -184,21 +186,45 @@ export function submissionFiles(venue: VenueInput, input: SubmissionInput): Map<
   return files;
 }
 
-/** The submission as its version records it. */
+/** The source's id for the venue, as a venue page lists it and the `venues` table keys it: `openreview:ICLR.cc/2027/Conference`. */
+export function venueSourceId(venue: Pick<VenueInput, 'source' | 'id'>): string {
+  return `${venue.source}:${venue.id}`;
+}
+
+/** The venue's series and edition pages, or a refusal saying it has none yet. */
+export function placeOf(venue: Pick<VenueInput, 'source' | 'id' | 'name'>): VenuePlace {
+  const place = venuePlace(venueSourceId(venue), venue.name);
+  if (!place) {
+    throw new ApiError(
+      422,
+      'validation_error',
+      `${venueSourceId(venue)} has no venue page: only a conference's main edition (<Series>/<year>/Conference) has one yet, so its reviews can't be imported`,
+    );
+  }
+  return place;
+}
+
+/** The venue's name as a version made for its submission is labelled. */
+function venueLabel(venue: VenueInput): string {
+  return venue.name.trim().slice(0, MAX_VENUE) || venue.id.slice(0, MAX_VENUE);
+}
+
+/** The submission as its version records it: at the venue's edition page, which has its name. */
 export function versionEntry(
-  venue: VenueInput,
+  place: Pick<VenuePlace, 'edition'>,
+  source: string,
   input: SubmissionInput,
-): VersionSubmission & { url: string; reviews: string } {
+): VersionSubmission & { url: string; reviews: string; page: string } {
   const decision = input.decision?.replace(/\s+/g, ' ').trim().slice(0, MAX_VERSION_DECISION);
   const site = input.site?.replace(/\s+/g, ' ').trim().slice(0, MAX_SITE);
   return {
-    venue: venue.name.trim().slice(0, MAX_VENUE) || venue.id.slice(0, MAX_VENUE),
+    page: place.edition.key,
     ...(input.status ? { status: input.status } : {}),
     ...(decision ? { decision } : {}),
     ...(site ? { site } : {}),
     ...(input.number !== null && input.number > 0 ? { number: input.number } : {}),
     url: input.url,
-    reviews: reviewsKey(venue.source, input.externalId),
+    reviews: reviewsKey(source, input.externalId),
     evidence: [input.url],
   };
 }
@@ -217,6 +243,7 @@ function describe(venue: VenueInput, input: SubmissionInput, changes: FileChange
 /** Writes one submission's folder; whether it committed. */
 async function importOne(
   venue: VenueInput,
+  place: VenuePlace,
   input: SubmissionInput,
   actor: Actor,
   options: ImportOptions,
@@ -238,7 +265,8 @@ async function importOne(
   // What the venue decided goes in the version the submission is of, the one place a decision is kept.
   const before = tree ? await readVersions(database, paperId, await readFiles(database, paperId, tree)) : [];
   const date = input.submittedAt ? input.submittedAt.toISOString().slice(0, 10) : undefined;
-  changes.push(...versionChanges(before, attachSubmission(before, versionEntry(venue, input), { date })));
+  const entry = versionEntry(place, venue.source, input);
+  changes.push(...versionChanges(before, attachSubmission(before, entry, { date, label: venueLabel(venue) })));
   if (changes.length === 0) return { status: 'unchanged', paperId };
   const isNew = !held?.has(submissionFilePath(venue.source, input.externalId));
   const result = await commitPage(paperId, head, actor, changes, describe(venue, input, changes, isNew), {
@@ -247,6 +275,36 @@ async function importOne(
     evidence: [input.url],
   });
   return { status: result.status, paperId };
+}
+
+/**
+ * Writes the venue's forms into its edition page's `forms.json`, as the system, when they changed: what the source says
+ * about showing its notes, kept once for all its submissions. Before the submissions, so the `venues` row has them.
+ */
+export async function writeVenueForms(venue: VenueInput, place: VenuePlace, database: Database): Promise<boolean> {
+  const page = await findKeyedPage(database, 'venue', place.edition.key);
+  if (!page) throw new Error(`the venue page ${place.edition.key} wasn't made`);
+  return withRetry(async () => {
+    const head = await readHead(database, page.id);
+    const tree = head ? (await readCommit(database, page.id, head)).tree : null;
+    const blob = tree ? (await readFiles(database, page.id, tree)).get(VENUE_FORMS_FILE) : undefined;
+    const existing = blob ? await readText(database, page.id, blob) : null;
+    const content = withSourceForms(existing, place.source, {
+      forms: venue.forms,
+      url: venue.url ?? sourceUrl(place.source) ?? '',
+      license: venue.license,
+    });
+    if (content === null) return false;
+    const result = await commitPage(
+      page.id,
+      head,
+      SYSTEM_ACTOR,
+      [{ path: VENUE_FORMS_FILE, content }],
+      `${existing === null ? 'Add' : 'Update'} the forms of ${place.source}`,
+      { database, rateLimit: IMPORT_RATE_LIMIT },
+    );
+    return result.status === 'committed';
+  });
 }
 
 /** Tries again when the page was busy (someone else committing to it), a few times. */
@@ -267,6 +325,9 @@ export async function importReviews(
   options: ImportOptions = {},
 ): Promise<ImportResult> {
   const database = options.database ?? getDb();
+  const place = placeOf(venue);
+  await syncVenuePages({ venues: [{ id: place.source, name: venue.name }], database });
+  await writeVenueForms(venue, place, database);
   const actor = options.actor ?? (await botActor(OPENREVIEW_BOT, database));
   const all = [...new Map([...input].map((s) => [s.externalId, s])).values()];
   const result: ImportResult = {
@@ -284,7 +345,7 @@ export async function importReviews(
     while (next < all.length) {
       const item = all[next++];
       try {
-        const { status, paperId } = await withRetry(() => importOne(venue, item, actor, options, database));
+        const { status, paperId } = await withRetry(() => importOne(venue, place, item, actor, options, database));
         if (status === 'committed' && paperId) result.changed.push(paperId);
         if (status === 'skipped') result.skipped += 1;
         else {

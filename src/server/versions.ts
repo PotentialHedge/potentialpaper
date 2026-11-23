@@ -51,10 +51,14 @@ function clean(text: string | undefined | null, multiline = false): string | und
 
 function cleanSubmission(input: VersionSubmission): VersionSubmission {
   const evidence = [...new Set((input.evidence ?? []).map((url) => url.trim()).filter(Boolean))];
+  const page = clean(input.page);
   const out: VersionSubmission = {
-    venue: clean(input.venue) ?? '',
+    // A venue page's name is the page's: the name read back with it (`page_current.versions`) isn't stored again.
+    venue: page ? undefined : (clean(input.venue) ?? ''),
+    page,
     status: input.status ?? undefined,
     decision: clean(input.decision),
+    site: clean(input.site),
     number: input.number ?? undefined,
     url: clean(input.url),
     reviews: input.reviews ?? undefined,
@@ -229,6 +233,23 @@ function sameUrl(url: string | undefined): string {
 }
 
 /**
+ * Whether two submissions name the same venue: by page when both name one, by name when both name none. One naming a
+ * page and one a name may still be the same venue, so the forum's address decides alone.
+ */
+function sameVenue(a: VersionSubmission, b: VersionSubmission): boolean {
+  if (a.page && b.page) return a.page === b.page;
+  if (!a.page && !b.page) return a.venue === b.venue;
+  return true;
+}
+
+/** `was` with `next` laid over it, naming its venue once: by its page when either names one. */
+function overlaySubmission(was: VersionSubmission, next: VersionSubmission): VersionSubmission {
+  const out: VersionSubmission = { ...was, ...next };
+  if (out.page) delete out.venue;
+  return out;
+}
+
+/**
  * A version's submissions with the ones a lookup found: one at the same forum takes what the source says now, unless
  * a bot imported its reviews (`reviews`), whose entry only that bot changes; the rest are added.
  */
@@ -238,9 +259,9 @@ function mergeSubmissions(
 ): VersionSubmission[] | undefined {
   const out = (was ?? []).map((s) => ({ ...s }));
   for (const submission of found ?? []) {
-    const at = out.findIndex((s) => sameUrl(s.url) === sameUrl(submission.url) && s.venue === submission.venue);
+    const at = out.findIndex((s) => sameUrl(s.url) === sameUrl(submission.url) && sameVenue(s, submission));
     if (at === -1) out.push({ ...submission });
-    else if (!out[at].reviews) out[at] = { ...out[at], ...submission };
+    else if (!out[at].reviews) out[at] = overlaySubmission(out[at], submission);
   }
   return out.length > 0 ? out : undefined;
 }
@@ -289,16 +310,19 @@ export function attachSubmission(
   entry: VersionSubmission & { url: string; reviews: string },
   {
     date,
+    label,
     newId = newVersionId,
   }: {
     /** When it was submitted (`YYYY-MM-DD`): the date of a version made for it, or of one that has none. */
     date?: string;
+    /** The label of a version made for it: the venue's name, which an entry naming its page doesn't hold. */
+    label?: string;
     newId?: () => string;
   } = {},
 ): PaperVersion[] {
   const out: PaperVersion[] = versions.map((v) => ({ ...v, submissions: v.submissions?.map((s) => ({ ...s })) }));
   const merge = (was: VersionSubmission): VersionSubmission => {
-    const next: VersionSubmission = { ...was, ...entry };
+    const next = overlaySubmission(was, entry);
     const evidence = [...new Set([...(was.evidence ?? []), ...(entry.evidence ?? [])])];
     if (evidence.length > 0) next.evidence = evidence;
     // What the source no longer says is gone, not kept from before.
@@ -324,7 +348,7 @@ export function attachSubmission(
     else {
       version = {
         id: newId(),
-        label: entry.venue,
+        label: label ?? entry.venue ?? entry.page ?? 'Submission',
         kind: 'submitted',
         url: entry.url,
         submissions: [entry],

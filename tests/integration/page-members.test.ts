@@ -45,9 +45,9 @@ async function person() {
 
 const submission = (forum: string, venue: string) =>
   encodeReviewFile({
-    schema: 'submission/1',
+    schema: 'submission/2',
     id: forum,
-    venue: { id: venue, name: venue, url: null },
+    venue: { id: venue },
     number: 1,
     url: `https://openreview.net/forum?id=${forum}`,
     license: 'CC-BY-4.0',

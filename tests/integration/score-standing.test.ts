@@ -8,7 +8,7 @@ import { accounts, pageCurrent, pdfDocuments } from '@/db/schema';
 import { panelSlot, validateManifest, type PluginManifest } from '@/lib/plugins/manifest';
 import { pageWhenContext, whenHolds } from '@/lib/plugins/when';
 import { PAGE_KINDS, type PageKind } from '@/lib/kinds';
-import { encodeReviewFile, formsFilePath, noteFilePath, submissionFilePath, type NoteFile } from '@/lib/review-files';
+import { encodeReviewFile, noteFilePath, submissionFilePath, type NoteFile } from '@/lib/review-files';
 import { ensureBot, grantBot, OPENREVIEW_BOT } from '@/server/bots';
 import { CONSUMERS } from '@/server/consumers';
 import { runConsumer } from '@/server/consumers/run';
@@ -18,7 +18,7 @@ import { savePaper } from '@/server/papers';
 import { servePlugin } from '@/server/plugins/serve';
 import { pluginHostLabel } from '@/server/plugins/snapshot';
 import { recomputeDueScopes } from '@/server/scope-stats';
-import { api, closePool, resetDatabase, signUp, submittedVersion } from './helpers';
+import { api, closePool, resetDatabase, signUp, submittedVersion, venueWithForms } from './helpers';
 
 /**
  * Score standing (`handoffs/plugins.md` Phase 6), the first plugin outside this repo, installed from GitHub as any
@@ -74,6 +74,16 @@ async function submitted(
   });
   const bot = await ensureBot(OPENREVIEW_BOT);
   const license = 'CC-BY-4.0';
+  await venueWithForms(`openreview:${VENUE}`, 'ICLR 2027', {
+    Official_Review: {
+      label: 'Official review',
+      summary: ['rating'],
+      fields: [
+        { key: 'soundness', label: 'Soundness', type: 'score', min: 1, max: 4 },
+        { key: 'rating', label: 'Rating', type: 'score', min: 1, max: 10 },
+      ],
+    },
+  });
   await commitPage(
     paper,
     null,
@@ -82,33 +92,15 @@ async function submitted(
       {
         path: submissionFilePath('openreview', forum),
         content: encodeReviewFile({
-          schema: 'submission/1',
+          schema: 'submission/2',
           id: forum,
-          venue: { id: VENUE, name: 'ICLR 2027', url: null },
+          venue: { id: VENUE },
           number: 1,
           url: `https://openreview.net/forum?id=${forum}`,
           license,
         }),
       },
       submittedVersion(forum, 'ICLR 2027', status, status === 'accepted' ? 'Accept (poster)' : 'Reject'),
-      {
-        path: formsFilePath('openreview', forum),
-        content: encodeReviewFile({
-          schema: 'forms/1',
-          forms: {
-            Official_Review: {
-              label: 'Official review',
-              summary: ['rating'],
-              fields: [
-                { key: 'soundness', label: 'Soundness', type: 'score', min: 1, max: 4 },
-                { key: 'rating', label: 'Rating', type: 'score', min: 1, max: 10 },
-              ],
-            },
-          },
-          url: `https://openreview.net/group?id=${VENUE}`,
-          license,
-        }),
-      },
       ...ratings.map((rating, i) => ({
         path: noteFilePath('openreview', forum, `${forum}r${i}`),
         content: encodeReviewFile({

@@ -1,6 +1,7 @@
 import { linkProblem, type TitleLink } from '@/lib/paper-links';
-import { encodeVersionFile, parseVersionFile, type PaperVersion } from '@/lib/versions';
-import { KINDS, OWNERS_DIR, type PageKind } from '@/lib/kinds';
+import { encodeVersionFile, parseVersionFile, type PaperVersion, type VersionSubmission } from '@/lib/versions';
+import { KINDS, OWNERS_DIR, type PageKind, venueFileSchema } from '@/lib/kinds';
+import { type SourceForms, SUBMISSION_SCHEMA, VENUE_FORMS_FILE, withSourceForms } from '@/lib/review-files';
 import { encodePaperFile, paperFileOf, type PaperFileFields } from '@/lib/paper-file';
 import type { FileChange } from './commit';
 import { linkChanges, versionChanges } from './content';
@@ -249,6 +250,111 @@ export function planPaperFile(
   ];
   if (page.kind === 'paper' && paper && !files.has(KINDS.paper.kindFile)) {
     changes.push({ path: KINDS.paper.kindFile, content: encodePaperFile(paperFileOf(paper)) });
+  }
+  return changes;
+}
+
+/** What `planVenueData` needs to know beyond a page's files. */
+export interface VenueDataContext {
+  /** Each source's forms as its newest paper had them, by the source's id for the venue. */
+  forms: ReadonlyMap<string, SourceForms>;
+  /** The key of the venue page a source's venue is, when there is one: `iclr/2027`. */
+  pageOf: (source: string) => string | null;
+}
+
+/** A layout 6 submission's folder, `reviews/<source>/<submission>/`, with its `forms.json`. */
+const OLD_FORMS = /^reviews\/([^/]+)\/([^/]+)\/forms\.json$/;
+const SUBMISSION_PATH = /^reviews\/([^/]+)\/([^/]+)\/submission\.json$/;
+
+/**
+ * A layout 6 `submission.json`'s source id for its venue (`openreview:ICLR.cc/2027/Conference`) and the forms beside it,
+ * by the folder a version's entry names (`openreview/abc123`). For `scripts/migrate-venue-data.ts`, which keeps each
+ * source's newest forms for its venue page.
+ */
+export function oldSubmissionVenues(
+  files: ReadonlyMap<string, string>,
+): Map<string, { source: string; name: string | null; forms: SourceForms | null }> {
+  const out = new Map<string, { source: string; name: string | null; forms: SourceForms | null }>();
+  for (const [path, text] of files) {
+    const match = SUBMISSION_PATH.exec(path);
+    if (!match) continue;
+    const venue = parseJson(text)?.venue as { id?: unknown; name?: unknown } | undefined;
+    if (typeof venue?.id !== 'string') continue;
+    const forms = parseJson(files.get(`reviews/${match[1]}/${match[2]}/forms.json`));
+    out.set(`${match[1]}/${match[2]}`, {
+      source: `${match[1]}:${venue.id}`,
+      name: typeof venue.name === 'string' ? venue.name : null,
+      forms:
+        forms && typeof forms.forms === 'object' && typeof forms.url === 'string' && typeof forms.license === 'string'
+          ? { forms: forms.forms as SourceForms['forms'], url: forms.url, license: forms.license }
+          : null,
+    });
+  }
+  return out;
+}
+
+/**
+ * Layout 7: a venue's name and forms are kept once, on its page (`rules.ts`). A venue page gains a `forms.json` with
+ * the forms of each source it lists; a paper's `submission.json`s keep only their venue's id (`submission/2`), lose
+ * the `forms.json` beside them, and each version entry of an imported submission names its venue's page in place of
+ * its name, where the venue has one. Every page's `metadata.json` says layout 7. Pure: `scripts/migrate-venue-data.ts`
+ * commits it, venue pages first, as the system.
+ */
+export function planVenueData(
+  page: { kind: PageKind },
+  files: ReadonlyMap<string, string>,
+  context: VenueDataContext,
+): FileChange[] {
+  const metadata = files.get(METADATA_PATH);
+  if (metadata === undefined || (layoutVersionOf(metadata) ?? 0) >= 7) return [];
+  const bumped = withLayoutVersion(metadata, 7);
+  const changes: FileChange[] = bumped ? [{ path: METADATA_PATH, content: bumped }] : [];
+
+  if (page.kind === 'venue') {
+    const venue = venueFileSchema.safeParse(parseJson(files.get(KINDS.venue.kindFile)));
+    let forms = files.get(VENUE_FORMS_FILE) ?? null;
+    for (const source of venue.success ? (venue.data.sources ?? []) : []) {
+      const found = context.forms.get(source);
+      if (found) forms = withSourceForms(forms, source, found) ?? forms;
+    }
+    if (forms !== null && forms !== files.get(VENUE_FORMS_FILE))
+      changes.push({ path: VENUE_FORMS_FILE, content: forms });
+    return changes;
+  }
+  if (page.kind !== 'paper') return changes;
+
+  const folders = oldSubmissionVenues(files);
+  for (const [path, text] of files) {
+    if (OLD_FORMS.test(path)) {
+      changes.push({ path, content: null });
+      continue;
+    }
+    if (!SUBMISSION_PATH.test(path)) continue;
+    const value = parseJson(text);
+    const venue = value?.venue as { id?: unknown } | undefined;
+    if (!value || value.schema !== 'submission/1' || typeof venue?.id !== 'string') continue;
+    const next = { ...value, schema: SUBMISSION_SCHEMA, venue: { id: venue.id } };
+    changes.push({ path, content: `${JSON.stringify(next, null, 2)}\n` });
+  }
+  for (const [path, text] of files) {
+    const id = versionIdOf(path);
+    if (!id) continue;
+    const parsed = parseVersionFile(id, text);
+    if (!('version' in parsed)) continue;
+    let changed = false;
+    const submissions = parsed.version.submissions?.map((entry) => {
+      const folder = entry.reviews ? folders.get(entry.reviews) : undefined;
+      const key = folder && entry.venue !== undefined ? context.pageOf(folder.source) : null;
+      if (!key) return entry;
+      changed = true;
+      // `page` where `venue` was, so the file changes only on that line.
+      return Object.fromEntries(
+        Object.entries(entry).map(([field, value]) => (field === 'venue' ? ['page', key] : [field, value])),
+      ) as VersionSubmission;
+    });
+    if (!changed) continue;
+    const version = { ...parsed.version, submissions, pdf: parsed.pdfInfo } as PaperVersion;
+    changes.push({ path, content: encodeVersionFile(version) });
   }
   return changes;
 }

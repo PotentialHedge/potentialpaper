@@ -84,7 +84,7 @@ export const ImportSubmissionsBody = z.object({
     id: z.string().min(1).max(200),
     name: z.string().min(1).max(200),
     url: Url.nullable(),
-    /** How to show each kind of note (`forms.json`), by the source's name for it. */
+    /** How to show each kind of note, by the source's name for it: kept in the venue page's `forms.json`. */
     forms: z.record(z.string(), z.unknown()).default({}),
     license: z.string().max(100),
   }),

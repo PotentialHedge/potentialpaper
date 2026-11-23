@@ -11,6 +11,8 @@ import {
   paperPdfOf,
   submissionStanding,
   versionStanding,
+  venuePagesOf,
+  withVenueNames,
   type PaperVersion,
 } from '@/lib/versions';
 import { encodeCommit, parseCommit, type Commit } from '@/server/pages/git-objects';
@@ -191,6 +193,56 @@ describe('versions/<id>.json', () => {
     expect(attachSubmission([hand], entry, { newId: id })[0].submissions).toEqual([
       { ...entry, evidence: ['https://e.org'] },
     ]);
+  });
+
+  it('names a venue by its page, and shows the page’s name', () => {
+    const forum = 'https://openreview.net/forum?id=dskf2Ppd9o';
+    const file = (submissions: unknown[]) => JSON.stringify({ label: 'NeurIPS 2026', kind: 'submitted', submissions });
+    expect(parseVersionFile('v_a', file([{ page: 'neurips/2026', status: 'accepted' }]))).toHaveProperty('version');
+    expect(parseVersionFile('v_a', file([{ venue: 'NeurIPS 2026', page: 'neurips/2026' }]))).toEqual({
+      problem: expect.stringMatching(/needs a venue/),
+    });
+    expect(parseVersionFile('v_a', file([{ status: 'accepted' }]))).toEqual({
+      problem: expect.stringMatching(/needs a venue/),
+    });
+    expect(parseVersionFile('v_a', file([{ page: 'NeurIPS 2026' }]))).toEqual({
+      problem: expect.stringMatching(/needs a venue/),
+    });
+
+    const versions: PaperVersion[] = [
+      { id: 'v_a', label: 'x', kind: 'submitted', submissions: [{ page: 'neurips/2026', url: forum }] },
+      { id: 'v_b', label: 'y', kind: 'preprint', submissions: [{ venue: 'SPIGM @ ICML 2026' }] },
+      { id: 'v_c', label: 'z', kind: 'preprint' },
+    ];
+    expect(venuePagesOf(versions)).toEqual(['neurips/2026']);
+    const shown = withVenueNames(versions, new Map([['neurips/2026', 'NeurIPS 2026']]));
+    expect(shown[0].submissions).toEqual([{ page: 'neurips/2026', venue: 'NeurIPS 2026', url: forum }]);
+    expect(shown[1]).toBe(versions[1]);
+    expect(versionStanding(shown[0])).toBe('NeurIPS 2026');
+    // A page with no name yet shows its key.
+    expect(withVenueNames(versions, new Map())[0].submissions![0].venue).toBe('neurips/2026');
+  });
+
+  it('records an imported submission by its venue page, over a hand-written one at its forum', () => {
+    const forum = 'https://openreview.net/forum?id=dskf2Ppd9o';
+    const entry = { page: 'iclr/2027', status: 'accepted' as const, url: forum, reviews: 'openreview/dskf2ppd9o' };
+    const made = attachSubmission([], entry, { newId: () => 'v_new', label: 'ICLR 2027' });
+    expect(made[0]).toMatchObject({ label: 'ICLR 2027', submissions: [entry] });
+    const hand = { ...conference, submissions: [{ venue: 'ICLR 2027', url: forum }] };
+    expect(attachSubmission([hand], entry)[0].submissions).toEqual([entry]);
+    // A lookup's entry by name at the same forum is the same submission as one by page.
+    const merged = mergeFoundVersions(
+      [{ ...conference, submissions: [{ page: 'iclr/2027', url: forum }] }],
+      [
+        {
+          label: 'x',
+          kind: 'submitted',
+          url: conference.url!,
+          submissions: [{ venue: 'ICLR 2027', url: forum, status: 'accepted' }],
+        },
+      ],
+    );
+    expect(merged[0].submissions).toEqual([{ page: 'iclr/2027', url: forum, status: 'accepted' }]);
   });
 
   it('gives a PDF to the version at its address, and shows the newest version’s', () => {

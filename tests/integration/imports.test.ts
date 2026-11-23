@@ -4,13 +4,13 @@ import { join } from 'node:path';
 import { eq } from 'drizzle-orm';
 import { afterAll, beforeEach, describe, expect, it } from 'vitest';
 import { getDb } from '@/db';
-import { accounts, pageCurrent } from '@/db/schema';
+import { accounts, pageCurrent, venues as venuesTable } from '@/db/schema';
 import { ensureBot, grantBot, OPENREVIEW_BOT } from '@/server/bots';
-import { VENUES_BOT } from '@/server/venue-pages';
+import { findKeyedPage } from '@/server/pages/kinds';
 import { findPaper } from '@/server/papers';
 import { mintToken } from '@/server/tokens';
 import { versionsAt } from '@/server/versions';
-import { api, closePool, resetDatabase, signUp } from './helpers';
+import { api, closePool, grantVenuesBot, resetDatabase, signUp } from './helpers';
 
 process.env.EVIDENCE_FILES_DIR = mkdtempSync(join(tmpdir(), 'evidence-'));
 
@@ -58,7 +58,10 @@ function submission(notes = 1) {
   };
 }
 
-beforeEach(resetDatabase);
+beforeEach(async () => {
+  await resetDatabase();
+  await grantVenuesBot();
+});
 afterAll(closePool);
 
 describe('the import API', () => {
@@ -99,7 +102,7 @@ describe('the import API', () => {
         date: '2026-09-20',
         url: FORUM,
         submissions: [
-          { venue: 'ICLR 2027', status: 'accepted', decision: 'Accept (Poster)', reviews: 'openreview/forum1' },
+          { page: 'iclr/2027', status: 'accepted', decision: 'Accept (Poster)', reviews: 'openreview/forum1' },
         ],
       },
     ]);
@@ -111,14 +114,27 @@ describe('the import API', () => {
     });
     expect(other.status).toBe(403);
 
-    // The `venues` bot writes them, as its grant has it (migration 0035).
-    await ensureBot(VENUES_BOT);
-    await grantBot(VENUES_BOT, 'venue.json', { grantedBy: 'system', kind: 'venue' });
+    // The import made the venue's pages (the `venues` bot writes them, as its grant has it, migration 0035), and put
+    // its forms on the edition's page; asking again writes nothing.
+    const edition = await findKeyedPage(getDb(), 'venue', 'iclr/2027');
+    expect(edition).not.toBeNull();
+    const [row] = await getDb()
+      .select()
+      .from(venuesTable)
+      .where(eq(venuesTable.id, 'openreview:ICLR.cc/2027/Conference'));
+    expect(row).toMatchObject({ name: 'ICLR 2027', forms: VENUE.forms });
     const venues = await api('POST', '/imports/venues', {
       token,
       body: { venues: [{ id: 'openreview:ICLR.cc/2027/Conference', name: 'ICLR 2027' }] },
     });
-    expect(venues.body.written).toEqual(expect.arrayContaining(['iclr', 'iclr/2027']));
+    expect(venues.body.written).toEqual([]);
+    // A venue with no page yet isn't imported.
+    const workshop = await api('POST', '/imports/submissions', {
+      token,
+      body: { ...body, venue: { ...VENUE, id: 'ICLR.cc/2027/Workshop/X' } },
+    });
+    expect(workshop.status).toBe(422);
+    expect(workshop.body.error.message).toMatch(/has no venue page/);
     const elsewhere = await api('POST', '/imports/venues', {
       token,
       body: { venues: [{ id: 'acl:ACL/2027', name: 'ACL 2027' }] },

@@ -12,7 +12,7 @@ import {
 import { labeledLinkSchema, LINK_LABELS } from '@/lib/labeled-links';
 import { linkFileSchema } from '@/lib/paper-links';
 import { authorPluginsFileSchema } from '@/lib/plugins/author-plugins';
-import { formsFileSchema, noteFileSchema, submissionFileSchema } from '@/lib/review-files';
+import { noteFileSchema, submissionFileSchema, venueFormsFileSchema } from '@/lib/review-files';
 import { factLineSchema } from '@/lib/infobox-facts';
 import { scoreOf } from '@/lib/submissions';
 import { versionFileSchema } from '@/lib/versions';
@@ -203,6 +203,15 @@ export const PAGE_SCHEMAS = {
   // Searched through `papers`, its projection, as a paper is found by its title and abstract.
   paper: fileType({ ...kindFileType('paper', paperFileSchema), scope: undefined, index: undefined }),
   venue: fileType(kindFileType('venue', venueFileSchema)),
+  venueForms: fileType({
+    title: 'Venue forms',
+    schema: venueFormsFileSchema,
+    glob: 'forms.json',
+    filesRegex: '^forms\\.json$',
+    writable: false,
+    // Read with the notes it describes, on each paper; nothing in it to find on its own.
+    render: { panel: 'Submissions', slots: ['paper.body'] },
+  }),
   category: fileType(kindFileType('category', categoryFileSchema)),
   org: fileType(kindFileType('org', orgFileSchema)),
   link: fileType({
@@ -228,7 +237,8 @@ export const PAGE_SCHEMAS = {
         text: words(
           version.label,
           version.title,
-          ...(version.submissions ?? []).flatMap((s) => [s.venue, s.decision]),
+          // A venue page's name is the page's, found there; its key stands in here.
+          ...(version.submissions ?? []).flatMap((s) => [s.venue ?? s.page, s.decision]),
           version.note,
           version.abstract,
         ),
@@ -262,20 +272,12 @@ export const PAGE_SCHEMAS = {
     index: (submission) => [
       {
         kind: 'submission',
-        text: words(submission.venue.name),
+        // Found by its venue's id ("ICLR.cc/2027/Conference"); the venue's name is its page's, found there.
+        text: words(submission.venue.id),
         fields: { venue: submission.venue.id, number: submission.number },
       },
     ],
     render: { panel: 'Submissions', slots: ['paper.aside', 'paper.body'] },
-  }),
-  forms: fileType({
-    title: 'Venue forms',
-    schema: formsFileSchema,
-    glob: 'reviews/*/*/forms.json',
-    filesRegex: '^reviews/[^/]+/[^/]+/forms\\.json$',
-    writable: false,
-    // Read with the notes it describes; nothing in it to find on its own.
-    render: { panel: 'Submissions', slots: ['paper.body'] },
   }),
   note: fileType({
     title: 'Review',

@@ -3,7 +3,7 @@ import { keyedPagePath } from './kinds';
 import { sourceLinks, type PaperId } from './paper-ids';
 import { reviewsKey } from './review-files';
 import type { Submission, SubmissionStatus } from './submissions';
-import { sortVersions, type PaperVersion } from './versions';
+import { sortVersions, venueOf, type PaperVersion } from './versions';
 import { venuePlace } from './venues';
 
 /**
@@ -98,8 +98,8 @@ export function paperFacts({
   const venues = sorted
     .flatMap((v) =>
       (v.submissions ?? []).map((s): VenueFact => ({
-        venue: s.venue,
-        path: (s.reviews && paths.get(s.reviews)) ?? null,
+        venue: venueOf(s),
+        path: s.page ? keyedPagePath('venue', s.page) : ((s.reviews && paths.get(s.reviews)) ?? null),
         status: s.status ?? null,
         presentation: presentationOf(s.decision),
         site: s.site ?? null,
