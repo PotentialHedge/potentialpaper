@@ -38,9 +38,6 @@ export function ReviewBlur({ venues, children }: { venues: ReviewVenue[]; childr
       <div className="fixed inset-x-0 top-1/3 z-40 flex justify-center px-4">
         <div className={`${ui.box} max-w-[420px] text-center shadow-lg`}>
           <p className="font-semibold">This paper is under review</p>
-          <p className="mt-1 text-subtle">
-            Its page is blurred so you can read it without knowing its authors or what others say about it.
-          </p>
           {venues
             .filter((v) => !notAt.includes(v.id))
             .map((v) => (
