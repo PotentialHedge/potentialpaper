@@ -34,6 +34,7 @@
     "pages:migrate-lfs": "tsx scripts/migrate-page-lfs.ts",
     "pages:migrate-owners": "tsx scripts/migrate-page-owners.ts",
     "pages:migrate-categories": "tsx scripts/migrate-categories.ts",
+    "pages:migrate-paper-files": "tsx scripts/migrate-paper-files.ts",
     "pages:add-starter": "tsx scripts/add-page-starter.ts",
     "pages:protect": "tsx scripts/protect-page.ts",
     "identity:keys": "tsx scripts/identity-keys.ts",

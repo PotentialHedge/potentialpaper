@@ -6,6 +6,7 @@ import {
   PAGE_KINDS,
   type PageKind,
   categoryFileSchema,
+  paperFileSchema,
   venueFileSchema,
 } from '@/lib/kinds';
 import { labeledLinkSchema, LINK_LABELS } from '@/lib/labeled-links';
@@ -199,6 +200,8 @@ export const PAGE_SCHEMAS = {
     writable: true,
     render: { panel: 'AuthorSection', slots: ['paper.author'] },
   }),
+  // Searched through `papers`, its projection, as a paper is found by its title and abstract.
+  paper: fileType({ ...kindFileType('paper', paperFileSchema), scope: undefined, index: undefined }),
   venue: fileType(kindFileType('venue', venueFileSchema)),
   category: fileType(kindFileType('category', categoryFileSchema)),
   org: fileType(kindFileType('org', orgFileSchema)),

@@ -187,7 +187,9 @@ partitioning remains available later.
 ### 4.2 A repo exists only after the first edit
 
 A page nobody has edited is a `papers` row with no objects. Millions of stubs therefore cost almost
-nothing, and the first commit creates the repo with a metadata snapshot.
+nothing, and the first commit creates the repo with the paper's `paper.json`, written from what its source said.
+From then on `paper.json` is what the paper is (title, authors, abstract), and the row's columns its projection
+(decided 2026-11-23: one source for each fact). The row's `venue` and `year` are a projection of the versions.
 
 ### 4.3 Repo layout, and permissions by path
 
@@ -196,7 +198,8 @@ big files. `src/server/pages/rules.ts` is the authority.
 
 ```
 .gitattributes                  system, always the same: which files are Git LFS
-.potentialpaper/metadata.json   system: layout version, identifiers, title, authors, abstract snapshot
+.potentialpaper/metadata.json   system: layout version, kind and key
+paper.json                      the paper: { "title", "authors", "abstract", "license" }; the card's writers
 owners/10-tl-dr.md              the owners' sections (a paper's confirmed authors'), one file per section
 owners/20-results.html          … in Markdown or HTML
 community/10-tl-dr.md           the community section, the same way

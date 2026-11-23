@@ -20,8 +20,6 @@ async function paper(): Promise<string> {
     title: 'Recursive Scaling in Masked Diffusion Models',
     authors: [],
     abstract: 'Masked diffusion models apply a transformer.',
-    year: 2027,
-    venue: null,
     identifiers: [PAPER],
     source: 'openreview',
     metadataLicense: 'CC0-1.0',

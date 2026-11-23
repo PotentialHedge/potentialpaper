@@ -45,6 +45,13 @@ uploads are `PUT`s of at most 40 MB through Cloudflare (whose limit is 100 MB) t
 `dc run --rm tools npm run pages:migrate-lfs` (a system commit per page; until a page is moved, edits to it are
 refused), then `scripts/purge-edge-cache.sh`. `-- --dry-run` lists what it would change. It is safe to run again.
 
+## Layout 6: paper.json
+
+**Once, when deploying the move to it** (`LAYOUT_VERSION` 6): straight after `dc up -d app`, run
+`dc run --rm tools npm run pages:migrate-paper-files` (a system commit per page: a paper's title, authors and abstract
+go to its `paper.json`; until a paper is moved, edits to it are refused), then `scripts/purge-edge-cache.sh`.
+`-- --dry-run` lists what it would change. It is safe to run again.
+
 ## PDF ingest
 
 The `ingest` service runs `npm run pdfs:ingest -- --watch` from the tools image (which has poppler): every

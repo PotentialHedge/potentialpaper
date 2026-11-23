@@ -27,8 +27,6 @@ async function paper(arxiv: string) {
     title: `Paper ${arxiv}`,
     authors: [],
     abstract: null,
-    year: 2027,
-    venue: null,
     source: 'arxiv',
     metadataLicense: 'CC0-1.0',
     abstractLicense: null,

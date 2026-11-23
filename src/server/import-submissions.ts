@@ -11,8 +11,6 @@ export interface Submission {
   abstract: string | null;
   /** Only for a venue whose review has ended. Left out, the paper stays anonymous. */
   authors?: string[];
-  /** Overrides the venue's name, for a paper it didn't accept. */
-  venue?: string;
 }
 
 const CHUNK = 500;
@@ -26,7 +24,6 @@ const ABSTRACT_MIN = 50;
  */
 export async function importSubmissions(
   submissions: Iterable<Submission>,
-  venue: { name: string; year: number },
   database: Database = getDb(),
 ): Promise<number> {
   const usable = [...submissions].filter((s) => s.title.trim() && (s.abstract?.trim().length ?? 0) >= ABSTRACT_MIN);
@@ -52,8 +49,6 @@ export async function importSubmissions(
           title: s.title.trim(),
           abstract: s.abstract?.trim(),
           authors: s.authors ?? [],
-          year: venue.year,
-          venue: s.venue ?? venue.name,
           source: 'openreview' as const,
           // OpenReview's terms define title, authors and abstract as metadata, dedicated to CC0.
           metadataLicense: CC0,

@@ -64,8 +64,6 @@ async function submitted(venue: string, status: SubmissionStatus | null, ratings
     title: `Paper ${papers}`,
     authors: [],
     abstract: null,
-    year: 2027,
-    venue: null,
     source: 'openreview',
     metadataLicense: 'CC0-1.0',
     abstractLicense: null,

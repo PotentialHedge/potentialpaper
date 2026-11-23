@@ -305,6 +305,12 @@ function checkTreeShape(files: FileTree, kind: PageKind): void {
   const paths = [...files.keys()];
   checkPathsShape(files, paths, kind);
   if (kind !== 'paper') return;
+  // What the paper is: its title has nowhere else to be.
+  if (!files.has(KINDS.paper.kindFile)) {
+    throw new ApiError(422, 'validation_error', `a paper's page keeps its ${KINDS.paper.kindFile}`, {
+      path: KINDS.paper.kindFile,
+    });
+  }
   const reviewFiles = paths.filter(isReviewPath);
   if (files.size - reviewFiles.length > MAX_FILES) {
     throw new ApiError(422, 'validation_error', `a page can have at most ${MAX_FILES} files`);

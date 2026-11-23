@@ -90,13 +90,10 @@ describe('importing reviews', () => {
   beforeEach(async () => {
     await ensureBot(OPENREVIEW_BOT);
     await grantBot(OPENREVIEW_BOT, 'reviews/openreview/**', { grantedBy: 'system' });
-    await importSubmissions(
-      [
-        { id: 'forum1', title: 'Sparse routing', abstract: 'x'.repeat(60) },
-        { id: 'Forum2', title: 'Dense routing', abstract: 'y'.repeat(60) },
-      ],
-      { name: 'Test 2027 (under review)', year: 2027 },
-    );
+    await importSubmissions([
+      { id: 'forum1', title: 'Sparse routing', abstract: 'x'.repeat(60) },
+      { id: 'Forum2', title: 'Dense routing', abstract: 'y'.repeat(60) },
+    ]);
   });
 
   it('is a consumer the worker runs', () => {

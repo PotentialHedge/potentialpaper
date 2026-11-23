@@ -30,8 +30,6 @@ function paper(arxiv: string = PAPER.value, authors = ['Ada Lovelace', 'Charles 
     title: `Paper ${arxiv}`,
     authors,
     abstract: null,
-    year: 2027,
-    venue: null,
     identifiers: [{ scheme: 'arxiv', value: arxiv }],
     source: 'arxiv',
     metadataLicense: 'CC0-1.0',

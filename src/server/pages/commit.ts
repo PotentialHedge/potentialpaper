@@ -1,7 +1,7 @@
 import { and, eq, max, sql } from 'drizzle-orm';
 import { getDb, type Database } from '@/db';
 import { pgErrorCode } from '@/db/errors';
-import { pageEvents, pageRefs, pageRevisions, papers, paperIdentifiers } from '@/db/schema';
+import { pageEvents, pageRefs, pageRevisions, papers } from '@/db/schema';
 import { ApiError } from '../api/errors';
 import { EVENTS_CHANNEL } from '../consumers/types';
 import { pageRepo } from '../git/repo';
@@ -20,7 +20,8 @@ import {
   SYSTEM_ACTOR,
   takeCommit,
 } from './check';
-import type { KeyedKind } from '@/lib/kinds';
+import { KINDS, type KeyedKind } from '@/lib/kinds';
+import { encodePaperFile, paperFileOf } from '@/lib/paper-file';
 import { buildTrees, type Commit, type EditKind, encodeCommit, gitObject, type GitObject } from './git-objects';
 import { mergeFile, type Version } from './merge';
 import { lockPage, writeCurrent, writeRevision, type Writer } from './projections';
@@ -87,24 +88,21 @@ export interface CommitOptions {
 }
 
 /**
- * The first commit's snapshot (DESIGN.md §4.2), with the layout the repo starts in (`rules.ts`). Stable, so that it
- * hashes the same when unchanged. A paper's is the paper; any other kind's says what the page is, its kind and key,
- * since what it holds is in its kind file.
+ * The first commit's `metadata.json` (DESIGN.md §4.2), with the layout the repo starts in (`rules.ts`): what the page
+ * is, its kind and key, whatever its kind. Stable, so that it hashes the same when unchanged.
  */
 async function metadataSnapshot(tx: Writer, pageId: string): Promise<string> {
   const page = await mustPage(tx, pageId);
-  if (page.kind !== 'paper') {
-    return `${JSON.stringify({ layout: LAYOUT_VERSION, kind: page.kind, key: page.key }, null, 2)}\n`;
-  }
+  return `${JSON.stringify({ layout: LAYOUT_VERSION, kind: page.kind, key: page.key }, null, 2)}\n`;
+}
+
+/**
+ * A paper's first `paper.json`, from its row as the paper's source filled it in (`server/papers.ts`, an import). From
+ * then on the file is what the paper is, and the row its projection.
+ */
+async function firstPaperFile(tx: Writer, pageId: string): Promise<string> {
   const [paper] = await tx.select().from(papers).where(eq(papers.id, pageId));
-  const identifiers = await tx
-    .select({ scheme: paperIdentifiers.scheme, value: paperIdentifiers.value })
-    .from(paperIdentifiers)
-    .where(eq(paperIdentifiers.paperId, pageId));
-  identifiers.sort((a, b) => `${a.scheme}:${a.value}`.localeCompare(`${b.scheme}:${b.value}`, 'en'));
-  const { title, authors, abstract, year, venue, source, metadataLicense, abstractLicense } = paper;
-  const license = { metadata: metadataLicense, abstract: abstractLicense };
-  return `${JSON.stringify({ layout: LAYOUT_VERSION, identifiers, title, authors, abstract, year, venue, source, license }, null, 2)}\n`;
+  return encodePaperFile(paperFileOf(paper));
 }
 
 function normalizeChanges(changes: readonly FileChange[], migration: boolean): FileChange[] {
@@ -280,6 +278,9 @@ export async function commitPage(
       if (isFirstCommit) {
         const start: [string, () => Promise<string>][] = [
           [METADATA_PATH, () => metadataSnapshot(tx, pageId)],
+          ...(roles.kind === 'paper' && !changes.some((change) => change.path === KINDS.paper.kindFile)
+            ? [[KINDS.paper.kindFile, () => firstPaperFile(tx, pageId)] as [string, () => Promise<string>]]
+            : []),
           [GITATTRIBUTES_PATH, async () => GITATTRIBUTES],
           ...starterFiles(roles.kind)
             .filter(([path]) => !changes.some((change) => change.path === path))
@@ -357,7 +358,8 @@ export async function createPage(
 /**
  * Undoes one commit, keeping everything since: the files as they were before it, merged from it onto the
  * head, which is what `git revert` does. Goes through `commitPage`, so reverting needs the same permissions
- * as writing those paths. The first commit's metadata and `.gitattributes` stay, because a page always has them.
+ * as writing those paths. The first commit's metadata, a paper's `paper.json` and `.gitattributes` stay, because a
+ * page always has them.
  */
 export async function revertCommit(
   pageId: string,
@@ -379,7 +381,8 @@ export async function revertCommit(
   );
   const changed = changedFiles(before, await readFiles(database, pageId, commit.tree)).filter(
     (file) =>
-      (parent || (file.path !== METADATA_PATH && started.get(file.path) !== file.after)) &&
+      (parent ||
+        (file.path !== METADATA_PATH && file.path !== KINDS.paper.kindFile && started.get(file.path) !== file.after)) &&
       file.path !== GITATTRIBUTES_PATH &&
       file.path !== PREK_PATH,
   );

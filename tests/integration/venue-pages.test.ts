@@ -68,8 +68,6 @@ async function submitted(
     title,
     authors: [],
     abstract: null,
-    year: 2027,
-    venue: null,
     source: 'openreview',
     metadataLicense: 'CC0-1.0',
     abstractLicense: null,

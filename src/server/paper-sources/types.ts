@@ -1,5 +1,5 @@
 import type { PaperId } from '@/lib/paper-ids';
-import type { VersionKind } from '@/lib/versions';
+import type { VersionKind, VersionSubmission } from '@/lib/versions';
 import type { RateLimitConfig } from '../ratelimit';
 
 /** Where a paper's row came from. */
@@ -21,6 +21,8 @@ export interface SourceVersion {
   kind: VersionKind;
   date?: string;
   url?: string;
+  /** Where it was published, when the source says: a journal, a conference's proceedings. */
+  submissions?: VersionSubmission[];
 }
 
 /** A paper as a source describes it. `identifiers` includes the one asked for. */
@@ -28,17 +30,15 @@ export interface SourcePaper {
   title: string;
   authors: string[];
   abstract: string | null;
-  year: number | null;
-  venue: string | null;
   identifiers: PaperId[];
   source: PaperOrigin;
-  /** Of the title, authors, year, venue and identifiers. */
+  /** Of the title, authors and identifiers. */
   metadataLicense: License;
   /** `null` exactly when there is no abstract. */
   abstractLicense: License | null;
   /**
    * The versions the source knows of, oldest first, which a paper new here starts with: a paper always has at
-   * least one. Whoever knows more (`import-versions`, an editor) adds the rest.
+   * least one. Where it was published is theirs too (`submissions`), as for every paper. Whoever knows more (`import-versions`, an editor) adds the rest.
    */
   versions: SourceVersion[];
 }

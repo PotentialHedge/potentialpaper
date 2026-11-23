@@ -12,13 +12,11 @@ import { api, closePool, resetDatabase, signUp } from './helpers';
 const OLD = { scheme: 'openreview', value: 'Tzcj46FpZT' } as const;
 const NEW = { scheme: 'openreview', value: 'yQYuOXhMDw' } as const;
 
-async function paper(id: typeof OLD | typeof NEW, year: number): Promise<string> {
+async function paper(id: typeof OLD | typeof NEW, _year: number): Promise<string> {
   return savePaper({
     title: 'Concept Component Analysis',
     authors: [],
     abstract: 'We extract concepts from LLMs.',
-    year,
-    venue: `ICLR ${year}`,
     identifiers: [id],
     source: 'openreview',
     metadataLicense: 'CC0-1.0',

@@ -1,4 +1,5 @@
 import { normalizeArxivId, parseDoi, type PaperId } from '@/lib/paper-ids';
+import { MAX_VENUE } from '@/lib/versions';
 import { CC0, fetchSource, tidy, type License, type PaperSource, type SourcePaper } from './types';
 
 const FIELDS =
@@ -61,8 +62,6 @@ export function parseOpenAlexWork(work: Work, doi: string): SourcePaper | null {
       .map((a) => tidy(a.raw_author_name ?? a.author?.display_name ?? ''))
       .filter(Boolean),
     abstract,
-    year: work.publication_year ?? null,
-    venue,
     identifiers,
     source: 'openalex',
     metadataLicense: CC0,
@@ -74,6 +73,7 @@ export function parseOpenAlexWork(work: Work, doi: string): SourcePaper | null {
         kind: work.primary_location?.source?.type === 'journal' ? 'journal' : 'camera-ready',
         date: date && /^\d{4}(-\d{2}-\d{2})?$/.test(date) ? date : undefined,
         url: `https://doi.org/${doi}`,
+        ...(venue ? { submissions: [{ venue: venue.slice(0, MAX_VENUE), status: 'accepted' as const }] } : {}),
       },
     ],
   };

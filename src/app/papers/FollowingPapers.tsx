@@ -1,5 +1,6 @@
 'use client';
 
+import { venueLine } from '@/lib/paper-file';
 import Link from 'next/link';
 import { useState } from 'react';
 import { ui } from '@/components/ui';
@@ -66,9 +67,7 @@ export function FollowingPapers({ initial: rows, n }: { initial: FollowingRow[];
                   <td className={`${ui.td} font-serif ${unfollowed ? 'text-muted line-through' : ''}`}>
                     <Link href={row.path}>{row.title}</Link>
                     {(row.year || row.venue) && (
-                      <div className="font-sans text-xs text-faint">
-                        {[row.venue, row.year].filter(Boolean).join(' ')}
-                      </div>
+                      <div className="font-sans text-xs text-faint">{venueLine(row.venue, row.year)}</div>
                     )}
                   </td>
                   <td className={`${ui.td} whitespace-nowrap text-subtle tabular-nums`}>

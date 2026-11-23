@@ -51,8 +51,6 @@ async function newPaper(): Promise<string> {
     title: `Paper ${count}`,
     authors: ['Ada Lovelace'],
     abstract: null,
-    year: 2020,
-    venue: null,
     source: 'arxiv',
     metadataLicense: 'CC0-1.0',
     abstractLicense: null,

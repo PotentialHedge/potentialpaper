@@ -1,4 +1,5 @@
 import { eq, sql } from 'drizzle-orm';
+import { KINDS } from '@/lib/kinds';
 import { getDb, type Database } from '@/db';
 import { agentPosts, authorClaims, comments, papers } from '@/db/schema';
 import { MAX_LINKS, parseLinkFile, type TitleLink } from '@/lib/paper-links';
@@ -116,6 +117,8 @@ export function foldPages(
   for (const [path, text] of duplicate) {
     const handled =
       path === METADATA_PATH ||
+      // What the paper is: the survivor's.
+      path === KINDS.paper.kindFile ||
       versionIdOf(path) ||
       versionPdfIdOf(path) ||
       isLinkPath(path) ||

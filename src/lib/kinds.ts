@@ -59,6 +59,38 @@ const slugList = (description: string) =>
     .meta({ description });
 const date = z.string().regex(/^\d{4}-\d{2}-\d{2}$/, 'a date, YYYY-MM-DD');
 
+/** The longest title and abstract a `paper.json` holds; a version's own title and abstract have the same. */
+export const MAX_PAPER_TITLE = 400;
+export const MAX_PAPER_ABSTRACT = 6000;
+export const MAX_AUTHORS = 500;
+export const MAX_AUTHOR_NAME = 300;
+
+/**
+ * A paper's `paper.json`: what the paper is, the one place its title, authors and abstract are kept. The system writes
+ * it in a paper's first commit, from where the paper came from (arXiv, OpenAlex, an OpenReview import); after that it
+ * changes as any file does, so a fixed title or the authors named when a review ends have history. `papers.title`,
+ * `authors` and `abstract` are its projection (`server/pages/projections.ts`). Where the paper went is its versions'.
+ */
+export const paperFileSchema = z
+  .strictObject({
+    title: shortText(MAX_PAPER_TITLE).meta({ description: 'The title, as on the paper.' }),
+    authors: z.array(shortText(MAX_AUTHOR_NAME)).max(MAX_AUTHORS).meta({
+      description:
+        'The authors, as printed on the paper and in its order. Empty while the paper is under anonymous review.',
+    }),
+    abstract: z.string().trim().min(1).max(MAX_PAPER_ABSTRACT).optional().meta({ description: 'The abstract.' }),
+    license: z
+      .strictObject({
+        metadata: shortText(100).meta({ description: 'Of the title and authors: an SPDX id, as "CC0-1.0".' }),
+        abstract: shortText(100).optional().meta({ description: 'Of the abstract.' }),
+      })
+      .optional()
+      .meta({ description: 'The licenses of the text, as the source it was copied from gave it.' }),
+  })
+  .meta({ title: 'Paper', description: "A paper page's paper.json: its title, authors and abstract." });
+
+export type PaperFile = z.output<typeof paperFileSchema>;
+
 /** A `venue.json`: a series (`iclr`), an edition (`iclr/2027`), or deeper, a track or workshop. */
 export const venueFileSchema = z
   .strictObject({
@@ -148,7 +180,7 @@ export interface KindInfo {
   repo: boolean;
   /** The kind file, from the repo's root; `null` on a kind without a repo. */
   kindFile: string | null;
-  /** Its schema; `null` for a paper's, which is the system's snapshot. */
+  /** Its schema; `null` on a kind without a repo. */
   kindFileSchema: z.ZodType | null;
   /**
    * Its owners, if it has any: what the page calls them ("the authors"), and how they are confirmed. Their part is
@@ -189,12 +221,13 @@ export const KINDS = {
     title: 'Paper',
     route: '/abs',
     repo: true,
-    kindFile: '.potentialpaper/metadata.json',
-    kindFileSchema: null,
+    kindFile: 'paper.json',
+    kindFileSchema: paperFileSchema,
     owners: { dir: OWNERS_DIR, title: 'the authors', noun: 'confirmed authors', claim: 'authors' },
     community: true,
     slots: slots('paper', ['title', 'submission', 'community', 'author']),
     fileTypes: [
+      'paper',
       'section',
       'labeledLink',
       'fact',

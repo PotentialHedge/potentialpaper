@@ -25,8 +25,6 @@ async function newPaper(title: string, abstract = 'An abstract about nothing muc
     title,
     authors: ['Ada Lovelace'],
     abstract,
-    year: 2026,
-    venue: null,
     source: 'openreview',
     metadataLicense: 'CC0-1.0',
     abstractLicense: 'CC0-1.0',

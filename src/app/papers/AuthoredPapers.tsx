@@ -1,5 +1,6 @@
 'use client';
 
+import { venueLine } from '@/lib/paper-file';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { useState } from 'react';
@@ -65,9 +66,7 @@ export function AuthoredPapers({
                   <td className={`${ui.td} font-serif`}>
                     <Link href={row.path}>{row.title}</Link>
                     {(row.year || row.venue) && (
-                      <div className="font-sans text-xs text-faint">
-                        {[row.venue, row.venue?.includes(String(row.year)) ? null : row.year].filter(Boolean).join(' ')}
-                      </div>
+                      <div className="font-sans text-xs text-faint">{venueLine(row.venue, row.year)}</div>
                     )}
                   </td>
                   <td className={ui.td}>

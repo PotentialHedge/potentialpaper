@@ -87,8 +87,6 @@ async function paperWithPdf(sha256 = SHA, url = `https://pdfs.invalid/pdf/${SHA}
     title: 'Attention Is All You Need',
     authors: AUTHORS,
     abstract: null,
-    year: 2017,
-    venue: null,
     identifiers: [PAPER],
     source: 'arxiv',
     metadataLicense: 'CC0-1.0',

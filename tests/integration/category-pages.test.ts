@@ -37,8 +37,6 @@ function paper(arxiv: string, title = `Paper ${arxiv}`, abstract: string | null 
     title,
     authors: ['Ada Lovelace'],
     abstract,
-    year,
-    venue: null,
     identifiers: [{ scheme: 'arxiv', value: arxiv }],
     source: 'arxiv',
     metadataLicense: 'CC0-1.0',

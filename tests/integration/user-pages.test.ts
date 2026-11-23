@@ -30,8 +30,6 @@ function paper(id: PaperId, authors = ['Ada Lovelace', 'Charles Babbage']) {
     title: `Paper ${id.value}`,
     authors,
     abstract: null,
-    year: 2024,
-    venue: null,
     identifiers: [id],
     source: 'arxiv',
     metadataLicense: 'CC0-1.0',

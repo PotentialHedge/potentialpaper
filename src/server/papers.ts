@@ -92,8 +92,6 @@ export async function savePaper(source: Omit<SourcePaper, 'versions'>, database:
           title: source.title,
           authors: source.authors,
           abstract: source.abstract,
-          year: source.year,
-          venue: source.venue,
           source: source.source,
           metadataLicense: source.metadataLicense,
           abstractLicense: source.abstractLicense,

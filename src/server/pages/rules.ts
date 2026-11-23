@@ -16,7 +16,8 @@ import { htmlProblem } from './html';
  *
  *   .gitattributes                  the system's, always the same: which files are kept with Git LFS
  *   prek.toml                       the system's, always the same: checks to run before a commit
- *   .potentialpaper/metadata.json   the system's: the layout's version, identifiers, title, authors, abstract
+ *   .potentialpaper/metadata.json   the system's: the layout's version, the kind and the key
+ *   paper.json                      the paper's title, authors and abstract (`lib/kinds.ts`)
  *   owners/10-overview.md           the owners' sections (on a paper, its confirmed authors'), a file per section
  *                                   (Markdown or HTML)
  *   owners/plugins.json             the plugins' panels the authors let into them (`lib/plugins/author-plugins.ts`)
@@ -34,7 +35,6 @@ import { htmlProblem } from './html';
  * the system, its parts' sections (`<part>/NN-slug.md`) and each part's labeled links (`<part>/links.jsonl`), its
  * kind file, and `extensions/`. The rest above is a paper's own. Other kinds today:
  *
- *   .potentialpaper/metadata.json   the system's: the layout's version, the kind and the key
  *   venue.json, category.json, org.json or profile.json   the kind file (`lib/kinds.ts`)
  *   owners/                         the owners' sections, where the kind has owners; community/ on all but a user's
  *   <part>/links.jsonl              that part's labeled links
@@ -63,8 +63,10 @@ const SYSTEM_PATHS = new Set([METADATA_PATH]);
  *   5  every PDF is a version's (no `.potentialpaper/paper.pdf` or `pdf.json`), and a version records where it was
  *      submitted and what each venue decided, which `submission.json` no longer says. No move: the database was
  *      wiped and reseeded.
+ *   6  a paper's title, authors and abstract are in `paper.json`, and its `metadata.json` says only the layout, the
+ *      kind and the key, as every other kind's does: no copy of the paper that could go stale (`planPaperFile`)
  */
-export const LAYOUT_VERSION = 5;
+export const LAYOUT_VERSION = 6;
 
 /** The layout a page's `metadata.json` says it has; `null` if it says none, as the first layout's doesn't. */
 export function layoutVersionOf(metadata: string | undefined): number | null {
@@ -314,7 +316,7 @@ function kindLayout(kind: PageKind): string {
     return `${kind} pages hold .gitattributes, prek.toml, ${METADATA_PATH}, ${KINDS[kind].kindFile}, ${sections} and extensions/`;
   }
   return (
-    `pages hold .gitattributes, prek.toml, .potentialpaper/ (metadata.json), ${sections}, ` +
+    `pages hold .gitattributes, prek.toml, .potentialpaper/ (metadata.json), paper.json, ${sections}, ` +
     'versions/<id>.json and <id>.pdf, links/ (named like 10-code.json), thumbnail.png (or .jpg, .gif, .webp, .avif) ' +
     'and thumbnail.json, demos/<name>/, reviews/<source>/<submission>/ and extensions/'
   );
@@ -384,6 +386,17 @@ function kindFileRule(kind: Exclude<PageKind, 'paper'>): PathRule {
 
 /** The rules of a paper's own files, beyond every kind's. */
 const PAPER_RULES: PathRule[] = [
+  {
+    // What the paper is: the system writes it from the paper's source, then as its card, its confirmed authors' once
+    // it is claimed and anyone verified's until then, so an import can name the authors when a review ends.
+    covers: (path) => path === KINDS.paper.kindFile,
+    layout: fine,
+    denied: (roles) => {
+      if (roles.system || roles.admin) return null;
+      if (roles.claimed) return roles.owner ? null : "only this paper's confirmed authors can change its paper.json";
+      return roles.verified ? null : CONFIRM;
+    },
+  },
   {
     covers: (path) => path.startsWith(`${VERSIONS_DIR}/`),
     layout: (path) =>

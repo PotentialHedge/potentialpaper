@@ -1,5 +1,6 @@
 'use client';
 
+import { venueLine } from '@/lib/paper-file';
 import { useEffect, useState } from 'react';
 import type { PaperId } from '@/lib/paper-ids';
 import { ui } from './ui';
@@ -112,13 +113,7 @@ export function ClaimSuggestions({ autoFocus = false }: { autoFocus?: boolean })
                             </span>
                           </span>
                         ))}
-                    {(row.venue || row.year) && (
-                      <span className="text-faint">
-                        {' '}
-                        ·{' '}
-                        {[row.venue, row.venue?.includes(String(row.year)) ? null : row.year].filter(Boolean).join(' ')}
-                      </span>
-                    )}
+                    {(row.venue || row.year) && <span className="text-faint"> · {venueLine(row.venue, row.year)}</span>}
                   </div>
                 </div>
                 <div className="shrink-0 text-right whitespace-nowrap">

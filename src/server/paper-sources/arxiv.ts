@@ -1,5 +1,6 @@
 import { XMLParser } from 'fast-xml-parser';
 import { normalizeArxivId, parseDoi, type PaperId } from '@/lib/paper-ids';
+import { MAX_VENUE, MAX_VERSION_LABEL } from '@/lib/versions';
 import {
   CC0,
   fetchSource,
@@ -42,6 +43,15 @@ function arxivVersions(entry: AtomEntry, id: string): SourceVersion[] {
   });
   const versions = [version(1, day(entry.published))];
   if (latest > 1) versions.push(version(latest, day(entry.updated)));
+  // Where the authors say it was published: "Phys. Rev. D 76, 013009 (2007)". Undated, so it sorts last.
+  const journal = entry['arxiv:journal_ref'] ? tidy(entry['arxiv:journal_ref']).slice(0, MAX_VENUE) : '';
+  if (journal) {
+    versions.push({
+      label: journal.slice(0, MAX_VERSION_LABEL),
+      kind: 'journal',
+      submissions: [{ venue: journal, status: 'accepted' }],
+    });
+  }
   return versions;
 }
 
@@ -60,14 +70,11 @@ export function parseArxivFeed(xml: string, id: string): SourcePaper | null {
   const identifiers: PaperId[] = [{ scheme: 'arxiv', value: id }];
   const doi = entry['arxiv:doi'] ? parseDoi(entry['arxiv:doi']) : null;
   if (doi?.scheme === 'doi') identifiers.push(doi);
-  const year = Number(entry.published?.slice(0, 4));
   const abstract = entry.summary ? tidy(entry.summary) || null : null;
   return {
     title: tidy(entry.title),
     authors: (entry.author ?? []).map((a) => tidy(a.name ?? '')).filter(Boolean),
     abstract,
-    year: Number.isInteger(year) && year > 0 ? year : null,
-    venue: entry['arxiv:journal_ref'] ? tidy(entry['arxiv:journal_ref']) : null,
     identifiers,
     source: 'arxiv',
     // arXiv's API terms: descriptive metadata, "title, abstract, authors, identifiers", is CC0.

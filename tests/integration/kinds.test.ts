@@ -17,6 +17,7 @@ import { gitIdentity } from '@/server/pages/receive';
 import { readFiles, readCommit, readHead, readText } from '@/server/pages/repo';
 import { savePaper } from '@/server/papers';
 import { mintToken } from '@/server/tokens';
+import { LAYOUT_VERSION } from '@/server/pages/rules';
 import { closePool, resetDatabase } from './helpers';
 
 /**
@@ -54,8 +55,6 @@ describe('pages', () => {
       title: 'A paper',
       authors: [],
       abstract: null,
-      year: 2024,
-      venue: null,
       source: 'arxiv',
       metadataLicense: 'CC0-1.0',
       abstractLicense: null,
@@ -75,7 +74,11 @@ describe('pages', () => {
     expect(await findPage('venue:iclr/2027')).toMatchObject({ id: venue.id, kind: 'venue', key: 'iclr/2027' });
     const tree = await files(venue.id);
     expect(Object.keys(tree).sort()).toEqual(['.gitattributes', '.potentialpaper/metadata.json', 'prek.toml']);
-    expect(JSON.parse(tree['.potentialpaper/metadata.json'])).toEqual({ layout: 5, kind: 'venue', key: 'iclr/2027' });
+    expect(JSON.parse(tree['.potentialpaper/metadata.json'])).toEqual({
+      layout: LAYOUT_VERSION,
+      kind: 'venue',
+      key: 'iclr/2027',
+    });
     await expect(createPage('venue', 'ICLR 2027')).rejects.toThrow(/slugs/);
     await expect(createPage('category', 'a/b')).rejects.toThrow(/more than 1 part/);
     await expect(createPage('user', 'x')).rejects.toThrow(/handle/);
@@ -167,8 +170,6 @@ describe('path rules per kind', () => {
       title: 'Linear attention',
       authors: [],
       abstract: null,
-      year: 2020,
-      venue: null,
       source: 'arxiv',
       metadataLicense: 'CC0-1.0',
       abstractLicense: null,

@@ -45,9 +45,11 @@ const ImportPaper = z.object({
 });
 export const ImportPapersList = z.object({ papers: z.array(ImportPaper), next: z.string().nullable() });
 
-/** New papers, by their OpenReview id. One already here is left as it is. */
+/**
+ * New papers, by their OpenReview id. One already here is left as it is. Where each went is its versions'
+ * (`/imports/submissions`, `/imports/versions`), not the paper's.
+ */
 export const ImportPapersBody = z.object({
-  venue: z.object({ name: z.string().min(1).max(200), year: z.number().int().min(1900).max(2100) }),
   papers: z
     .array(
       z.object({
@@ -56,8 +58,6 @@ export const ImportPapersBody = z.object({
         abstract: z.string().max(20_000).nullable(),
         /** Left out while the venue's review is anonymous. */
         authors: z.array(z.string().max(300)).max(500).optional(),
-        /** Overrides the venue's name: "ICLR 2026 submission" for one it didn't accept. */
-        venue: z.string().max(200).optional(),
       }),
     )
     .max(MAX_PAPERS),
@@ -168,11 +168,8 @@ export const postImportPapers = route(async (req) => {
   if (!importsFrom(grants, 'openreview')) {
     throw new ApiError(403, 'forbidden', 'only a bot granted reviews/openreview/** adds papers by OpenReview id');
   }
-  const { venue, papers } = await parseBody(req, ImportPapersBody);
-  const added = await importSubmissions(
-    papers.map(({ openreview, ...p }) => ({ id: openreview, ...p })),
-    venue,
-  );
+  const { papers } = await parseBody(req, ImportPapersBody);
+  const added = await importSubmissions(papers.map(({ openreview, ...p }) => ({ id: openreview, ...p })));
   return respond(ImportedPapers, { added }, { principal });
 });
 

@@ -337,8 +337,6 @@ describe('the page routes plugins read', () => {
       title: 'Linear attention at scale',
       authors: ['A. Author'],
       abstract: 'We scale it.',
-      year: 2027,
-      venue: null,
       source: 'arxiv',
       metadataLicense: 'CC0-1.0',
       abstractLicense: null,
@@ -442,7 +440,8 @@ describe('the page routes plugins read', () => {
     const members = (await api('GET', `/pages/${enc('venue:iclr')}/members?limit=10`)).body;
     expect(members).toMatchObject({
       total: 1,
-      papers: [{ identifier: 'arxiv:2701.00001', year: 2027, via: ['submission'] }],
+      // No version dates it, and none names a venue.
+      papers: [{ identifier: 'arxiv:2701.00001', year: null, via: ['submission'] }],
       nextOffset: null,
     });
     expect((await api('GET', `/pages/${enc('venue:iclr')}/members?rollUp=false`)).body.total).toBe(0);

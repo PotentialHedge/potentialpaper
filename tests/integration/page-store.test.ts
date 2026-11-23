@@ -37,11 +37,11 @@ import { savePaper } from '@/server/papers';
 import { searchPapers } from '@/server/search';
 import { closePool, resetDatabase } from './helpers';
 
-/** The paths a page's first commit has besides its own: the metadata, `.gitattributes` and the starter files. */
+/** The paths a paper's first commit has besides its own: the metadata, `paper.json`, `.gitattributes` and the starter files. */
 const byBytes = (a: string, b: string) => Buffer.compare(Buffer.from(a), Buffer.from(b));
 const STARTER_PATHS = starterFiles().map(([path]) => path);
 const firstPaths = (...own: string[]) =>
-  [...new Set(['.gitattributes', '.potentialpaper/metadata.json', ...STARTER_PATHS, ...own])].sort(byBytes);
+  [...new Set(['.gitattributes', '.potentialpaper/metadata.json', 'paper.json', ...STARTER_PATHS, ...own])].sort(byBytes);
 
 const NO_LIMIT = { burst: 100_000, perSecond: 1000 };
 const ARXIV = { scheme: 'arxiv', value: '1706.03762' } as const;
@@ -79,8 +79,6 @@ async function newPaper(identifier: { scheme: 'arxiv' | 'doi' | 'openreview'; va
     title: `Paper ${paperCount}: Über 日本語`,
     authors: ['Ada Lovelace', 'Émile Noether'],
     abstract: 'An abstract.',
-    year: 2020,
-    venue: null,
     source: 'arxiv',
     metadataLicense: 'CC0-1.0',
     abstractLicense: 'CC0-1.0',
@@ -216,6 +214,7 @@ describe('every repo passes git fsck --strict', () => {
         fsck(repo);
         const files = filesAt(repo);
         expect(files.delete('.potentialpaper/metadata.json')).toBe(true);
+        if (!expected.has('paper.json')) expect(files.delete('paper.json')).toBe(true);
         expect(files.delete('.gitattributes')).toBe(true);
         expect(new Map([...files].sort())).toEqual(new Map([...expected].sort()));
       }),
@@ -384,7 +383,7 @@ describe('concurrent commits', () => {
     const repo = await exportRepo(paperId);
     fsck(repo);
     expect(git(['rev-list', '--count', 'main'], repo).trim()).toBe('50');
-    expect(filesAt(repo).size).toBe(52 + STARTER_PATHS.length);
+    expect(filesAt(repo).size).toBe(53 + STARTER_PATHS.length);
     expect(git(['rev-list', '--max-parents=0', 'main'], repo).trim().split('\n')).toHaveLength(1);
   }, 60_000);
 
@@ -479,7 +478,7 @@ describe('rebuilding the projections', () => {
 });
 
 describe('commitPage', () => {
-  it('starts a repo with a metadata snapshot, and not for nothing', async () => {
+  it('starts a repo with its metadata and paper.json, and not for nothing', async () => {
     const paperId = await newPaper(ARXIV);
     const person = await newAccount();
     expect(
@@ -500,13 +499,13 @@ describe('commitPage', () => {
     const repo = await exportRepo(paperId);
     expect(JSON.parse(filesAt(repo).get('.potentialpaper/metadata.json')!)).toEqual({
       layout: LAYOUT_VERSION,
-      identifiers: [ARXIV],
+      kind: 'paper',
+      key: expect.any(String),
+    });
+    expect(JSON.parse(filesAt(repo).get('paper.json')!)).toEqual({
       title: expect.stringContaining('Über'),
       authors: ['Ada Lovelace', 'Émile Noether'],
       abstract: 'An abstract.',
-      year: 2020,
-      venue: null,
-      source: 'arxiv',
       license: { metadata: 'CC0-1.0', abstract: 'CC0-1.0' },
     });
     expect(
@@ -1185,8 +1184,6 @@ describe('the PDF', () => {
       title: 'A paper',
       authors: [],
       abstract: null,
-      year: 2026,
-      venue: null,
       identifiers: [ARXIV],
       source: 'arxiv',
       metadataLicense: 'CC0-1.0',
@@ -1194,7 +1191,7 @@ describe('the PDF', () => {
     });
   }
 
-  it('is projected for the page, with the metadata snapshot, and survives a rebuild', async () => {
+  it('is projected for the page, with its first files, and survives a rebuild', async () => {
     const id = await paper();
     await commitPage(id, null, SYSTEM_ACTOR, change(POINTER), 'Add the PDF');
     await rebuildAllPages();
@@ -1205,6 +1202,7 @@ describe('the PDF', () => {
       [
         '.gitattributes',
         '.potentialpaper/metadata.json',
+        'paper.json',
         'versions/v_submitted.json',
         'versions/v_submitted.pdf',
         ...STARTER_PATHS,

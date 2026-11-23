@@ -25,8 +25,6 @@ function paper(): Promise<string> {
     title: 'Attention Is All You Need',
     authors: ['Ashish Vaswani', 'Noam Shazeer'],
     abstract: 'The dominant sequence transduction models...',
-    year: 2017,
-    venue: null,
     identifiers: [PAPER],
     source: 'arxiv',
     metadataLicense: 'CC0-1.0',

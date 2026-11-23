@@ -22,8 +22,6 @@ async function newPaper() {
     title: `Paper ${count}`,
     authors: ['Ada Lovelace'],
     abstract: 'An abstract.',
-    year: 2026,
-    venue: null,
     source: 'openreview',
     metadataLicense: 'CC0-1.0',
     abstractLicense: 'CC0-1.0',

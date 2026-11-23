@@ -14,8 +14,6 @@ function paper(n: number): Promise<string> {
     title: `Paper ${n}`,
     authors: ['Ada Lovelace'],
     abstract: null,
-    year: 2020 + n,
-    venue: null,
     identifiers: [{ scheme: 'arxiv', value: `2101.0000${n}` }],
     source: 'arxiv',
     metadataLicense: 'CC0-1.0',

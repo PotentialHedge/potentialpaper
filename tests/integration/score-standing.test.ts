@@ -67,8 +67,6 @@ async function submitted(
     title: `Paper ${arxiv}`,
     authors: ['A. Author'],
     abstract: 'An abstract.',
-    year: 2027,
-    venue: null,
     source: 'arxiv',
     metadataLicense: 'CC0-1.0',
     abstractLicense: null,

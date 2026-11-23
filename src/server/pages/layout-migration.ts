@@ -1,6 +1,7 @@
 import { linkProblem, type TitleLink } from '@/lib/paper-links';
 import { encodeVersionFile, parseVersionFile, type PaperVersion } from '@/lib/versions';
-import { OWNERS_DIR, type PageKind } from '@/lib/kinds';
+import { KINDS, OWNERS_DIR, type PageKind } from '@/lib/kinds';
+import { encodePaperFile, paperFileOf, type PaperFileFields } from '@/lib/paper-file';
 import type { FileChange } from './commit';
 import { linkChanges, versionChanges } from './content';
 import { shiftHeadings, splitSections } from './markdown';
@@ -228,5 +229,26 @@ export function planOwners(kind: PageKind, files: ReadonlyMap<string, string>): 
   }
   const stamped = withLayoutVersion(metadata, 4);
   if (stamped) changes.push({ path: METADATA_PATH, content: stamped });
+  return changes;
+}
+
+/**
+ * To layout 6: a paper's title, authors and abstract move from its row, of which `metadata.json` kept a snapshot, to
+ * `paper.json`, and every page's `metadata.json` says only the layout, the kind and the key. Pure:
+ * `scripts/migrate-paper-files.ts` commits what this says, with the paper's row as `paper`. None if the page is there.
+ */
+export function planPaperFile(
+  page: { kind: PageKind; key: string },
+  files: ReadonlyMap<string, string>,
+  paper: PaperFileFields | null,
+): FileChange[] {
+  const metadata = files.get(METADATA_PATH);
+  if (metadata === undefined || (layoutVersionOf(metadata) ?? 0) >= 6) return [];
+  const changes: FileChange[] = [
+    { path: METADATA_PATH, content: `${JSON.stringify({ layout: 6, kind: page.kind, key: page.key }, null, 2)}\n` },
+  ];
+  if (page.kind === 'paper' && paper && !files.has(KINDS.paper.kindFile)) {
+    changes.push({ path: KINDS.paper.kindFile, content: encodePaperFile(paperFileOf(paper)) });
+  }
   return changes;
 }

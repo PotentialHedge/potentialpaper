@@ -29,8 +29,6 @@ describe('arXiv feed', () => {
       title: 'Attention Is All You & Need',
       authors: ['Ashish Vaswani', 'Noam Shazeer'],
       abstract: 'The dominant models.',
-      year: 2017,
-      venue: 'NeurIPS 2017',
       identifiers: [
         { scheme: 'arxiv', value: '1706.03762' },
         { scheme: 'doi', value: '10.1000/abc' },
@@ -41,6 +39,8 @@ describe('arXiv feed', () => {
       versions: [
         { label: 'arXiv v1', kind: 'preprint', date: '2017-06-12', url: 'https://arxiv.org/abs/1706.03762v1' },
         { label: 'arXiv v7', kind: 'preprint', date: '2023-08-02', url: 'https://arxiv.org/abs/1706.03762v7' },
+        // Its journal_ref, as where it was published.
+        { label: 'NeurIPS 2017', kind: 'journal', submissions: [{ venue: 'NeurIPS 2017', status: 'accepted' }] },
       ],
     });
   });
@@ -88,7 +88,6 @@ describe('OpenAlex work', () => {
     const paper = parseOpenAlexWork(work, '10.1145/3065386');
     expect(paper?.title).toBe('ImageNet classification');
     expect(paper?.authors).toEqual(['A. Krizhevsky']);
-    expect(paper?.venue).toBe('Communications of the ACM');
     expect(paper?.identifiers).toEqual([
       { scheme: 'doi', value: '10.1145/3065386' },
       { scheme: 'arxiv', value: '1234.56789' },
@@ -99,6 +98,7 @@ describe('OpenAlex work', () => {
         kind: 'camera-ready',
         date: '2017',
         url: 'https://doi.org/10.1145/3065386',
+        submissions: [{ venue: 'Communications of the ACM', status: 'accepted' }],
       },
     ]);
   });

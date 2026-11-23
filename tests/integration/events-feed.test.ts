@@ -20,8 +20,6 @@ async function paper(value: string, title: string): Promise<string> {
     title,
     authors: [],
     abstract: 'An abstract.',
-    year: 2027,
-    venue: 'ICLR 2027',
     identifiers: [{ scheme: 'openreview', value }],
     source: 'openreview',
     metadataLicense: 'CC0-1.0',

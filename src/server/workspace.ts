@@ -49,9 +49,9 @@ function areasOf(kind: PageKind): Record<string, string> {
       'thumbnail.json': 'thumbnail.json',
       'demos/': 'demos/new/index.html',
     });
-  } else if (KINDS[kind].kindFile) {
-    areas[KINDS[kind].kindFile] = KINDS[kind].kindFile;
   }
+  const { kindFile } = KINDS[kind];
+  if (kindFile) areas[kindFile] = kindFile;
   areas['.potentialpaper/'] = '.potentialpaper/metadata.json';
   return areas;
 }

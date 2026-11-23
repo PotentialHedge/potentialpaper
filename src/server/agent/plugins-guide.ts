@@ -481,7 +481,7 @@ every commit to every paper, oldest first, and \`next\`, the cursor to read afte
 true; with nothing new, \`wait\` holds the request until a commit lands. It never skips one, so keep \`next\` and you can
 stop and start where you left off (or begin at \`after=now\`). Each event names the paper with all its
 \`identifiers\`, the files its commit changed (\`paths\`: recompute when the ones you read changed, e.g.
-\`metadata.json\`), \`created\` for a new paper, and \`merged\` when another paper was folded into it. A small follower:
+\`paper.json\`), \`created\` for a new paper, and \`merged\` when another paper was folded into it. A small follower:
 \`examples/signals/follow.mjs\` in the PotentialPaper repo.
 
 **Read a set** with \`pp.signals\` (no permission needed: signals are public), or over HTTP:

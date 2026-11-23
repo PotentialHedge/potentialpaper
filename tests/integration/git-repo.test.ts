@@ -36,8 +36,6 @@ function paperId(): Promise<string> {
     title: 'A paper',
     authors: ['Ada Lovelace'],
     abstract: 'An abstract.',
-    year: 2020,
-    venue: null,
     source: 'arxiv',
     metadataLicense: 'CC0-1.0',
     abstractLicense: 'CC0-1.0',

@@ -17,8 +17,6 @@ function paper(): Promise<string> {
     title: 'Attention Is All You Need',
     authors: ['Ashish Vaswani'],
     abstract: null,
-    year: 2017,
-    venue: null,
     identifiers: [PAPER],
     source: 'arxiv',
     metadataLicense: 'CC0-1.0',

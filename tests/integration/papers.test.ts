@@ -21,8 +21,6 @@ const ATTENTION: SourcePaper = {
   title: 'Attention Is All You Need',
   authors: ['Ashish Vaswani'],
   abstract: 'The dominant sequence transduction models are based on recurrent networks.',
-  year: 2017,
-  venue: null,
   identifiers: [{ scheme: 'arxiv', value: '1706.03762' }],
   source: 'arxiv',
   metadataLicense: 'CC0-1.0',
@@ -253,11 +251,10 @@ describe('importing submissions', () => {
     { id: 'submission1', title: 'Sparse routing for vision models', abstract: 'x'.repeat(60) },
     { id: 'wnlWatgGQl', title: 'Internal Test', abstract: 'test' },
   ];
-  const venue = { name: 'ICLR 2027 (under review)', year: 2027 };
 
   it('skips test notes, stays anonymous, and can run twice', async () => {
-    expect(await importSubmissions(submissions, venue)).toBe(1);
-    expect(await importSubmissions(submissions, venue)).toBe(0);
+    expect(await importSubmissions(submissions)).toBe(1);
+    expect(await importSubmissions(submissions)).toBe(0);
     const found = await lookupPaper({ scheme: 'openreview', value: 'submission1' });
     expect(found.status === 'found' && found.paper.authors).toEqual([]);
     expect(found.status === 'found' && found.paper).toMatchObject({
@@ -268,27 +265,28 @@ describe('importing submissions', () => {
     expect(await getDb().select().from(paperIdentifiers)).toHaveLength(1);
   });
 
-  it('keeps the authors and venue of a paper whose review has ended', async () => {
-    const decided = { ...submissions[0], authors: ['Ada Lovelace'], venue: 'ICLR 2026 submission' };
-    expect(await importSubmissions([decided], venue)).toBe(1);
+  it('keeps the authors of a paper whose review has ended', async () => {
+    const decided = { ...submissions[0], authors: ['Ada Lovelace'] };
+    expect(await importSubmissions([decided])).toBe(1);
     const found = await lookupPaper({ scheme: 'openreview', value: decided.id });
-    expect(found.status === 'found' && [found.paper.authors, found.paper.venue]).toEqual([
-      ['Ada Lovelace'],
-      'ICLR 2026 submission',
-    ]);
+    expect(found.status === 'found' && found.paper.authors).toEqual(['Ada Lovelace']);
   });
 });
 
 describe('search', () => {
+  // Each with its versions, as a lookup gives it, which date it.
   beforeEach(async () => {
-    await savePaper(ATTENTION);
-    await savePaper({
-      ...ATTENTION,
-      title: 'Deep residual learning',
-      authors: ['Kaiming He'],
-      abstract: 'Skip connections help very deep networks.',
-      identifiers: [{ scheme: 'doi', value: '10.1/resnet' }],
-    });
+    await startVersions(await savePaper(ATTENTION), ATTENTION);
+    await startVersions(
+      await savePaper({
+        ...ATTENTION,
+        title: 'Deep residual learning',
+        authors: ['Kaiming He'],
+        abstract: 'Skip connections help very deep networks.',
+        identifiers: [{ scheme: 'doi', value: '10.1/resnet' }],
+      }),
+      ATTENTION,
+    );
   });
 
   it('finds words in titles and abstracts', async () => {
@@ -346,13 +344,15 @@ describe('search', () => {
   });
 
   it('filters by one venue, and lists the venues with most papers', async () => {
-    const venued = (venue: string, value: string) =>
-      savePaper({
+    // As its versions' projection would set it.
+    const venued = async (venue: string, value: string) => {
+      const id = await savePaper({
         ...ATTENTION,
         title: `Paper ${value}`,
-        venue,
         identifiers: [{ scheme: 'doi', value: `10.1/${value}` }],
       });
+      await getDb().update(papers).set({ venue }).where(eq(papers.id, id));
+    };
     await venued('ICLR 2026', 'a');
     await venued('ICLR 2026', 'b');
     await venued('NeurIPS', 'c');
@@ -361,8 +361,10 @@ describe('search', () => {
   });
 
   it('sorts', async () => {
-    const dated = (title: string, year: number | null, value: string) =>
-      savePaper({ ...ATTENTION, title, year, identifiers: [{ scheme: 'doi', value: `10.1/${value}` }] });
+    const dated = async (title: string, year: number | null, value: string) => {
+      const id = await savePaper({ ...ATTENTION, title, identifiers: [{ scheme: 'doi', value: `10.1/${value}` }] });
+      await getDb().update(papers).set({ year }).where(eq(papers.id, id));
+    };
     await dated('Banana', 2030, 'a');
     await dated('apple', 1990, 'b');
     await dated('Undated', null, 'c');

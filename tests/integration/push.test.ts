@@ -90,8 +90,6 @@ async function newPaper() {
     title: `Paper ${count}`,
     authors: ['Ada Lovelace', 'Emmy Noether'],
     abstract: 'An abstract.',
-    year: 2022,
-    venue: null,
     source: 'arxiv',
     metadataLicense: 'CC0-1.0',
     abstractLicense: 'CC0-1.0',

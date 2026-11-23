@@ -1,3 +1,4 @@
+import { venueLine } from '@/lib/paper-file';
 import 'katex/dist/katex.min.css';
 import { eq, sql } from 'drizzle-orm';
 import type { Metadata } from 'next';
@@ -179,7 +180,7 @@ export async function PaperRoute({ scheme, segments }: { scheme: PaperScheme; se
     },
     authorPanels: current?.authorPlugins ?? [],
   };
-  const about = [paper.venue, paper.year].filter(Boolean).join(', ');
+  const about = venueLine(paper.venue, paper.year);
   const linkSources = {
     identifiers,
     title: paper.title,

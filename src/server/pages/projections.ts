@@ -1,12 +1,13 @@
 import { eq, notInArray, sql } from 'drizzle-orm';
 import { getDb, type Database } from '@/db';
-import { authorClaims, commitIdentities, pageCurrent, pageRefs, pageRevisions } from '@/db/schema';
+import { authorClaims, commitIdentities, pageCurrent, pageRefs, pageRevisions, papers } from '@/db/schema';
 import { KINDS, OWNERS_DIR, pageName } from '@/lib/kinds';
 import { FACTS_FILE, parseFacts, type PageFacts } from '@/lib/infobox-facts';
 import { AUTHOR_PLUGINS_PATH, type AuthorPanel, parseAuthorPlugins } from '@/lib/plugins/author-plugins';
 import { pageDemoSources } from '../demos/attach';
 import { readLinks, readThumbnail, readVersions } from './content';
-import { paperPdfOf } from '@/lib/versions';
+import { listedVenue, paperRowOf, parsePaperFile } from '@/lib/paper-file';
+import { paperPdfOf, type PaperVersion } from '@/lib/versions';
 import { type Commit, SYSTEM_AUTHOR_ID } from './git-objects';
 import { mustPage, type PageRow } from './kinds';
 import { demoRefs } from './markdown';
@@ -127,7 +128,25 @@ async function readFacts(db: Reader, page: PageRow, files: ReadonlyMap<string, s
   return facts.owners.length + facts.community.length > 0 ? facts : null;
 }
 
-/** Makes `page_current` say what the commit at the head says. */
+/**
+ * A paper's row says what its `paper.json` says, and where its versions say it went (`listedVenue`). A file that
+ * doesn't parse leaves the row as it was: the rules (`check.ts`) let none in, so that is a repo from before them.
+ */
+async function writePaperRow(
+  tx: Writer,
+  page: PageRow,
+  files: ReadonlyMap<string, string>,
+  versions: PaperVersion[],
+): Promise<void> {
+  if (page.kind !== 'paper') return;
+  const file = parsePaperFile(await readText(tx, page.id, files.get(KINDS.paper.kindFile)));
+  await tx
+    .update(papers)
+    .set({ ...(file ? paperRowOf(file) : {}), ...listedVenue(versions) })
+    .where(eq(papers.id, page.id));
+}
+
+/** Makes `page_current` say what the commit at the head says, and a paper's row what its files say. */
 export async function writeCurrent(tx: Writer, pageId: string, head: string, commit: Commit): Promise<void> {
   const files = await readFiles(tx, pageId, commit.tree);
   const thumbnail = await readThumbnail(tx, pageId, files);
@@ -168,6 +187,7 @@ export async function writeCurrent(tx: Writer, pageId: string, head: string, com
     .insert(pageCurrent)
     .values({ pageId, ...row })
     .onConflictDoUpdate({ target: pageCurrent.pageId, set: row });
+  await writePaperRow(tx, page, files, versions);
 }
 
 /** Replaces one page's projection rows with what its objects say, atomically. */

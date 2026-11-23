@@ -1,4 +1,5 @@
 import type { Metadata } from 'next';
+import { listedVenue, venueLine } from '@/lib/paper-file';
 import { headers } from 'next/headers';
 import { notFound, redirect } from 'next/navigation';
 import { ui } from '@/components/ui';
@@ -66,6 +67,7 @@ export default async function NewPaperPage({ searchParams }: Props) {
   }
 
   const { paper } = found;
+  const { year } = listedVenue(paper.versions);
   const [similar, viewer] = await Promise.all([similarPapers(paper.title), viewerFromHeaders(await headers())]);
   return (
     <main className={ui.page}>
@@ -73,7 +75,7 @@ export default async function NewPaperPage({ searchParams }: Props) {
       <h1 className="mt-1 text-[26px] leading-tight font-normal">{paper.title}</h1>
       <p className="mt-1 font-sans text-sm text-muted">
         {authorLine(paper.authors)}
-        {paper.year ? ` · ${paper.year}` : ''}
+        {year ? ` · ${year}` : ''}
       </p>
       {paper.abstract && (
         <p className="mt-3 line-clamp-4 max-w-[760px] text-[14px] leading-snug text-subtle">{paper.abstract}</p>
@@ -97,7 +99,7 @@ export default async function NewPaperPage({ searchParams }: Props) {
                     {s.title}
                   </a>
                   <span className="block font-sans text-xs text-muted">
-                    {[authorLine(s.authors), s.venue, s.year].filter(Boolean).join(' · ')}
+                    {[authorLine(s.authors), venueLine(s.venue, s.year)].filter(Boolean).join(' · ')}
                   </span>
                 </span>
                 {viewer ? (
