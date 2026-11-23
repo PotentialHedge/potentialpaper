@@ -22,6 +22,7 @@ export function CopyField({
   caption,
   marker,
   onCopied,
+  bigButton,
 }: {
   value: string;
   /** What it is, for screen readers ("Short link", "Prompt for your AI agent"). */
@@ -30,6 +31,8 @@ export function CopyField({
   caption?: string;
   marker?: CopyMarker;
   onCopied?: () => void;
+  /** A full-width button under the card instead of its Copy bar ("Copy the prompt"), where copying is the one thing to do. */
+  bigButton?: { label: string; copiedLabel: string };
 }) {
   const [copied, setCopied] = useState(false);
   const copy = async () => {
@@ -67,45 +70,52 @@ export function CopyField({
             {value}
           </code>
         </button>
-        <div className="flex items-center justify-end border-t border-rule-soft bg-highlight/60 px-2 py-1">
-          <button
-            type="button"
-            onClick={() => void copy()}
-            className={`inline-flex cursor-pointer items-center gap-1.5 px-2 py-0.5 font-sans text-xs font-semibold ${copied ? 'text-up' : 'text-accent hover:underline'}`}
-          >
-            {copied ? (
-              <>
-                <svg
-                  aria-hidden
-                  viewBox="0 0 16 16"
-                  className="size-3.5"
-                  fill="none"
-                  stroke="currentColor"
-                  strokeWidth="2"
-                >
-                  <path d="M3 8.5l3 3 7-7" />
-                </svg>
-                Copied
-              </>
-            ) : (
-              <>
-                <svg
-                  aria-hidden
-                  viewBox="0 0 16 16"
-                  className="size-3.5"
-                  fill="none"
-                  stroke="currentColor"
-                  strokeWidth="1.5"
-                >
-                  <rect x="5.5" y="5.5" width="8" height="8" />
-                  <path d="M10.5 5.5v-3h-8v8h3" />
-                </svg>
-                Copy
-              </>
-            )}
-          </button>
-        </div>
+        {!bigButton && (
+          <div className="flex items-center justify-end border-t border-rule-soft bg-highlight/60 px-2 py-1">
+            <button
+              type="button"
+              onClick={() => void copy()}
+              className={`inline-flex cursor-pointer items-center gap-1.5 px-2 py-0.5 font-sans text-xs font-semibold ${copied ? 'text-up' : 'text-accent hover:underline'}`}
+            >
+              {copied ? (
+                <>
+                  <svg
+                    aria-hidden
+                    viewBox="0 0 16 16"
+                    className="size-3.5"
+                    fill="none"
+                    stroke="currentColor"
+                    strokeWidth="2"
+                  >
+                    <path d="M3 8.5l3 3 7-7" />
+                  </svg>
+                  Copied
+                </>
+              ) : (
+                <>
+                  <svg
+                    aria-hidden
+                    viewBox="0 0 16 16"
+                    className="size-3.5"
+                    fill="none"
+                    stroke="currentColor"
+                    strokeWidth="1.5"
+                  >
+                    <rect x="5.5" y="5.5" width="8" height="8" />
+                    <path d="M10.5 5.5v-3h-8v8h3" />
+                  </svg>
+                  Copy
+                </>
+              )}
+            </button>
+          </div>
+        )}
       </div>
+      {bigButton && (
+        <button type="button" className={ui.btn()} disabled={!value} onClick={() => void copy()}>
+          {copied ? bigButton.copiedLabel : bigButton.label}
+        </button>
+      )}
     </div>
   );
 }

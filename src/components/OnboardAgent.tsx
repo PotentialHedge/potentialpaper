@@ -116,5 +116,5 @@ export function AgentPromptBox() {
   }, []);
 
   // No caption: the screen's title says what to do with it.
-  return <AgentPromptField prompt={prompt} label="" />;
+  return <AgentPromptField prompt={prompt} label="" big />;
 }
