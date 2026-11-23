@@ -154,6 +154,9 @@ describe('pages in a category', () => {
     expect(again.status).toBe(200);
     expect(again.body.status).toBe('exists');
 
+    // Listed at once, before the worker indexes the commits: adding indexes the link itself.
+    expect((await listed('linear-attention')).pages).toEqual(['arxiv:2401.00002', 'arxiv:2401.00001']);
+
     await catchUp();
     // Its pages, by name; the papers are its scope's too, for its statistics.
     expect((await listed('linear-attention')).pages).toEqual(['arxiv:2401.00002', 'arxiv:2401.00001']);

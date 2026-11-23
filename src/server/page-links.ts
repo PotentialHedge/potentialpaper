@@ -77,8 +77,9 @@ export async function indexPageLinks(database: Database, pageId: string, head: s
       })),
     );
   });
-  // The pages these links name, before and after, show what links to them: they are refreshed as the page is.
-  const touched = [...before.map((row) => row.target), ...targets.values()].filter((id) => id !== null);
+  // The page itself shows its links (its Categories box), and the pages they name, before and after, show what links
+  // to them: all are refreshed now that the index has them, since a refresh at commit time came before it.
+  const touched = [pageId, ...before.map((row) => row.target), ...targets.values()].filter((id) => id !== null);
   await refreshPageIds(database, touched).catch((err) => console.error('refreshing link targets failed', err));
   return links.length;
 }

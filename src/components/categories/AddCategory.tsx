@@ -1,6 +1,7 @@
 'use client';
 
 import { type FormEvent, type KeyboardEvent, useEffect, useId, useRef, useState } from 'react';
+import { useRouter } from 'next/navigation';
 import { Modal } from '@/components/Modal';
 import { ui } from '@/components/ui';
 import { failureOf, send } from './api';
@@ -28,6 +29,7 @@ export function AddCategory({
   label: string;
   className?: string;
 }) {
+  const router = useRouter();
   const [open, setOpen] = useState(false);
   const [text, setText] = useState('');
   const [picked, setPicked] = useState<Picked[]>([]);
@@ -122,6 +124,8 @@ export function AddCategory({
     setPicked(left);
     setNotes(out);
     setBusy(false);
+    // Show it in the Categories box behind the modal.
+    if (out.some((n) => n.ok)) router.refresh();
   }
 
   function onKeyDown(e: KeyboardEvent<HTMLInputElement>) {
@@ -247,7 +251,6 @@ export function AddCategory({
               )}
             </p>
           ))}
-          {notes.some((n) => n.ok) && <p className={ui.fine}>It shows on this page within a few minutes.</p>}
         </form>
       </Modal>
     </>

@@ -20,7 +20,7 @@ import {
 } from '@/lib/labeled-links';
 import { categoryNameKey, categorySlug } from '@/lib/categories';
 import { ApiError } from './api/errors';
-import { linksTo, type PageLink } from './page-links';
+import { indexPageLinks, linksTo, type PageLink } from './page-links';
 import { indexMembers } from './page-members';
 import { checkProtection, type Protection, protectionOf } from './page-protection';
 import { rolesOf } from './pages/check';
@@ -286,6 +286,9 @@ export async function linkPageToCategory(
     database,
   });
   if (result.status !== 'committed') throw new ApiError(409, 'page_busy', 'the page changed meanwhile; try again');
+  // Indexed now rather than by the worker a moment later, so both pages show it on their next render; the worker
+  // indexing the same commit again changes nothing.
+  await indexPageLinks(database, page.id, result.oid);
   await refreshPageIds(database, [page.id, category.id]);
   return { category, created, status: 'linked' };
 }
