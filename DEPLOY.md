@@ -30,7 +30,7 @@ https://potentialpaper.com loads.
 
 ## Staging
 
-https://staging.potentialpaper.com runs any commit beside production, behind a password (user `staging`; the password is
+https://staging.potentialpaper.com runs any commit beside production, behind a password (user `pp`; the password is
 in `~/.config/potentialpaper/staging-basic-auth` on this host). It is its own compose project, `potentialpaper-staging`:
 `docker-compose.prod.yml` with `docker-compose.staging.yml` over it and `.env.staging` (gitignored, made from
 `.env.production` with its own database password, auth secrets and host). Its images are `potentialpaper-staging-*`, so a
