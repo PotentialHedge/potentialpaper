@@ -1,10 +1,11 @@
 import { createHash } from 'node:crypto';
-import { sql } from 'drizzle-orm';
+import { eq, sql } from 'drizzle-orm';
 import { getDb, type Database } from '@/db';
-import { evidenceFiles, pdfDocuments, type EvidenceFile } from '@/db/schema';
+import { accounts, evidenceFiles, pdfDocuments, type EvidenceFile } from '@/db/schema';
 import { AGENT_FILE_TEXT_TYPES } from '@/lib/agent-posts';
 import type { VersionPdf } from '@/lib/versions';
 import { ApiError } from './api/errors';
+import { trustedAccount } from './auth';
 import { recordLfsObject } from './lfs';
 import { storeImage, storeMedia } from './media';
 import type { Reader } from './pages/repo';
@@ -21,6 +22,8 @@ import { consume, rateLimitHeaders, type RateLimitConfig } from './ratelimit';
  */
 
 const UPLOAD_BUDGET: RateLimitConfig = { burst: 40, perSecond: 40 / 3600 };
+/** Admins' and bots' (`trustedAccount`), so an import's PDFs aren't held to a person's 40 an hour. */
+const TRUSTED_UPLOAD_BUDGET: RateLimitConfig = { burst: 2_000, perSecond: 1 };
 export const MAX_PDF_BYTES = MAX_LFS_PDF_BYTES;
 const MAX_IMAGE_BYTES = 10 * 1024 * 1024;
 const MAX_TEXT_BYTES = 2 * 1024 * 1024;
@@ -104,7 +107,9 @@ function classify(bytes: Buffer, name: string): { type: string; ext: string } {
 
 async function spend(accountId: string | null): Promise<void> {
   if (!accountId) return;
-  const budget = await consume(`evidence-file:${accountId}`, UPLOAD_BUDGET);
+  const [account] = await getDb().select().from(accounts).where(eq(accounts.id, accountId)).limit(1);
+  const trusted = account ? await trustedAccount(account) : false;
+  const budget = await consume(`evidence-file:${accountId}`, trusted ? TRUSTED_UPLOAD_BUDGET : UPLOAD_BUDGET);
   if (!budget.allowed) {
     throw new ApiError(
       429,

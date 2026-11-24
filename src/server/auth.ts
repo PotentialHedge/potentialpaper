@@ -143,7 +143,8 @@ async function bucketOf(account: Account): Promise<RateLimitConfig> {
   return accountRateLimit(account, await trustedAccount(account));
 }
 
-async function trustedAccount(account: Account): Promise<boolean> {
+/** Admins and bots: accounts only we make, which imports and scripts act as, and which get larger budgets. */
+export async function trustedAccount(account: Account): Promise<boolean> {
   if (account.isBot) return true;
   if (!account.userId || !process.env.ADMIN_EMAILS) return false;
   const [row] = await getDb().select({ email: user.email }).from(user).where(eq(user.id, account.userId)).limit(1);
