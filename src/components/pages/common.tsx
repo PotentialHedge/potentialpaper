@@ -19,6 +19,7 @@ import { type PanelKind, slotPanels } from '@/lib/panels';
 import type { OwnersInfo } from '@/server/owners';
 import type { PageLink } from '@/server/page-links';
 import { LinksBox } from './LinkLists';
+import { OwnClaimStatus } from './OwnClaimStatus';
 
 /**
  * What every kind of page has, and the panels that show it the same way on each (`lib/panels.ts`): its sections, as
@@ -70,6 +71,14 @@ const ASK: Partial<Record<OwnersInfo['claim'], { question: string; action: strin
     domain: { question: 'A member?', action: 'See how', join: 'how to join', pitch: 'to write here.' },
   };
 
+/** The API route answering with the viewer's own claim to a page. */
+function ownClaimUrl(address: PageAddress): string {
+  if (address.kind === 'paper') {
+    return `/api/v1/claims?${new URLSearchParams({ scheme: address.id.scheme, value: address.id.value })}`;
+  }
+  return `/api/v1/pages/${encodeURIComponent(formatIdentifier(address))}/claim`;
+}
+
 /** The invitation in a community part nobody has started, by kind: its title and what to write. */
 const COMMUNITY_INVITE: Partial<Record<PageKind, { title: string; hint: string }>> = {
   paper: {
@@ -108,18 +117,23 @@ export function Sections({ kind, address, ownersHtml, communityHtml, owners }: P
       {owners && (
         <div id="owners">
           {ask && !owners.claimed ? (
-            <div className="flex flex-wrap items-center gap-x-4 gap-y-2 border border-frame bg-card px-4 py-3 font-sans text-[13px]">
-              <p className="min-w-0 flex-1 basis-64 text-muted">
-                <strong className="text-ink">{ask.question}</strong> {ask.action} {ask.pitch}
-              </p>
-              <a
-                href={owners.claimPath ?? undefined}
-                rel="nofollow"
-                className={ui.btn({ ghost: true, inline: true, flush: true })}
-              >
-                {ask.action}
-              </a>
-            </div>
+            <OwnClaimStatus
+              claimUrl={owners.claim === 'domain' ? null : ownClaimUrl(address)}
+              claimPath={owners.claimPath ?? ''}
+            >
+              <div className="flex flex-wrap items-center gap-x-4 gap-y-2 border border-frame bg-card px-4 py-3 font-sans text-[13px]">
+                <p className="min-w-0 flex-1 basis-64 text-muted">
+                  <strong className="text-ink">{ask.question}</strong> {ask.action} {ask.pitch}
+                </p>
+                <a
+                  href={owners.claimPath ?? undefined}
+                  rel="nofollow"
+                  className={ui.btn({ ghost: true, inline: true, flush: true })}
+                >
+                  {ask.action}
+                </a>
+              </div>
+            </OwnClaimStatus>
           ) : (
             both && (
               <PartLabel>

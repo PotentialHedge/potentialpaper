@@ -48,8 +48,8 @@ const post = (path: string, body: unknown) =>
     body: JSON.stringify(body),
   }).catch(() => null);
 
-const list = (names: string[]) =>
-  names.length <= 1 ? names.join('') : `${names.slice(0, -1).join(', ')} and ${names[names.length - 1]}`;
+const list = (names: string[], last = 'and') =>
+  names.length <= 1 ? names.join('') : `${names.slice(0, -1).join(', ')} ${last} ${names[names.length - 1]}`;
 
 /** What a request did, and how to send it again. */
 function useRequest() {
@@ -146,8 +146,10 @@ function OpenClaim(props: Props) {
   const chosenAddress =
     address && candidates.includes(address) ? address : candidates.length === 1 ? candidates[0] : null;
   const instant = onPaper.length > 0;
-  // Someone else's address is printed, so a co-author who joins with it can confirm the claim.
-  const coAuthorCanJoin = printed.emails.some((e) => printed.authorOf[e] !== author && !onPaper.includes(e));
+  // Someone else's addresses printed on it: a co-author who joins with one can confirm the claim.
+  const confirmers = (who: number | null) =>
+    printed.emails.filter((e) => printed.authorOf[e] !== who && !onPaper.includes(e));
+  const coAuthorCanJoin = confirmers(author).length > 0;
 
   const sendCode = () =>
     run(
@@ -195,7 +197,12 @@ function OpenClaim(props: Props) {
       {pending && (
         <p className={`${ui.box} mb-4`}>
           Your claim to be <b>{authors[pending.authorIndex]}</b> is waiting
-          {confirmedNames.length > 0 ? ` for ${list(confirmedNames)}` : ''}.{' '}
+          {confirmedNames.length > 0
+            ? ` for ${list(confirmedNames)}`
+            : confirmers(pending.authorIndex).length > 0
+              ? ` for a co-author with ${list(confirmers(pending.authorIndex), 'or')} to join`
+              : ''}
+          .{' '}
           <button type="button" className={ui.linkBtn} onClick={withdraw} disabled={busy}>
             Withdraw it
           </button>
@@ -329,13 +336,19 @@ function OpenClaim(props: Props) {
                 {confirmedNames.length > 0
                   ? `We email ${list(confirmedNames)}; the first to answer decides.`
                   : coAuthorCanJoin
-                    ? 'Your claim waits. The first co-author to join with their address on the paper is asked to confirm it.'
+                    ? 'Your claim waits until then.'
                     : 'No co-author can confirm it here yet, so we check your claim by hand.'}{' '}
                 {confirmedNames.length > 0 || coAuthorCanJoin
                   ? `They see your address${ownAddresses.length === 1 ? '' : 'es'} (${ownAddresses.join(', ')}) and your note.`
                   : ''}
               </InfoTip>
             </h3>
+            {confirmedNames.length === 0 && coAuthorCanJoin && (
+              <p className="mb-2">
+                {confirmers(author).length === 1 ? 'The author' : 'An author'} with {list(confirmers(author), 'or')} can
+                confirm you once they join.
+              </p>
+            )}
             <textarea
               value={note}
               onChange={(e) => setNote(e.target.value)}
