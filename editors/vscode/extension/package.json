@@ -1,7 +1,7 @@
 {
   "name": "potentialpaper",
-  "displayName": "PotentialPaper",
-  "description": "PotentialPaper page repos in VS Code: a preview of each section as the page shows it, a PDF viewer, checked JSON files, and, in the browser, commits to the site.",
+  "displayName": "potentialpaper",
+  "description": "potentialpaper page repos in VS Code: a preview of each section as the page shows it, a PDF viewer, checked JSON files, and, in the browser, commits to the site.",
   "publisher": "potentialpaper",
   "version": "0.1.0",
   "license": "UNLICENSED",
@@ -28,7 +28,7 @@
   },
   "contributes": {
     "configuration": {
-      "title": "PotentialPaper",
+      "title": "potentialpaper",
       "properties": {
         "potentialpaper.paper": {
           "type": "object",
@@ -61,97 +61,97 @@
       {
         "command": "potentialpaper.commit",
         "title": "Commit to the Page",
-        "category": "PotentialPaper",
+        "category": "potentialpaper",
         "icon": "$(check)"
       },
       {
         "command": "potentialpaper.refresh",
         "title": "Load the Page's Latest Version",
-        "category": "PotentialPaper",
+        "category": "potentialpaper",
         "icon": "$(refresh)"
       },
       {
         "command": "potentialpaper.discard",
         "title": "Discard Change",
-        "category": "PotentialPaper",
+        "category": "potentialpaper",
         "icon": "$(discard)"
       },
       {
         "command": "potentialpaper.discardAll",
         "title": "Discard All Changes",
-        "category": "PotentialPaper",
+        "category": "potentialpaper",
         "icon": "$(discard)"
       },
       {
         "command": "potentialpaper.openChange",
         "title": "Open Change",
-        "category": "PotentialPaper"
+        "category": "potentialpaper"
       },
       {
         "command": "potentialpaper.openPage",
         "title": "Open the Paper's Page",
-        "category": "PotentialPaper",
+        "category": "potentialpaper",
         "icon": "$(link-external)"
       },
       {
         "command": "potentialpaper.newSection",
         "title": "New Section",
-        "category": "PotentialPaper"
+        "category": "potentialpaper"
       },
       {
         "command": "potentialpaper.nothing",
         "title": "Nothing",
-        "category": "PotentialPaper"
+        "category": "potentialpaper"
       },
       {
         "command": "potentialpaper.showPreview",
         "title": "Open Page Preview to the Side",
-        "category": "PotentialPaper",
+        "category": "potentialpaper",
         "icon": "$(open-preview)"
       },
       {
         "command": "potentialpaper.newLink",
         "title": "New Link",
-        "category": "PotentialPaper",
+        "category": "potentialpaper",
         "icon": "$(add)"
       },
       {
         "command": "potentialpaper.addPicture",
         "title": "Add a Picture",
-        "category": "PotentialPaper"
+        "category": "potentialpaper"
       },
       {
         "command": "potentialpaper.runChecks",
         "title": "Run the Page's Checks (prek)",
-        "category": "PotentialPaper",
+        "category": "potentialpaper",
         "icon": "$(checklist)"
       },
       {
         "command": "potentialpaper.signIn",
         "title": "Sign In for Previews",
-        "category": "PotentialPaper"
+        "category": "potentialpaper"
       },
       {
         "command": "potentialpaper.signOut",
         "title": "Sign Out",
-        "category": "PotentialPaper"
+        "category": "potentialpaper"
       },
       {
         "command": "potentialpaper.pdfZoomIn",
         "title": "Zoom In",
-        "category": "PotentialPaper",
+        "category": "potentialpaper",
         "icon": "$(zoom-in)"
       },
       {
         "command": "potentialpaper.pdfZoomOut",
         "title": "Zoom Out",
-        "category": "PotentialPaper",
+        "category": "potentialpaper",
         "icon": "$(zoom-out)"
       },
       {
         "command": "potentialpaper.pdfFitWidth",
         "title": "Fit to Width",
-        "category": "PotentialPaper",
+        "category": "potentialpaper",
         "icon": "$(screen-full)"
       }
     ],

@@ -408,7 +408,7 @@ function Invite({
   const subject = `Can you confirm me on “${title}”?`;
   const text = (name: string) =>
     `Hi ${name.split(' ')[0]},\n\n` +
-    `I'm claiming our paper “${title}” on PotentialPaper, where authors write a short section about their paper. ` +
+    `I'm claiming our paper “${title}” on potentialpaper, where authors write a short section about their paper. ` +
     `Could you sign up with your institutional address and confirm that I'm ${me}? It takes a minute:\n\n` +
     `${inviteUrl}\n\nOnce you're in, my request is waiting under My papers.\n\nThanks!`;
   const mailto = (to: string, name: string) =>

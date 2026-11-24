@@ -271,7 +271,7 @@ describe('git over SSH', () => {
     const bare = await run('ssh', [...sshArgs(key), '-p', String(port), '-T', 'git@127.0.0.1']);
     expect(bare.code).toBe(1);
     expect(bare.output).toBe(
-      `Hi ${account.handle}! You've authenticated, but PotentialPaper does not provide shell access.\n`,
+      `Hi ${account.handle}! You've authenticated, but potentialpaper does not provide shell access.\n`,
     );
     const asked = await run('ssh', [...sshArgs(key), '-p', String(port), 'git@127.0.0.1', 'ls -la']);
     expect(asked.code).toBe(128);

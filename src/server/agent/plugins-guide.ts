@@ -17,8 +17,8 @@ import { IDENTITY_TOKEN_SECONDS, JWKS_PATH } from '../plugins/identity';
 import { MAX_PLUGIN_BYTES, MAX_PLUGIN_FILE_BYTES, MAX_PLUGIN_FILES } from '../plugins/snapshot';
 
 /**
- * `/plugins.md` (`handoffs/plugins.md` Phase 3): how to build, try and publish a PotentialPaper plugin, written for
- * agents (a person's README says "Follow https://…/plugins.md for a new PotentialPaper plugin.", `pluginPrompt`). The tables of
+ * `/plugins.md` (`handoffs/plugins.md` Phase 3): how to build, try and publish a potentialpaper plugin, written for
+ * agents (a person's README says "Follow https://…/plugins.md for a new potentialpaper plugin.", `pluginPrompt`). The tables of
  * permissions, RPC methods and `when` keys are made from the code, so they can't drift from what the host does.
  */
 
@@ -112,11 +112,11 @@ export function pluginsGuide(origin: string): string {
     .join('\n');
   const kindRows = PAGE_KINDS.map((k) => `| \`${k}\` | \`${KINDS[k].contextKeys.join('`, `')}\` |`).join('\n');
 
-  return `# Building a PotentialPaper plugin
+  return `# Building a potentialpaper plugin
 
 > ${pluginPrompt(origin)}
 
-A PotentialPaper plugin adds panels to pages on ${origin}: a paper, a venue, a category, an organisation or a person.
+A potentialpaper plugin adds panels to pages on ${origin}: a paper, a venue, a category, an organisation or a person.
 It is an HTML page plus a manifest, \`${MANIFEST_FILE}\`, in a public GitHub repo. Readers find it under
 Settings → Plugins (${origin}/settings/plugins), install it pinned to a commit, and approve what it may read before it
 runs. Like a VS Code extension, a plugin never edits the site's own interface: it *declares* what it adds (panels,
@@ -482,7 +482,7 @@ true; with nothing new, \`wait\` holds the request until a commit lands. It neve
 stop and start where you left off (or begin at \`after=now\`). Each event names the paper with all its
 \`identifiers\`, the files its commit changed (\`paths\`: recompute when the ones you read changed, e.g.
 \`paper.json\`), \`created\` for a new paper, and \`merged\` when another paper was folded into it. A small follower:
-\`examples/signals/follow.mjs\` in the PotentialPaper repo.
+\`examples/signals/follow.mjs\` in the potentialpaper repo.
 
 **Read a set** with \`pp.signals\` (no permission needed: signals are public), or over HTTP:
 \`GET ${origin}/api/v1/signal-sets\`, \`…/<owner>/<name>\`, \`…/<owner>/<name>/columns?signals=a,b&scope=<identifier>&titles=true\`,

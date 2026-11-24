@@ -1,4 +1,4 @@
-# PotentialPaper — design
+# potentialpaper — design
 
 Status: draft for review, 2026-11-05. Updated 2026-11-16 with the data model for bots and plugins, search
 and the scaling path (§3, §4.3, §4.4, §4.8–4.11, §10, §12).
@@ -513,7 +513,7 @@ session only). The only commands are `git-upload-pack '<path>'` and `git-receive
 git quotes it and parsed strictly (`ssh-command.ts`): the page's own path (`abs/1706.03762`, `doi/…`, `openreview/…`)
 or the HTTPS address's (`arxiv/…`, `git/arxiv/…`), with or without the leading slash and `.git`, then `findRepo`, its
 redirects followed. `GIT_PROTOCOL` (sent with `SendEnv`) chooses v2 for fetches. No shell, pty, forwarding, agent or
-subsystems: a bare `ssh git@host` gets "Hi <handle>! You've authenticated, but PotentialPaper does not provide shell
+subsystems: a bare `ssh git@host` gets "Hi <handle>! You've authenticated, but potentialpaper does not provide shell
 access." and exit 1, another command `Invalid command` and 128. Any key may clone; pushing needs what HTTPS needs (a
 confirmed address, or a bot account), refused on stderr, which git prints. Every command counts against the account's
 API bucket, and the server caps connections (in all, per address, a per-address bucket of new ones), key attempts,
@@ -1023,7 +1023,7 @@ Built 2026-11-16 (`handoffs/plugins.md` Phase 2). A plugin is a public repo (or 
   installed plugins' panels too.
 - **`/plugins.md`**, linked from `llms.txt`, is the guide for agents: the manifest, the SDK (its method, permission
   and `when` tables are made from the code), the data routes, the dev loop and publishing. A README says "Read
-  https://…/plugins.md and build me a PotentialPaper plugin."
+  https://…/plugins.md and build me a potentialpaper plugin."
 - **The first plugin outside this repo** (built 2026-11-17, `handoffs/plugins.md` Phase 6) is score standing,
   `github.com/benedict-armstrong/potentialpaper-score-standing` (id `benedict-armstrong/score-standing`): the
   acceptodds "where you stand" figure for review scores, a histogram and a kernel-density curve, on papers (aside:
@@ -1171,7 +1171,7 @@ Decided on 2026-11-05:
 - **Storage:** git objects in Postgres (section 4).
 - **Identity:** real names are optional, with anonymous commenting available (section 5.3).
 - **Joining:** institutional email only, following acceptodds (section 5).
-- **Name:** PotentialPaper.
+- **Name:** potentialpaper.
 
 Decided on 2026-11-16 (the work is in [handoffs/data-model.md](handoffs/data-model.md)):
 

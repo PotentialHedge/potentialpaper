@@ -62,7 +62,7 @@ export interface SshServerOptions {
   log?: (...args: unknown[]) => void;
 }
 
-const SITE = 'PotentialPaper';
+const SITE = 'potentialpaper';
 
 /** A token bucket per address, in memory: one process takes every connection. */
 class ConnectionBuckets {

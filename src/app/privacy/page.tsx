@@ -3,8 +3,8 @@ import Link from 'next/link';
 import { ui } from '@/components/ui';
 
 export const metadata: Metadata = {
-  title: 'Privacy · PotentialPaper',
-  description: 'What PotentialPaper stores about you, why, who else handles it, and how to have it changed or removed.',
+  title: 'Privacy · potentialpaper',
+  description: 'What potentialpaper stores about you, why, who else handles it, and how to have it changed or removed.',
   alternates: { canonical: '/privacy' },
 };
 
@@ -32,14 +32,14 @@ export default function PrivacyPage() {
     <main className={`${ui.page} max-w-[640px]`}>
       <h1 className="mt-6 text-center text-[26px] leading-tight font-normal">Privacy</h1>
       <p className="mt-3 leading-relaxed">
-        PotentialPaper stores what it needs to run accounts and pages, and little else. It sets no advertising or
+        potentialpaper stores what it needs to run accounts and pages, and little else. It sets no advertising or
         tracking cookies, sells nothing, and counts visits without knowing who made them.
       </p>
 
       <h2 className={ui.groupHeading}>Who is responsible</h2>
       <div className={prose}>
         <p>
-          PotentialPaper is run by the people behind acceptodds, reachable at <Mail to={CONTACT} />. Write there with
+          potentialpaper is run by the people behind acceptodds, reachable at <Mail to={CONTACT} />. Write there with
           any question about your data, or to use your rights below.
         </p>
       </div>

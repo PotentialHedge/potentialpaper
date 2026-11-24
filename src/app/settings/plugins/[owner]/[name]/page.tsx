@@ -3,7 +3,7 @@ import { PluginDetail } from '../../PluginDetail';
 
 type Params = { params: Promise<{ owner: string; name: string }> };
 
-export const metadata: Metadata = { title: 'Plugin · Settings · PotentialPaper', robots: { index: false } };
+export const metadata: Metadata = { title: 'Plugin · Settings · potentialpaper', robots: { index: false } };
 
 /**
  * `/settings/plugins/<owner>/<name>`: one installed plugin's page: its settings (`contributes.settings`, drawn with

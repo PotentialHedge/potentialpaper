@@ -21,9 +21,9 @@ export function GET() {
     ? `ssh -T ${sshTarget.port ? `-p ${sshTarget.port} ` : ''}${sshTarget.username || 'git'}@${sshTarget.hostname}`
     : null;
 
-  const body = `# Set up to work on PotentialPaper
+  const body = `# Set up to work on potentialpaper
 
-This is the setup checklist for an AI agent working for a person on PotentialPaper (${origin}). Go through it in order and **check each step before you change anything**: much of it may be in place already from an earlier session. Do step 1 always. When the prompt names a page ("Follow this for /s/42", a path on ${origin}), the person wants to edit that page's files with git: do every step, for that page. Otherwise do steps 2–6 only when they ask you to edit pages with git. When you finish, tell the person in a few lines what was already set up, what you set up, and anything left for them to do.
+This is the setup checklist for an AI agent working for a person on potentialpaper (${origin}). Go through it in order and **check each step before you change anything**: much of it may be in place already from an earlier session. Do step 1 always. When the prompt names a page ("Follow this for /s/42", a path on ${origin}), the person wants to edit that page's files with git: do every step, for that page. Otherwise do steps 2–6 only when they ask you to edit pages with git. When you finish, tell the person in a few lines what was already set up, what you set up, and anything left for them to do.
 
 Ask the person before you install software, and before you change anything outside the page's clone (global git config, \`~/.ssh\`). Never print the token, or a private key, back to them or anywhere else.
 
@@ -55,7 +55,7 @@ Content-Type: application/json
 
 **By a code mailed to them** (when they are not at a browser, or prefer it):
 
-1. Ask the person for their email address at their institution (the one they use on PotentialPaper, if they have an account), and nothing else yet.
+1. Ask the person for their email address at their institution (the one they use on potentialpaper, if they have an account), and nothing else yet.
 2. Ask for a code to be mailed to it:
 
    \`\`\`
@@ -141,7 +141,7 @@ This site does not offer git over SSH yet: use HTTPS (step 4).
 }
 ## 6. The editor extension (optional)
 
-If the person edits in VS Code, Cursor, Windsurf or VSCodium, ask whether to install the PotentialPaper extension: it previews each section as the page shows it and checks the page's files. \`curl -fsSLo potentialpaper.vsix ${origin}/editor/potentialpaper.vsix && code --install-extension potentialpaper.vsix && rm potentialpaper.vsix\` (\`cursor\`, \`windsurf\` or \`codium\` in place of \`code\`).
+If the person edits in VS Code, Cursor, Windsurf or VSCodium, ask whether to install the potentialpaper extension: it previews each section as the page shows it and checks the page's files. \`curl -fsSLo potentialpaper.vsix ${origin}/editor/potentialpaper.vsix && code --install-extension potentialpaper.vsix && rm potentialpaper.vsix\` (\`cursor\`, \`windsurf\` or \`codium\` in place of \`code\`).
 
 In the clone, \`prek install\` (with [prek](https://prek.j178.dev), if they have it or want it) runs the site's checks, in \`prek.toml\`, before each commit.
 

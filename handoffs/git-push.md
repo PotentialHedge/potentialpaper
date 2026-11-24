@@ -444,7 +444,7 @@ error`. `--atomic` with any refusal → all `atomic push failed`. `main` → `ta
   `write` (write = everything an account does, agents' keys included). The profile's API key form has a second
   checkbox, "Allow `git push` to papers' pages"; unticking the first makes a key that can push but not post, which is
   what to keep in a credential helper. `CreateTokenBody`/`TokenList` take `TOKEN_SCOPES`.
-- No/invalid credentials → **401** `WWW-Authenticate: Basic realm="PotentialPaper", charset="UTF-8"` (git asks, or
+- No/invalid credentials → **401** `WWW-Authenticate: Basic realm="potentialpaper", charset="UTF-8"` (git asks, or
   says "Authentication failed"); key without the scope → 403 "This API key may not push…"; unconfirmed account →
   403 `not_verified` "Confirm an institutional email address before you push." Both GET (advertisement) and POST
   check, so git asks for credentials before it builds a pack. `findRepo` (404/308) runs first.
@@ -535,7 +535,7 @@ drizzle/0022_ssh_keys.sql      applied to the dev and test DBs
   `findRepo`, following its redirect (old arXiv version, merged paper, other identifier) instead of refusing.
   `GIT_PROTOCOL` env is taken (≤ 256 chars), nothing else; v2 for upload-pack, receive-pack v0/v1. Pty, x11, agent,
   subsystem/sftp, tcpip/streamlocal forwarding and global requests are refused. Bare `ssh` → "Hi <handle>! You've
-  authenticated, but PotentialPaper does not provide shell access." exit 1; other commands → `Invalid command`, 128;
+  authenticated, but potentialpaper does not provide shell access." exit 1; other commands → `Invalid command`, 128;
   unknown page → "ERROR: No page repository at …" exit 1. Internal faults are logged, the client gets an `ERROR:` line.
 - **Limits** (`SSH_LIMITS`, overridable per server): 100 connections, 10 per address, per-address bucket of 30 new
   connections refilled at one per 2 s (in memory: one process), checked on our own `net.Server` before any SSH work

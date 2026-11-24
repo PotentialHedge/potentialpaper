@@ -1,5 +1,5 @@
 /*
- * PotentialPaper plugin SDK, API version 1. https://ppusercontent.com/sdk/v1/pp.js
+ * potentialpaper plugin SDK, API version 1. https://ppusercontent.com/sdk/v1/pp.js
  *
  * Load it in your plugin's HTML, before your own script:
  *

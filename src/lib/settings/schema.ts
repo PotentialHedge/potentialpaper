@@ -36,7 +36,7 @@ export function settingsJsonSchema(origin: string, plugins: PluginSettings[] = [
     $id: `${origin}/schemas/settings.json`,
     title: 'settings.json',
     description:
-      'Your PotentialPaper settings. Keys are dotted; a plugin’s are "<plugin id>.<name>". The file holds only what differs from the site’s defaults. Comments are allowed.',
+      'Your potentialpaper settings. Keys are dotted; a plugin’s are "<plugin id>.<name>". The file holds only what differs from the site’s defaults. Comments are allowed.',
     type: 'object',
     // VS Code reads this, for JSONC.
     allowComments: true,

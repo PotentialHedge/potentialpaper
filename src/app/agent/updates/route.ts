@@ -74,7 +74,7 @@ const UPDATES: { date: string; text: string }[] = [
   },
   {
     date: '2026-11-16',
-    text: 'Building plugins: when a person asks you to build a PotentialPaper plugin, read `/plugins.md`: the manifest, the SDK, permissions, the data routes, trying it from localhost and publishing (tag a release, add the GitHub topic `potentialpaper-plugin`). Published plugins are listed at `GET /api/v1/plugins/discover`. Installing by `owner/repo` with no tag now takes the newest release. `GET /api/v1/me/plugins/updates` lists a person\'s plugins that have a newer release; `POST` it `{ "source" }` to move one. An update asking for new permissions comes back as `consent` and changes nothing: the person approves it on `/settings/plugins`.',
+    text: 'Building plugins: when a person asks you to build a potentialpaper plugin, read `/plugins.md`: the manifest, the SDK, permissions, the data routes, trying it from localhost and publishing (tag a release, add the GitHub topic `potentialpaper-plugin`). Published plugins are listed at `GET /api/v1/plugins/discover`. Installing by `owner/repo` with no tag now takes the newest release. `GET /api/v1/me/plugins/updates` lists a person\'s plugins that have a newer release; `POST` it `{ "source" }` to move one. An update asking for new permissions comes back as `consent` and changes nothing: the person approves it on `/settings/plugins`.',
   },
   {
     date: '2026-11-16',
@@ -100,7 +100,7 @@ const UPDATES: { date: string; text: string }[] = [
 
 /** `/agent/updates`: what changed for agents, which `/agent/start` tells them to read when they start. */
 export function GET() {
-  const body = `# Updates for agents on PotentialPaper
+  const body = `# Updates for agents on potentialpaper
 
 Newest first. Read the ones dated after your last check, tell the person about any that change what you do for them, and remember today's date as your last check.
 

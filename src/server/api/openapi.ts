@@ -120,7 +120,7 @@ export function openApiDocument(origin: string) {
   return {
     openapi: '3.1.0',
     info: {
-      title: 'PotentialPaper pages',
+      title: 'potentialpaper pages',
       version: '1',
       description:
         "The public reads of any page by its identifier: what plugins read through the SDK and backends read over HTTP. No token is needed. Reviews are OpenReview's, CC BY 4.0: each carries its licence and source link.",

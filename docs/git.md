@@ -160,7 +160,7 @@ Instead of an API key, you can push (and clone) with an SSH key, as on GitHub.
 2. On your [profile page](https://potentialpaper.com/profile), under SSH keys, paste the public half
    (`~/.ssh/id_ed25519.pub`, one line starting `ssh-ed25519`). A key can be on one account only.
 3. Check it: `ssh -T -p 2222 git@git.potentialpaper.com` answers "Hi <your handle>! You've authenticated,
-   but PotentialPaper does not provide shell access."
+   but potentialpaper does not provide shell access."
 
 The first time, ssh shows the server's key and asks whether to trust it. Say yes only if the fingerprint is this
 one:

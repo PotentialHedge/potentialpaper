@@ -14,7 +14,7 @@ type Props = { params: ToolParams };
 
 export async function generateMetadata({ params }: Props): Promise<Metadata> {
   const { name } = await toolPage('code', params);
-  return { title: `Edit ${name} · PotentialPaper`, robots: { index: false, follow: false } };
+  return { title: `Edit ${name} · potentialpaper`, robots: { index: false, follow: false } };
 }
 
 /**

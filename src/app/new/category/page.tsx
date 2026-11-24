@@ -8,7 +8,7 @@ import { viewerFromHeaders } from '@/server/auth';
 
 export const dynamic = 'force-dynamic';
 
-export const metadata: Metadata = { title: 'New category · PotentialPaper', robots: { index: false, follow: false } };
+export const metadata: Metadata = { title: 'New category · potentialpaper', robots: { index: false, follow: false } };
 
 type Props = { searchParams: Promise<{ name?: string | string[] }> };
 

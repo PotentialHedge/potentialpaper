@@ -352,7 +352,7 @@ function Invite({ row, open }: { row: AuthoredRow; open: { name: string; index: 
   const link = `${window.location.origin}/welcome?next=${encodeURIComponent(claimPath(row.path))}`;
   const text = (name: string) =>
     `Hi ${name.split(' ')[0]},\n\n` +
-    `I've claimed our paper “${row.title}” on PotentialPaper, where authors write a short section about their paper. ` +
+    `I've claimed our paper “${row.title}” on potentialpaper, where authors write a short section about their paper. ` +
     `Join me as ${name}: sign up with your institutional address and claim your name, and I'll confirm you.\n\n` +
     `${link}\n\nThanks!`;
   const mailto = (name: string) =>
@@ -361,7 +361,7 @@ function Invite({ row, open }: { row: AuthoredRow; open: { name: string; index: 
       .replace(/\+/g, '%20')}`;
   return (
     <>
-      <h3 className={`${ui.boxHeading} mt-5`}>Not on PotentialPaper yet?</h3>
+      <h3 className={`${ui.boxHeading} mt-5`}>Not on potentialpaper yet?</h3>
       <CopyField value={link} label="Invite link" onCopied={() => track('share_copied', { target: 'invite' })} />
       <p className="mt-2">
         Email{' '}

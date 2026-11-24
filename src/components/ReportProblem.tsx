@@ -8,7 +8,7 @@ export const REPORT_ADDRESS = 'hello@acceptodds.com';
 export function ReportProblem({ className }: { className?: string }) {
   const href = (page: string) =>
     `mailto:${REPORT_ADDRESS}?${new URLSearchParams({
-      subject: 'PotentialPaper: a problem',
+      subject: 'potentialpaper: a problem',
       body: `Page: ${page}\n\nWhat happened:\n\n\nWhat you expected:\n\n`,
     })
       .toString()

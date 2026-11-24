@@ -136,7 +136,7 @@ describe('the plugin guide', () => {
     const { PERMISSION_NAMES } = await import('@/lib/plugins/manifest');
     const { KINDS, PAGE_KINDS } = await import('@/lib/kinds');
     const guide = pluginsGuide('https://potentialpaper.org');
-    expect(guide).toContain('> Follow https://potentialpaper.org/plugins.md for a new PotentialPaper plugin.');
+    expect(guide).toContain('> Follow https://potentialpaper.org/plugins.md for a new potentialpaper plugin.');
     expect(Object.keys(METHOD_DOCS).sort()).toEqual(Object.keys(HOST_METHODS).sort());
     for (const doc of Object.values(METHOD_DOCS)) expect(guide).toContain(doc.call);
     for (const p of PERMISSION_NAMES) expect(guide).toContain(`| \`${p}\` |`);

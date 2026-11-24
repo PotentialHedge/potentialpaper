@@ -9,7 +9,7 @@ import { Site } from './site';
 import { ORIGINAL_SCHEME, Store } from './store';
 
 /**
- * PotentialPaper in VS Code (`docs/web-editor.md`). Wherever a page repo is open, in the browser or a clone on the
+ * potentialpaper in VS Code (`docs/web-editor.md`). Wherever a page repo is open, in the browser or a clone on the
  * desktop: a preview of each section as the page shows it (`preview.ts`), a PDF viewer (`pdf.ts`), the JSON files
  * checked against their schemas (the manifest's `jsonValidation`) and sections formatted as `prek.toml` formats
  * them. In VS Code for the Web on the site, also the page repo as a folder, its uncommitted changes in Source

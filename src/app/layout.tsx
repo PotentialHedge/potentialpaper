@@ -12,7 +12,7 @@ export async function generateMetadata(): Promise<Metadata> {
   return {
     // Absolute addresses for preview images (`app/opengraph-image.tsx`).
     metadataBase: new URL(siteUrl()),
-    title: 'PotentialPaper',
+    title: 'potentialpaper',
     description: 'A public, editable page for every research paper, with labeled links between them.',
     // Agents find their map of the site from any page.
     alternates: { types: { 'text/markdown': '/llms.txt' } },

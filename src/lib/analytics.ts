@@ -1,7 +1,7 @@
 import { HOME_LIST_PARAMS } from './private-paths';
 
 /**
- * Page analytics: the host-wide Umami instance in ~/ops, website "PotentialPaper". Constants, not env: the
+ * Page analytics: the host-wide Umami instance in ~/ops, website "potentialpaper". Constants, not env: the
  * layout is prerendered for the edge cache and the image build sees no `.env*`, so an env value would be
  * read once, at build, and come out empty. Neither is a secret: both ship in every page.
  */

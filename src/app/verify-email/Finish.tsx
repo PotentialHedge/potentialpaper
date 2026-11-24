@@ -83,7 +83,7 @@ export function Finish({
 
   if (step === 'profile') {
     return (
-      <OnboardingCard title="Choose a handle" eyebrow="Confirmed. Welcome to PotentialPaper.">
+      <OnboardingCard title="Choose a handle" eyebrow="Confirmed. Welcome to potentialpaper.">
         <form onSubmit={saveProfile}>
           <ProfileFields values={profile} onChange={setProfile} handleOnly />
           <p className={ui.fine}>Your institution shows next to it. You can change both on your profile.</p>

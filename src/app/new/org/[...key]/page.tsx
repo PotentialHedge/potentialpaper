@@ -31,7 +31,7 @@ async function load(params: Props['params']) {
 
 export async function generateMetadata({ params }: Props): Promise<Metadata> {
   const { name } = await load(params);
-  return { title: `Add a department or lab to ${name} · PotentialPaper`, robots: { index: false, follow: false } };
+  return { title: `Add a department or lab to ${name} · potentialpaper`, robots: { index: false, follow: false } };
 }
 
 /**

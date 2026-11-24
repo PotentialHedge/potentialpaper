@@ -1,4 +1,4 @@
-// Verifying a PotentialPaper identity token, with nothing but Node's own crypto (Node 18+). Copy this file into your
+// Verifying a potentialpaper identity token, with nothing but Node's own crypto (Node 18+). Copy this file into your
 // backend, or use any JWT library that does ES256 and JWKS (jose, PyJWT, …): it checks the same things.
 //
 //   const verifier = identityVerifier({ site: 'https://potentialpaper.org', plugin: '<owner>/<name>' });

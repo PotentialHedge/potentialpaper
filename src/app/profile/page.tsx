@@ -23,7 +23,7 @@ import { EditProfile } from './ProfileForm';
 import { SshKeys } from './SshKeys';
 
 export const dynamic = 'force-dynamic';
-export const metadata: Metadata = { title: 'Profile · PotentialPaper' };
+export const metadata: Metadata = { title: 'Profile · potentialpaper' };
 
 const BUTTON = ui.btn({ ghost: true, inline: true, flush: true });
 

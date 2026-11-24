@@ -1,6 +1,6 @@
-# PotentialPaper for VS Code
+# potentialpaper for VS Code
 
-For editing a PotentialPaper page: a paper's page is a git repository of Markdown sections, links, versions and
+For editing a potentialpaper page: a paper's page is a git repository of Markdown sections, links, versions and
 PDFs. Clone one from the site (each page's **edit** button gives the address) and open the folder.
 
 - **Preview.** A section in `community/` or `author/` opens with a preview beside it, as the page will show it,
@@ -10,7 +10,7 @@ PDFs. Clone one from the site (each page's **edit** button gives the address) an
 - **JSON files** (`links/*.json`, `versions/*.json`, `thumbnail.json`) are checked as you type against the
   site's schemas, with completion and descriptions on hover.
 - **Format Document** formats a section as the page's `prek.toml` does before each commit.
-- **PotentialPaper: New Link** adds a link under the title. The **Page** view in the explorer lists the links and
+- **potentialpaper: New Link** adds a link under the title. The **Page** view in the explorer lists the links and
   the picture, with a way to add each where the page has none.
 
 The site's address comes from the clone's git remote; set `potentialpaper.origin` to use another.

@@ -79,7 +79,7 @@ export async function keyedPageMetadata(kind: KeyedKind, segments: string[]): Pr
   const name = found.current?.name ?? pageName(kind, found.key, null);
   const preview = await previewOfPage(found.page.id);
   return {
-    title: `${name} · ${KINDS[kind].title} · PotentialPaper`,
+    title: `${name} · ${KINDS[kind].title} · potentialpaper`,
     ...(preview && previewMetadata(name, undefined, preview)),
     alternates: { canonical: keyedPagePath(kind, found.key) },
   };

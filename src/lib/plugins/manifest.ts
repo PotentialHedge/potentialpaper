@@ -370,7 +370,7 @@ export const manifestSchema = z
   })
   .meta({
     title: MANIFEST_FILE,
-    description: 'A PotentialPaper plugin: what it is, what it may do and what it adds.',
+    description: 'A potentialpaper plugin: what it is, what it may do and what it adds.',
   });
 
 export interface PanelContribution {

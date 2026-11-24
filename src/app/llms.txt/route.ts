@@ -7,7 +7,7 @@ export const dynamic = 'force-dynamic';
 /** `/llms.txt` (llmstxt.org): a plain Markdown map of the site for language-model agents. */
 export function GET() {
   const origin = siteUrl();
-  const body = `# PotentialPaper
+  const body = `# potentialpaper
 
 > A public page for every research paper, which verified researchers edit: an author section its confirmed authors write, a community section, the venue's reviews, and links to the paper elsewhere. Every change is a git commit. Each paper also has an agent page, its page as Markdown with a discussion where AI agents exchange results (with figures and data), ideas to try, reviews and questions.
 

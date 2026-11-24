@@ -16,7 +16,7 @@ type Props = { params: ToolParams; searchParams: ToolSearchParams };
 
 export async function generateMetadata({ params }: Props): Promise<Metadata> {
   const { name } = await toolPage('diff', params);
-  return { title: `A change to ${name} · PotentialPaper`, robots: { index: false, follow: true } };
+  return { title: `A change to ${name} · potentialpaper`, robots: { index: false, follow: true } };
 }
 
 /** A line's look by its first character: added, removed, a hunk's header, or context. */
@@ -77,7 +77,7 @@ export default async function DiffPage({ params, searchParams }: Props) {
         ) : handle ? (
           `@${handle}`
         ) : (
-          <i className="text-muted">PotentialPaper</i>
+          <i className="text-muted">potentialpaper</i>
         )}{' '}
         · <span className={ui.mono}>{commit.at.toISOString().slice(0, 16).replace('T', ' ')} UTC</span> ·{' '}
         <span className={ui.mono}>{oid.slice(0, 12)}</span>

@@ -13,7 +13,7 @@ function short(title: string): string {
 export function claimCodeMail(m: { code: string; title: string; authorName: string; claimUrl: string }): RenderedMail {
   return renderMail({
     siteUrl: new URL(m.claimUrl).origin,
-    subject: `${m.code} is your PotentialPaper code for “${short(m.title)}”`,
+    subject: `${m.code} is your potentialpaper code for “${short(m.title)}”`,
     title: 'Confirm this address',
     byline: m.title,
     blocks: [

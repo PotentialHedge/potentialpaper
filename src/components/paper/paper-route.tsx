@@ -93,7 +93,7 @@ export async function paperMetadata(scheme: PaperScheme, segments: string[]): Pr
   // The authors' own one-sentence summary says it best, where they gave one.
   const description = (facts.tldr ?? paper.abstract)?.slice(0, DESCRIPTION_LENGTH);
   return {
-    title: `${paper.title} · PotentialPaper`,
+    title: `${paper.title} · potentialpaper`,
     description,
     ...(preview && previewMetadata(paper.title, description, preview)),
     // For Google Scholar, from the same facts as the infobox.
