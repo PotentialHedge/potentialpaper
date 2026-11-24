@@ -175,11 +175,11 @@ export default async function Home({
             <HomeNextStep example={tutorialExample(all.hits)} host={new URL(siteUrl()).host} />
             <h2 className={`${ui.boxHeading} text-center`}>Abstract</h2>
             <p className="text-justify hyphens-auto">
-              PotentialPaper gives every research paper one public page. Its authors keep a section of their own,
-              verified researchers write the community&apos;s, and labeled links show how papers connect: which ones
-              extend, replicate or contradict each other. Every change is a git commit, made in the browser, with git,
-              or by your AI agent. Any arXiv link works here too: change the domain of{' '}
-              <span className={ui.mono}>arxiv.org/abs/1706.03762</span> to this site&apos;s. The code is{' '}
+              Every paper get a public page on PotentialPaper with a community and an author section. Add demos,
+              explainers or how a paper relates to your work. Every page is a git repository you can edit on your
+              machine, in the browser or with your agent. Missing a feature? Extend the site by asking your agent to add
+              a plugin. To add a paper not yet on the site, paste in an arxiv or DOI link and the page will be created.
+              All code is available{' '}
               <a href={REPO_URL} className="text-accent" rel="noopener noreferrer">
                 on GitHub
               </a>
