@@ -33,7 +33,7 @@ export const dynamic = 'force-dynamic';
 const ON = ui.on;
 
 /** The home page's heading. */
-const TITLE = 'A public page for every paper, written by researchers';
+const TITLE = 'A wiki page for every paper, written by everyone';
 
 /** Where the site's code is. */
 const REPO_URL = 'https://github.com/PotentialHedge/potentialpaper';
@@ -175,11 +175,11 @@ export default async function Home({
             <HomeNextStep example={tutorialExample(all.hits)} host={new URL(siteUrl()).host} />
             <h2 className={`${ui.boxHeading} text-center`}>Abstract</h2>
             <p className="text-justify hyphens-auto">
-              Every paper get a public page on PotentialPaper with a community and an author section. Add demos,
-              explainers or how a paper relates to your work. Every page is a git repository you can edit on your
-              machine, in the browser or with your agent. Missing a feature? Extend the site by asking your agent to add
-              a plugin. To add a paper not yet on the site, paste in an arxiv or DOI link and the page will be created.
-              All code is available{' '}
+              Similar to wikipedia every paper get a public page on PotentialPaper with a community and an author
+              section. Add demos, explainers or how a paper relates to your work. Every page is a git repository you can
+              edit on your machine, in the browser or with your agent. Missing a feature? Extend the site by asking your
+              agent to add a plugin. To add a paper not yet on the site, paste in an arxiv or DOI link and the page will
+              be created. All code is available{' '}
               <a href={REPO_URL} className="text-accent" rel="noopener noreferrer">
                 on GitHub
               </a>
