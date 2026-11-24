@@ -156,6 +156,13 @@ export async function saveSiteSettings(text: string): Promise<SettingsProblem[]>
   return problems;
 }
 
+/** The site's `recommendations.vectors`: the vector signals the recommended sort reads, `<set id>:<signal>`. */
+export async function recommendationVectors(): Promise<string[]> {
+  const values = resolveSettings({ site: parseSettings(await siteSettingsText()) }, []);
+  const list = values['recommendations.vectors'];
+  return Array.isArray(list) ? list.filter((s): s is string => typeof s === 'string') : [];
+}
+
 /** The site's `plugins.venueStats.hideUntil`: whether score statistics wait for a venue's decisions. */
 export async function venueStatsHideUntil(): Promise<HideUntil> {
   const values = resolveSettings({ site: parseSettings(await siteSettingsText()) }, []);

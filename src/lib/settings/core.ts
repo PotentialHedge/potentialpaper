@@ -358,8 +358,35 @@ const REVIEW_SETTINGS: Record<string, CoreSetting> = {
   },
 };
 
+/** The vector signals the home page's `recommended` sort reads by default (`server/recommendations.ts`). */
+export const DEFAULT_RECOMMEND_VECTORS: readonly string[] = ['benedict-armstrong/acceptodds-map:embedding'];
+
+/** A vector signal, as `recommendations.vectors` names one: `<set id>:<signal>`. */
+export const SIGNAL_REF_RE = /^[a-z0-9][a-z0-9_.-]*\/[a-z0-9][a-z0-9_.-]*:[A-Za-z0-9_.-]+$/i;
+
+/**
+ * Which signals rank recommendations. Site only: any account can publish a signal set, so one a publisher made
+ * up could otherwise put its own papers next to everyone's.
+ */
+const RECOMMEND_SETTINGS: Record<string, CoreSetting> = {
+  'recommendations.vectors': {
+    schema: z.array(z.string().regex(SIGNAL_REF_RE, 'a vector signal: <set id>:<signal>')).max(10) as z.ZodType,
+    default: DEFAULT_RECOMMEND_VECTORS,
+    title: 'Recommendation vectors',
+    description:
+      'Set by the site: the vector signals ("<owner>/<set>:<signal>", cosine or dot) whose nearest papers the home page\'s recommended sort counts.',
+    group: 'Plugins',
+    siteOnly: true,
+    sanitize: (raw) =>
+      Array.isArray(raw)
+        ? raw.filter((s): s is string => typeof s === 'string' && SIGNAL_REF_RE.test(s)).slice(0, 10)
+        : undefined,
+  },
+};
+
 export const CORE_SETTINGS: Record<string, CoreSetting> = {
   ...NAV_SETTINGS,
+  ...RECOMMEND_SETTINGS,
   ...TEXT_SETTINGS,
   ...REVIEW_SETTINGS,
   ...Object.fromEntries(PANEL_KINDS.flatMap((kind) => Object.entries(kindSettings(kind)))),

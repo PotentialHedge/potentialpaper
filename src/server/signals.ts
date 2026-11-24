@@ -659,6 +659,53 @@ async function valuesOf(set: SetRow, papers: string[], names: string[], database
   return { values: out, labels };
 }
 
+/** Every row's score against row `self`: larger is nearer (minus the squared distance for `l2`). */
+function scoresAgainst(index: VectorIndex, self: number): Float32Array {
+  const { dims, data } = index;
+  const n = index.paperIds.length;
+  const scores = new Float32Array(n);
+  const base = self * dims;
+  for (let i = 0; i < n; i++) {
+    let s = 0;
+    const at = i * dims;
+    if (index.metric === 'l2') {
+      for (let d = 0; d < dims; d++) s -= (data[at + d] - data[base + d]) ** 2;
+    } else {
+      for (let d = 0; d < dims; d++) s += data[at + d] * data[base + d];
+    }
+    scores[i] = s;
+  }
+  return scores;
+}
+
+/**
+ * The ids of the `k` papers nearest a paper by a live vector signal, nearest first, never the paper itself; empty when
+ * the set, the signal or the paper's value is missing, so a reader that only ranks (`server/recommendations.ts`)
+ * carries on without it.
+ */
+export async function nearestPaperIds(
+  setId: string,
+  signal: string,
+  paperId: string,
+  k: number,
+  database: Db = getDb(),
+): Promise<string[]> {
+  const set = await findSet(setId, database);
+  if (!set) return [];
+  const index = await vectorIndex(set, signal, database).catch((e) => {
+    if (e instanceof ApiError) return null;
+    throw e;
+  });
+  const self = index?.byPaperId.get(paperId);
+  if (!index || self === undefined) return [];
+  const order = topK(
+    scoresAgainst(index, self),
+    k,
+    (i) => i === self || !index.paperIds[i] || index.paperIds[i] === paperId,
+  );
+  return order.map((i) => index.paperIds[i]);
+}
+
 /**
  * The `k` papers nearest a paper by one of a set's vector signals, best first, without the paper itself. `with` names
  * other signals of the set to send for the paper and each neighbour (a map's `map.xy` and `map.cluster`, so a minimap
@@ -681,20 +728,7 @@ export async function nearestPapers(
   const index = await vectorIndex(set, signal, database);
   const self = index.byPaperId.get(paperId);
   if (self === undefined) return { paper: null, neighbours: [] };
-  const { dims, data } = index;
-  const n = index.paperIds.length;
-  const scores = new Float32Array(n);
-  const base = self * dims;
-  for (let i = 0; i < n; i++) {
-    let s = 0;
-    const at = i * dims;
-    if (index.metric === 'l2') {
-      for (let d = 0; d < dims; d++) s -= (data[at + d] - data[base + d]) ** 2;
-    } else {
-      for (let d = 0; d < dims; d++) s += data[at + d] * data[base + d];
-    }
-    scores[i] = s;
-  }
+  const scores = scoresAgainst(index, self);
   const order = topK(scores, k, (i) => i === self || index.paperIds[i] === paperId);
   const neighbours: Neighbour[] = order.map((i) => ({
     paper: index.identifiers[i],

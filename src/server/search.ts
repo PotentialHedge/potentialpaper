@@ -13,6 +13,7 @@ import {
 } from '@/lib/query';
 import { CATEGORY_LABEL } from '@/lib/labeled-links';
 import { MARK_END, MARK_START, normalizeSearch, prefixTsquery, type SearchSort } from '@/lib/search';
+import { scoresTable } from './recommendations';
 
 export const SEARCH_PAGE_SIZE = 50;
 
@@ -73,6 +74,11 @@ export interface SearchFilter {
   exceptFollowedBy?: string | null;
   /** Leave out the papers this account is an author of, or has claimed to be. */
   exceptAuthoredBy?: string | null;
+  /**
+   * Recommended papers first, best first, by these scores (paper id to score, `server/recommendations.ts`); the rest
+   * after them, in `sort`'s order.
+   */
+  recommendScores?: ReadonlyMap<string, number> | null;
   /** From 1. */
   page?: number;
   limit?: number;
@@ -285,6 +291,7 @@ async function readPage(
     authoredBy,
     exceptFollowedBy,
     exceptAuthoredBy,
+    recommendScores,
   }: SearchFilter,
   node: SearchNode | null,
   fuzzy: boolean,
@@ -303,7 +310,11 @@ async function readPage(
     ],
     sql` and `,
   );
-  const order = sql.join([...ordering(sort, node, scopes), sql`p.id`], sql`, `);
+  const recommending = recommendScores?.size ? recommendScores : null;
+  const order = sql.join(
+    [...(recommending ? [sql`rec.score desc nulls last`] : []), ...ordering(sort, node, scopes), sql`p.id`],
+    sql`, `,
+  );
   const [{ rows: counted }, { rows }] = await Promise.all([
     database.execute<{ total: number }>(sql`select count(*)::int as total from papers p where ${where}`),
     database.execute<Found & Record<string, unknown>>(sql`
@@ -317,6 +328,7 @@ async function readPage(
         select p.id from papers p
         left join page_current c on c.page_id = p.id
         ${fileRanks(sort, node, scopes)}
+        ${recommending ? sql`left join ${scoresTable(recommending)} rec on rec.paper_id = p.id` : sql``}
         where ${where}
         order by ${order}
         limit ${limit} offset ${(page - 1) * limit}

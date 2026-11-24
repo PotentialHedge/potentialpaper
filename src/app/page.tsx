@@ -25,6 +25,7 @@ import { institutionNames } from '@/server/affiliations';
 import { currentAnnouncements } from '@/server/announcements';
 import { viewerFromHeaders } from '@/server/auth';
 import { findPaper, PAPER_SOURCES } from '@/server/papers';
+import { canRecommend, recommendationScores } from '@/server/recommendations';
 import { siteUrl } from '@/server/site';
 import { SEARCH_PAGE_SIZE, searchPapers, topVenues, type SearchFilter, type SearchHit } from '@/server/search';
 
@@ -38,8 +39,14 @@ const TITLE = 'A wiki page for every paper, written by everyone';
 /** Where the site's code is. */
 const REPO_URL = 'https://github.com/PotentialHedge/potentialpaper';
 
+/**
+ * The home list's sorts: the search's, and `recommended` for a signed-in reader who has done enough for it to mean
+ * something (`server/recommendations.ts`), papers near theirs first.
+ */
+type HomeSort = SearchSort | 'recommended';
+
 /** Sorts kept out of the row, in the ⋯ menu (on a phone every sort is in the filter menu). */
-const MENU_SORTS: readonly SearchSort[] = ['oldest', 'title'];
+const MENU_SORTS: readonly HomeSort[] = ['oldest', 'title'];
 
 /** The viewer's own papers per page in the "My papers" section; `?mpage=` pages it. */
 const MINE_PAGE = 10;
@@ -94,28 +101,38 @@ export default async function Home({
   const venue = normalizeSearch(one(sp.venue));
   const venueFilter = parsed?.fields.has('venue') ? null : venue;
 
-  // A search sorts by relevance unless another sort is asked for; relevance needs a search.
-  const defaultSort: SearchSort = q ? 'relevance' : 'activity';
-  const sorts = SEARCH_SORTS.filter((s) => q || s !== 'relevance');
-  const sort = sorts.find((s) => s === one(sp.sort)) ?? defaultSort;
-
   const viewer = await viewerFromHeaders(await headers());
   const me = viewer?.account.id ?? null;
+
+  // A search sorts by relevance unless another sort is asked for; relevance needs a search. Browsing, a reader
+  // who can be recommended papers gets them first, as on acceptodds.
+  const recommends = me !== null && !q && (await canRecommend(me));
+  const browseDefault: HomeSort = recommends ? 'recommended' : 'activity';
+  const defaultSort: HomeSort = q ? 'relevance' : browseDefault;
+  const sorts: HomeSort[] = [
+    ...(recommends ? (['recommended'] as const) : []),
+    ...SEARCH_SORTS.filter((s) => q || s !== 'relevance'),
+  ];
+  const sort = sorts.find((s) => s === one(sp.sort)) ?? defaultSort;
+  // What the database sorts by: the recommended papers come first by their scores, the rest by activity.
+  const recommendScores = sort === 'recommended' && me ? await recommendationScores(me) : null;
+  const searchSort: SearchSort = sort === 'recommended' ? 'activity' : sort;
   // ?following=1: only papers the signed-in viewer follows.
   const onlyFollowed = me !== null && one(sp.following) === '1';
   // The viewer's own papers, then the papers they follow, are pinned above the list, as acceptodds pins
   // followed papers and positions: same venue and sort, each paged on its own, and none repeated. A paper both
   // theirs and followed is under My papers. Not while searching, nor when the list is already only followed papers.
   const pins = me !== null && !q && !onlyFollowed;
-  const browse = { venue, sort };
+  const browse = { venue, sort: searchSort };
   const [all, mine, followed, topVenueList, announced, institutions] = await Promise.all([
     pageOf(sp.page, SEARCH_PAGE_SIZE, {
       q,
       venue: venueFilter,
-      sort,
+      sort: searchSort,
       followedBy: onlyFollowed ? me : null,
       exceptAuthoredBy: pins ? me : null,
       exceptFollowedBy: pins ? me : null,
+      recommendScores,
     }),
     pins ? pageOf(sp.mpage, MINE_PAGE, { ...browse, authoredBy: me }) : null,
     pins ? pageOf(sp.fpage, FOLLOWING_PAGE, { ...browse, followedBy: me, exceptAuthoredBy: me }) : null,
@@ -148,7 +165,7 @@ export default async function Home({
     if (params.get('following') === '0') params.delete('following');
     // The default sort stays out of the address, and relevance is gone with the search.
     const chosen = params.get('sort');
-    if (chosen === 'relevance' || (chosen === 'activity' && !params.has('q'))) params.delete('sort');
+    if (chosen === 'relevance' || (chosen === browseDefault && !params.has('q'))) params.delete('sort');
     for (const key of ['page', 'mpage', 'fpage']) if (params.get(key) === '1') params.delete(key);
     const query = params.toString();
     return query ? `/?${query}` : '/';
@@ -411,7 +428,8 @@ export default async function Home({
           <section id="all">
             {pinnedCount > 0 ? (
               <h2 className={`mt-7 mb-2 ${ui.section}`}>
-                All papers <span className="font-normal">({all.total.toLocaleString('en')})</span>
+                {sort === 'recommended' ? 'Recommended for you' : 'All papers'}{' '}
+                <span className="font-normal">({all.total.toLocaleString('en')})</span>
               </h2>
             ) : (
               <div className="h-3.5" />
