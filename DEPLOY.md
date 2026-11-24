@@ -28,6 +28,38 @@ scripts/purge-edge-cache.sh       # required, see below
 Check it: `docker inspect potentialpaper-app-1 --format '{{.Config.Image}}'` names the new commit, and
 https://potentialpaper.com loads.
 
+## Staging
+
+https://staging.potentialpaper.com runs any commit beside production, behind a password (user `staging`; the password is
+in `~/.config/potentialpaper/staging-basic-auth` on this host). It is its own compose project, `potentialpaper-staging`:
+`docker-compose.prod.yml` with `docker-compose.staging.yml` over it and `.env.staging` (gitignored, made from
+`.env.production` with its own database password, auth secrets and host). Its images are `potentialpaper-staging-*`, so a
+staging build never replaces production's untagged tools image. Only `app` and `worker` run: no PDF ingest (it would
+write covers to production's bucket) and no SSH. Its database starts as a copy of production's. Its user content
+(demos, plugin frames) still comes from production's `ppusercontent.com`. Cloudflare's cache rules name
+`potentialpaper.com` only, so nothing behind the password is cached at the edge.
+
+```sh
+git worktree add --detach ../papertrail-staging-<commit> <commit> && cd ../papertrail-staging-<commit>
+cp ../papertrail/.env.staging . && export GIT_COMMIT=$(git rev-parse --short HEAD)
+dcs() { docker compose -p potentialpaper-staging -f docker-compose.prod.yml -f docker-compose.staging.yml \
+          --env-file .env.staging "$@"; }
+dcs --profile tools build
+dcs up -d postgres
+dcs run --rm tools                 # migrations
+dcs up -d app && dcs --profile tools up -d worker
+```
+
+Copying production's database in again (it replaces staging's):
+
+```sh
+dcs stop app worker
+docker exec potentialpaper-postgres-1 pg_dump -U potentialpaper -Fc potentialpaper \
+  | docker exec -i potentialpaper-staging-postgres-1 pg_restore -U potentialpaper -d potentialpaper --clean --if-exists --no-owner
+```
+
+then migrate and start as above.
+
 ## Why each step is there
 
 - **Migrations run as their own step**, never at app start. `dc run --rm tools npm run <script>` runs any
