@@ -38,9 +38,10 @@ export default function RootLayout({ children }: Readonly<{ children: React.Reac
     <html lang="en" suppressHydrationWarning>
       <body>
         <header className="flex flex-wrap items-baseline gap-x-4.5 gap-y-1.5 px-6 pt-4 pb-2.5 narrow:px-4">
-          <Link href="/" className="text-[22px] text-ink hover:no-underline">
+          <Link href="/" aria-label="potentialpaper" className="text-[22px] text-ink hover:no-underline">
             <LogoMark />
-            <span className="ml-2">
+            {/* On a phone the mark alone, leaving the row to the account links. */}
+            <span className="ml-2 narrow:hidden">
               <Wordmark />
             </span>
           </Link>
