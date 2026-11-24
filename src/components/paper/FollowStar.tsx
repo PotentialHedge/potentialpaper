@@ -1,5 +1,6 @@
 'use client';
 
+import { track } from '@/lib/track';
 import { usePathname } from 'next/navigation';
 import { useEffect, useState } from 'react';
 import { StarIcon, WITH_ICON } from '@/components/icons';
@@ -32,7 +33,12 @@ export function FollowStar({ paper, className }: { paper: PaperId; className: st
   const count = state && state.followers > 0 ? <span className="tabular-nums">{state.followers}</span> : null;
   if (state?.following === null) {
     return (
-      <a href={authHref('/signin', pathname)} className={`${className} ${WITH_ICON}`} title="Sign in to follow">
+      <a
+        href={authHref('/signin', pathname)}
+        className={`${className} ${WITH_ICON}`}
+        title="Sign in to follow"
+        onClick={() => track('follow_signin_clicked')}
+      >
         <StarIcon />
         follow {count}
       </a>
@@ -67,8 +73,10 @@ export function FollowStar({ paper, className }: { paper: PaperId; className: st
         ).catch(() => null);
         setBusy(false);
         const body = res?.ok ? await res.json().catch(() => null) : null;
-        if (body) setState(body);
-        else setFailed(true);
+        if (body) {
+          setState(body);
+          track('follow_toggled', { following: !following });
+        } else setFailed(true);
       }}
     >
       <StarIcon filled={following} />

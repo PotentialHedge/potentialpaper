@@ -1,5 +1,6 @@
 'use client';
 
+import { track } from '@/lib/track';
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { AgentPromptField } from '@/components/AgentPromptField';
 import { CopyField } from '@/components/CopyField';
@@ -55,7 +56,10 @@ export function EditDialog({ pagePath, codePath, clone, hasRepo, form }: EditOpt
    */
   const made = useRef(false);
   const open = useCallback(() => {
-    if (!dialog.current?.open) dialog.current?.showModal();
+    if (!dialog.current?.open) {
+      dialog.current?.showModal();
+      track('edit_opened');
+    }
     if (made.current) return;
     made.current = true;
     const origin = window.location.origin;
@@ -91,6 +95,7 @@ export function EditDialog({ pagePath, codePath, clone, hasRepo, form }: EditOpt
       history.replaceState(null, '', window.location.pathname + window.location.search);
   };
   const onCopied = () => {
+    track('edit_clone_copied', { target: via });
     let declined = false;
     try {
       declined = localStorage.getItem(DECLINED) === '1';
@@ -141,7 +146,12 @@ export function EditDialog({ pagePath, codePath, clone, hasRepo, form }: EditOpt
                 {form.label}
               </a>
             )}
-            <a href={codePath} rel="nofollow" className={form ? 'text-accent' : ui.btn({ inline: true, flush: true })}>
+            <a
+              href={codePath}
+              rel="nofollow"
+              onClick={() => track('edit_web_opened')}
+              className={form ? 'text-accent' : ui.btn({ inline: true, flush: true })}
+            >
               Edit in web editor
             </a>
           </div>
@@ -196,7 +206,7 @@ export function EditDialog({ pagePath, codePath, clone, hasRepo, form }: EditOpt
           <p className="mt-1 text-xs text-muted">
             It checks and sets up everything: signing in, git, the clone, credentials and an SSH key.
           </p>
-          {prompt && <AgentPromptField prompt={prompt} label="Paste into your AI agent:" />}
+          {prompt && <AgentPromptField prompt={prompt} label="Paste into your AI agent:" where="edit" />}
         </div>
       </dialog>
     </>
@@ -227,7 +237,7 @@ function ExtensionOffer({ onDecline }: { onDecline: () => void }) {
           </button>
         ))}
       </div>
-      <TerminalLine text={command} />
+      <TerminalLine text={command} onCopied={() => track('extension_command_copied', { target: cli })} />
       <p className="mt-2 text-xs">
         <a href={VSIX} download>
           Download the .vsix

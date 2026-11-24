@@ -1,5 +1,6 @@
 'use client';
 
+import { track } from '@/lib/track';
 import { venueLine } from '@/lib/paper-file';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
@@ -361,7 +362,7 @@ function Invite({ row, open }: { row: AuthoredRow; open: { name: string; index: 
   return (
     <>
       <h3 className={`${ui.boxHeading} mt-5`}>Not on PotentialPaper yet?</h3>
-      <CopyField value={link} label="Invite link" />
+      <CopyField value={link} label="Invite link" onCopied={() => track('share_copied', { target: 'invite' })} />
       <p className="mt-2">
         Email{' '}
         {open.map((a, i) => (

@@ -1,5 +1,6 @@
 'use client';
 
+import { track } from '@/lib/track';
 import { useState } from 'react';
 import { ui } from '@/components/ui';
 import type { PageRef } from '@/lib/kinds';
@@ -20,6 +21,7 @@ export function RevertButton({ page, oid, historyPath }: { page: PageRef; oid: s
       });
       const body = await res.json().catch(() => null);
       if (!res.ok) {
+        track('edit_revert_refused', { reason: body?.error?.code ?? String(res.status) });
         setProblem(
           res.status === 401
             ? 'Sign in to revert.'
@@ -30,6 +32,7 @@ export function RevertButton({ page, oid, historyPath }: { page: PageRef; oid: s
         setState('idle');
         return;
       }
+      track('edit_reverted');
       window.location.replace(`${historyPath}?v=${(body?.head ?? Date.now().toString(16)).slice(0, 12)}`);
     } catch {
       setProblem('Could not reach the server.');

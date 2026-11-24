@@ -7,6 +7,12 @@ describe('analyticsUrl', () => {
   it('keeps the home page list parameters and drops the rest', () => {
     expect(analyticsUrl(`${origin}/?q=attention&page=2&token=abc#x`, origin)).toBe(`${origin}/?q=attention&page=2`);
   });
+  it("keeps where a link of ours was posted, and the tour's step", () => {
+    expect(analyticsUrl(`${origin}/openreview/abc?ref=acceptodds&utm_source=x&email=me%40x.org`, origin)).toBe(
+      `${origin}/openreview/abc?ref=acceptodds&utm_source=x`,
+    );
+    expect(analyticsUrl(`${origin}/welcome?step=read&next=%2Fprofile`, origin)).toBe(`${origin}/welcome?step=read`);
+  });
   it('drops every parameter on auth pages', () => {
     expect(analyticsUrl(`${origin}/signin/link?token=secret&next=%2Fprofile`, origin)).toBe(`${origin}/signin/link`);
   });

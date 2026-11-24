@@ -179,7 +179,12 @@ export function VersionsSection({
                       </td>
                       <td className={ui.td}>
                         {v.pdf ? (
-                          <a href={v.pdf.url} rel="noopener">
+                          <a
+                            href={v.pdf.url}
+                            rel="noopener"
+                            data-umami-event="pdf_opened"
+                            data-umami-event-target="version"
+                          >
                             PDF
                           </a>
                         ) : (

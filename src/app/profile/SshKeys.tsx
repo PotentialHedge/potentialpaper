@@ -1,5 +1,6 @@
 'use client';
 
+import { track } from '@/lib/track';
 import { useState } from 'react';
 import { ui } from '@/components/ui';
 
@@ -84,6 +85,7 @@ export function SshKeys({
         }),
       async (res) => {
         const added = (await res.json()) as SshKeyRow;
+        track('ssh_key_added');
         setKey('');
         setTitle('');
         setNote({ ok: true, text: `Added ${added.title} (${added.fingerprint}).` });

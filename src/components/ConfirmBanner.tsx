@@ -1,5 +1,6 @@
 'use client';
 
+import { track } from '@/lib/track';
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import { useEffect, useMemo, useSyncExternalStore } from 'react';
@@ -29,11 +30,22 @@ export function ConfirmBanner({ signedIn }: { signedIn: boolean }) {
       <span>
         Confirm <b>{pending.email}</b> to start editing: enter the code we emailed you.
       </span>
-      <Link href={authHref(VERIFY_EMAIL, pathname, { email: pending.email })} className="font-semibold">
+      <Link
+        href={authHref(VERIFY_EMAIL, pathname, { email: pending.email })}
+        className="font-semibold"
+        onClick={() => track('confirm_banner_clicked')}
+      >
         enter code
       </Link>
       <span className="flex-1" />
-      <button className="cursor-pointer text-faint" onClick={clearPending} aria-label="dismiss">
+      <button
+        className="cursor-pointer text-faint"
+        onClick={() => {
+          clearPending();
+          track('confirm_banner_dismissed');
+        }}
+        aria-label="dismiss"
+      >
         ×
       </button>
     </div>

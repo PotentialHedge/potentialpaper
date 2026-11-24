@@ -1,5 +1,6 @@
 'use client';
 
+import { track } from '@/lib/track';
 import { useRouter } from 'next/navigation';
 import { type DragEvent, useId, useRef, useState } from 'react';
 import { ui } from '@/components/ui';
@@ -63,6 +64,7 @@ export function PictureDrop({ canonical, paperPath }: { canonical: PaperId; pape
         }),
       });
       if (!committed.ok) return setError(await failure(committed));
+      track('picture_added', { target: ext });
       router.refresh();
     } catch {
       setError('Could not reach the server.');

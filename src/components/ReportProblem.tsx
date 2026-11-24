@@ -1,5 +1,6 @@
 'use client';
 
+import { track } from '@/lib/track';
 /** Where problem reports go: the same people run acceptodds and answer there (`app/privacy`). */
 export const REPORT_ADDRESS = 'hello@acceptodds.com';
 
@@ -18,6 +19,7 @@ export function ReportProblem({ className }: { className?: string }) {
       className={className}
       onClick={(e) => {
         e.currentTarget.href = href(window.location.href);
+        track('problem_report_opened');
       }}
     >
       Report a problem

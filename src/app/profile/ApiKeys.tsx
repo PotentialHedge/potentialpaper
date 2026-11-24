@@ -1,5 +1,6 @@
 'use client';
 
+import { track } from '@/lib/track';
 import { useState } from 'react';
 import { CopyField } from '@/components/CopyField';
 import { OnboardAgent } from '@/components/OnboardAgent';
@@ -80,6 +81,7 @@ export function ApiKeys({ initial, n, canWrite }: { initial: ApiKeyRow[]; n: num
         }),
       async (res) => {
         const created = await res.json();
+        track('api_key_created', { target: [write && 'write', push && 'push'].filter(Boolean).join('+') || 'read' });
         setSecret({ name: keyName, token: created.token });
         setName('');
       },
@@ -90,6 +92,7 @@ export function ApiKeys({ initial, n, canWrite }: { initial: ApiKeyRow[]; n: num
     return run(
       () => fetch(`/api/v1/me/tokens/${encodeURIComponent(row.id)}`, { method: 'DELETE' }),
       async () => {
+        track('api_key_revoked');
         if (secret?.token.startsWith(row.start)) setSecret(null);
         setNote({ ok: true, text: `Revoked ${row.name}. It no longer works.` });
       },

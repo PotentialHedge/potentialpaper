@@ -1,8 +1,9 @@
 'use client';
 
+import { track } from '@/lib/track';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { ClaimSuggestions } from '@/components/ClaimSuggestions';
 import { OnboardingCard } from '@/components/OnboardingCard';
 import { ProfileFields, profileRefusal, type ProfileValues } from '@/components/ProfileFields';
@@ -30,7 +31,11 @@ export function Finish({
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  function finish() {
+  // Once, as it opens: what is owed.
+  useEffect(() => track('finish_shown', { needsName: needsProfile, needsPassword }), [needsProfile, needsPassword]);
+
+  function finish(how: 'done' | 'skip' = 'done') {
+    track('finish_completed', { target: how });
     router.push(next);
     router.refresh();
   }
@@ -49,6 +54,7 @@ export function Finish({
     }).catch(() => null);
     setBusy(false);
     if (!res?.ok) return setError(await profileRefusal(res));
+    track('finish_step', { target: 'name' });
     setStep('papers');
   }
 
@@ -68,7 +74,10 @@ export function Finish({
         .json()
         .catch(() => null)
     )?.error?.code;
-    if (res?.ok || code === 'password_already_set') return finish();
+    if (res?.ok || code === 'password_already_set') {
+      track('finish_step', { target: 'password' });
+      return finish();
+    }
     setError(code === 'validation_error' ? 'At least 12 characters.' : 'Could not save your password.');
   }
 
@@ -120,7 +129,7 @@ export function Finish({
         <button className={ui.btn()} disabled={busy}>
           {busy ? 'Saving…' : 'Set password'}
         </button>
-        <button type="button" className={ui.btn({ ghost: true })} disabled={busy} onClick={finish}>
+        <button type="button" className={ui.btn({ ghost: true })} disabled={busy} onClick={() => finish('skip')}>
           Skip for now
         </button>
         {error && <div className={ui.note(false)}>{error}</div>}

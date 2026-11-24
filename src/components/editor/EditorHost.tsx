@@ -1,5 +1,6 @@
 'use client';
 
+import { track } from '@/lib/track';
 import { useEffect, useState } from 'react';
 import { ui } from '@/components/ui';
 import { editorChannelName, type EditorMessage, type HostMessage } from '@/editors/channel';
@@ -33,7 +34,10 @@ export function EditorHost({
     channel.onmessage = (event: MessageEvent<EditorMessage>) => {
       const message = event.data;
       if (message?.type === 'ready') setReady(true);
-      if (message?.type === 'committed') setCommitted(true);
+      if (message?.type === 'committed') {
+        setCommitted(true);
+        track('edit_saved', { target: 'web_editor' });
+      }
     };
     channel.postMessage({ type: 'hello' } satisfies HostMessage);
     const timer = setTimeout(() => setSlow(true), 20_000);

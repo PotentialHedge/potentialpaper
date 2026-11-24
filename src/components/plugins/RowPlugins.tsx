@@ -1,5 +1,6 @@
 'use client';
 
+import { pluginLabel, track } from '@/lib/track';
 import {
   createContext,
   type CSSProperties,
@@ -171,6 +172,7 @@ export function RowActions({ paper, className = '' }: { paper: string; className
 
   async function pick(plugin: ReadyPlugin, command: RowCommand) {
     setError(null);
+    track('plugin_command_run', { plugin: pluginLabel(plugin), target: command.popover ? 'row_popover' : 'row' });
     if (command.popover) {
       setActive({ plugin, command });
       return;

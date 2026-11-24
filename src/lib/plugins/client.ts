@@ -1,6 +1,7 @@
 'use client';
 
 import { useSyncExternalStore } from 'react';
+import { pluginLabel, track } from '../track';
 import { load as reloadSettings, setSetting, settingsSnapshot, subscribeSettings } from '../settings/client';
 import type { InstalledPlugin } from './installed';
 import { type PluginPermission, validateManifest } from './manifest';
@@ -55,6 +56,7 @@ export function addDevPlugin(url: string): string {
   const source = parsePluginSource(url);
   if (source?.kind !== 'dev') throw new Error('a dev plugin is served from http://localhost:<port>/');
   saveDevSources([...devSources().filter((s) => s !== source.url), source.url]);
+  track('plugin_dev_added');
   return source.url;
 }
 
@@ -169,7 +171,12 @@ export function usePlugins(page: string | null): PluginsState {
 }
 
 /** Approve a plugin at the commit it runs. */
-export async function grantPlugin(pluginId: string, commit: string): Promise<void> {
+export async function grantPlugin(
+  pluginId: string,
+  commit: string,
+  /** Where it was approved, for analytics: on a page's prompt, or in settings. */
+  where: 'page' | 'settings' = 'settings',
+): Promise<void> {
   const res = await fetch('/api/v1/me/plugins/grants', {
     method: 'PUT',
     headers: { 'Content-Type': 'application/json' },
@@ -179,6 +186,7 @@ export async function grantPlugin(pluginId: string, commit: string): Promise<voi
     const body = await res.json().catch(() => null);
     throw new Error(body?.error?.message ?? `couldn't approve it (${res.status})`);
   }
+  track('plugin_approved', { plugin: pluginId, target: where });
   reloadPlugins();
 }
 
@@ -190,7 +198,11 @@ export async function installPlugin(source: string): Promise<InstalledPlugin> {
     body: JSON.stringify({ source }),
   });
   const body = await res.json().catch(() => null);
-  if (!res.ok) throw new Error(body?.error?.message ?? `couldn't install it (${res.status})`);
+  if (!res.ok) {
+    track('plugin_install_refused', { reason: body?.error?.code ?? String(res.status) });
+    throw new Error(body?.error?.message ?? `couldn't install it (${res.status})`);
+  }
+  track('plugin_installed');
   // Its settings join the reader's, and it joins the pages; the settings change reloads the plugins.
   void reloadSettings();
   return body as InstalledPlugin;
@@ -210,12 +222,14 @@ async function call<T>(url: string, init: RequestInit, what: string): Promise<T>
 /** Remove a plugin from the reader's settings.json (a site default is turned off instead). */
 export async function uninstallPlugin(source: string): Promise<void> {
   await call(`/api/v1/me/plugins?source=${encodeURIComponent(source)}`, { method: 'DELETE' }, 'remove it');
+  track('plugin_removed');
   void reloadSettings();
 }
 
 /** Withdraw the reader's approval: the plugin asks again before it runs. */
 export async function revokePlugin(pluginId: string): Promise<void> {
   await call(`/api/v1/me/plugins/grants?plugin=${encodeURIComponent(pluginId)}`, { method: 'DELETE' }, 'withdraw it');
+  track('plugin_revoked', { plugin: pluginId });
   reloadPlugins();
 }
 
@@ -229,6 +243,7 @@ export async function setPluginEnabled(plugin: InstalledPlugin, enabled: boolean
       ? undefined
       : { enabled, ...(plugin.ref && plugin.from !== 'site' ? { ref: plugin.ref } : {}) };
   await setSetting(['plugins', plugin.source], entry);
+  track('plugin_toggled', { plugin: pluginLabel(plugin), on: enabled, target: plugin.from });
 }
 
 /** A public repo with the topic `potentialpaper-plugin` (`GET /api/v1/plugins/discover`). */
@@ -297,6 +312,9 @@ export async function updatePluginTo(source: string, ref: string, approve = fals
     { method: 'POST', body: JSON.stringify({ source, ref, approve }) },
     'update it',
   );
-  if (result.status === 'updated') void reloadSettings();
+  if (result.status === 'updated') {
+    track('plugin_updated', { target: approve ? 'approved' : 'same_permissions' });
+    void reloadSettings();
+  }
   return result;
 }

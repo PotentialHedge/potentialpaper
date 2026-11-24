@@ -1,5 +1,6 @@
 'use client';
 
+import { track } from '@/lib/track';
 import Link from 'next/link';
 import { useRef, useState } from 'react';
 import {
@@ -44,6 +45,7 @@ export function GettingStartedSheet({
   const current = steps[step];
 
   function go(next: number) {
+    if (next > step) track('tutorial_step', { step: next + 1 });
     setStep(next);
     content.current?.scrollTo({ top: 0 });
   }
@@ -53,7 +55,10 @@ export function GettingStartedSheet({
       open={open}
       onOpenChange={(value) => {
         setOpen(value);
-        if (value) setStep(0);
+        if (value) {
+          setStep(0);
+          track('tutorial_opened', { signedIn });
+        }
       }}
     >
       <SheetTrigger type="button" className="cursor-pointer font-sans text-base font-semibold text-accent">
@@ -134,12 +139,23 @@ export function GettingStartedSheet({
             </button>
           ) : signedIn ? (
             <SheetClose asChild>
-              <Link href="/profile" className={ui.btn()}>
+              <Link
+                href="/profile"
+                className={ui.btn()}
+                onClick={() => track('tutorial_finished', { target: 'profile' })}
+              >
                 Finish my profile
               </Link>
             </SheetClose>
           ) : (
-            <Link href="/welcome?step=email" className={ui.btn()} onClick={() => setOpen(false)}>
+            <Link
+              href="/welcome?step=email"
+              className={ui.btn()}
+              onClick={() => {
+                track('tutorial_finished', { target: 'welcome' });
+                setOpen(false);
+              }}
+            >
               Create my account
             </Link>
           )}
@@ -158,7 +174,13 @@ export function OnboardAgentSheet() {
   const [open, setOpen] = useState(false);
   const step = agentPromptStep();
   return (
-    <Sheet open={open} onOpenChange={setOpen}>
+    <Sheet
+      open={open}
+      onOpenChange={(value) => {
+        setOpen(value);
+        if (value) track('tutorial_opened', { target: 'agent' });
+      }}
+    >
       <SheetTrigger type="button" className="cursor-pointer font-sans text-base font-semibold text-accent">
         [onboard your agent]
       </SheetTrigger>

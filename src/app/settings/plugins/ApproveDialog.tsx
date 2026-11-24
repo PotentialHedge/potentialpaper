@@ -1,5 +1,6 @@
 'use client';
 
+import { track } from '@/lib/track';
 import { useEffect, useRef, useState } from 'react';
 import { ui } from '@/components/ui';
 import { grantPlugin } from '@/lib/plugins/client';
@@ -61,7 +62,15 @@ export function ApproveDialog({
         )}
         {error && <p className={`${ui.note(false)} mt-2`}>{error}</p>}
         <div className="mt-4 flex items-center justify-end gap-4">
-          <button type="button" className={ui.linkBtn} disabled={busy} onClick={() => dialog.current?.close()}>
+          <button
+            type="button"
+            className={ui.linkBtn}
+            disabled={busy}
+            onClick={() => {
+              track('plugin_consent_dismissed', { plugin: plugin.id });
+              dialog.current?.close();
+            }}
+          >
             Later
           </button>
           <button type="button" className={ui.btn({ inline: true, flush: true })} disabled={busy} onClick={approve}>

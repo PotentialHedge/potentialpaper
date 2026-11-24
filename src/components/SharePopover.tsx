@@ -1,5 +1,6 @@
 'use client';
 
+import { track } from '@/lib/track';
 import { CopyField } from './CopyField';
 import { ShareIcon, WITH_ICON } from './icons';
 import { Popover, PopoverContent, PopoverTrigger } from './Popover';
@@ -69,14 +70,14 @@ export function SharePopover({
   className?: string;
 }) {
   return (
-    <Popover>
+    <Popover onOpenChange={(open) => open && track('share_opened')}>
       <PopoverTrigger className={`${className ?? ''} ${WITH_ICON}`}>
         <ShareIcon />
         share
       </PopoverTrigger>
       <PopoverContent>
         <h3 className={ui.boxHeading}>Link</h3>
-        <CopyField value={url} label="Short link" />
+        <CopyField value={url} label="Short link" onCopied={() => track('share_copied', { target: 'link' })} />
         <p className="mt-2.5 flex flex-wrap gap-1.5 font-sans text-[13px]">
           {services(url, title).map((s) => (
             <a
@@ -84,6 +85,7 @@ export function SharePopover({
               href={s.href}
               target="_blank"
               rel="noopener noreferrer"
+              onClick={() => track('share_sent', { target: s.name.toLowerCase() })}
               style={{ backgroundColor: s.color }}
               className="inline-flex items-center gap-1.5 px-2.5 py-1 font-semibold text-white hover:no-underline hover:opacity-85"
             >
@@ -97,7 +99,11 @@ export function SharePopover({
             <h3 className={`${ui.boxHeading} mt-3`}>Badge for a README</h3>
             {/* eslint-disable-next-line @next/next/no-img-element -- an SVG from this site, shown as it will be embedded */}
             <img src={badge.image} alt="" className="mb-1.5 h-5" />
-            <CopyField value={badge.markdown} label="Badge Markdown" />
+            <CopyField
+              value={badge.markdown}
+              label="Badge Markdown"
+              onCopied={() => track('share_copied', { target: 'badge' })}
+            />
           </>
         )}
       </PopoverContent>

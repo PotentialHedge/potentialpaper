@@ -1,5 +1,6 @@
 'use client';
 
+import { track } from '@/lib/track';
 import { useRouter } from 'next/navigation';
 import { useState, type FormEvent } from 'react';
 import { CodeInput } from '@/components/CodeInput';
@@ -57,13 +58,21 @@ function useRequest() {
   const [busy, setBusy] = useState(false);
   const [problem, setProblem] = useState<string | null>(null);
   const [done, setDone] = useState<string | null>(null);
-  async function run(action: () => Promise<Response | null>, after: (res: Response) => Promise<void> | void) {
+  async function run(
+    step: string,
+    action: () => Promise<Response | null>,
+    after: (res: Response) => Promise<void> | void,
+  ) {
     setBusy(true);
     setProblem(null);
     setDone(null);
     try {
       const res = await action();
-      if (!res?.ok) return setProblem(await messageOf(res));
+      if (!res?.ok) {
+        track('claim_refused', { target: step, reason: res ? String(res.status) : 'network' });
+        return setProblem(await messageOf(res));
+      }
+      track('claim_step', { target: step });
       await after(res);
       router.refresh();
     } finally {
@@ -115,6 +124,7 @@ function HiddenClaim({ paper, authors, onPaper, printed }: Props) {
         className={`${ui.btn({ inline: true })} mt-2`}
         onClick={() =>
           run(
+            'claim',
             () => post('/api/v1/claims', { paper, authorIndex: index, evidence: '' }),
             () => {},
           )
@@ -153,6 +163,7 @@ function OpenClaim(props: Props) {
 
   const sendCode = () =>
     run(
+      'code_sent',
       () => post('/api/v1/claims/code', { paper, authorIndex: author, email: chosenAddress }),
       async (res) => {
         if ((await res.json()).sent) setSentTo(chosenAddress);
@@ -161,12 +172,14 @@ function OpenClaim(props: Props) {
 
   const confirmCode = (value = code) =>
     run(
+      'code_confirmed',
       () => post('/api/v1/claims/code/confirm', { paper, email: sentTo, code: value }),
       () => setSentTo(null),
     ).then(() => setCode(''));
 
   const ask = () =>
     run(
+      'ask',
       () => post('/api/v1/claims/ask', { paper, authorIndex: author, evidence: note }),
       async (res) => {
         const body = (await res.json()) as { asked: string[] };
@@ -180,6 +193,7 @@ function OpenClaim(props: Props) {
 
   const withdraw = () =>
     run(
+      'withdraw',
       () =>
         fetch(`/api/v1/claims?${new URLSearchParams({ scheme: paper.scheme, value: paper.value })}`, {
           method: 'DELETE',
@@ -241,6 +255,7 @@ function OpenClaim(props: Props) {
             className={ui.btn({ inline: true })}
             onClick={() =>
               run(
+                'claim',
                 () => post('/api/v1/claims', { paper, authorIndex: author, evidence: '' }),
                 () => {},
               )

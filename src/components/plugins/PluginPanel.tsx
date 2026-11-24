@@ -1,5 +1,6 @@
 'use client';
 
+import { pluginLabel, track } from '@/lib/track';
 import Link from 'next/link';
 import { type ReactNode, useMemo, useRef, useState } from 'react';
 import { Popover, PopoverClose, PopoverContent, PopoverTrigger } from '@/components/Popover';
@@ -59,7 +60,7 @@ export function ConsentPrompt({
     setBusy(true);
     setError(null);
     try {
-      await grantPlugin(id, commit);
+      await grantPlugin(id, commit, 'page');
     } catch (e) {
       setError((e as Error).message);
       setBusy(false);
@@ -110,7 +111,14 @@ export function ConsentPrompt({
         ) : (
           <span className={ui.fine}>Sign in to approve it.</span>
         )}
-        <button type="button" className={ui.linkBtn} onClick={() => setDismissed(true)}>
+        <button
+          type="button"
+          className={ui.linkBtn}
+          onClick={() => {
+            setDismissed(true);
+            track('plugin_consent_dismissed', { plugin: id });
+          }}
+        >
           Not now
         </button>
       </div>
@@ -127,6 +135,7 @@ function CommandsMenu({ plugin, connection }: { plugin: ReadyPlugin; connection:
     setNote(null);
     try {
       if (!connection.current) throw new Error("the plugin hasn't started yet");
+      track('plugin_command_run', { plugin: pluginLabel(plugin), target: 'panel' });
       await connection.current.call('commands.run', { command });
     } catch (e) {
       setNote((e as Error).message);

@@ -1,5 +1,6 @@
 'use client';
 
+import { track } from '@/lib/track';
 import { useRouter } from 'next/navigation';
 import { type FormEvent, useState } from 'react';
 import { ui } from '@/components/ui';
@@ -42,6 +43,7 @@ export function NewCategoryForm({ initialName = '' }: { initialName?: string }) 
           link: typeof identifier === 'string' ? `/c/${identifier.slice('category:'.length)}` : undefined,
         });
       }
+      track('category_created');
       router.push(`/c/${shownSlug}`);
     } catch {
       setProblem({ message: 'Could not reach the server.' });

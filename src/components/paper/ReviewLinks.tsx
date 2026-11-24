@@ -1,5 +1,6 @@
 'use client';
 
+import { track } from '@/lib/track';
 import { useEffect, useRef, useState, type ReactNode } from 'react';
 import { CheckIcon, LinkIcon } from '@/components/icons';
 import { ui } from '@/components/ui';
@@ -40,6 +41,7 @@ export function Permalink({ anchor, kind, children }: { anchor: string; kind: st
           await navigator.clipboard.writeText(url.toString());
           setCopied(true);
           setTimeout(() => setCopied(false), 1500);
+          track('share_copied', { target: kind });
         } catch {
           // No clipboard: the address bar has the link.
         }
@@ -65,7 +67,12 @@ export function LinkedDetails({ anchor, summary, children }: { anchor: string; s
   return (
     // The browser opens it before hydration when the address bar links inside it; the effect agrees with it after.
     <details open={open} onToggle={(e) => setOpen(e.currentTarget.open)} className="mt-2" suppressHydrationWarning>
-      <summary className="cursor-pointer font-sans text-[13px] text-accent">{summary}</summary>
+      <summary
+        className="cursor-pointer font-sans text-[13px] text-accent"
+        onClick={() => !open && track('review_opened')}
+      >
+        {summary}
+      </summary>
       {children}
     </details>
   );
@@ -111,12 +118,22 @@ export function LinkedComments({ anchors, items }: { anchors: string[]; items: R
   return (
     // The browser opens it before hydration when the address bar links inside it; the effect agrees with it after.
     <details open={open} onToggle={(e) => setOpen(e.currentTarget.open)} className="mt-2" suppressHydrationWarning>
-      <summary className="cursor-pointer font-sans text-[13px] text-accent">
+      <summary
+        className="cursor-pointer font-sans text-[13px] text-accent"
+        onClick={() => !open && track('review_comments_opened')}
+      >
         {items.length === 1 ? '1 comment' : `${items.length} comments`}
       </summary>
       {all || hidden === 0 ? items : items.slice(0, SHOWN)}
       {!all && hidden > 0 && (
-        <button type="button" className={`${ui.linkBtn} mt-3 font-sans text-[13px]`} onClick={() => setAll(true)}>
+        <button
+          type="button"
+          className={`${ui.linkBtn} mt-3 font-sans text-[13px]`}
+          onClick={() => {
+            setAll(true);
+            track('review_comments_more');
+          }}
+        >
           Show {hidden} more {hidden === 1 ? 'comment' : 'comments'}
         </button>
       )}

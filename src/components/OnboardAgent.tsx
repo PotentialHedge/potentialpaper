@@ -1,5 +1,6 @@
 'use client';
 
+import { track } from '@/lib/track';
 import { useEffect, useState } from 'react';
 import { agentPrompt } from '@/lib/agent-prompt';
 import { AgentPromptField } from './AgentPromptField';
@@ -71,6 +72,7 @@ export function OnboardAgent({
       setState('failed');
       return;
     }
+    if (copied) track('agent_prompt_copied', { target: 'onboard' });
     setState(copied ? 'copied' : 'shown');
   }
 
@@ -82,7 +84,7 @@ export function OnboardAgent({
       {state === 'copied' && <p className={ui.fine}>Paste it into your AI agent.</p>}
       {state === 'shown' && (
         <div className="text-left">
-          <AgentPromptField prompt={prompt} label="Copy this into your AI agent:" />
+          <AgentPromptField prompt={prompt} label="Copy this into your AI agent:" where="onboard" />
         </div>
       )}
       {state === 'failed' && <div className={ui.note(false)}>Could not make the prompt. Try again in a moment.</div>}
@@ -116,5 +118,5 @@ export function AgentPromptBox() {
   }, []);
 
   // No caption: the screen's title says what to do with it.
-  return <AgentPromptField prompt={prompt} label="" big />;
+  return <AgentPromptField prompt={prompt} label="" big where="tutorial" />;
 }

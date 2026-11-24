@@ -1,5 +1,6 @@
 'use client';
 
+import { track } from '@/lib/track';
 import Link from 'next/link';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { useState } from 'react';
@@ -48,6 +49,7 @@ export function Welcome({
     const q = new URLSearchParams(params);
     if (s === 'intro') q.delete('step');
     else q.set('step', s);
+    track('tour_step', { step: s });
     window.history.pushState(null, '', q.size ? `/welcome?${q}` : '/welcome');
   }
 
@@ -149,11 +151,13 @@ function EmailStep({ next, institutionCount }: { next: string; institutionCount:
           }).catch(() => null);
           setBusy(false);
           if (res?.ok) {
+            track('signup_submitted');
             rememberPending({ email: address, next });
             return router.push(authHref(VERIFY_EMAIL, next, { email: address }));
           }
           if (!res) return setError('Could not reach the server. Try again.');
           const code = (await res.json().catch(() => null))?.error?.code;
+          track('signup_refused', { reason: code ?? String(res.status) });
           if (code === 'email_domain_not_allowed') return setError(DOMAIN_NOT_LISTED);
           setError(
             code === 'rate_limited'

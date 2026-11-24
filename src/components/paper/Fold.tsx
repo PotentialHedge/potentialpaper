@@ -1,5 +1,6 @@
 'use client';
 
+import { track } from '@/lib/track';
 import { useEffect, useRef, useState, type ReactNode } from 'react';
 import { ui } from '@/components/ui';
 
@@ -63,6 +64,7 @@ export function Fold({
   function toggle() {
     const next = !open;
     setOpen(next);
+    track('section_toggled', { target: id, on: next });
     try {
       const rest = folded().filter((x) => x !== id);
       localStorage.setItem(KEY, JSON.stringify(next ? rest : [...rest, id]));

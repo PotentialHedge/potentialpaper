@@ -1,5 +1,6 @@
 'use client';
 
+import { track } from '@/lib/track';
 import { type ReactNode, useState } from 'react';
 import { AnalyticsPanel, usePageAnalytics } from '@/components/pages/Analytics';
 import { usePluginPanels } from '@/components/plugins/PluginPanel';
@@ -60,7 +61,10 @@ export function ArrangedTabs({
               role="tab"
               type="button"
               aria-selected={id === shown}
-              onClick={() => setChosen(id)}
+              onClick={() => {
+                setChosen(id);
+                track('tab_opened', { target: id === ANALYTICS ? 'analytics' : id || 'lead' });
+              }}
               className={`-mb-px cursor-pointer border-b-2 pb-1 ${id === shown ? `border-ink ${ui.on}` : 'border-transparent text-muted'}`}
             >
               {title(id)}

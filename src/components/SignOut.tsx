@@ -1,5 +1,6 @@
 'use client';
 
+import { track } from '@/lib/track';
 import { useRouter } from 'next/navigation';
 import { authClient } from '@/lib/auth-client';
 
@@ -10,6 +11,7 @@ export function SignOut({ className = 'cursor-pointer hover:underline' }: { clas
       className={className}
       onClick={async () => {
         await authClient.signOut();
+        track('signed_out');
         router.push('/');
         router.refresh();
       }}

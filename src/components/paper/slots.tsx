@@ -81,7 +81,14 @@ function ReadThePaper({ identifiers, pdf, picture, canonical, address }: PanelPr
         <figure className="mb-3">
           <div className="border border-rule bg-white">
             {opens ? (
-              <a href={opens} rel="noopener" aria-label={pdf ? 'Open the PDF' : 'Open the paper'} className="block">
+              <a
+                href={opens}
+                rel="noopener"
+                aria-label={pdf ? 'Open the PDF' : 'Open the paper'}
+                className="block"
+                data-umami-event={pdf ? 'pdf_opened' : 'source_opened'}
+                data-umami-event-target="picture"
+              >
                 {image}
               </a>
             ) : (
@@ -96,13 +103,25 @@ function ReadThePaper({ identifiers, pdf, picture, canonical, address }: PanelPr
       )}
       {pdf && (
         <p>
-          <a href={pdf.url} rel="noopener" className={ui.hyperref}>
+          <a
+            href={pdf.url}
+            rel="noopener"
+            className={ui.hyperref}
+            data-umami-event="pdf_opened"
+            data-umami-event-target="link"
+          >
             PDF
           </a>{' '}
           {pdf.source && (
             <span className={ui.fine}>
               {pdf.license ? `${pdf.license}, from` : 'from'}{' '}
-              <a href={pdf.source} rel="noopener" className={ui.hyperref}>
+              <a
+                href={pdf.source}
+                rel="noopener"
+                className={ui.hyperref}
+                data-umami-event="source_opened"
+                data-umami-event-target="pdf_source"
+              >
                 {sourceName(pdf.source)}
               </a>
             </span>

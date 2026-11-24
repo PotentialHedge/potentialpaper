@@ -1,5 +1,6 @@
 'use client';
 
+import { track } from '@/lib/track';
 import { pluginPrompt } from '@/lib/agent-prompt';
 import Link from 'next/link';
 import { type FormEvent, useEffect, useMemo, useState, useSyncExternalStore } from 'react';
@@ -115,7 +116,12 @@ export function PluginsSettings() {
 
       <section className="mb-8">
         <h3 className="mb-2 font-serif text-lg font-normal">Build one with your agent</h3>
-        <CopyField value={pluginPrompt(origin || '')} label="Prompt for your AI agent" marker="prompt" />
+        <CopyField
+          value={pluginPrompt(origin || '')}
+          label="Prompt for your AI agent"
+          marker="prompt"
+          onCopied={() => track('agent_prompt_copied', { target: 'plugins' })}
+        />
       </section>
       {note && <p className={`${ui.note(note.ok)} mb-3 whitespace-pre-line`}>{note.text}</p>}
 

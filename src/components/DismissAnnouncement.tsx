@@ -1,5 +1,6 @@
 'use client';
 
+import { track } from '@/lib/track';
 import { useState } from 'react';
 import { DISMISSED_COOKIE, withDismissed } from '@/lib/announcements';
 
@@ -16,7 +17,13 @@ export function DismissAnnouncement({ id, children }: { id: string; children: Re
   const [dismissed, setDismissed] = useState(false);
   if (dismissed) return null;
   return (
-    <div role="note" className="flex items-baseline gap-x-3 border-b border-rule pb-1 text-[14px] text-subtle">
+    <div
+      role="note"
+      className="flex items-baseline gap-x-3 border-b border-rule pb-1 text-[14px] text-subtle"
+      onClick={(e) => {
+        if ((e.target as Element).closest('a')) track('announcement_clicked', { announcement: id });
+      }}
+    >
       {children}
       <button
         type="button"
@@ -27,6 +34,7 @@ export function DismissAnnouncement({ id, children }: { id: string; children: Re
           const value = withDismissed(readCookie(DISMISSED_COOKIE), id);
           document.cookie = `${DISMISSED_COOKIE}=${encodeURIComponent(value)}; path=/; max-age=31536000; samesite=lax`;
           setDismissed(true);
+          track('announcement_dismissed', { announcement: id });
         }}
       >
         ×

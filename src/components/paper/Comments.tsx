@@ -1,5 +1,6 @@
 'use client';
 
+import { track } from '@/lib/track';
 import { useCallback, useEffect, useState } from 'react';
 import type { z } from 'zod';
 import { Checkbox } from '@/components/controls';
@@ -234,7 +235,14 @@ function Thread({ c, tree }: { c: Comment; tree: Tree }) {
       <CommentItem
         c={c}
         historyHref={tree.historyHref}
-        onReply={tree.viewer?.canComment && !c.removed ? () => setReplying(true) : undefined}
+        onReply={
+          tree.viewer?.canComment && !c.removed
+            ? () => {
+                setReplying(true);
+                track('comment_reply_opened');
+              }
+            : undefined
+        }
         onRemoved={() => tree.replaced({ ...c, removed: true, body: null, html: null, mentions: [] })}
       />
       {(replies.length > 0 || replying || remaining > 0 || note) && (
@@ -309,6 +317,7 @@ function CommentForm({
 
   async function togglePreview() {
     if (preview !== null) return setPreview(null);
+    track('comment_previewed');
     setBusy(true);
     setError(null);
     const res = await fetch('/api/v1/comments/preview', {
@@ -331,10 +340,12 @@ function CommentForm({
     }).catch(() => null);
     setBusy(false);
     if (res?.ok) {
+      track('comment_posted', { target: parentId ? 'reply' : 'top', on: anonymous && !viewer.authorName });
       setBody('');
       setPreview(null);
       onPosted(await res.json());
     } else {
+      track('comment_failed', { reason: res ? String(res.status) : 'network' });
       setError(await errorText(res, 'Could not post.'));
     }
   }
@@ -465,8 +476,10 @@ function CommentItem({
     setNote(null);
     const res = await fetch(`/api/v1/comments/${c.id}`, { method: 'DELETE' }).catch(() => null);
     setBusy(false);
-    if (res?.ok) onRemoved();
-    else setNote(await errorText(res, 'Could not remove it.'));
+    if (res?.ok) {
+      track('comment_removed');
+      onRemoved();
+    } else setNote(await errorText(res, 'Could not remove it.'));
   }
 
   return (

@@ -1,5 +1,6 @@
 'use client';
 
+import { track } from '@/lib/track';
 import { useRouter } from 'next/navigation';
 import { useEffect, useRef, useState } from 'react';
 import { ui } from '@/components/ui';
@@ -67,6 +68,7 @@ export function SignInForm({ next }: { next: string }) {
     });
     setBusy(false);
     if (error) {
+      track('signin_link_refused', { reason: error.code ?? String(error.status) });
       if (error.code === 'EMAIL_DOMAIN_NOT_ALLOWED') return setError(DOMAIN_NOT_LISTED);
       setError(
         error.status === 429
@@ -75,6 +77,7 @@ export function SignInForm({ next }: { next: string }) {
       );
       return;
     }
+    track('signin_link_requested');
     setLinkSent(address);
   }
 
@@ -88,6 +91,7 @@ export function SignInForm({ next }: { next: string }) {
     const { error } = await authClient.requestPasswordReset({ email: address, redirectTo: setPasswordPath(address) });
     setBusy(false);
     if (error) return setError(error.message ?? 'Could not send a reset link.');
+    track('password_reset_requested');
     setResetSent(address);
   }
 
@@ -114,6 +118,7 @@ export function SignInForm({ next }: { next: string }) {
         });
         if (error) {
           setBusy(false);
+          track('signin_failed', { reason: error.code ?? String(error.status) });
           if (error.code === 'EMAIL_NOT_VERIFIED') {
             rememberPending({ email: address, next });
             router.push(authHref(VERIFY_EMAIL, next, { email: address, resent: '1' }));
@@ -122,6 +127,7 @@ export function SignInForm({ next }: { next: string }) {
           setError(error.message ?? 'Could not sign in.');
           return;
         }
+        track('signin_succeeded');
         router.push(next);
         router.refresh();
       }}

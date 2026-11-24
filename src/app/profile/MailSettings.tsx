@@ -1,5 +1,6 @@
 'use client';
 
+import { track } from '@/lib/track';
 import { useState, type ReactNode } from 'react';
 import { Switch } from '@/components/controls';
 import { ui } from '@/components/ui';
@@ -37,6 +38,7 @@ function MailToggle({
             setBusy(false);
             if (!res?.ok) return setNote({ ok: false, text: 'Could not save that.' });
             setOn(next);
+            track('mail_setting_changed', { target: field, on: next });
             setNote({ ok: true, text: 'Saved.' });
           }}
         />

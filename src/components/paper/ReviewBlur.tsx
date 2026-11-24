@@ -1,5 +1,6 @@
 'use client';
 
+import { track } from '@/lib/track';
 import { type ReactNode, useEffect, useState } from 'react';
 import { ui } from '@/components/ui';
 import { setSetting, settingsSnapshot, useSetting } from '@/lib/settings/client';
@@ -40,6 +41,7 @@ export function ReviewBlur({ venues, children }: { venues: ReviewVenue[]; childr
   if (shown || venues.every((v) => notAt.includes(v.id))) return children;
   const show = () => {
     setShown(true);
+    track('reviews_unblurred', { target: ticked.length ? 'not_reviewer' : 'once' });
     if (ticked.length === 0) return;
     const current = (settingsSnapshot().values[NOT_REVIEWER] as string[] | undefined) ?? [];
     setSetting(NOT_REVIEWER, [...new Set([...current, ...ticked])]).catch(() => {

@@ -1,5 +1,6 @@
 'use client';
 
+import { track } from '@/lib/track';
 import { useEffect, useRef, useState } from 'react';
 import { authClient } from '@/lib/auth-client';
 import { CodeInput } from './CodeInput';
@@ -56,6 +57,7 @@ export function CodeEntry({
     setNote(null);
     const { error } = await authClient.emailOtp.verifyEmail({ email, otp: code });
     if (error) {
+      track('code_failed', { reason: error.code ?? String(error.status) });
       const dead = spent || error.code === 'TOO_MANY_ATTEMPTS' || error.code === 'OTP_EXPIRED';
       setSpent(dead);
       setBusy(false);
@@ -70,6 +72,7 @@ export function CodeEntry({
       });
       return;
     }
+    track('code_confirmed');
     onConfirmed();
   }
 
@@ -80,6 +83,7 @@ export function CodeEntry({
     const refused = await resend();
     setBusy(false);
     if (refused) return setNote({ ok: false, text: refused });
+    track('code_resent');
     setSpent(false);
     setCode('');
     setNote({ ok: true, text: 'Sent. Only the newest code works.' });

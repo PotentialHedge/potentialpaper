@@ -1,5 +1,6 @@
 'use client';
 
+import { track } from '@/lib/track';
 import { useRouter } from 'next/navigation';
 import { useState } from 'react';
 import { Modal } from '@/components/Modal';
@@ -28,7 +29,15 @@ export function EditProfile({
 
   return (
     <>
-      <button type="button" className={className} aria-haspopup="dialog" onClick={() => setOpen(true)}>
+      <button
+        type="button"
+        className={className}
+        aria-haspopup="dialog"
+        onClick={() => {
+          setOpen(true);
+          track('profile_edit_opened');
+        }}
+      >
         edit profile
       </button>
       <Modal
@@ -57,6 +66,7 @@ export function EditProfile({
             }).catch(() => null);
             setBusy(false);
             if (!res?.ok) return setNote({ ok: false, text: await profileRefusal(res) });
+            track('profile_saved');
             setNote({ ok: true, text: 'Saved.' });
             router.refresh();
           }}

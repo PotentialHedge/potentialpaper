@@ -1,5 +1,6 @@
 'use client';
 
+import { track } from '@/lib/track';
 import { type ReactNode, useState } from 'react';
 import { Modal } from '@/components/Modal';
 import { AgentPromptField } from '@/components/AgentPromptField';
@@ -89,6 +90,7 @@ export function AddMissing({
     const origin = window.location.origin;
     setPrompt(addPrompt(origin, what, paperPath));
     setOpen(true);
+    track('missing_opened', { target: what });
     // A signed-in reader's prompt carries a one-time sign-in code for the agent, as `OnboardAgent`'s does.
     try {
       const res = await fetch('/api/v1/me/agent-code', { method: 'POST' });
@@ -115,13 +117,14 @@ export function AddMissing({
         </span>
       )}
       <Modal open={open} onClose={() => setOpen(false)} title={ask.title}>
-        <AgentPromptField prompt={prompt} />
+        <AgentPromptField prompt={prompt} where="missing" />
         <div className="mt-5 flex flex-wrap items-baseline gap-x-3 border-t border-rule pt-4">
           <button
             type="button"
             className={ui.btn({ inline: true, ghost: true, flush: true })}
             onClick={() => {
               setOpen(false);
+              track('missing_edit_myself', { target: what });
               // The Edit dialog opens on its address: the web editor, or git.
               window.location.hash = '#edit';
             }}

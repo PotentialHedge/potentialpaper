@@ -1,5 +1,6 @@
 'use client';
 
+import { track } from '@/lib/track';
 import { useRouter } from 'next/navigation';
 import { useState, type FormEvent } from 'react';
 import { ui } from '@/components/ui';
@@ -56,6 +57,7 @@ export function NewDepartmentForm({
         body: JSON.stringify({ name: name.trim(), slug: shownSlug, domains: own }),
       });
       if (!res.ok) return setProblem(await messageOf(res));
+      track('department_created');
       router.push(`/o/${parentKey}/${shownSlug}`);
     } catch {
       setProblem('Could not reach the server.');

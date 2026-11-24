@@ -1,5 +1,6 @@
 'use client';
 
+import { track } from '@/lib/track';
 import { useState } from 'react';
 import { OnboardingCard } from '@/components/OnboardingCard';
 import { ui } from '@/components/ui';
@@ -27,7 +28,10 @@ export function Approve({
       headers: { 'content-type': 'application/json' },
       body: JSON.stringify({ id, approve }),
     }).catch(() => null);
-    if (res?.ok) return setState(approve ? 'approved' : 'declined');
+    if (res?.ok) {
+      track(approve ? 'agent_connect_approved' : 'agent_connect_declined');
+      return setState(approve ? 'approved' : 'declined');
+    }
     const body = await res?.json().catch(() => null);
     setError(body?.error?.message ?? 'Something went wrong.');
     setState('ask');

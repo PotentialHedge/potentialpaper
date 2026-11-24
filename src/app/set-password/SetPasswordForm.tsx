@@ -1,5 +1,6 @@
 'use client';
 
+import { track } from '@/lib/track';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { useState } from 'react';
@@ -37,11 +38,13 @@ export function SetPasswordForm({
     const reset = await authClient.resetPassword({ newPassword: password, token });
     if (reset.error) {
       setBusy(false);
+      track('password_set_failed', { reason: reset.error.code ?? String(reset.error.status) });
       if (reset.error.code === 'INVALID_TOKEN') {
         return setDead(true);
       }
       return setNote({ ok: false, text: reset.error.message ?? 'Could not set the password.' });
     }
+    track('password_set');
     const signIn = await authClient.signIn.email({ email, password });
     if (signIn.error) return router.push('/signin');
     router.push('/');

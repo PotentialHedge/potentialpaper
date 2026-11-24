@@ -1,5 +1,6 @@
 'use client';
 
+import { pluginLabel, track } from '@/lib/track';
 import { useEffect, useRef, useState } from 'react';
 import { type Connection, connect, HostError, type HostServices } from '@/lib/plugins/host';
 import { type InstalledPlugin, runningPermissions } from '@/lib/plugins/installed';
@@ -321,6 +322,7 @@ export function PluginFrame({
       identityToken: () => identityToken(latest.current.plugin),
       setHeight: (h) => setHeight(Math.max(0, h)),
       openUrl: (url) => {
+        track('plugin_link_opened', { plugin: pluginLabel(latest.current.plugin) });
         window.open(url, '_blank', 'noopener,noreferrer');
       },
       setPath: (path) => {
@@ -340,6 +342,8 @@ export function PluginFrame({
       const data = event.data as { type?: unknown; protocol?: unknown } | null;
       if (data?.type !== HELLO_MESSAGE || data.protocol !== PROTOCOL_VERSION) return;
       // A hello after boot is the frame's page loading again: it gets a new port.
+      if (!connection)
+        track('plugin_started', { plugin: pluginLabel(latest.current.plugin), target: latest.current.surface.type });
       connection?.close();
       const channel = new MessageChannel();
       connection = connect(channel.port1, services);

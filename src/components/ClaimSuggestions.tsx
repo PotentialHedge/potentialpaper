@@ -1,5 +1,6 @@
 'use client';
 
+import { track } from '@/lib/track';
 import { venueLine } from '@/lib/paper-file';
 import { useEffect, useState } from 'react';
 import type { PaperId } from '@/lib/paper-ids';
@@ -58,6 +59,11 @@ export function ClaimSuggestions({ autoFocus = false }: { autoFocus?: boolean })
     }).catch(() => null);
     const body = await res?.json().catch(() => null);
     const name = row.authors[authorIndex];
+    const confirmed = res?.ok && body?.claim?.status === 'confirmed';
+    track(confirmed ? 'claim_step' : 'claim_refused', {
+      target: 'suggestion',
+      reason: confirmed ? undefined : (body?.error?.code ?? (res ? String(res.status) : 'network')),
+    });
     if (res?.ok && body?.claim?.status === 'confirmed') setClaimed((c) => ({ ...c, [row.path]: { name, ok: true } }));
     else
       setClaimed((c) => ({

@@ -1,5 +1,6 @@
 'use client';
 
+import { track } from '@/lib/track';
 import Link from 'next/link';
 import { useState } from 'react';
 import { parseSettings, setInSettings } from '@/lib/settings';
@@ -25,6 +26,7 @@ export function SettingsImport() {
     try {
       await saveSettings(text);
       clearLocalSettings();
+      track('settings_imported');
     } catch (err) {
       setError(err instanceof Error ? err.message : String(err));
     } finally {

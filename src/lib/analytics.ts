@@ -13,11 +13,18 @@ export const UMAMI_DOMAIN = 'potentialpaper.com';
 /**
  * What analytics may learn about a URL. Umami records the full URL and referrer of every hit, and some of
  * ours carry what is not ours to hand on: a sign-in link's token, a verification address, a `?next=`
- * return URL. So a same-site URL keeps its path and only the home page's list parameters, never a hash;
- * another site's URL keeps only its origin and path. An allowlist: a parameter added later stays out until
- * someone decides it belongs.
+ * return URL. So a same-site URL keeps its path, the home page's list parameters, `/welcome`'s step, and where a
+ * link of ours was posted (`?ref=acceptodds`, `utm_*`), never a hash; another site's URL keeps only its origin and
+ * path. An allowlist: a parameter added later stays out until someone decides it belongs.
  */
-const KEPT_PARAMS: ReadonlySet<string> = new Set(HOME_LIST_PARAMS);
+const KEPT_PARAMS: ReadonlySet<string> = new Set([
+  ...HOME_LIST_PARAMS,
+  'step',
+  'ref',
+  'utm_source',
+  'utm_medium',
+  'utm_campaign',
+]);
 
 /** `url` as analytics may record it; `origin` is this site's. Unparseable input becomes ''. */
 export function analyticsUrl(url: string, origin: string): string {

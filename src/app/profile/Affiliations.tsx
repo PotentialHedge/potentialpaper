@@ -1,5 +1,6 @@
 'use client';
 
+import { track } from '@/lib/track';
 import { useRouter } from 'next/navigation';
 import { useState } from 'react';
 import { CodeInput } from '@/components/CodeInput';
@@ -67,10 +68,13 @@ export function Affiliations({ initial, n }: { initial: AffiliationRow[]; n: num
     setNote(null);
     try {
       const res = await call();
+      const step = key.split(':')[0];
       if (!res.ok) {
+        track('affiliation_refused', { target: step, reason: String(res.status) });
         setNote({ ok: false, text: await errorText(res) });
         return false;
       }
+      track('affiliation_step', { target: step });
       setNote({ ok: true, text: ok });
       await reload();
       return true;

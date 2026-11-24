@@ -1,5 +1,6 @@
 'use client';
 
+import { track } from '@/lib/track';
 import { useRouter } from 'next/navigation';
 import { useState, type FormEvent } from 'react';
 import { ui } from '@/components/ui';
@@ -32,7 +33,12 @@ export function OrganiserClaimForm({
     setProblem(null);
     try {
       const res = await fetch(url, init);
-      if (!res.ok) return setProblem(await messageOf(res));
+      const step = init.method === 'DELETE' ? 'organiser_step_down' : 'organiser';
+      if (!res.ok) {
+        track('claim_refused', { target: step, reason: String(res.status) });
+        return setProblem(await messageOf(res));
+      }
+      track('claim_step', { target: step });
       router.refresh();
     } catch {
       setProblem('Could not reach the server.');
