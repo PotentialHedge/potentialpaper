@@ -14,6 +14,7 @@ import type { Consumer } from './consumers/types';
 import { pageRepo } from './git/repo';
 import { readCommit, readFolder, readText } from './pages/repo';
 import { versionIdOf, VERSIONS_DIR } from './pages/rules';
+import { refreshPaperRating } from './paper-ratings';
 import { markPaperScopes } from './scope-stats';
 
 /**
@@ -223,6 +224,8 @@ export async function projectReviews(database: Database, paperId: string, head: 
     report.removed = gone.length;
     // The paper's scopes' score statistics are due again (`scope-stats.ts`).
     await markPaperScopes(tx, paperId);
+    // And its rating, for the home list's rating sort (`paper-ratings.ts`).
+    await refreshPaperRating(tx, paperId);
     return report;
   });
 }

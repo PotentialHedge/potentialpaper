@@ -104,15 +104,14 @@ export default async function Home({
   const viewer = await viewerFromHeaders(await headers());
   const me = viewer?.account.id ?? null;
 
-  // A search sorts by relevance unless another sort is asked for; relevance needs a search. Browsing, a reader
-  // who can be recommended papers gets them first, as on acceptodds.
+  // A search sorts by relevance unless another sort is asked for; relevance needs a search. Browsing, papers are by
+  // rating; a reader who can be recommended papers also has `recommended`, after it.
   const recommends = me !== null && !q && (await canRecommend(me));
-  const browseDefault: HomeSort = recommends ? 'recommended' : 'activity';
+  const browseDefault: HomeSort = 'rating';
   const defaultSort: HomeSort = q ? 'relevance' : browseDefault;
-  const sorts: HomeSort[] = [
-    ...(recommends ? (['recommended'] as const) : []),
-    ...SEARCH_SORTS.filter((s) => q || s !== 'relevance'),
-  ];
+  const sorts: HomeSort[] = SEARCH_SORTS.filter((s) => q || s !== 'relevance').flatMap((s) =>
+    s === 'rating' && recommends ? ['rating', 'recommended'] : [s],
+  );
   const sort = sorts.find((s) => s === one(sp.sort)) ?? defaultSort;
   // What the database sorts by: the recommended papers come first by their scores, the rest by activity.
   const recommendScores = sort === 'recommended' && me ? await recommendationScores(me) : null;

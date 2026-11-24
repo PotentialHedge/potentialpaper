@@ -1514,6 +1514,29 @@ export const scopeStats = pgTable(
 );
 
 /**
+ * Each paper's rating, for the home list's `rating` sort (`server/paper-ratings.ts`): its latest reviewed submission's
+ * mean, over its reviews, of the venue's headline score (the review form's first summary field), with the field's range
+ * where the form gives one. The sort reads the mean as a share of the range, so venues that score on different scales
+ * compare. Written only there, with a paper's reviews and a venue's forms.
+ */
+export const paperRatings = pgTable(
+  'paper_ratings',
+  {
+    paperId: uuid('paper_id')
+      .primaryKey()
+      .references(() => papers.id, { onDelete: 'cascade' }),
+    venueId: text('venue_id').notNull(),
+    field: text('field').notNull(),
+    mean: doublePrecision('mean').notNull(),
+    reviews: integer('reviews').notNull(),
+    /** The field's range by the venue's form; `null` when the form doesn't give one. */
+    min: doublePrecision('min'),
+    max: doublePrecision('max'),
+  },
+  (t) => [index('paper_ratings_venue_idx').on(t.venueId)],
+);
+
+/**
  * Each scope's last change and its pending recomputation of `scope_stats`. A change to a member paper's reviews or to
  * membership marks the scope and the scopes above it: `changed_at` moves (the bulk route's ETag), and `due_at` is set a
  * few seconds ahead, pushed back by later changes but never past `dirty_since` plus a minute, so an import recomputes a

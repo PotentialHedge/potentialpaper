@@ -37,6 +37,7 @@
     "pages:migrate-paper-files": "tsx scripts/migrate-paper-files.ts",
     "pages:migrate-venue-data": "tsx scripts/migrate-venue-data.ts",
     "pages:add-starter": "tsx scripts/add-page-starter.ts",
+    "ratings:rebuild": "tsx scripts/rebuild-ratings.ts",
     "pages:protect": "tsx scripts/protect-page.ts",
     "identity:keys": "tsx scripts/identity-keys.ts",
     "claims:decide": "tsx scripts/decide-claim.ts",

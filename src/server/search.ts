@@ -13,6 +13,7 @@ import {
 } from '@/lib/query';
 import { CATEGORY_LABEL } from '@/lib/labeled-links';
 import { MARK_END, MARK_START, normalizeSearch, prefixTsquery, type SearchSort } from '@/lib/search';
+import { ratingJoins, ratingSql } from './paper-ratings';
 import { scoresTable } from './recommendations';
 
 export const SEARCH_PAGE_SIZE = 50;
@@ -247,6 +248,8 @@ function ordering(sort: SearchSort, node: SearchNode | null, scopes: Scopes): SQ
       if (wanted) ranks.push(sql`coalesce(fr.rank, 0)`);
       return [sql`${sql.join(ranks, sql` + `)} desc`];
     }
+    case 'rating':
+      return [sql`${ratingSql} desc nulls last`, ...activity];
     case 'activity':
       return activity;
     case 'newest':
@@ -329,6 +332,7 @@ async function readPage(
         left join page_current c on c.page_id = p.id
         ${fileRanks(sort, node, scopes)}
         ${recommending ? sql`left join ${scoresTable(recommending)} rec on rec.paper_id = p.id` : sql``}
+        ${sort === 'rating' ? ratingJoins : sql``}
         where ${where}
         order by ${order}
         limit ${limit} offset ${(page - 1) * limit}

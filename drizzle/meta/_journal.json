@@ -414,6 +414,13 @@
       "when": 1795452747273,
       "tag": "0058_page_facts",
       "breakpoints": true
+    },
+    {
+      "idx": 59,
+      "version": "7",
+      "when": 1795542619850,
+      "tag": "0059_paper_ratings",
+      "breakpoints": true
     }
   ]
 }

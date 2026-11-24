@@ -8,7 +8,11 @@
  */
 
 /** `relevance` only means something with words to rank by; without them it reads as `activity`. */
-export const SEARCH_SORTS = ['relevance', 'activity', 'newest', 'oldest', 'title'] as const;
+/**
+ * `rating`: by each paper's latest reviewed submission's headline score, as a share of the venue's scale
+ * (`server/paper-ratings.ts`), so papers from venues that score differently compare.
+ */
+export const SEARCH_SORTS = ['relevance', 'rating', 'activity', 'newest', 'oldest', 'title'] as const;
 export type SearchSort = (typeof SEARCH_SORTS)[number];
 
 /** Longest accepted query, in characters. The API refuses longer; the UI truncates. */

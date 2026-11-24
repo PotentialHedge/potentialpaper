@@ -4,6 +4,7 @@ import { type VenueFile, venueFileSchema } from '@/lib/kinds';
 import { parseVenueFormsFile, VENUE_FORMS_FILE, type VenueFormsFile } from '@/lib/review-files';
 import { sourceUrl } from '@/lib/venues';
 import { venuePagesOf, withVenueNames, type PaperVersion } from '@/lib/versions';
+import { refreshVenueRatings } from '../paper-ratings';
 import type { Writer } from './projections';
 import { readText, type Reader } from './repo';
 
@@ -47,13 +48,20 @@ export async function writeVenueRows(
   const sources = venue.sources ?? [];
   if (sources.length === 0) return;
   const forms = await readVenueForms(tx, pageId, files);
+  const reformed: string[] = [];
   for (const id of sources) {
     const row = { name: venue.name, url: sourceUrl(id), forms: forms[id]?.forms ?? {} };
+    const { rows } = await tx.execute<{ same: boolean }>(
+      sql`select forms = ${JSON.stringify(row.forms)}::jsonb as same from venues where id = ${id}`,
+    );
+    if (rows.length > 0 && !rows[0].same) reformed.push(id);
     await tx
       .insert(venues)
       .values({ id, ...row })
       .onConflictDoUpdate({ target: venues.id, set: row });
   }
+  // Ratings are shares of a form's range: new forms rate the venue's papers afresh (`paper-ratings.ts`).
+  await refreshVenueRatings(tx, reformed);
 }
 
 /** The venue pages these keys name, with their names and `locations`; a key with no page is left out. */
