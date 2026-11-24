@@ -193,11 +193,11 @@ export default async function Home({
             <HomeNextStep example={tutorialExample(all.hits)} host={new URL(siteUrl()).host} />
             <h2 className={`${ui.boxHeading} text-center`}>Abstract</h2>
             <p className="text-justify hyphens-auto">
-              Similar to wikipedia every paper get a public page on PotentialPaper with a community and an author
-              section. Add demos, explainers or how a paper relates to your work. Every page is a git repository you can
-              edit on your machine, in the browser or with your agent. Missing a feature? Extend the site by asking your
-              agent to add a plugin. To add a paper not yet on the site, paste in an arxiv or DOI link and the page will
-              be created. All code is available at{' '}
+              Potential<span className="text-accent">Paper</span> is a wiki for papers: each one gets a public page,
+              with a community section and an author section. Add demos, explainers or how a paper relates to your work.
+              Every page is a git repository you can edit on your machine, in the browser or with your agent. Missing a
+              feature? Extend the site by asking your agent to add a plugin. To add a paper not yet on the site, paste
+              in an arxiv or DOI link and the page will be created. All code is available at{' '}
               <a href={REPO_URL} className={ui.hyperref} rel="noopener noreferrer">
                 {REPO_URL.replace(/^https:\/\//, '')}
               </a>
