@@ -7,13 +7,13 @@
 # .env.staging sets COMPOSE_PROJECT_NAME=potentialpaper-staging (the routers' names), APP_HOST and APP_URL, its own
 # BETTER_AUTH_SECRET and Postgres password, and CONTENT_HOST_PATTERN to a host that never matches: production
 # answers the user content domain, and two routers with one rule would split its traffic. STAGING_BASIC_AUTH is the
-# htpasswd line, with every `$` doubled.
+# htpasswd line in single quotes, `$`s as they are: a value from the env file isn't interpolated again.
 
 services:
   app:
     # Images of their own: production's tools image has no tag, and a staging build must never replace it.
     image: potentialpaper-staging-app:${GIT_COMMIT:-latest}
-    env_file: .env.staging
+    env_file: !override [.env.staging]
     labels:
       - traefik.http.routers.${COMPOSE_PROJECT_NAME}.middlewares=${COMPOSE_PROJECT_NAME}-auth,${COMPOSE_PROJECT_NAME}-headers,${COMPOSE_PROJECT_NAME}-ratelimit,${COMPOSE_PROJECT_NAME}-compress
       - traefik.http.routers.${COMPOSE_PROJECT_NAME}-git.middlewares=${COMPOSE_PROJECT_NAME}-auth,${COMPOSE_PROJECT_NAME}-git-ratelimit
@@ -24,16 +24,16 @@ services:
 
   tools:
     image: potentialpaper-staging-tools
-    env_file: .env.staging
+    env_file: !override [.env.staging]
 
   ingest:
     image: potentialpaper-staging-tools
-    env_file: .env.staging
+    env_file: !override [.env.staging]
 
   worker:
     image: potentialpaper-staging-tools
-    env_file: .env.staging
+    env_file: !override [.env.staging]
 
   ssh:
     image: potentialpaper-staging-tools
-    env_file: .env.staging
+    env_file: !override [.env.staging]
