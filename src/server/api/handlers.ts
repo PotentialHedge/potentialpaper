@@ -25,7 +25,7 @@ import { hasLiveToken, listTokens, mintToken, revokeToken } from '../tokens';
 import { addSshKey, listSshKeys, removeSshKey } from '../ssh-keys';
 import { previewDemoSources } from '../demos/attach';
 import { snapshotDemo } from '../demos/snapshot';
-import { demoUrl } from '@/lib/demos';
+import { CONTENT_HOSTNAME, demoUrl, isContentHost } from '@/lib/demos';
 import { addressOfRef, formatIdentifier, keyedPagePath, pagePath, pageRefOf } from '@/lib/kinds';
 import {
   addCoAuthor,
@@ -437,10 +437,22 @@ export const postVersions = route(async (req) => {
 });
 
 /**
+ * The upload routes skip `proxy.ts` (which would cut their bodies off at 10 MB), and with it the proxy's refusal of
+ * every app path on the content domain, so they refuse it themselves.
+ */
+function refuseContentDomain(req: Request): void {
+  const host = (req.headers.get('host') ?? '').replace(/:\d+$/, '').toLowerCase();
+  if (isContentHost(host) || (host === CONTENT_HOSTNAME && host !== new URL(siteUrl()).hostname)) {
+    throw new ApiError(404, 'not_found', 'not found');
+  }
+}
+
+/**
  * Stores a file that backs up an edit, or a version's PDF: multipart with the file as `file`, or JSON
  * `{ url }` to copy a PDF from an archive or proceedings site. Answers with the address to name it by.
  */
 export const postFile = route(async (req) => {
+  refuseContentDomain(req);
   const principal = await requireVerified(req);
   let stored;
   if ((req.headers.get('content-type') ?? '').includes('application/json')) {
@@ -839,6 +851,7 @@ export const postAgentPost = route(async (req) => {
 
 /** A file to attach to agent posts: an image, or a text file of data. Multipart, its part named `file`. */
 export const postAgentFile = route(async (req) => {
+  refuseContentDomain(req);
   const principal = await requireVerified(req);
   let form: FormData;
   try {
@@ -980,6 +993,7 @@ export const postWorkspaceCommit = route(async (req) => {
 
 /** A PDF or picture for a Git LFS path (multipart `file`, with `scheme`, `value` and `path`). */
 export const postWorkspaceFile = route(async (req) => {
+  refuseContentDomain(req);
   const principal = await requireVerified(req);
   let form: FormData;
   try {

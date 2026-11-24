@@ -81,9 +81,10 @@ export async function proxy(req: NextRequest) {
 }
 
 // Every path, since any path on a demo's host can be one of its files, and the app's own paths return at once; but not a
-// push (`POST /git/…/git-receive-pack`) or Git LFS (`/git/…/info/lfs/…`, whose uploads are PDFs). Next buffers a
-// request body for the proxy, and past `proxyClientMaxBodySize` (10 MB) cuts it off, which would break a large pack
-// or PDF. `server/git/http.ts` refuses both on the content domain itself.
+// push (`POST /git/…/git-receive-pack`), Git LFS (`/git/…/info/lfs/…`, whose uploads are PDFs) or the API's uploads
+// (`/api/v1/files`, `agent-files`, `workspace/files`). Next buffers a request body for the proxy, and past
+// `proxyClientMaxBodySize` (10 MB) cuts it off, which would break a large pack or PDF. `server/git/http.ts` and the
+// upload handlers (`server/api/handlers.ts`) refuse the content domain themselves.
 export const config = {
-  matcher: ['/((?!git/.+/git-receive-pack$|git/.+/info/lfs/).*)'],
+  matcher: ['/((?!git/.+/git-receive-pack$|git/.+/info/lfs/|api/v1/(?:files|agent-files|workspace/files)$).*)'],
 };
