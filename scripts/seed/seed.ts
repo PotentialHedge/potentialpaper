@@ -102,7 +102,7 @@ async function person(p: (typeof PEOPLE)[number]): Promise<Account> {
 
 async function papers(fixture: Fixture) {
   for (const venue of fixture.venues) {
-    const added = await importSubmissions(
+    const { added } = await importSubmissions(
       venue.papers.map((p) => ({
         id: p.id,
         title: p.title,

@@ -253,8 +253,8 @@ describe('importing submissions', () => {
   ];
 
   it('skips test notes, stays anonymous, and can run twice', async () => {
-    expect(await importSubmissions(submissions)).toBe(1);
-    expect(await importSubmissions(submissions)).toBe(0);
+    expect(await importSubmissions(submissions)).toEqual({ added: 1, named: 0 });
+    expect(await importSubmissions(submissions)).toEqual({ added: 0, named: 0 });
     const found = await lookupPaper({ scheme: 'openreview', value: 'submission1' });
     expect(found.status === 'found' && found.paper.authors).toEqual([]);
     expect(found.status === 'found' && found.paper).toMatchObject({
@@ -267,7 +267,7 @@ describe('importing submissions', () => {
 
   it('keeps the authors of a paper whose review has ended', async () => {
     const decided = { ...submissions[0], authors: ['Ada Lovelace'] };
-    expect(await importSubmissions([decided])).toBe(1);
+    expect(await importSubmissions([decided])).toEqual({ added: 1, named: 0 });
     const found = await lookupPaper({ scheme: 'openreview', value: decided.id });
     expect(found.status === 'found' && found.paper.authors).toEqual(['Ada Lovelace']);
   });

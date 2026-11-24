@@ -95,6 +95,41 @@ async function revisions(paper: string) {
     .orderBy(pageRevisions.seq);
 }
 
+describe('naming the authors when a review ends', () => {
+  beforeEach(async () => {
+    await ensureBot(OPENREVIEW_BOT);
+    await grantBot(OPENREVIEW_BOT, 'reviews/openreview/**', { grantedBy: 'system' });
+    await importSubmissions([{ id: 'forum1', title: 'Sparse routing', abstract: 'x'.repeat(60) }]);
+  });
+
+  const named = { id: 'forum1', title: 'Sparse routing', abstract: 'x'.repeat(60), authors: ['Ada Lovelace'] };
+
+  it('names nobody while the paper is under review', async () => {
+    await importReviews(VENUE, [submission('forum1', [])], OPTIONS);
+    await project();
+    expect(await importSubmissions([named])).toEqual({ added: 0, named: 0 });
+    expect((await findPaper({ scheme: 'openreview', value: 'forum1' }))!.paper.authors).toEqual([]);
+  });
+
+  it('writes them into paper.json once it was withdrawn, and only once', async () => {
+    await importReviews(VENUE, [{ ...submission('forum1', []), status: 'withdrawn' }], OPTIONS);
+    await project();
+    expect(await importSubmissions([named])).toEqual({ added: 0, named: 1 });
+    const paper = await paperId('forum1');
+    expect(JSON.parse((await readText(getDb(), paper, (await files(paper)).get('paper.json')))!)).toMatchObject({
+      title: 'Sparse routing',
+      authors: ['Ada Lovelace'],
+    });
+    expect((await findPaper({ scheme: 'openreview', value: 'forum1' }))!.paper.authors).toEqual(['Ada Lovelace']);
+    expect(await importSubmissions([{ ...named, authors: ['Someone Else'] }])).toEqual({ added: 0, named: 0 });
+  });
+
+  it('names a paper with no repo yet in its row', async () => {
+    expect(await importSubmissions([named])).toEqual({ added: 0, named: 1 });
+    expect((await findPaper({ scheme: 'openreview', value: 'forum1' }))!.paper.authors).toEqual(['Ada Lovelace']);
+  });
+});
+
 describe('importing reviews', () => {
   beforeEach(async () => {
     await ensureBot(OPENREVIEW_BOT);

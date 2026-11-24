@@ -46,7 +46,8 @@ const ImportPaper = z.object({
 export const ImportPapersList = z.object({ papers: z.array(ImportPaper), next: z.string().nullable() });
 
 /**
- * New papers, by their OpenReview id. One already here is left as it is. Where each went is its versions'
+ * New papers, by their OpenReview id. One already here is left as it is, except that one imported while anonymous is
+ * given the authors sent once none of its submissions is under review any more (withdrawn, desk-rejected or decided). Where each went is its versions'
  * (`/imports/submissions`, `/imports/versions`), not the paper's.
  */
 export const ImportPapersBody = z.object({
@@ -62,7 +63,8 @@ export const ImportPapersBody = z.object({
     )
     .max(MAX_PAPERS),
 });
-export const ImportedPapers = z.object({ added: z.number().int() });
+/** `named`: papers already here, imported while anonymous, whose authors it gave now that their review has ended. */
+export const ImportedPapers = z.object({ added: z.number().int(), named: z.number().int() });
 
 const Note = z.object({
   externalId: z.string().min(1).max(200),
@@ -169,8 +171,8 @@ export const postImportPapers = route(async (req) => {
     throw new ApiError(403, 'forbidden', 'only a bot granted reviews/openreview/** adds papers by OpenReview id');
   }
   const { papers } = await parseBody(req, ImportPapersBody);
-  const added = await importSubmissions(papers.map(({ openreview, ...p }) => ({ id: openreview, ...p })));
-  return respond(ImportedPapers, { added }, { principal });
+  const result = await importSubmissions(papers.map(({ openreview, ...p }) => ({ id: openreview, ...p })));
+  return respond(ImportedPapers, result, { principal });
 });
 
 export const postImportSubmissions = route(async (req) => {
