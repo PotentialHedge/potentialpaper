@@ -14,6 +14,7 @@ import {
   installPlugin,
   type PluginUpdate,
   removeDevPlugin,
+  setPluginEnabled,
   uninstallPlugin,
   usePlugins,
 } from '@/lib/plugins/client';
@@ -89,6 +90,19 @@ export function PluginsSettings() {
     }
   }
 
+  /** Turn one of the site's plugins off or back on, for the reader. */
+  async function toggle(p: InstalledPlugin) {
+    setNote(null);
+    setRemoving(p.source);
+    try {
+      await setPluginEnabled(p, !p.enabled);
+    } catch (err) {
+      setNote({ ok: false, text: (err as Error).message });
+    } finally {
+      setRemoving(null);
+    }
+  }
+
   const onInstalled: OnInstalled = (p) => {
     if (p.status === 'consent' && p.plugin?.commit) setApproving(p);
     else setNote({ ok: true, text: `Installed ${nameOf(p)}.` });
@@ -125,7 +139,7 @@ export function PluginsSettings() {
                         {manifest!.name}
                       </Link>
                     ) : (
-                      <span className="font-semibold">{p.source}</span>
+                      <span className="font-semibold">{nameOf(p)}</span>
                     )}
                     {manifest && <span className="text-muted">{manifest.version}</span>}
                     {update && <span className="text-xs text-accent">{update.latest.version} is out</span>}
@@ -140,6 +154,17 @@ export function PluginsSettings() {
                         aria-label={`Remove ${manifest?.name ?? p.source}`}
                       >
                         {removing === p.source ? 'Removing…' : 'remove'}
+                      </button>
+                    )}
+                    {/* The site's own, when it didn't load: no page to turn it off on, so here. */}
+                    {signedIn && p.from === 'site' && !p.plugin && (
+                      <button
+                        type="button"
+                        className={`${ui.linkBtn} text-sm`}
+                        disabled={removing === p.source}
+                        onClick={() => toggle(p)}
+                      >
+                        {p.enabled ? 'turn off' : 'turn on'}
                       </button>
                     )}
                   </div>

@@ -116,7 +116,12 @@ export async function installedPlugins(
       snapshot = await snapshotOf(entry, fetch && entry.enabled, database);
     } catch (err) {
       const error = err instanceof ApiError ? err.message : 'unavailable';
-      out.push({ ...base, status: entry.enabled ? 'error' : 'disabled', error, plugin: null, missing: none });
+      // Turned off, it isn't fetched, so that it hasn't been copied is no error.
+      out.push(
+        entry.enabled
+          ? { ...base, status: 'error', error, plugin: null, missing: none }
+          : { ...base, status: 'disabled', plugin: null, missing: none },
+      );
       continue;
     }
     const plugin = {
