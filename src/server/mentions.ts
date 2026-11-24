@@ -6,6 +6,7 @@ import { aliasName } from '@/lib/aliases';
 import { renderMentionMail } from '@/lib/mention-mail';
 import { getComment } from './comments';
 import { sendMail } from './mail';
+import { unsubscribeHeaders } from './unsubscribe';
 import { consume, type RateLimitConfig } from './ratelimit';
 import { siteUrl } from './site';
 
@@ -62,7 +63,7 @@ export async function mailMentions(commentId: string, database: Database = getDb
       url: `${base}${shown.paper.path}`,
       settingsUrl: `${base}/profile#email`,
     });
-    await sendMail({ to: r.email, ...mail });
+    await sendMail({ to: r.email, ...mail, headers: unsubscribeHeaders(r.accountId, 'mention') });
     sent += 1;
   }
   return sent;

@@ -7,6 +7,7 @@ import { renderCoAuthorMail, renderCommentMail, renderEditMail } from '@/lib/fol
 import { shownHandle } from '@/lib/profile';
 import { getComment } from './comments';
 import { sendMail } from './mail';
+import { unsubscribeHeaders } from './unsubscribe';
 import { summaries, type PaperSummary } from './my-papers';
 import { consume, type RateLimitConfig } from './ratelimit';
 import { siteUrl } from './site';
@@ -139,7 +140,7 @@ export async function mailEditFollowers(
   let sent = 0;
   for (const r of to) {
     if (!(await consume(`follow-edit-mail:${r.accountId}:${paperId}`, EDIT_MAIL_BUDGET)).allowed) continue;
-    await sendMail({ to: r.email, ...mail });
+    await sendMail({ to: r.email, ...mail, headers: unsubscribeHeaders(r.accountId, 'follow') });
     sent += 1;
   }
   return sent;
@@ -179,7 +180,7 @@ export async function mailCommentFollowers(commentId: string, database: Database
   let sent = 0;
   for (const r of to) {
     if (!(await consume(`follow-comment-mail:${r.accountId}:${c.paperId}`, COMMENT_MAIL_BUDGET)).allowed) continue;
-    await sendMail({ to: r.email, ...mail });
+    await sendMail({ to: r.email, ...mail, headers: unsubscribeHeaders(r.accountId, 'follow') });
     sent += 1;
   }
   return sent;

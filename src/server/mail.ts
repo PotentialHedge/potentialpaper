@@ -18,6 +18,8 @@ export interface Mail {
   text: string;
   /** Made with the text by `lib/mail-html.ts` `renderMail`, never without it. */
   html: string;
+  /** Extra headers, such as `List-Unsubscribe` (`server/unsubscribe.ts`). */
+  headers?: Record<string, string>;
 }
 
 // For tests, which read it in the process that sent it; `/dev/mail` reads `DEV_MAIL_FILE`.
@@ -64,6 +66,7 @@ export async function sendMail(mail: Mail): Promise<void> {
     subject: mail.subject,
     text: mail.text,
     html: mail.html,
+    ...(mail.headers ? { headers: mail.headers } : {}),
   });
   if (error) throw new Error(`resend: ${error.message}`);
 }

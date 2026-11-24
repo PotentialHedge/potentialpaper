@@ -247,6 +247,11 @@ DNS in the `potentialpaper.com` zone, all DNS-only:
 - **Inbound:** Cloudflare Email Routing (its MX, apex SPF and DKIM records), a catch-all forwarding to the owner's
   Gmail, as for acceptodds.com. So replies to noreply@, postmaster@, abuse@ and the DMARC reports reach a person.
 
+Notification mail (mentions, followed papers) carries `List-Unsubscribe` and `List-Unsubscribe-Post` (RFC 8058,
+`src/server/unsubscribe.ts`), so Gmail and Yahoo show their own Unsubscribe button rather than leaving "Report spam"
+as the way out. The token is signed with `BETTER_AUTH_SECRET`, so rotating it voids the links in mail already sent.
+Sign-in and verification mail has none, as it isn't something to unsubscribe from.
+
 Another sender (a newsletter tool, say) needs its own DKIM, and an include in `send`'s or the apex SPF, before
 it sends, or DMARC quarantines it.
 
