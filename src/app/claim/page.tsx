@@ -7,7 +7,7 @@ import { authHref } from '@/lib/return-to';
 import { viewerFromHeaders } from '@/server/auth';
 
 export const dynamic = 'force-dynamic';
-export const metadata: Metadata = { title: 'Claim your papers · PotentialPaper', robots: { index: false } };
+export const metadata: Metadata = { title: 'Claim your papers · potentialpaper', robots: { index: false } };
 
 /** Finding the papers one wrote, to claim them (`server/claim-requests.ts`'s `claimSuggestions`). */
 export default async function ClaimIndex() {

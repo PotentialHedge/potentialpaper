@@ -103,7 +103,7 @@ async function authenticateToken(req: Request, header: string): Promise<Principa
   return { account: verified.account, isAdmin: false, credentialId: verified.id, via: 'token', rateLimit };
 }
 
-export const GIT_REALM = 'PotentialPaper';
+export const GIT_REALM = 'potentialpaper';
 
 /**
  * Who is pushing to a page over HTTPS (`server/git/http.ts`). Git sends HTTP Basic: any user name (it is

@@ -14,7 +14,7 @@ type Props = { params: ToolParams; searchParams: ToolSearchParams };
 
 export async function generateMetadata({ params }: Props): Promise<Metadata> {
   const { name } = await toolPaper('versions', params);
-  return { title: `Versions of ${name} · PotentialPaper`, robots: { index: false, follow: true } };
+  return { title: `Versions of ${name} · potentialpaper`, robots: { index: false, follow: true } };
 }
 
 /** Words as they changed: removed struck through in red, added in green, the rest as it was. */

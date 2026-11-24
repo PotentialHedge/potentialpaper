@@ -84,7 +84,7 @@ export async function GET(_req: Request, { params }: { params: Promise<{ what: s
   return markdown(
     `# ${task.title}
 
-The person who sent you here gave you a paper's address on PotentialPaper (a path like \`/s/42\` or \`/abs/1706.03762\`: it is on ${origin}), and maybe a sign-in code.
+The person who sent you here gave you a paper's address on potentialpaper (a path like \`/s/42\` or \`/abs/1706.03762\`: it is on ${origin}), and maybe a sign-in code.
 
 ${steps}
 `,

@@ -1,4 +1,4 @@
-# PotentialPaper — implementation plan
+# potentialpaper — implementation plan
 
 A rough order of work for [DESIGN.md](DESIGN.md). Sizes are relative (S, M, L), not estimates. Each
 milestone ends with something you can use and goes through `/api/v1` from the start.

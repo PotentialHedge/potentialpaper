@@ -1,7 +1,7 @@
 import type { Metadata } from 'next';
 import { PluginsSettings } from './PluginsSettings';
 
-export const metadata: Metadata = { title: 'Plugins · Settings · PotentialPaper', robots: { index: false } };
+export const metadata: Metadata = { title: 'Plugins · Settings · potentialpaper', robots: { index: false } };
 
 /**
  * `/settings/plugins` (`handoffs/plugins.md` Phase 3): the reader's plugins (each linking to its own page of settings

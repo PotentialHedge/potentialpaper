@@ -14,7 +14,7 @@ type Props = { params: ToolParams; searchParams: ToolSearchParams };
 
 export async function generateMetadata({ params }: Props): Promise<Metadata> {
   const { name } = await toolPage('history', params);
-  return { title: `History of ${name} · PotentialPaper`, robots: { index: false, follow: true } };
+  return { title: `History of ${name} · potentialpaper`, robots: { index: false, follow: true } };
 }
 
 function when(at: Date): string {
@@ -67,7 +67,7 @@ export default async function HistoryPage({ params, searchParams }: Props) {
                     ) : row.handle ? (
                       `@${row.handle}`
                     ) : (
-                      <i className="text-muted">PotentialPaper</i>
+                      <i className="text-muted">potentialpaper</i>
                     )}
                   </td>
                   <td className={ui.td}>

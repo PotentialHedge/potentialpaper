@@ -1,5 +1,5 @@
 /**
- * Types for the PotentialPaper plugin SDK, API version 1 (https://ppusercontent.com/sdk/v1/pp.js). Copy this file
+ * Types for the potentialpaper plugin SDK, API version 1 (https://ppusercontent.com/sdk/v1/pp.js). Copy this file
  * next to your code, or reference it: `/// <reference path="pp.d.ts" />`. The SDK installs `window.pp`.
  */
 

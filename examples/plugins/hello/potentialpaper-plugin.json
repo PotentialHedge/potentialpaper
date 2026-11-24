@@ -4,7 +4,7 @@
   "version": "1.0.0",
   "apiVersion": 1,
   "description": "The smallest useful plugin: reads its context and a setting, counts your visits in its storage, and reads the page.",
-  "author": "PotentialPaper",
+  "author": "potentialpaper",
   "main": "index.html",
   "permissions": ["page.read"],
   "contributes": {

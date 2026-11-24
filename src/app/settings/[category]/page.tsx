@@ -11,7 +11,7 @@ export function generateStaticParams() {
 
 export async function generateMetadata({ params }: Params): Promise<Metadata> {
   const category = findCategory((await params).category);
-  return { title: `${category?.title ?? 'Settings'} · Settings · PotentialPaper`, robots: { index: false } };
+  return { title: `${category?.title ?? 'Settings'} · Settings · potentialpaper`, robots: { index: false } };
 }
 
 /** `/settings/<category>`: one category of the core settings (`lib/settings/form.ts`). */

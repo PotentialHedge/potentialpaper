@@ -74,7 +74,7 @@ Code.
   (sections formatted with Prettier, the same version as the hook, also Format Document; JSON laid out as the site
   writes it; trailing whitespace and the end of each file) rewrite the changed files, and no commit while one fails
   a checking hook (bad JSON, a JSON Schema, an added file over 256 KB, a name that differs from another only in
-  case or that Windows can't have). **PotentialPaper: Run the Page's Checks (prek)** (also in Source Control's
+  case or that Windows can't have). **potentialpaper: Run the Page's Checks (prek)** (also in Source Control's
   menu) runs them without committing.
 - **Trusted domain:** the site's own address is a trusted domain (`additionalTrustedDomains` in `workbench.ts`), so
   its links open without VS Code asking first.
@@ -102,7 +102,7 @@ Code.
   the Cloudflare dashboard's account and zone, not in this repo.
 - **JSON files** get their schemas' errors, completion and hovers, and on an empty file a skeleton of the required
   fields (`defaultSnippets`, added by `scripts/write-page-schemas.ts` to the extension's copy only).
-  **PotentialPaper: New Link** writes `links/NN-<slug>.json`.
+  **potentialpaper: New Link** writes `links/NN-<slug>.json`.
 - **CSP:** the editor's frame and files have their own policy (`src/editors/vscode/csp.ts`), since VS Code runs
   workers from `blob:` and frames its extension host from this origin. The site's policy leaves `/editor/` out.
 - **Webviews** (the preview, the PDF viewer, VS Code's image preview) need an origin per webview: `{{uuid}}.<domain>`
@@ -124,6 +124,6 @@ There it has the preview, the PDF viewer, the JSON schemas, the section formatte
 git's own, and `prek` runs the checks before a commit. The site's address comes from the clone's git remote
 (`https://<host>/git/…`, or the SSH one's host without `git.`), or the `potentialpaper.origin` setting. The site
 renders previews only for someone signed in, so the first preview asks for an API key from the profile
-(**PotentialPaper: Sign In for Previews**), kept in VS Code's secret storage per site. JSON schemas apply by file
+(**potentialpaper: Sign In for Previews**), kept in VS Code's secret storage per site. JSON schemas apply by file
 name (`links/*.json`, `thumbnail.json`…), as VS Code's `jsonValidation` can't ask which repo a file is in, so a
 file with those names in another project is checked too.

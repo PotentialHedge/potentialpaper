@@ -53,5 +53,5 @@ export function setupPrompt(origin: string, pagePath: string, code?: string): st
 
 /** The prompt to build a plugin with an agent (Settings → Plugins, and the top of `/plugins.md`). */
 export function pluginPrompt(origin: string): string {
-  return followPrompt(origin, PLUGINS_GUIDE_PATH, { target: 'a new PotentialPaper plugin' });
+  return followPrompt(origin, PLUGINS_GUIDE_PATH, { target: 'a new potentialpaper plugin' });
 }

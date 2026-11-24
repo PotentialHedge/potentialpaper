@@ -1,4 +1,4 @@
-# PotentialPaper
+# potentialpaper
 
 ## Local development
 

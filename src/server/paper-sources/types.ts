@@ -61,7 +61,7 @@ export async function fetchSource(url: string): Promise<Response | null> {
   let res: Response;
   try {
     res = await fetch(url, {
-      headers: { 'User-Agent': 'PotentialPaper (https://potentialpaper.com)' },
+      headers: { 'User-Agent': 'potentialpaper (https://potentialpaper.com)' },
       signal: AbortSignal.timeout(TIMEOUT_MS),
     });
   } catch (err) {

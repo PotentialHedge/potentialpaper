@@ -1,7 +1,7 @@
 import type { Metadata } from 'next';
 import { PluginPageView } from '@/components/plugins/PluginPageView';
 
-export const metadata: Metadata = { title: 'Plugin · PotentialPaper', robots: { index: false } };
+export const metadata: Metadata = { title: 'Plugin · potentialpaper', robots: { index: false } };
 
 /**
  * `/x/<owner>/<name>/<page>/…`: a whole page of a plugin's own (its manifest's `contributes.pages`), drawn in one

@@ -1,4 +1,4 @@
-# Handoff: PotentialPaper (repo `potentialpaper`)
+# Handoff: potentialpaper (repo `potentialpaper`)
 
 ## What this is
 
@@ -217,7 +217,7 @@ All in `docs/web-editor.md` ("VS Code for the Web", "VS Code on the desktop"); t
   without the version path changing); VS Code's own files keep a day. Anyone who loaded the editor before dd7eb99
   may need DevTools → Application → Clear site data once.
 - **JSON:** the extension's copies of the schemas get `defaultSnippets` (skeleton of required fields);
-  **PotentialPaper: New Link** writes `links/NN-<slug>.json`.
+  **potentialpaper: New Link** writes `links/NN-<slug>.json`.
 - **Desktop:** `npm run editor:extension` also builds `public/editor/potentialpaper.vsix` (served at
   `/editor/potentialpaper.vsix`, linked in the Edit dialog), without the proposed API, engine `^1.90.0`. One bundle
   runs in both hosts. On a clone (folder with `prek.toml`) it gives the preview (site from the git remote,

@@ -11,7 +11,7 @@ export function GET() {
   const api = `${siteUrl()}/api/v1`;
   const body = `# The import API
 
-For import tools: programs that bring a venue's papers, submissions, reviews, versions and PDFs onto PotentialPaper from their source. Each tool runs as a **bot**, an account an admin makes and grants the paths it writes:
+For import tools: programs that bring a venue's papers, submissions, reviews, versions and PDFs onto potentialpaper from their source. Each tool runs as a **bot**, an account an admin makes and grants the paths it writes:
 
     npm run bots:grant -- openreview 'reviews/openreview/**' --by <admin> --create
     npm run bots:token -- openreview

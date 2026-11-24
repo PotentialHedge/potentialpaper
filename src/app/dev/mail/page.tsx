@@ -5,7 +5,7 @@ import { readFile } from 'node:fs/promises';
 import { DEV_MAIL_FILE, type Mail } from '@/server/mail';
 
 export const dynamic = 'force-dynamic';
-export const metadata: Metadata = { title: 'Dev mail · PotentialPaper', robots: { index: false, follow: false } };
+export const metadata: Metadata = { title: 'Dev mail · potentialpaper', robots: { index: false, follow: false } };
 
 /**
  * The mail the site would have sent, newest first: in dev without `RESEND_API_KEY` nothing is sent (`server/mail.ts`).

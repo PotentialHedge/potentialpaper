@@ -5,7 +5,7 @@ import { recentChanges } from '@/server/changes';
 
 export const dynamic = 'force-dynamic';
 
-export const metadata: Metadata = { title: 'Recent changes · PotentialPaper', robots: { index: false, follow: true } };
+export const metadata: Metadata = { title: 'Recent changes · potentialpaper', robots: { index: false, follow: true } };
 
 const PAGE_SIZE = 50;
 
@@ -94,7 +94,7 @@ export default async function ChangesPage({ searchParams }: Props) {
                     ) : change.handle ? (
                       `@${change.handle}`
                     ) : (
-                      <i className="text-muted">PotentialPaper</i>
+                      <i className="text-muted">potentialpaper</i>
                     )}
                   </td>
                   <td className={ui.td}>

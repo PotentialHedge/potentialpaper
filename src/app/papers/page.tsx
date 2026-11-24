@@ -11,7 +11,7 @@ import { AuthoredPapers } from './AuthoredPapers';
 import { FollowingPapers } from './FollowingPapers';
 
 export const dynamic = 'force-dynamic';
-export const metadata: Metadata = { title: 'My papers · PotentialPaper', robots: { index: false, follow: false } };
+export const metadata: Metadata = { title: 'My papers · potentialpaper', robots: { index: false, follow: false } };
 
 /**
  * The viewer's papers, one section per way a paper is theirs: the ones they are an author of, or have claimed, and

@@ -150,7 +150,7 @@ Prior art to read before starting: Presio's plugin system (`gh api repos/Potenti
 - Update check: a newer tag shows "Update". If the update needs new permissions, it asks before switching.
 - **A guide for agents**, `/plugins.md`, linked from `llms.txt`. It covers the manifest, SDK, permissions, data
   routes, the dev loop and publishing (tag a release, add the topic). Its README line is Presio's: "Read
-  https://…/plugins.md and build me a PotentialPaper plugin."
+  https://…/plugins.md and build me a potentialpaper plugin."
 
 ### Phase 4: data for plugins (A and B)
 
@@ -493,7 +493,7 @@ Built:
     Withdraw approval, and its panels, `when` conditions and pages); its settings as a form drawn from its
     `contributes.settings` (box, list, text and number fields, reset per key); Remove.
   - Discover (stars, description, last push, Install or "Installed"), Add by source, and Load from localhost.
-  - The line for agents with the site's address: "Read <origin>/plugins.md and build me a PotentialPaper plugin."
+  - The line for agents with the site's address: "Read <origin>/plugins.md and build me a potentialpaper plugin."
   - Browser calls in `lib/plugins/client.ts`: `uninstallPlugin`, `revokePlugin`, `setPluginEnabled`,
     `fetchDiscovered`, `fetchUpdates`, `updatePluginTo`.
 - **`/settings`**: its Plugins section is now a summary and a link to `/settings/plugins`. The `<kind>.panels.hidden`

@@ -1100,7 +1100,7 @@ describe('git clone', () => {
     await commitPage(paperId, null, SYSTEM_ACTOR, [], 'Start');
     const refs = await request('/git/arxiv/1706.03762.git/info/refs?service=git-receive-pack');
     expect(refs.status).toBe(401);
-    expect(refs.headers.get('www-authenticate')).toMatch(/^Basic realm="PotentialPaper"/);
+    expect(refs.headers.get('www-authenticate')).toMatch(/^Basic realm="potentialpaper"/);
     const push = await post('/git/arxiv/1706.03762.git/git-receive-pack', 'application/x-git-receive-pack-request');
     expect(push.status).toBe(401);
     expect(await readHead(getDb(), paperId)).not.toBeNull();

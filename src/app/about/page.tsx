@@ -3,7 +3,7 @@ import Link from 'next/link';
 import { ui } from '@/components/ui';
 
 export const metadata: Metadata = {
-  title: 'About · PotentialPaper',
+  title: 'About · potentialpaper',
   description: 'A public, editable page for every research paper, with labeled links between them.',
   alternates: { canonical: '/about' },
 };
@@ -14,7 +14,7 @@ const prose = 'mt-2 space-y-3 leading-relaxed';
 export default function AboutPage() {
   return (
     <main className={`${ui.page} max-w-[640px]`}>
-      <h1 className="mt-6 text-center text-[26px] leading-tight font-normal">About PotentialPaper</h1>
+      <h1 className="mt-6 text-center text-[26px] leading-tight font-normal">About potentialpaper</h1>
 
       <h2 className={ui.groupHeading}>What it is</h2>
       <div className={prose}>

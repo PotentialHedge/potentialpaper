@@ -175,7 +175,7 @@ async function download(address: string, max: number): Promise<Buffer> {
     const res = await fetch(url, {
       redirect: 'manual',
       signal: AbortSignal.timeout(60_000),
-      headers: { 'User-Agent': 'PotentialPaper (+https://potentialpaper.com)' },
+      headers: { 'User-Agent': 'potentialpaper (+https://potentialpaper.com)' },
     });
     if (res.status >= 300 && res.status < 400) {
       url = URL.parse(res.headers.get('location') ?? '', url);

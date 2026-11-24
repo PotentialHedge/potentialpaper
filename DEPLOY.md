@@ -234,7 +234,7 @@ domain run `dc run --rm tools npm run pages:rebuild`.
 ## Mail
 
 Set up 2026-11-22, outside this repo. Mail goes out through Resend (`src/server/mail.ts`) from
-`PotentialPaper <noreply@potentialpaper.com>` (`MAIL_FROM`), with `RESEND_API_KEY` a **sending-only key limited to
+`potentialpaper <noreply@potentialpaper.com>` (`MAIL_FROM`), with `RESEND_API_KEY` a **sending-only key limited to
 potentialpaper.com** (Resend domain `b88adeb8…`, region eu-west-1, open and click tracking off). A missing key is an
 error in production, never a silent drop.
 

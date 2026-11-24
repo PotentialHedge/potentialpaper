@@ -27,8 +27,8 @@ export function workbenchHtml(paper: PageRef & { title: string }): string {
       { scheme: origin.protocol.slice(0, -1), authority: origin.host, path: `${VSCODE_BASE}/potentialpaper` },
     ],
     productConfiguration: {
-      nameShort: 'PotentialPaper',
-      nameLong: 'PotentialPaper Editor',
+      nameShort: 'potentialpaper',
+      nameLong: 'potentialpaper Editor',
       enableTelemetry: false,
       // The Commit button in Source Control (the extension's `actionButton`), a proposed API.
       extensionEnabledApiProposals: { 'potentialpaper.potentialpaper': ['scmActionButton'] },
@@ -88,7 +88,7 @@ export function workbenchHtml(paper: PageRef & { title: string }): string {
     <meta id="vscode-workbench-web-configuration" data-settings="${attribute(config)}">
     <meta id="vscode-workbench-web-base-url" data-settings="${VSCODE_BASE}">
     <link rel="stylesheet" href="${base}/out/vs/workbench/workbench.web.main.internal.css">
-    <title>Edit · PotentialPaper</title>
+    <title>Edit · potentialpaper</title>
   </head>
   <body aria-label=""></body>
   <script>

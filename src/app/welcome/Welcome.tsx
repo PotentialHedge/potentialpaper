@@ -67,7 +67,7 @@ export function Welcome({
   switch (step) {
     case 'intro':
       return card(
-        'Join PotentialPaper',
+        'Join potentialpaper',
         <>
           <p className="mb-4 text-muted">
             One public page for every research paper, written by its authors and by verified researchers. For

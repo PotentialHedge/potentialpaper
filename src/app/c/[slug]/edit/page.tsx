@@ -45,7 +45,7 @@ async function load(params: Props['params']) {
 
 export async function generateMetadata({ params }: Props): Promise<Metadata> {
   const { name } = await load(params);
-  return { title: `Edit ${name} · Category · PotentialPaper`, robots: { index: false, follow: false } };
+  return { title: `Edit ${name} · Category · potentialpaper`, robots: { index: false, follow: false } };
 }
 
 /**
