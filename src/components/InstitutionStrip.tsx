@@ -14,7 +14,7 @@ function shuffle<T>(items: readonly T[]): T[] {
 }
 
 /**
- * "Researchers from" and a slow strip of institution names (`institutionNames`) under the home page's title, in a fresh
+ * "Researchers from" and a slow strip of institution names (`institutionNames`) under the home page's abstract, in a fresh
  * random order on every render. Names, not logos: a logo reads as an endorsement the institution never gave. Pure CSS:
  * the row is drawn twice and slid by half its width, so it loops without a seam. Under reduced motion it stands still,
  * and the second copy is hidden.

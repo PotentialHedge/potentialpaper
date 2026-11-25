@@ -5,7 +5,7 @@ import { useRouter } from 'next/navigation';
 import { useEffect, useRef, useState } from 'react';
 import { ui } from '@/components/ui';
 import { authClient } from '@/lib/auth-client';
-import { DOMAIN_NOT_LISTED, hasSubaddress, SUBADDRESS_REFUSED } from '@/lib/email-address';
+import { DOMAIN_NOT_LISTED, emailDomain, hasSubaddress, SUBADDRESS_REFUSED } from '@/lib/email-address';
 import { setPasswordPath } from '@/lib/links';
 import { rememberPending } from '@/lib/pending-confirmation';
 import { authHref, VERIFY_EMAIL } from '@/lib/return-to';
@@ -68,7 +68,8 @@ export function SignInForm({ next }: { next: string }) {
     });
     setBusy(false);
     if (error) {
-      track('signin_link_refused', { reason: error.code ?? String(error.status) });
+      const refusedDomain = error.code === 'EMAIL_DOMAIN_NOT_ALLOWED' ? (emailDomain(address) ?? undefined) : undefined;
+      track('signin_link_refused', { reason: error.code ?? String(error.status), domain: refusedDomain });
       if (error.code === 'EMAIL_DOMAIN_NOT_ALLOWED') return setError(DOMAIN_NOT_LISTED);
       setError(
         error.status === 429
