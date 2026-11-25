@@ -3,6 +3,16 @@
 Things only you can do or decide, most urgent first. Milestones 1 and 2 and the ICLR import are merged into
 `main`. Next up is Milestone 3, community editing.
 
+## Now that the site is live
+
+- [ ] **Back up production automatically.** The site has had real users since 2026-11-24, but nothing backs up
+      production. Postgres (`pgdata19`) holds everything people make, page repos included, and the only dumps are
+      the ones taken by hand before a migration (DEPLOY.md). The proposal: a nightly `pg_dump -Fc` from a
+      `systemd --user` timer into `~/backups`, plus a copy off this host, since a disk failure takes local dumps
+      with it. Check it by restoring one into staging now and then. To decide: where the off-host copy goes (an R2
+      bucket on the Cloudflare account is the obvious choice) and how long dumps are kept (e.g. 7 daily and 4
+      weekly). `secrets/ssh_host_ed25519_key` and `.env.production` should be copied off the host too.
+
 ## Before the Milestone 3 alpha
 
 - [ ] **Contribution license.** The starting proposal is CC BY-SA for community content and CC BY for author
