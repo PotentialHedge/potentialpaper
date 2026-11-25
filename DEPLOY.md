@@ -6,36 +6,48 @@ this host, and:
 
 - **Never reset, reseed or overwrite production's database.** Copying goes one way only, production into staging.
 - **Take a dump before migrating** (`docker exec potentialpaper-postgres-1 pg_dump -U potentialpaper -Fc
-  potentialpaper > ~/backups/potentialpaper-$(date +%F-%H%M).dump`). Migrations must not destroy data people made,
+potentialpaper > ~/backups/potentialpaper-$(date +%F-%H%M).dump`). Migrations must not destroy data people made,
   and the old app keeps serving while they run, so a migration should leave the schema usable by the running build.
 - **Try risky changes on staging first**: migrations that rewrite data, auth and sign-in changes, and anything the
   consumers rebuild.
-- **Build before stopping anything**, so the app is down only while the new container starts. Keep the previous
-  image's commit at hand: going back means `GIT_COMMIT=<old> dc up -d app` and a cache purge.
+- **Deploy with `scripts/deploy-prod.sh`**, which has no downtime: the new app container starts beside the old
+  one, which stops only once Traefik routes to the new. Keep the previous commit at hand: going back is
+  `GIT_COMMIT=<old> SKIP_BUILD=1 SKIP_DUMP=1 scripts/deploy-prod.sh`, as its image is still on the host.
 
 ## Recipe
 
-Run from the repo root on this host, with `main` checked out and committed (the image is tagged with HEAD's
-commit, so uncommitted changes would ship under the wrong name). The shared checkout can hold other sessions'
-uncommitted work, which `COPY . .` would ship, so a clean worktree is safer: `git worktree add --detach
-../papertrail-deploy-<commit> <commit>`, copy `.env.production` into it (it's gitignored), and run the recipe there.
-The compose project name is fixed (`potentialpaper`), so it drives the same containers.
+Deploy a commit on `main` from a clean worktree of it, since the shared checkout can hold other sessions' uncommitted
+work, which the image's `COPY . .` would ship. The compose project name is fixed (`potentialpaper`), so the worktree
+drives the same containers. A deploy takes some minutes (mostly the build and the dump), so run it as a systemd job,
+which outlives the shell that starts it.
 
 ```sh
-git checkout main && git pull --ff-only
-export GIT_COMMIT=$(git rev-parse --short HEAD)
-dc() { docker compose -f docker-compose.prod.yml --env-file .env.production "$@"; }
-
-dc --profile tools build          # app and tools images; without --profile tools, migrations go stale
-dc up -d postgres
-dc run --rm tools                 # migrations (npm run db:migrate)
-dc up -d app
-dc --profile tools up -d ingest worker ssh  # PDF ingest, the outbox consumers and git over SSH, on the new image
-scripts/purge-edge-cache.sh       # required, see below
+C=$(git rev-parse --short origin/main)
+git worktree add --detach ../papertrail-deploy-$C $C && cp .env.production ../papertrail-deploy-$C/
+systemd-run --user --unit=pp-deploy-$C --collect -p StandardOutput=file:$HOME/deploy-$C.log \
+  -p StandardError=file:$HOME/deploy-$C.log ../papertrail-deploy-$C/scripts/deploy-prod.sh
 ```
 
-Check it: `docker inspect potentialpaper-app-1 --format '{{.Config.Image}}'` names the new commit, and
-https://potentialpaper.com loads.
+`scripts/deploy-prod.sh`, in order:
+
+1. builds the app and tools images, tagged with the commit (`GIT_COMMIT`);
+2. dumps the database to `~/backups/potentialpaper-<date>.dump`, keeping the newest three (`SKIP_DUMP=1` skips it);
+3. runs the migrations (`npm run db:migrate`) while the old app still serves;
+4. starts a new app container beside the old one (`--scale app=2 --no-recreate`), waits until Docker calls it
+   healthy (`/healthz`) and Traefik's API (`127.0.0.1:8080`) lists it `UP`, then stops the old one with 30 s to
+   finish its requests. A new container that doesn't get there is removed and the old one keeps serving;
+5. recreates ingest, worker and ssh on the new image (a few seconds without git over SSH);
+6. purges the edge cache.
+
+Check it: the log ends with `live: potentialpaper-app-<n> potentialpaper-app:<commit> … (healthy)`, and
+https://potentialpaper.com loads. Then remove the previous deploy's worktree.
+
+Scripts against production run in the tools image from that worktree, with `GIT_COMMIT` exported:
+
+```sh
+dc() { docker compose -f docker-compose.prod.yml --env-file .env.production "$@"; }
+dc --profile tools run --rm tools npm run <script>
+```
 
 ## Staging
 
