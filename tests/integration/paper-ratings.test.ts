@@ -69,6 +69,14 @@ describe('paper ratings', () => {
     await reviewed(c, 'openreview:Ten', [4]);
     expect(await rebuildPaperRatings()).toBe(3);
     expect(await byRating()).toEqual(['B: 8 of 1–10', 'A: 3 of 1–4', 'C: 4 of 1–10', 'D: unrated']);
+    // Each hit carries its mean, which the home list shows beside the venue.
+    const hits = (await searchPapers({ sort: 'rating' })).hits.map((h) => [h.title, h.rating]);
+    expect(hits).toEqual([
+      ['B: 8 of 1–10', 8],
+      ['A: 3 of 1–4', 3],
+      ['C: 4 of 1–10', 4],
+      ['D: unrated', null],
+    ]);
   });
 
   it('rates a paper by its latest reviewed submission', async () => {
