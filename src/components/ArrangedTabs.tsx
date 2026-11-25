@@ -38,7 +38,7 @@ export function ArrangedTabs({
   const analytics = usePageAnalytics(pageId);
   const hidden = useSetting<string[]>(`${kind}.panels.hidden`);
   const order = useSetting<string[]>(`${kind}.panels.order`);
-  const panels: { id: string; title: string; hint?: string; locked?: boolean; node: ReactNode }[] = [
+  const panels: { id: string; title: string; hint?: string; locked?: boolean; lock?: boolean; node: ReactNode }[] = [
     ...builtIn,
     ...usePluginPanels(slot),
   ];
@@ -59,6 +59,8 @@ export function ArrangedTabs({
       title: 'Analytics',
       hint: who ? `${who[0].toUpperCase()}${who.slice(1)} only` : 'Only you can see this',
       locked,
+      // A lock on a person's own tab too: only they see it.
+      lock: locked || !owners,
       node: analytics ? (
         <AnalyticsPanel data={analytics} kind={kind} />
       ) : (
@@ -91,7 +93,7 @@ export function ArrangedTabs({
               }}
               className={`-mb-px cursor-pointer border-b-2 pb-1 ${id === shown ? `border-ink ${ui.on}` : 'border-transparent text-muted'} ${id !== LEAD && byId.get(id)!.locked ? 'opacity-60' : ''}`}
             >
-              {id !== LEAD && byId.get(id)!.locked && <LockIcon className="mr-1 inline size-3 -translate-y-px" />}
+              {id !== LEAD && byId.get(id)!.lock && <LockIcon className="mr-1 inline size-3 -translate-y-px" />}
               {title(id)}
             </button>
           ))}
