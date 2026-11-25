@@ -540,21 +540,22 @@ interface VectorIndex {
   metric: 'cosine' | 'dot' | 'l2';
 }
 
-const indexes = new Map<string, Promise<VectorIndex>>();
+/**
+ * Loaded or loading indexes by `<set>:<signal>`, with the etag each was built for. The promise is stored before any
+ * await, so concurrent callers (the recommended sort asks for up to `MAX_SOURCES` papers at once) share one load.
+ */
+const indexes = new Map<string, { etag: string; value: Promise<VectorIndex> }>();
 
 /** A vector signal's live values in memory, rebuilt when the set changes: fine for tens of thousands of papers. */
 async function vectorIndex(set: SetRow, signal: string, database: Db): Promise<VectorIndex> {
   const etag = signalEtagOf(set, signal);
   const key = `${set.id}:${signal}`;
   const cached = indexes.get(key);
-  if (cached) {
-    const found = await cached.catch(() => null);
-    if (found?.etag === etag) return found;
-  }
-  const spec = (await setSignals(set.id, database)).find((s) => s.name === signal)?.spec;
-  if (!spec) throw new ApiError(404, 'not_found', `${set.id} has no signal "${signal}"`);
-  if (spec.kind !== 'vector') throw new ApiError(422, 'validation_error', `${signal} is a ${spec.kind}, not a vector`);
-  const work = (async () => {
+  if (cached?.etag === etag) return cached.value;
+  const work = (async (): Promise<VectorIndex> => {
+    const spec = (await setSignals(set.id, database)).find((s) => s.name === signal)?.spec;
+    if (!spec) throw new ApiError(404, 'not_found', `${set.id} has no signal "${signal}"`);
+    if (spec.kind !== 'vector') throw new ApiError(422, 'validation_error', `${signal} is a ${spec.kind}, not a vector`);
     const columns = await signalColumns(set.id, [signal], { titles: true, database });
     const column = columns.signals[signal] as { dims: number; values: (number | null)[] };
     const keep: number[] = [];
@@ -595,8 +596,11 @@ async function vectorIndex(set: SetRow, signal: string, database: Db): Promise<V
       data,
     };
   })();
-  indexes.set(key, work);
-  work.catch(() => indexes.delete(key));
+  const entry = { etag, value: work };
+  indexes.set(key, entry);
+  work.catch(() => {
+    if (indexes.get(key) === entry) indexes.delete(key);
+  });
   return work;
 }
 
