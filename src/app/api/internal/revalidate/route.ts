@@ -3,8 +3,11 @@ import { isInternalRequest } from '@/server/internal';
 
 export const dynamic = 'force-dynamic';
 
-/** Paper pages only (`proxy.ts`'s `PAPER_PATH`): all the outside processes ever need to refresh. */
-const PAPER_PATH = /^\/(abs|doi|openreview)\/[^?#]{1,1000}$/;
+/**
+ * Paper pages only, at an identifier's address (`proxy.ts`'s `PAPER_PATH`) or the short one (`/s/<n>`): all the
+ * outside processes ever need to refresh.
+ */
+const PAPER_PATH = /^\/((abs|doi|openreview)\/[^?#]{1,1000}|s\/\d{1,12})$/;
 const NO_STORE = { 'Cache-Control': 'no-store' };
 
 /**
