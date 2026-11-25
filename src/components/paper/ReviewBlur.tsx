@@ -27,7 +27,7 @@ function earlyStyle(venues: ReviewVenue[]): string {
  * Reviewer mode: a paper still under review at a venue (`server/under-review.ts`) is shown blurred but for its title,
  * so a reviewer can find it without seeing who wrote it or what others think of it, until they choose to. The page is
  * the same cached HTML for everyone, blurred, and is shown in the browser. "Show the page" shows this paper only; a
- * ticked "I'm not a reviewer at <venue>" is kept in `paper.notReviewerAt`, and that venue's papers aren't blurred
+ * ticked "Don't show this again for <venue>" is kept in `paper.notReviewerAt`, and that venue's papers aren't blurred
  * again. A paper under review at several venues is blurred until the reader is listed as not reviewing at all of them.
  */
 export function ReviewBlur({ venues, children }: { venues: ReviewVenue[]; children: ReactNode }) {
@@ -74,7 +74,7 @@ export function ReviewBlur({ venues, children }: { venues: ReviewVenue[]; childr
                   checked={ticked.includes(v.id)}
                   onChange={(e) => setTicked((t) => (e.target.checked ? [...t, v.id] : t.filter((id) => id !== v.id)))}
                 />
-                I&apos;m not a reviewer at {v.name}
+                Don&apos;t show this again for {v.name}
               </label>
             ))}
           <button type="button" className={ui.btn()} onClick={show}>
