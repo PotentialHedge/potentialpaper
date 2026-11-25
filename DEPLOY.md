@@ -44,8 +44,9 @@ systemd-run --user --unit=pp-deploy-$C --collect -p StandardOutput=file:$HOME/de
 5. recreates ingest, worker and ssh on the new image (a few seconds without git over SSH);
 6. purges the edge cache.
 
-Check it: the log ends with `live: potentialpaper-app-<n> potentialpaper-app:<commit> … (healthy)`, and
-https://potentialpaper.com loads. Then remove the previous deploy's worktree.
+Check it: the log ends with `live: potentialpaper-app-<n> potentialpaper-app:<commit> … (healthy)` and
+`requests during the swap: <n> failed: 0` (Traefik's access log for the swap; it keeps only some minutes, so read it
+then), and https://potentialpaper.com loads. Then remove the previous deploy's worktree.
 
 Scripts against production run in the tools image from that worktree, with `GIT_COMMIT` exported:
 

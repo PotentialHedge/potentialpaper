@@ -49,6 +49,7 @@ if [[ -z "${SKIP_DUMP:-}" ]]; then
 fi
 compose --profile tools run --rm tools
 
+swap_start=$(date -u +%Y-%m-%dT%H:%M:%SZ)
 old=$(compose ps -q app)
 count=$(echo "$old" | grep -c . || true)
 echo "old app containers: $count"
@@ -155,3 +156,18 @@ else
   scripts/purge-edge-cache.sh
 fi
 echo "live: $(compose ps --format '{{.Name}} {{.Image}} {{.Status}}' app)"
+# What readers got during the swap, from Traefik's access log: a 5xx is a request the deploy failed (a draining
+# container's /healthz answering 503 is the drain, not a failure).
+docker logs --since "$swap_start" traefik 2>&1 | PROJECT=$project python3 -c '
+import json, os, sys, collections
+project, seen, failed = os.environ["PROJECT"], 0, collections.Counter()
+for line in sys.stdin:
+    try: d = json.loads(line)
+    except ValueError: continue
+    router = d.get("RouterName", "").split("@")[0]
+    if router != project and not (router.startswith(project + "-") and not router.startswith(project + "-staging")): continue
+    seen += 1
+    status = d.get("DownstreamStatus", 0)
+    if status >= 500 and not (status == 503 and d.get("RequestPath", "").startswith("/healthz")):
+        failed[status] += 1
+print("requests during the swap:", seen, "failed:", sum(failed.values()), dict(failed) if failed else "")'
