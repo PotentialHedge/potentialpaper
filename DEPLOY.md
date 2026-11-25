@@ -33,9 +33,14 @@ systemd-run --user --unit=pp-deploy-$C --collect -p StandardOutput=file:$HOME/de
 1. builds the app and tools images, tagged with the commit (`GIT_COMMIT`);
 2. dumps the database to `~/backups/potentialpaper-<date>.dump`, keeping the newest three (`SKIP_DUMP=1` skips it);
 3. runs the migrations (`npm run db:migrate`) while the old app still serves;
-4. starts a new app container beside the old one (`--scale app=2 --no-recreate`), waits until Docker calls it
-   healthy (`/healthz`) and Traefik's API (`127.0.0.1:8080`) lists it `UP`, then stops the old one with 30 s to
-   finish its requests. A new container that doesn't get there is removed and the old one keeps serving;
+4. starts a new app container beside the old one (`--scale app=2 --no-recreate`) and waits until Docker calls it
+   healthy (`/healthz`) and Traefik's API (`127.0.0.1:8080`) lists it `UP`. A new container that doesn't get there
+   is removed and the old one keeps serving. Then it drains the old one: `touch /tmp/draining` makes its `/healthz`
+   answer 503, Docker calls it unhealthy after two checks 5 s apart, Traefik stops routing to it, and 5 s later it
+   is stopped with 30 s to finish its requests. (Its `/healthz` answers 503 for those seconds; its pages don't.)
+   Containers of one Traefik service must carry the same labels, or Traefik drops the service and the site answers
+   404, so a deploy that changes the app's `traefik.*` labels stops here; `RECREATE=1` replaces the app in place
+   instead, with some seconds of downtime;
 5. recreates ingest, worker and ssh on the new image (a few seconds without git over SSH);
 6. purges the edge cache.
 
@@ -62,14 +67,10 @@ that content may be framed there; a plugin installed only on staging isn't on pr
 `potentialpaper.com` only, so nothing behind the password is cached at the edge.
 
 ```sh
-git worktree add --detach ../papertrail-staging-<commit> <commit> && cd ../papertrail-staging-<commit>
-cp ../papertrail/.env.staging . && export GIT_COMMIT=$(git rev-parse --short HEAD)
+git worktree add --detach ../papertrail-staging-<commit> <commit> && cp .env.staging ../papertrail-staging-<commit>/
+STAGING=1 ../papertrail-staging-<commit>/scripts/deploy-prod.sh   # as production's, without the dump and the purge
 dcs() { docker compose -p potentialpaper-staging -f docker-compose.prod.yml -f docker-compose.staging.yml \
-          --env-file .env.staging "$@"; }
-dcs --profile tools build
-dcs up -d postgres
-dcs run --rm tools                 # migrations
-dcs up -d app && dcs --profile tools up -d worker
+          --env-file .env.staging "$@"; }                          # for scripts and the steps below
 ```
 
 Copying production's database in again (it replaces staging's):
