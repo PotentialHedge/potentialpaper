@@ -8,14 +8,26 @@
 # The background services (ingest, worker, ssh) are recreated on the new image after, and the edge cache purged.
 #
 # Run it from a clean worktree of the commit, with `.env.production` copied in. SKIP_BUILD=1 swaps to images already
-# built for HEAD (or for $GIT_COMMIT, set by hand, to roll back).
+# built for HEAD (or for $GIT_COMMIT, set by hand, to roll back). STAGING=1 deploys staging the same way, with
+# `.env.staging`, no dump and no edge-cache purge (DEPLOY.md, "Staging").
 set -euo pipefail
 cd "$(dirname "$0")/.."
 
-compose() { docker compose -f docker-compose.prod.yml --env-file .env.production "$@"; }
-TRAEFIK_SERVICE=http://127.0.0.1:8080/api/http/services/potentialpaper@docker
+if [[ -n "${STAGING:-}" ]]; then
+  project=potentialpaper-staging
+  env_file=.env.staging
+  compose() {
+    docker compose -p $project -f docker-compose.prod.yml -f docker-compose.staging.yml --env-file $env_file "$@"
+  }
+  SKIP_DUMP=1
+else
+  project=potentialpaper
+  env_file=.env.production
+  compose() { docker compose -f docker-compose.prod.yml --env-file $env_file "$@"; }
+fi
+TRAEFIK_SERVICE=http://127.0.0.1:8080/api/http/services/$project@docker
 
-test -f .env.production || { echo "copy .env.production here first" >&2; exit 1; }
+test -f $env_file || { echo "copy $env_file here first" >&2; exit 1; }
 if [[ -z "${GIT_COMMIT:-}" ]]; then
   test -z "$(git status --porcelain)" || { echo "commit first: the image is tagged with HEAD" >&2; exit 1; }
   GIT_COMMIT=$(git rev-parse --short HEAD)
@@ -81,11 +93,33 @@ if [[ $missing != 0 ]]; then
 fi
 
 if [[ -n "$old" ]]; then
-  # Traefik drops a stopping container at once; SIGTERM lets Next finish the requests it has.
+  # Drain first: the old containers' /healthz answers 503, Traefik's own check (every 2 s) stops routing to them,
+  # and the requests they have get a few seconds to finish. Stopping one Traefik still routes to fails a request.
+  old_ips=()
+  for id in $old; do
+    docker exec "$id" touch /tmp/draining
+    old_ips+=("$(docker inspect -f '{{(index .NetworkSettings.Networks "web").IPAddress}}' "$id")")
+  done
+  for _ in $(seq 1 30); do
+    up=$(curl -s "$TRAEFIK_SERVICE" | python3 -c '
+import json, sys
+status = json.load(sys.stdin).get("serverStatus", {})
+print(" ".join(u for u, s in status.items() if s == "UP"))' || true)
+    routed=0
+    for ip in "${old_ips[@]}"; do [[ " $up " == *" http://$ip:3000 "* ]] && routed=1; done
+    [[ $routed == 0 ]] && break
+    sleep 1
+  done
+  [[ $routed == 0 ]] || echo "Traefik still routes to an old container after 30 s; stopping it anyway" >&2
+  sleep 5
   docker stop -t 30 $old >/dev/null
   docker rm $old >/dev/null
 fi
 
-compose --profile tools up -d --no-deps ingest worker ssh
-scripts/purge-edge-cache.sh
+if [[ -n "${STAGING:-}" ]]; then
+  compose --profile tools up -d --no-deps worker
+else
+  compose --profile tools up -d --no-deps ingest worker ssh
+  scripts/purge-edge-cache.sh
+fi
 echo "live: $(compose ps --format '{{.Name}} {{.Image}} {{.Status}}' app)"

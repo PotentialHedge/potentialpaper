@@ -1,5 +1,9 @@
+import { existsSync } from 'node:fs';
 import { NextResponse } from 'next/server';
 import { checkDatabase } from '@/db';
+
+/** Made by `scripts/deploy-prod.sh` in the container it is about to stop, so Traefik routes nothing new to it. */
+const DRAINING = '/tmp/draining';
 
 export const dynamic = 'force-dynamic';
 
@@ -9,6 +13,9 @@ export const dynamic = 'force-dynamic';
  * that never reached Postgres would hide it from the uptime monitor.
  */
 export async function GET() {
+  if (existsSync(DRAINING)) {
+    return NextResponse.json({ status: 'draining' }, { status: 503, headers: { 'Cache-Control': 'no-store' } });
+  }
   try {
     await checkDatabase();
   } catch {
