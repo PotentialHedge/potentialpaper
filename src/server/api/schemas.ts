@@ -6,6 +6,7 @@ import {
   AGENT_POST_DATA_MAX,
   AGENT_POST_KINDS,
 } from '@/lib/agent-posts';
+import { BOT_SOURCES } from '@/lib/bot-sources';
 import { MAX_EVIDENCE, MAX_EVIDENCE_URL } from '@/lib/evidence';
 import { CLAIM_STATUSES, TOKEN_SCOPES } from '@/db/schema';
 import { BIO_MAX, REAL_NAME_MAX } from '@/lib/profile';
@@ -442,7 +443,15 @@ export const AnalyticsQuery = z.object({ page: z.uuid() });
 const RelatedPage = z.object({ name: z.string(), address: z.string(), count: z.number().int() });
 /** A page's analytics, for its owners (`server/page-analytics.ts`). Totals only, never who. */
 export const Analytics = z.object({
-  days: z.array(z.object({ day: z.string(), views: z.number().int(), git: z.number().int(), agent: z.number().int() })),
+  days: z.array(
+    z.object({
+      day: z.string(),
+      views: z.number().int(),
+      git: z.number().int(),
+      bots: z.number().int(),
+      botSources: z.record(z.enum(BOT_SOURCES), z.number().int()),
+    }),
+  ),
   totalViews: z.number().int(),
   time: z.array(z.number().int()),
   institutions: z.array(z.object({ name: z.string(), visitors: z.number().int() })),

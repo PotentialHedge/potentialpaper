@@ -1,5 +1,6 @@
 import { sql } from 'drizzle-orm';
 import { getDb, type Database } from '@/db';
+import { BOT_SOURCES, type BotSource } from '@/lib/bot-sources';
 import { pageSummaries } from './plugins/pages';
 import { hmacOf, type Viewer, who } from './view-counter';
 
@@ -25,12 +26,13 @@ export const TIME_BUCKETS = [
   { max: Infinity, label: 'over 10 min' },
 ] as const;
 
-/** How many days the graphs cover. */
-export const ANALYTICS_DAYS = 90;
+/** How many days the graphs cover: as many as Cloudflare keeps bots' reads for on our plan (`bot-views.ts`). */
+export const ANALYTICS_DAYS = 30;
 /** How many months institutions are summed over. */
 const INSTITUTION_MONTHS = 12;
 
-export type Metric = 'views' | 'git' | 'agent';
+/** Counted here (`countQuietly`); `bots` is pulled from Cloudflare (`bot-views.ts`). */
+export type Metric = 'views' | 'git';
 
 function utcDay(at: Date): string {
   return at.toISOString().slice(0, 10);
@@ -74,7 +76,7 @@ export async function countDaily(
   return result.rows.length > 0;
 }
 
-/** As `countDaily`, but never failing what it is counted for: git, an agent's read. */
+/** As `countDaily`, but never failing what it is counted for: git. */
 export function countQuietly(pageId: string, metric: Metric, viewer: Viewer): void {
   countDaily(pageId, metric, metric, viewer).catch((err) => console.error(`analytics: counting ${metric}`, err));
 }
@@ -118,7 +120,7 @@ export async function countInstitution(
 
 export interface PageAnalytics {
   /** The last `ANALYTICS_DAYS` days, oldest first, every day there even with nothing. */
-  days: { day: string; views: number; git: number; agent: number }[];
+  days: { day: string; views: number; git: number; bots: number; botSources: Record<BotSource, number> }[];
   /** Unique visitors since the page began counting. */
   totalViews: number;
   /** Visitors by how long they kept the page open, over the same days, as `TIME_BUCKETS`. */
@@ -164,15 +166,25 @@ export async function pageAnalytics(
   const byDay = new Map<string, PageAnalytics['days'][number]>();
   for (let i = ANALYTICS_DAYS - 1; i >= 0; i -= 1) {
     const day = utcDay(new Date(now.getTime() - i * 86_400_000));
-    byDay.set(day, { day, views: 0, git: 0, agent: 0 });
+    byDay.set(day, {
+      day,
+      views: 0,
+      git: 0,
+      bots: 0,
+      botSources: Object.fromEntries(BOT_SOURCES.map((b) => [b, 0])) as Record<BotSource, number>,
+    });
   }
   const time = TIME_BUCKETS.map(() => 0);
   for (const row of counts.rows) {
     const entry = byDay.get(row.day);
     const n = Number(row.count);
     if (row.metric.startsWith('time:')) time[Number(row.metric.slice(5))] += n;
-    else if (entry && (row.metric === 'views' || row.metric === 'git' || row.metric === 'agent'))
-      entry[row.metric] += n;
+    else if (entry && (row.metric === 'views' || row.metric === 'git')) entry[row.metric] += n;
+    else if (entry && row.metric.startsWith('bots:')) {
+      const source = row.metric.slice(5) as BotSource;
+      if (source in entry.botSources) entry.botSources[source] += n;
+      entry.bots += n;
+    }
   }
 
   const summaries = await pageSummaries(

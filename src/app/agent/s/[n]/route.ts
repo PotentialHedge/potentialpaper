@@ -1,7 +1,5 @@
-import { clientIp } from '@/server/api/http';
 import { agentPaperMarkdown } from '@/server/agent/paper-page';
 import { markdown } from '@/server/agent/text';
-import { countQuietly } from '@/server/page-analytics';
 import { canonicalPaperId } from '@/lib/paper-ids';
 import { identifiersOf, lookupPaper } from '@/server/papers';
 import { shareSubject } from '@/server/share';
@@ -37,7 +35,5 @@ export async function GET(req: Request, { params }: { params: Promise<{ n: strin
   const canonical = canonicalPaperId(await identifiersOf(subject.pageId));
   const found = canonical && (await lookupPaper(canonical));
   if (!canonical || !found || found.status !== 'found') return notFound();
-  // An agent's read, for the paper's authors (`page-analytics.ts`); a paper's page id is the paper's id.
-  countQuietly(found.paper.id, 'agent', { ip: clientIp(req) });
   return markdown(await agentPaperMarkdown(found, canonical, origin), { cache: 'no-store' });
 }

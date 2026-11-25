@@ -1,8 +1,9 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { type ReactNode, useEffect, useState } from 'react';
 import { LockOpenIcon } from '@/components/icons';
 import { ui } from '@/components/ui';
+import { BOT_SOURCE_HINT, BOT_SOURCE_LABEL, BOT_SOURCES, type BotSource } from '@/lib/bot-sources';
 import { KINDS, type PageKind } from '@/lib/kinds';
 
 /**
@@ -12,7 +13,7 @@ import { KINDS, type PageKind } from '@/lib/kinds';
  */
 
 export interface PageAnalytics {
-  days: { day: string; views: number; git: number; agent: number }[];
+  days: { day: string; views: number; git: number; bots: number; botSources: Record<BotSource, number> }[];
   totalViews: number;
   time: number[];
   institutions: { name: string; visitors: number }[];
@@ -46,29 +47,109 @@ function shortDate(day: string): string {
   return new Date(`${day}T00:00:00Z`).toLocaleDateString('en', { month: 'short', day: 'numeric', timeZone: 'UTC' });
 }
 
-/** Bars over labelled positions, as the score histogram draws them. */
+/** One line of a bar's tooltip: a stack's part, with its colour. */
+interface TipLine {
+  label: string;
+  value: number;
+  colour: string;
+}
+
+/**
+ * Bars over labelled positions, as the score histogram draws them, each a stack of `segments` (bottom first, in
+ * `colours`), with a tooltip on hover: its `titles` line, and each part of the stack when there is more than one.
+ */
 function Bars({
-  values,
+  segments,
+  colours,
+  names,
   titles,
-  colour,
   label,
   height = 'h-28',
 }: {
-  values: number[];
+  segments: number[][];
+  colours: string[];
+  /** Each part's name, for the tooltip; none for a bar of one part. */
+  names?: string[];
   titles: string[];
-  colour: string;
   label: string;
   height?: string;
 }) {
-  const peak = Math.max(1, ...values);
+  const [hover, setHover] = useState<number | null>(null);
+  const totals = segments.map((parts) => parts.reduce((a, b) => a + b, 0));
+  const peak = Math.max(1, ...totals);
+  const count = segments.length;
+  let tip: ReactNode = null;
+  if (hover !== null) {
+    const lines: TipLine[] = names
+      ? names.map((name, j) => ({ label: name, value: segments[hover][j], colour: colours[j] })).reverse()
+      : [];
+    const left = hover < count / 2;
+    tip = (
+      <div
+        role="tooltip"
+        className="pointer-events-none absolute bottom-full z-10 mb-1.5 border border-frame bg-card px-2.5 py-1.5 font-sans text-xs whitespace-nowrap shadow-sm"
+        style={left ? { left: `${(hover / count) * 100}%` } : { right: `${((count - hover - 1) / count) * 100}%` }}
+      >
+        <div className="text-ink">{titles[hover]}</div>
+        {lines.length > 1 &&
+          lines.map((line) => (
+            <div key={line.label} className="mt-0.5 flex items-center gap-1.5 text-muted">
+              <span className={`inline-block size-2 ${line.colour}`} />
+              {line.label}
+              <span className="ml-auto pl-3 font-mono text-ink">{n(line.value)}</span>
+            </div>
+          ))}
+      </div>
+    );
+  }
   return (
-    <div role="img" aria-label={label} className={`flex ${height} items-end gap-px border-b border-ink`}>
-      {values.map((value, i) => (
-        <div key={i} title={titles[i]} className="flex h-full min-w-0 flex-1 flex-col-reverse">
-          {value > 0 && <div className={colour} style={{ height: `${(value / peak) * 100}%` }} />}
-        </div>
-      ))}
+    <div className="relative" onMouseLeave={() => setHover(null)}>
+      {tip}
+      <div role="img" aria-label={label} className={`flex ${height} items-end gap-px border-b border-ink`}>
+        {segments.map((parts, i) => (
+          <div
+            key={i}
+            onMouseEnter={() => setHover(i)}
+            className={`flex h-full min-w-0 flex-1 flex-col-reverse ${hover === i ? 'bg-ink/5' : ''}`}
+          >
+            {parts.map(
+              (value, j) =>
+                value > 0 && <div key={j} className={colours[j]} style={{ height: `${(value / peak) * 100}%` }} />,
+            )}
+          </div>
+        ))}
+      </div>
     </div>
+  );
+}
+
+/** Each kind of bot's colour, bottom of the stack first. */
+const BOT_COLOUR: Record<BotSource, string> = {
+  assistant: 'bg-accent/80',
+  ai: 'bg-accent/40',
+  search: 'bg-ink/45',
+  other: 'bg-faint/50',
+};
+
+/** Bots' reads a day, stacked by kind of bot. */
+function BotChart({ days }: { days: PageAnalytics['days'] }) {
+  const first = days[0]?.day;
+  const last = days[days.length - 1]?.day;
+  return (
+    <figure className="mt-3">
+      <Bars
+        segments={days.map((d) => BOT_SOURCES.map((source) => d.botSources[source]))}
+        colours={BOT_SOURCES.map((source) => BOT_COLOUR[source])}
+        names={BOT_SOURCES.map((source) => BOT_SOURCE_LABEL[source])}
+        titles={days.map((d) => `${shortDate(d.day)}: ${n(d.bots)} bot reads`)}
+        height="h-20"
+        label={`Bot reads a day: ${n(days.reduce((sum, d) => sum + d.bots, 0))} over the last ${days.length} days`}
+      />
+      <div className="mt-0.5 flex justify-between font-mono text-[11px] text-muted">
+        <span>{first && shortDate(first)}</span>
+        <span>{last && shortDate(last)}</span>
+      </div>
+    </figure>
   );
 }
 
@@ -81,7 +162,7 @@ function DailyChart({
   height,
 }: {
   data: PageAnalytics;
-  metric: 'views' | 'git' | 'agent';
+  metric: 'views' | 'git' | 'bots';
   what: string;
   colour: string;
   height?: string;
@@ -93,9 +174,9 @@ function DailyChart({
   return (
     <figure className="mt-3">
       <Bars
-        values={values}
+        segments={values.map((v) => [v])}
+        colours={[colour]}
         titles={data.days.map((d) => `${shortDate(d.day)}: ${n(d[metric])}`)}
-        colour={colour}
         height={height}
         label={`${what}: ${n(sum)} over the last ${data.days.length} days`}
       />
@@ -107,7 +188,7 @@ function DailyChart({
   );
 }
 
-function lastDays(data: PageAnalytics, metric: 'views' | 'git' | 'agent', days: number): number {
+function lastDays(data: PageAnalytics, metric: 'views' | 'git' | 'bots', days: number): number {
   return data.days.slice(-days).reduce((sum, d) => sum + d[metric], 0);
 }
 
@@ -158,7 +239,7 @@ export function AnalyticsPanel({
   const timeTotal = data.time.reduce((a, b) => a + b, 0);
   const median = medianBucket(data.time);
   const git = lastDays(data, 'git', data.days.length);
-  const agent = lastDays(data, 'agent', data.days.length);
+  const bots = lastDays(data, 'bots', data.days.length);
   return (
     <section id="analytics">
       <p className={`${ui.fine} flex items-center gap-1.5 font-sans`}>
@@ -179,9 +260,9 @@ export function AnalyticsPanel({
       ) : (
         <figure className="mt-3">
           <Bars
-            values={data.time}
+            segments={data.time.map((v) => [v])}
+            colours={['bg-accent/70']}
             titles={data.time.map((v, i) => `${TIME_LABELS[i]}: ${n(v)}`)}
-            colour="bg-accent/70"
             label={`Time on the page: ${n(timeTotal)} visitors, median ${median === null ? '–' : TIME_LABELS[median]}`}
           />
           <div className="mt-0.5 flex gap-px font-mono text-[11px] text-muted">
@@ -235,23 +316,31 @@ export function AnalyticsPanel({
         <Related title="Just after" pages={data.next} />
       </div>
 
-      <h2 className={ui.groupHeading}>{kind === 'paper' ? 'Git and agents' : 'Git'}</h2>
-      <div className="grid grid-cols-2 gap-8 narrow:grid-cols-1">
-        <div>
-          <p className="mt-3 font-sans text-sm">
-            <span className="font-mono">{n(git)}</span> clones and pulls
-          </p>
-          <DailyChart data={data} metric="git" what="Clones and pulls a day" colour="bg-faint/60" height="h-16" />
-        </div>
-        {kind === 'paper' && (
-          <div>
-            <p className="mt-3 font-sans text-sm">
-              <span className="font-mono">{n(agent)}</span> reads of its page for AI agents
-            </p>
-            <DailyChart data={data} metric="agent" what="Agent reads a day" colour="bg-faint/60" height="h-16" />
-          </div>
-        )}
-      </div>
+      <h2 className={ui.groupHeading}>Bots and crawlers</h2>
+      <p className="font-sans text-sm">
+        <span className="font-mono">{n(bots)}</span> reads in the last {data.days.length} days
+      </p>
+      <BotChart days={data.days} />
+      <ul className="mt-2 flex flex-wrap gap-x-5 gap-y-1 font-sans text-xs text-muted">
+        {BOT_SOURCES.map((source) => (
+          <li key={source} title={BOT_SOURCE_HINT[source]} className="flex items-center gap-1.5">
+            <span className={`inline-block size-2 ${BOT_COLOUR[source]}`} />
+            {BOT_SOURCE_LABEL[source]}
+            <span className="font-mono text-ink">{n(data.days.reduce((sum, d) => sum + d.botSources[source], 0))}</span>
+          </li>
+        ))}
+      </ul>
+      <p className={ui.fine}>
+        Bots that say they are one, reading the page{kind === 'paper' && ' or its page for AI agents'}, counted per
+        request as Cloudflare reports them, and updated daily. AI assistants fetch a page for someone who asked them; AI
+        crawlers collect pages for training and AI search.
+      </p>
+
+      <h2 className={ui.groupHeading}>Git</h2>
+      <p className="font-sans text-sm">
+        <span className="font-mono">{n(git)}</span> clones and pulls
+      </p>
+      <DailyChart data={data} metric="git" what="Clones and pulls a day" colour="bg-faint/60" height="h-16" />
       <p className={ui.fine}>
         Over the last {data.days.length} days, each visitor counted once a day. None of these numbers says who anyone
         is.

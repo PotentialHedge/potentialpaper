@@ -1,5 +1,3 @@
-import { clientIp } from '@/server/api/http';
-import { countQuietly } from '@/server/page-analytics';
 import { eq } from 'drizzle-orm';
 import { getDb } from '@/db';
 import { pages } from '@/db/schema';
@@ -64,7 +62,5 @@ export async function GET(req: Request, { params }: { params: Promise<{ prefix: 
       headers: { Location: `${siteUrl()}${agentPaperPath(canonical)}`, 'Cache-Control': 'no-store' },
     });
   }
-  // An agent's read, for the paper's authors (`page-analytics.ts`); a paper's page id is the paper's id.
-  countQuietly(found.paper.id, 'agent', { ip: clientIp(req) });
   return markdown(await agentPaperMarkdown(found, canonical, siteUrl()), { cache: 'no-store' });
 }
