@@ -1,6 +1,8 @@
 import { describe, expect, it } from 'vitest';
 import {
   formatScore,
+  nextScoreChanges,
+  scoreMove,
   scoreOf,
   scoreTable,
   shownFields,
@@ -35,6 +37,7 @@ function note(fields: Partial<SubmissionNote> & Pick<SubmissionNote, 'externalId
     license: 'CC-BY-4.0',
     url: null,
     createdAt: new Date(Date.UTC(2026, 10, 1, 0, at)),
+    scoreChanges: [],
     ...fields,
   };
 }
@@ -144,5 +147,59 @@ describe('threads', () => {
     ]);
     const all = (list: typeof forum): string[] => list.flatMap((t) => [t.note.externalId, ...all(t.replies)]);
     expect(all(forum).sort()).toEqual(['a', 'b']);
+  });
+});
+
+describe('nextScoreChanges', () => {
+  const T1 = '2026-11-20T10:00:00.000Z';
+  const T2 = '2026-11-24T10:00:00.000Z';
+
+  it('keeps none without a previous file, or when nothing moved', () => {
+    expect(nextScoreChanges(null, { rating: 6 }, REVIEW_FORM, T1)).toEqual([]);
+    expect(nextScoreChanges({ content: { rating: 6 } }, { rating: 6 }, REVIEW_FORM, T1)).toEqual([]);
+  });
+
+  it('records a moved score with what it was and when, and only scores', () => {
+    const before = { content: { rating: 4, confidence: 3, summary: 'Fine.' } };
+    expect(nextScoreChanges(before, { rating: 6, confidence: 3, summary: 'Better.' }, REVIEW_FORM, T1)).toEqual([
+      { field: 'rating', from: 4, at: T1 },
+    ]);
+  });
+
+  it('reads "6: marginally above" scores', () => {
+    expect(nextScoreChanges({ content: { rating: '4: reject' } }, { rating: '6: accept' }, REVIEW_FORM, T1)).toEqual([
+      { field: 'rating', from: 4, at: T1 },
+    ]);
+  });
+
+  it('keeps the first score and its time while it stands, and the first score when it moves again', () => {
+    const moved = { content: { rating: 6 }, scoreChanges: [{ field: 'rating', from: 4, at: T1 }] };
+    expect(nextScoreChanges(moved, { rating: 6 }, REVIEW_FORM, T2)).toEqual([{ field: 'rating', from: 4, at: T1 }]);
+    expect(nextScoreChanges(moved, { rating: 8 }, REVIEW_FORM, T2)).toEqual([{ field: 'rating', from: 4, at: T2 }]);
+  });
+
+  it('drops a score back where it started, or gone', () => {
+    const moved = { content: { rating: 6 }, scoreChanges: [{ field: 'rating', from: 4, at: T1 }] };
+    expect(nextScoreChanges(moved, { rating: 4 }, REVIEW_FORM, T2)).toEqual([]);
+    expect(nextScoreChanges(moved, {}, REVIEW_FORM, T2)).toEqual([]);
+  });
+
+  it('treats an unformed number as a score', () => {
+    expect(nextScoreChanges({ content: { soundness: 2 } }, { soundness: 3 }, undefined, T1)).toEqual([
+      { field: 'soundness', from: 2, at: T1 },
+    ]);
+  });
+});
+
+describe('scoreMove', () => {
+  it('marks a raise and a drop, and nothing for no move', () => {
+    const at = '2026-11-18T07:50:59Z';
+    expect(scoreMove('Rating', 6, { from: 4, at })).toEqual({
+      delta: 2,
+      mark: '(+2)',
+      title: 'The reviewer raised rating from 4 to 6 after posting the review (first seen 18 Nov).',
+    });
+    expect(scoreMove('Soundness', 2, { from: 3, at })?.mark).toBe('(−1)');
+    expect(scoreMove('Rating', 4, { from: 4, at })).toBeNull();
   });
 });

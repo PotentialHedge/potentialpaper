@@ -215,6 +215,41 @@ describe('importing reviews', () => {
     expect(all[0].notes.map((note) => [note.externalId, note.content.rating])).toEqual([['a', 4]]);
   });
 
+  it('keeps how a score moved since first imported, and shows it', async () => {
+    const first = new Date('2026-11-20T10:00:00Z');
+    const later = new Date('2026-11-24T10:00:00Z');
+    await importReviews(VENUE, [submission('forum1', [review('a', 3), review('b', 1)])], { ...OPTIONS, now: first });
+    const paper = await paperId('forum1');
+    const raised = await importReviews(VENUE, [submission('forum1', [review('a', 5), review('b', 1)])], {
+      ...OPTIONS,
+      now: first,
+    });
+    expect(raised).toMatchObject({ committed: 1 });
+    const file = JSON.parse(
+      (await readText(getDb(), paper, (await files(paper)).get('reviews/openreview/forum1/notes/a.json')!))!,
+    );
+    expect(file.scoreChanges).toEqual([{ field: 'rating', from: 3, at: first.toISOString() }]);
+
+    // Imported again as it stands: nothing to commit, and the move is kept.
+    const again = await importReviews(VENUE, [submission('forum1', [review('a', 5), review('b', 1)])], {
+      ...OPTIONS,
+      now: later,
+    });
+    expect(again).toMatchObject({ committed: 0, unchanged: 1 });
+
+    await project();
+    const [shown] = await submissionsOf(paper);
+    expect(shown.notes.map((note) => [note.externalId, note.scoreChanges])).toEqual([
+      ['a', [{ field: 'rating', from: 3, at: first.toISOString() }]],
+      ['b', []],
+    ]);
+
+    // Back where it started: the move goes.
+    await importReviews(VENUE, [submission('forum1', [review('a', 3), review('b', 1)])], { ...OPTIONS, now: later });
+    await project();
+    expect((await submissionsOf(paper))[0].notes[0].scoreChanges).toEqual([]);
+  });
+
   it('names folders by the lower-cased id and keeps the id as spelled inside', async () => {
     await importReviews(VENUE, [submission('Forum2', [review('XyZ', 2)])], OPTIONS);
     const paper = await paperId('Forum2');

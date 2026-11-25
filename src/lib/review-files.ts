@@ -1,5 +1,5 @@
 import { z } from 'zod';
-import { type FieldValue, NOTE_KINDS, type NoteKind, type VenueForms } from './submissions';
+import { type FieldValue, NOTE_KINDS, type NoteKind, type ScoreChange, type VenueForms } from './submissions';
 
 /**
  * A venue's submissions and what it published about them, as files in the paper's repo (DESIGN.md §3, §4.3,
@@ -230,6 +230,21 @@ export const noteFileSchema = z
     modifiedAt: timestamp.nullable().optional().meta({ description: 'When it was last changed at the source.' }),
     url: httpsUrl.meta({ description: 'Where it is at the source, linked from its credit.' }),
     license,
+    scoreChanges: z
+      .array(
+        z.strictObject({
+          field: shortText(200).meta({ description: 'The score, as "content" names it: "rating".' }),
+          from: z.number().meta({ description: 'The score as first recorded.' }),
+          at: timestamp.meta({ description: 'When its current value was first seen (ISO 8601, with its offset).' }),
+        }),
+      )
+      .max(200)
+      .optional()
+      .meta({
+        description:
+          'Its scores that differ from the first ones recorded, as a reviewer raises one after the rebuttal. ' +
+          'Kept by the import; left out when none moved.',
+      }),
   })
   .meta({
     title: 'Review',
@@ -273,6 +288,7 @@ export interface NoteFile {
   modifiedAt?: string | null;
   url: string;
   license: string;
+  scoreChanges?: ScoreChange[];
 }
 
 /** Each kind of file's definition. Typed against the shapes `lib/submissions.ts` shows. */
@@ -365,5 +381,6 @@ export function noteFromFile(file: NoteFile) {
     license: file.license,
     url: file.url,
     createdAt: new Date(file.createdAt),
+    scoreChanges: file.scoreChanges ?? [],
   };
 }

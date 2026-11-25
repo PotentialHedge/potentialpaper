@@ -1,0 +1,1 @@
+ALTER TABLE "submission_notes" ADD COLUMN "score_changes" jsonb DEFAULT '[]'::jsonb NOT NULL;

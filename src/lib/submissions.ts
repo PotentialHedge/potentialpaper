@@ -68,6 +68,19 @@ export interface SubmissionNote {
   /** Where it is at the source, linked from its credit. */
   url: string | null;
   createdAt: Date;
+  /** Its scores that differ from the first ones recorded, as a reviewer raises or lowers one after the rebuttal. */
+  scoreChanges: ScoreChange[];
+}
+
+/**
+ * A review's score that has moved since it was first recorded: `field` is its key in the note's `content`, `from` the
+ * score as first recorded, `at` when its current value was first seen (no later than the import after the reviewer
+ * changed it). As acceptodds keeps a review's `scoreChanges`.
+ */
+export interface ScoreChange {
+  field: string;
+  from: number;
+  at: string;
 }
 
 export interface Submission {
@@ -236,4 +249,59 @@ export function threads(notes: SubmissionNote[]): NoteThread[] {
 /** A mean as a review's scores are given: `2.67`, or `3` when whole. */
 export function formatScore(score: number): string {
   return Number.isInteger(score) ? String(score) : score.toFixed(2).replace(/0$/, '');
+}
+
+/** The keys of a note's fields shown as scores (`shownFields`), the ones whose moves are kept. */
+function scoreKeys(content: SubmissionNote['content'], form: NoteForm | undefined): Set<string> {
+  return new Set(
+    shownFields({ content }, form)
+      .filter((field) => field.type === 'score')
+      .map((field) => field.key),
+  );
+}
+
+/**
+ * A note's score changes once its content becomes `content`, from what its file said before (`previous`, with the
+ * changes it kept): a score now unlike the first one recorded keeps that first one as `from`, and `at` is `now` when it
+ * moved just now, else when it last did. A score back where it started has none. Without a previous file, none.
+ */
+export function nextScoreChanges(
+  previous: { content: SubmissionNote['content']; scoreChanges?: ScoreChange[] } | null,
+  content: SubmissionNote['content'],
+  form: NoteForm | undefined,
+  now: string,
+): ScoreChange[] {
+  if (!previous) return [];
+  const kept = new Map((previous.scoreChanges ?? []).map((change) => [change.field, change]));
+  const before = scoreKeys(previous.content, form);
+  const out: ScoreChange[] = [];
+  for (const field of scoreKeys(content, form)) {
+    const to = scoreOf(content[field]);
+    const last = before.has(field) ? scoreOf(previous.content[field]) : null;
+    const from = kept.get(field)?.from ?? last;
+    if (to === null || from === null || to === from) continue;
+    out.push({ field, from, at: last === to ? (kept.get(field)?.at ?? now) : now });
+  }
+  return out.sort((a, b) => a.field.localeCompare(b.field));
+}
+
+/**
+ * How a review's score moved since it was first recorded: the mark beside it, `(+1)`, and a sentence for its title.
+ * `null` when it is back where it started. As acceptodds marks one.
+ */
+export function scoreMove(
+  label: string,
+  to: number,
+  change: Pick<ScoreChange, 'from' | 'at'>,
+): { delta: number; mark: string; title: string } | null {
+  const delta = Math.round((to - change.from) * 100) / 100;
+  if (delta === 0) return null;
+  const day = new Date(change.at).toLocaleDateString('en-GB', { day: 'numeric', month: 'short', timeZone: 'UTC' });
+  return {
+    delta,
+    mark: `(${delta > 0 ? '+' : '−'}${Math.abs(delta)})`,
+    title:
+      `The reviewer ${delta > 0 ? 'raised' : 'lowered'} ${label.toLowerCase()} from ${formatScore(change.from)} to ` +
+      `${formatScore(to)} after posting the review (first seen ${day}).`,
+  };
 }

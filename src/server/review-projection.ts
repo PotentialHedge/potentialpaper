@@ -207,6 +207,7 @@ export async function projectReviews(database: Database, paperId: string, head: 
             url: note.url,
             createdAt: new Date(note.createdAt),
             modifiedAt: note.modifiedAt ? new Date(note.modifiedAt) : null,
+            scoreChanges: note.scoreChanges ?? [],
           })),
         );
       }

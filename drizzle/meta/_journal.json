@@ -421,6 +421,13 @@
       "when": 1795542619850,
       "tag": "0059_paper_ratings",
       "breakpoints": true
+    },
+    {
+      "idx": 60,
+      "version": "7",
+      "when": 1795593566175,
+      "tag": "0060_review_score_changes",
+      "breakpoints": true
     }
   ]
 }

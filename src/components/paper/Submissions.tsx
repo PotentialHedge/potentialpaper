@@ -5,11 +5,13 @@ import { sourceName } from '@/lib/paper-ids';
 import {
   formOf,
   noteLabel,
+  scoreMove,
   scoreTable,
   shownFields,
   STATUS_LABELS,
   threads,
   type NoteThread,
+  type ScoreChange,
   type ShownField,
   type Submission,
   type SubmissionNote,
@@ -86,21 +88,36 @@ function Heading({ submission, note }: { submission: Submission; note: Submissio
   );
 }
 
-/** The scores, and short answers such as a decision, on one wrapping line. */
-function Scores({ fields }: { fields: ShownField[] }) {
+/**
+ * The scores, and short answers such as a decision, on one wrapping line. A score the reviewer moved since posting has
+ * the move after it, `(+1)`, explained on hover, as on acceptodds. Confidence is how sure the reviewer is, not a
+ * verdict on the paper, so its move is not coloured.
+ */
+function Scores({ fields, changes }: { fields: ShownField[]; changes: ScoreChange[] }) {
   const short = fields.filter((field) => field.type !== 'text');
   if (short.length === 0) return null;
+  const moved = new Map(changes.map((change) => [change.field, change]));
   return (
     <dl className="mt-1 flex flex-wrap gap-x-4 gap-y-0.5 font-sans text-[13px]">
-      {short.map((field) => (
-        <div key={field.key} className="flex gap-1">
-          <dt className="text-muted">{field.label}</dt>
-          <dd className={field.type === 'score' ? 'font-mono' : ''}>
-            {field.text}
-            {field.type === 'score' && field.max !== undefined && <span className="text-faint">/{field.max}</span>}
-          </dd>
-        </div>
-      ))}
+      {short.map((field) => {
+        const change = field.type === 'score' ? moved.get(field.key) : undefined;
+        const move = field.type === 'score' && change ? scoreMove(field.label, field.value, change) : null;
+        const tone = !move || field.key === 'confidence' ? 'text-muted' : move.delta > 0 ? 'text-up' : 'text-down';
+        return (
+          <div key={field.key} className="flex gap-1">
+            <dt className="text-muted">{field.label}</dt>
+            <dd className={field.type === 'score' ? 'font-mono' : ''}>
+              {field.text}
+              {field.type === 'score' && field.max !== undefined && <span className="text-faint">/{field.max}</span>}
+              {move && (
+                <span className={`ml-1 cursor-help ${tone}`} title={move.title}>
+                  {move.mark}
+                </span>
+              )}
+            </dd>
+          </div>
+        );
+      })}
     </dl>
   );
 }
@@ -155,7 +172,7 @@ function Comment({ submission, note }: { submission: Submission; note: Submissio
         {title && <p className="mt-0.5 text-[15px] font-semibold">{title.text}</p>}
       </div>
       <div className="px-3 pb-2.5">
-        <Scores fields={rest} />
+        <Scores fields={rest} changes={note.scoreChanges} />
         <Sections fields={rest} />
       </div>
     </div>
@@ -173,7 +190,7 @@ function Note({ submission, thread }: { submission: Submission; thread: NoteThre
   return (
     <article id={anchor(note)} className="mt-5 scroll-mt-4 border-t border-rule pt-3">
       <Heading submission={submission} note={note} />
-      <Scores fields={fields} />
+      <Scores fields={fields} changes={note.scoreChanges} />
       {hasText && (
         <LinkedDetails
           anchor={anchor(note)}

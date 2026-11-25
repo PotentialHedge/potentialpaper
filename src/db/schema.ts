@@ -22,7 +22,13 @@ import {
 } from 'drizzle-orm/pg-core';
 import { AGENT_POST_KINDS } from '../lib/agent-posts';
 import { PAGE_KINDS } from '../lib/kinds';
-import { NOTE_KINDS, SUBMISSION_STATUSES, type FieldValue, type VenueForms } from '../lib/submissions';
+import {
+  NOTE_KINDS,
+  SUBMISSION_STATUSES,
+  type FieldValue,
+  type ScoreChange,
+  type VenueForms,
+} from '../lib/submissions';
 import type { Bins, ScoreGroup, StatOutcome } from '../lib/scope-stats';
 import type { TitleLink } from '../lib/paper-links';
 import type { PageFacts } from '../lib/infobox-facts';
@@ -843,6 +849,8 @@ export const submissionNotes = pgTable(
     url: text('url'),
     createdAt: timestamp('created_at', { withTimezone: true, mode: 'date' }).notNull(),
     modifiedAt: timestamp('modified_at', { withTimezone: true, mode: 'date' }),
+    /** Its scores that moved since first recorded, from its file's `scoreChanges`. */
+    scoreChanges: jsonb('score_changes').$type<ScoreChange[]>().notNull().default([]),
   },
   (t) => [
     primaryKey({ columns: [t.submissionId, t.externalId] }),

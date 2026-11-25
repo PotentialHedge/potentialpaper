@@ -4,7 +4,9 @@ import {
   MAX_KEYWORDS,
   MAX_TLDR,
   NOTE_SCHEMA,
+  type NoteFile,
   noteFilePath,
+  parseReviewFile,
   reviewsKey,
   submissionDir,
   SUBMISSION_SCHEMA,
@@ -14,7 +16,13 @@ import {
 } from '@/lib/review-files';
 import { sourceUrl, type VenuePlace, venuePlace } from '@/lib/venues';
 import type { PaperId } from '@/lib/paper-ids';
-import type { FieldValue, NoteKind, SubmissionStatus, VenueForms } from '@/lib/submissions';
+import {
+  type FieldValue,
+  nextScoreChanges,
+  type NoteKind,
+  type SubmissionStatus,
+  type VenueForms,
+} from '@/lib/submissions';
 import { ApiError } from './api/errors';
 import { botActor, OPENREVIEW_BOT } from './bots';
 import { type Actor, commitPage, type FileChange, SYSTEM_ACTOR } from './pages/commit';
@@ -126,6 +134,8 @@ export interface ImportOptions {
   concurrency?: number;
   /** Called after each submission, with the running totals. */
   progress?: (result: ImportResult, done: number) => void;
+  /** When a score this run finds moved is said to have moved (`scoreChanges`): now, unless a test says. */
+  now?: Date;
 }
 
 /** A bot importing on its own schedule: our scripts, run by an admin, not a request. */
@@ -156,8 +166,20 @@ function cleanText<K extends string>(key: K, value: string | null | undefined, m
 
 const nonEmpty = (value: string, fallback: string) => (value.trim() ? value : fallback);
 
-/** A submission's folder as the source gives it: each file's path and its content. */
-export function submissionFiles(venue: VenueInput, input: SubmissionInput): Map<string, string> {
+/**
+ * What a submission's notes said before an import rewrites them, so the import can keep their scores' moves: each
+ * held note file by its path, and the time to say a score moved at.
+ */
+export interface NoteHistory {
+  previous: ReadonlyMap<string, NoteFile>;
+  now: Date;
+}
+
+/**
+ * A submission's folder as the source gives it: each file's path and its content. With `history`, each note keeps
+ * the moves of its scores since first recorded (`scoreChanges`, `nextScoreChanges`).
+ */
+export function submissionFiles(venue: VenueInput, input: SubmissionInput, history?: NoteHistory): Map<string, string> {
   const files = new Map<string, string>();
   files.set(
     submissionFilePath(venue.source, input.externalId),
@@ -175,8 +197,17 @@ export function submissionFiles(venue: VenueInput, input: SubmissionInput): Map<
   );
   // A source can list a note twice, as a scan and a lookup both return it: the last one stands.
   for (const note of input.notes) {
+    const path = noteFilePath(venue.source, input.externalId, note.externalId);
+    const scoreChanges = history
+      ? nextScoreChanges(
+          history.previous.get(path) ?? null,
+          note.content,
+          Object.hasOwn(venue.forms, note.invitation) ? venue.forms[note.invitation] : undefined,
+          history.now.toISOString(),
+        )
+      : [];
     files.set(
-      noteFilePath(venue.source, input.externalId, note.externalId),
+      path,
       encodeReviewFile({
         schema: NOTE_SCHEMA,
         id: note.externalId,
@@ -189,6 +220,7 @@ export function submissionFiles(venue: VenueInput, input: SubmissionInput): Map<
         ...(note.modifiedAt ? { modifiedAt: note.modifiedAt.toISOString() } : {}),
         url: note.url ?? input.url,
         license: note.license,
+        ...(scoreChanges.length > 0 ? { scoreChanges } : {}),
       }),
     );
   }
@@ -280,11 +312,24 @@ async function importOne(
   const found = await findPaper(input.paper, database);
   if (!found) return { status: 'skipped' };
   const paperId = found.paper.id;
-  const wanted = submissionFiles(venue, input);
   const dir = submissionDir(venue.source, input.externalId);
   const head = await readHead(database, paperId);
   const tree = head ? (await readCommit(database, paperId, head)).tree : null;
   const held = tree ? await readFolder(database, paperId, tree, dir) : null;
+  let wanted = submissionFiles(venue, input);
+  // A note the import would change: read what it said, to keep how its scores moved (and one whose only change is
+  // that history comes out the same again, so it isn't rewritten).
+  const rewritten = [...wanted.keys()].filter(
+    (path) => path.includes('/notes/') && held?.has(path) && held.get(path) !== blobId(wanted.get(path)!),
+  );
+  if (rewritten.length > 0) {
+    const previous = new Map<string, NoteFile>();
+    for (const path of rewritten) {
+      const parsed = parseReviewFile('note', (await readText(database, paperId, held!.get(path)!)) ?? '');
+      if ('file' in parsed) previous.set(path, parsed.file);
+    }
+    wanted = submissionFiles(venue, input, { previous, now: options.now ?? new Date() });
+  }
   const changes: FileChange[] = [];
   for (const [path, content] of wanted) {
     if (held?.get(path) !== blobId(content)) changes.push({ path, content });

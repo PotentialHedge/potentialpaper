@@ -16,6 +16,7 @@
     "users:prune": "tsx scripts/prune-unconfirmed-users.ts",
     "admin:password": "tsx scripts/set-admin-password.ts",
     "papers:merge": "tsx scripts/merge-papers.ts",
+    "reviews:score-history": "tsx scripts/import-score-changes.ts",
     "papers:start-versions": "tsx scripts/start-versions.ts",
     "pdfs:ingest": "tsx scripts/ingest-pdfs.ts",
     "git:ssh": "tsx scripts/git-ssh.ts",

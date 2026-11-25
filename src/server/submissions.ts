@@ -39,7 +39,7 @@ export async function submissionsOf(paperId: string, database: Database = getDb(
     fetchedAt: submission.fetchedAt,
     notes: notes
       .filter((note) => note.submissionId === submission.id)
-      .map(({ externalId, replyTo, kind, invitation, signature, content, license, url, createdAt }) => ({
+      .map(({ externalId, replyTo, kind, invitation, signature, content, license, url, createdAt, scoreChanges }) => ({
         externalId,
         replyTo,
         kind,
@@ -49,6 +49,7 @@ export async function submissionsOf(paperId: string, database: Database = getDb(
         license,
         url,
         createdAt,
+        scoreChanges,
       })),
   }));
   const started = (s: Submission) => s.notes[0]?.createdAt.getTime() ?? s.fetchedAt.getTime();
