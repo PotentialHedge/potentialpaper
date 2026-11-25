@@ -20,6 +20,7 @@ import type { OwnersInfo } from '@/server/owners';
 import type { PageLink } from '@/server/page-links';
 import { LinksBox } from './LinkLists';
 import { OwnClaimStatus } from './OwnClaimStatus';
+import { OwnersEmpty } from './OwnersEmpty';
 
 /**
  * What every kind of page has, and the panels that show it the same way on each (`lib/panels.ts`): its sections, as
@@ -54,22 +55,33 @@ const STATS = (
   </>
 );
 
-const ASK: Partial<Record<OwnersInfo['claim'], { question: string; action: string; join: string; pitch: ReactNode }>> =
-  {
-    authors: {
-      question: 'Are you an author?',
-      action: 'Claim this paper',
-      join: 'also an author?',
-      pitch: <>to see who&apos;s reading it, {STATS}, and to write about it here.</>,
+const ASK: Partial<
+  Record<
+    OwnersInfo['claim'],
+    { question: string; action: string; join: string; pitch: ReactNode; empty?: { title: string; hint: string } }
+  >
+> = {
+  authors: {
+    question: 'Are you an author?',
+    action: 'Claim this paper',
+    join: 'also an author?',
+    pitch: <>to see who&apos;s reading it, {STATS}, and to write about it here.</>,
+    empty: {
+      title: 'Tell readers about your paper.',
+      hint: 'Add a summary, what came after it, code, talks or errata.',
     },
-    organisers: {
-      question: 'Organise this venue?',
-      action: 'Claim it',
-      join: 'also organising?',
-      pitch: <>to see who&apos;s reading it, {STATS}, and to write here.</>,
-    },
-    domain: { question: 'A member?', action: 'See how', join: 'how to join', pitch: 'to write here.' },
-  };
+  },
+  organisers: {
+    question: 'Organise this venue?',
+    action: 'Claim it',
+    join: 'also organising?',
+    pitch: <>to see who&apos;s reading it, {STATS}, and to write here.</>,
+    empty: { title: 'Tell readers about your venue.', hint: 'Add what it covers, its deadlines or how to submit.' },
+  },
+  domain: { question: 'A member?', action: 'See how', join: 'how to join', pitch: 'to write here.' },
+};
+/** What an owner is asked to write while their part is empty, on a kind without its own. */
+const OWNERS_EMPTY = { title: 'Nothing here yet.', hint: 'Write what readers should know.' };
 
 /** The API route answering with the viewer's own claim to a page. */
 function ownClaimUrl(address: PageAddress): string {
@@ -112,6 +124,31 @@ export function Sections({ kind, address, ownersHtml, communityHtml, owners }: P
   const both = owners !== null && community;
   const ask = owners && ASK[owners.claim];
   const history = toolPath('history', address);
+  const label = both && (
+    <PartLabel>
+      From {owners.title}
+      {owners.people.length > 0 && ': '}
+      {owners.people.map((p, i) => (
+        <Fragment key={p.authorIndex}>
+          {i > 0 && ', '}
+          {p.href ? <a href={p.href}>{p.name}</a> : p.name}
+        </Fragment>
+      ))}{' '}
+      ·{' '}
+      <a href={EDIT} rel="nofollow">
+        edit
+      </a>
+      {owners.claimPath && ask && (
+        <>
+          {' '}
+          ·{' '}
+          <a href={owners.claimPath} rel="nofollow">
+            {ask.join}
+          </a>
+        </>
+      )}
+    </PartLabel>
+  );
   return (
     <section id="sections" className="mt-5">
       {owners && (
@@ -134,38 +171,15 @@ export function Sections({ kind, address, ownersHtml, communityHtml, owners }: P
                 </a>
               </div>
             </OwnClaimStatus>
+          ) : label && owners.claimed && !ownersHtml ? (
+            <OwnersEmpty {...(ask?.empty ?? OWNERS_EMPTY)}>
+              {label}
+              <p className={`${ui.fine} font-sans`}>Nothing yet.</p>
+            </OwnersEmpty>
           ) : (
-            both && (
-              <PartLabel>
-                From {owners.title}
-                {owners.people.length > 0 && ': '}
-                {owners.people.map((p, i) => (
-                  <Fragment key={p.authorIndex}>
-                    {i > 0 && ', '}
-                    {p.href ? <a href={p.href}>{p.name}</a> : p.name}
-                  </Fragment>
-                ))}{' '}
-                ·{' '}
-                <a href={EDIT} rel="nofollow">
-                  edit
-                </a>
-                {owners.claimPath && ask && (
-                  <>
-                    {' '}
-                    ·{' '}
-                    <a href={owners.claimPath} rel="nofollow">
-                      {ask.join}
-                    </a>
-                  </>
-                )}
-              </PartLabel>
-            )
+            label
           )}
-          {ownersHtml ? (
-            <Html html={ownersHtml} />
-          ) : (
-            both && owners.claimed && <p className={`${ui.fine} font-sans`}>Nothing yet.</p>
-          )}
+          {ownersHtml && <Html html={ownersHtml} />}
           {/* The plugins' panels a paper's authors let in (`paper.author`, `owners/plugins.json`). */}
           {kind === 'paper' && (
             <div className="flow-root">
