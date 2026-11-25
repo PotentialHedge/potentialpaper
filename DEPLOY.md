@@ -58,6 +58,15 @@ docker exec potentialpaper-postgres-1 pg_dump -U potentialpaper -Fc potentialpap
   | docker exec -i potentialpaper-staging-postgres-1 pg_restore -U potentialpaper -d potentialpaper --clean --if-exists --no-owner
 ```
 
+The copied `page_events` carry production's transaction ids, far above the copy's own counter, so the consumers would
+skip every commit made on staging after it. Before starting the worker, put the copied events at the start:
+
+```sh
+docker exec potentialpaper-staging-postgres-1 psql -U potentialpaper -d potentialpaper -c "begin;
+  update consumer_cursors set last_xid = '1', last_event_id = (select coalesce(max(id), 0) from page_events);
+  update page_events set xid = '1'; commit;"
+```
+
 then migrate and start as above.
 
 ## Why each step is there
