@@ -24,13 +24,13 @@ function SourceLink({ link }: { link: RowLink }) {
 }
 
 /**
- * One paper in a list: its PDF link (or, with no PDF, its page at its source), title and authors, venue and year.
+ * One paper in a list: its PDF link (or, with no PDF, its page at its source), title, authors and year, and venue.
  * The whole row is one target: the title's link is stretched over the row (`after:inset-0`), since a row that is
  * itself a link could not hold the PDF link, which sits above the stretched one, in a column of its own at the left
  * so titles align.
  *
- * Under `RowPlugins` (`paper` given), a plugin's note on the paper takes the venue's place, and the year's column
- * widens by `--row-actions` for the ⋯ of the plugins' row commands, when there are any.
+ * Under `RowPlugins` (`paper` given), a plugin's note on the paper takes the venue's place, and the last column
+ * is `--row-actions` wide, for the ⋯ of the plugins' row commands, when there are any.
  */
 export function PaperRow({
   paper,
@@ -51,14 +51,14 @@ export function PaperRow({
   href: string;
 }) {
   return (
-    <div className="relative grid grid-cols-[44px_1fr_150px_calc(40px_+_var(--row-actions,0px))] items-center gap-x-3.5 border-b border-dotted border-rule-strong py-2 hover:bg-highlight narrow:grid-cols-[44px_1fr_calc(40px_+_var(--row-actions,0px))]">
+    <div className="relative grid grid-cols-[44px_1fr_150px_var(--row-actions,0px)] items-center gap-x-3.5 border-b border-dotted border-rule-strong py-2 hover:bg-highlight narrow:grid-cols-[44px_1fr_var(--row-actions,0px)]">
       <span className="font-sans text-xs">{link && <SourceLink link={link} />}</span>
       <span className="min-w-0 leading-[1.35]">
         {/* At most two lines; the whole title on hover. */}
         <Link href={href} className="line-clamp-2 after:absolute after:inset-0 hover:no-underline" title={title}>
           {title}
         </Link>
-        <span className="block font-sans text-xs text-muted">{authorLine(authors)}</span>
+        <span className="block font-sans text-xs text-muted">{authorLine(authors, year)}</span>
       </span>
       <span className="truncate text-right font-sans text-xs text-muted narrow:hidden" title={venue ?? undefined}>
         {paper ? (
@@ -69,23 +69,27 @@ export function PaperRow({
           venue
         )}
       </span>
-      <span className="flex items-center justify-end gap-1 font-mono text-xs text-muted">
-        {year}
+      <span className="flex items-center justify-end font-mono text-xs text-muted">
         {paper && <RowActions paper={paper} />}
       </span>
     </div>
   );
 }
 
-/** "A, B, C et al.": enough to recognise a paper by. */
-function authorLine(names: string[]): string {
-  if (names.length === 0) return 'Anonymous authors';
-  return names.length > 3 ? `${names.slice(0, 3).join(', ')} et al.` : names.join(', ');
+/** "A, B, C et al., 2017": enough to recognise a paper by. */
+function authorLine(names: string[], year: number | null): string {
+  const who =
+    names.length === 0
+      ? 'Anonymous authors'
+      : names.length > 3
+        ? `${names.slice(0, 3).join(', ')} et al.`
+        : names.join(', ');
+  return year ? `${who}, ${year}` : who;
 }
 
 /**
  * One paper in the detailed list: a picture of its first page beside the title, authors, its TL;DR (or else the
- * start of its abstract), venue and year. As in `PaperRow`, the title's link covers the card, picture included, and opens the paper's
+ * start of its abstract), and venue; the year follows the authors. As in `PaperRow`, the title's link covers the card, picture included, and opens the paper's
  * page. A paper with no cover gets a blank title page instead, so the column stays even. The frame is A4.
  */
 export function PaperCard({
@@ -139,7 +143,7 @@ export function PaperCard({
         >
           {title}
         </Link>
-        <div className="mt-0.5 font-sans text-xs text-muted">{authorLine(authors)}</div>
+        <div className="mt-0.5 font-sans text-xs text-muted">{authorLine(authors, year)}</div>
         {(tldr || abstract) && (
           <p className="mt-1.5 line-clamp-3 text-[13px] leading-snug text-subtle narrow:line-clamp-2">
             {tldr ? (
@@ -157,11 +161,9 @@ export function PaperCard({
               <RowNote paper={paper} venue={venue}>
                 {venue}
               </RowNote>
-              {venue && year && ' · '}
-              {year}
             </span>
           ) : (
-            [venue, year].filter(Boolean).join(' · ')
+            venue
           )}
           {link && <SourceLink link={link} />}
           {paper && <RowActions paper={paper} />}
