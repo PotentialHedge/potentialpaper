@@ -60,6 +60,10 @@ services:
     restart: unless-stopped
     logging: *logging
     env_file: .env.production
+    environment:
+      # Longer than Traefik keeps an idle connection to it (90 s), so Traefik never sends a request down one Node
+      # has just closed (a 502 in 1 ms). With Node's default of 5 s that happened, most during a deploy's overlap.
+      KEEP_ALIVE_TIMEOUT: '95000'
     depends_on:
       postgres:
         condition: service_healthy
@@ -78,6 +82,8 @@ services:
       timeout: 5s
       retries: 3
       start_period: 20s
+      # While starting, checked every 2 s, so a deploy's new container is routed to within seconds.
+      start_interval: 2s
     labels:
       - traefik.enable=true
       - traefik.docker.network=web
