@@ -114,6 +114,16 @@ export function LockIcon({ className = 'size-3' }: { className?: string }) {
   );
 }
 
+/** An open padlock: open to the page's owners, and only to them. */
+export function LockOpenIcon({ className = 'size-3' }: { className?: string }) {
+  return (
+    <svg {...line} className={className}>
+      <rect x="1.5" y="7" width="9.5" height="7" rx="1.5" />
+      <path d="M8.5 7V4.5a2.5 2.5 0 0 1 5 0V6" />
+    </svg>
+  );
+}
+
 /** A star: follow a paper. Filled when followed. */
 export function StarIcon({ className = 'size-3.5', filled = false }: { className?: string; filled?: boolean }) {
   return (

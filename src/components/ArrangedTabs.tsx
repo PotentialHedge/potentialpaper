@@ -4,7 +4,7 @@ import { track } from '@/lib/track';
 import { type ReactNode, useState } from 'react';
 import { AnalyticsPanel, usePageAnalytics } from '@/components/pages/Analytics';
 import { usePluginPanels } from '@/components/plugins/PluginPanel';
-import { LockIcon } from '@/components/icons';
+import { LockIcon, LockOpenIcon } from '@/components/icons';
 import { ui } from '@/components/ui';
 import { type ClaimPolicy, KINDS } from '@/lib/kinds';
 import { arrangePanels, type PanelKind } from '@/lib/panels';
@@ -38,10 +38,14 @@ export function ArrangedTabs({
   const analytics = usePageAnalytics(pageId);
   const hidden = useSetting<string[]>(`${kind}.panels.hidden`);
   const order = useSetting<string[]>(`${kind}.panels.order`);
-  const panels: { id: string; title: string; hint?: string; locked?: boolean; lock?: boolean; node: ReactNode }[] = [
-    ...builtIn,
-    ...usePluginPanels(slot),
-  ];
+  const panels: {
+    id: string;
+    title: string;
+    hint?: string;
+    locked?: boolean;
+    lock?: 'open' | 'shut';
+    node: ReactNode;
+  }[] = [...builtIn, ...usePluginPanels(slot)];
   const ids = arrangePanels(
     panels.map((p) => p.id),
     hidden,
@@ -58,11 +62,11 @@ export function ArrangedTabs({
       id: ANALYTICS,
       title: 'Analytics',
       hint: who ? `${who[0].toUpperCase()}${who.slice(1)} only` : 'Only you can see this',
+      // Open to its owners (an open lock), shut to anyone else.
+      lock: locked ? 'shut' : 'open',
       locked,
-      // A lock on a person's own tab too: only they see it.
-      lock: locked || !owners,
       node: analytics ? (
-        <AnalyticsPanel data={analytics} kind={kind} />
+        <AnalyticsPanel data={analytics} kind={kind} who={owners ? owners.title : null} />
       ) : (
         <LockedAnalytics who={who!} claim={owners!.claim} claimPath={claimPath!} />
       ),
@@ -93,7 +97,12 @@ export function ArrangedTabs({
               }}
               className={`-mb-px cursor-pointer border-b-2 pb-1 ${id === shown ? `border-ink ${ui.on}` : 'border-transparent text-muted'} ${id !== LEAD && byId.get(id)!.locked ? 'opacity-60' : ''}`}
             >
-              {id !== LEAD && byId.get(id)!.lock && <LockIcon className="mr-1 inline size-3 -translate-y-px" />}
+              {id !== LEAD && byId.get(id)!.lock === 'shut' && (
+                <LockIcon className="mr-1 inline size-3 -translate-y-px" />
+              )}
+              {id !== LEAD && byId.get(id)!.lock === 'open' && (
+                <LockOpenIcon className="mr-1 inline size-3 -translate-y-px" />
+              )}
               {title(id)}
             </button>
           ))}

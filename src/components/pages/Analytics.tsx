@@ -1,8 +1,9 @@
 'use client';
 
 import { useEffect, useState } from 'react';
+import { LockOpenIcon } from '@/components/icons';
 import { ui } from '@/components/ui';
-import type { PageKind } from '@/lib/kinds';
+import { KINDS, type PageKind } from '@/lib/kinds';
 
 /**
  * A page's analytics, as a tab only its owners see (`server/page-analytics.ts`, `GET /api/v1/analytics`). The page is
@@ -144,13 +145,26 @@ function Related({ title, pages }: { title: string; pages: PageAnalytics['next']
   );
 }
 
-export function AnalyticsPanel({ data, kind }: { data: PageAnalytics; kind: PageKind }) {
+export function AnalyticsPanel({
+  data,
+  kind,
+  who,
+}: {
+  data: PageAnalytics;
+  kind: PageKind;
+  /** Its owners, as the page calls them ("the authors"); `null` on a person's page, which only they own. */
+  who: string | null;
+}) {
   const timeTotal = data.time.reduce((a, b) => a + b, 0);
   const median = medianBucket(data.time);
   const git = lastDays(data, 'git', data.days.length);
   const agent = lastDays(data, 'agent', data.days.length);
   return (
     <section id="analytics">
+      <p className={`${ui.fine} flex items-center gap-1.5 font-sans`}>
+        <LockOpenIcon />
+        {who ? `Only ${who} of this ${KINDS[kind].title.toLowerCase()} can see this.` : 'Only you can see this.'}
+      </p>
       <h2 className={`${ui.groupHeading} mt-4`}>Visitors</h2>
       <p className="font-sans text-sm">
         <span className="font-mono">{n(lastDays(data, 'views', 30))}</span> in the last 30 days ·{' '}
@@ -239,8 +253,8 @@ export function AnalyticsPanel({ data, kind }: { data: PageAnalytics; kind: Page
         )}
       </div>
       <p className={ui.fine}>
-        Over the last {data.days.length} days, each visitor counted once a day. Only this page&apos;s owners see these
-        numbers, and none of them says who anyone is.
+        Over the last {data.days.length} days, each visitor counted once a day. None of these numbers says who anyone
+        is.
       </p>
     </section>
   );
