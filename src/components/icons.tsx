@@ -104,6 +104,16 @@ export function ChartIcon({ className = 'size-3.5' }: { className?: string }) {
   );
 }
 
+/** A padlock: only the page's owners may open it. */
+export function LockIcon({ className = 'size-3' }: { className?: string }) {
+  return (
+    <svg {...line} className={className}>
+      <rect x="3" y="7" width="10" height="7" rx="1.5" />
+      <path d="M5.5 7V5a2.5 2.5 0 0 1 5 0v2" />
+    </svg>
+  );
+}
+
 /** A star: follow a paper. Filled when followed. */
 export function StarIcon({ className = 'size-3.5', filled = false }: { className?: string; filled?: boolean }) {
   return (

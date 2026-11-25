@@ -134,6 +134,7 @@ export async function KeyedPageRoute({ kind, segments }: { kind: KeyedKind; segm
   return (
     <PageView
       pageId={page.id}
+      claimPath={owners?.claimPath}
       kind={kind}
       plugins={{ kind, page: summary, scopes, facts }}
       panels={buildPanels(kind, KIND_PANELS[kind], props, (id) => presentPanel(props, id))}

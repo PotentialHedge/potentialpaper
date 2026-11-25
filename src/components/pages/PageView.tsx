@@ -28,6 +28,7 @@ export function PageView({
   panels,
   after,
   reviewAt = [],
+  claimPath = null,
 }: {
   kind: PageKind;
   /** For the Analytics tab its owners see (`Analytics.tsx`). */
@@ -40,6 +41,8 @@ export function PageView({
   after?: ReactNode;
   /** The venues a paper is under review at: all but its title is blurred until the reader shows it (`ReviewBlur`). */
   reviewAt?: ReviewVenue[];
+  /** Where to claim it: anyone but its owners sees the Analytics tab locked, pointing there. */
+  claimPath?: string | null;
 }) {
   const slot = (name: GenericSlot) => `${kind}.${name}`;
   return (
@@ -54,6 +57,7 @@ export function PageView({
               slot={slot('tabs')}
               panels={panels.tabs}
               pageId={pageId}
+              claimPath={claimPath}
               lead={{
                 title: KINDS[kind].title,
                 node: (

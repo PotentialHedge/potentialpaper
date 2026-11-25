@@ -4,8 +4,9 @@ import { track } from '@/lib/track';
 import { type ReactNode, useState } from 'react';
 import { AnalyticsPanel, usePageAnalytics } from '@/components/pages/Analytics';
 import { usePluginPanels } from '@/components/plugins/PluginPanel';
+import { LockIcon } from '@/components/icons';
 import { ui } from '@/components/ui';
-import { KINDS } from '@/lib/kinds';
+import { type ClaimPolicy, KINDS } from '@/lib/kinds';
 import { arrangePanels, type PanelKind } from '@/lib/panels';
 import { useSetting } from '@/lib/settings/client';
 
@@ -23,6 +24,7 @@ export function ArrangedTabs({
   panels: builtIn,
   lead,
   pageId,
+  claimPath,
 }: {
   kind: PanelKind;
   /** The slot's full name (`venue.tabs`), for plugins' panels, which join as tabs of their own. */
@@ -30,11 +32,13 @@ export function ArrangedTabs({
   panels: { id: string; title: string; node: ReactNode }[];
   lead?: { title: string; node: ReactNode };
   pageId?: string;
+  /** Where to claim the page (`OwnersInfo.claimPath`): anyone else sees its Analytics tab locked, pointing there. */
+  claimPath?: string | null;
 }) {
   const analytics = usePageAnalytics(pageId);
   const hidden = useSetting<string[]>(`${kind}.panels.hidden`);
   const order = useSetting<string[]>(`${kind}.panels.order`);
-  const panels: { id: string; title: string; note?: string; node: ReactNode }[] = [
+  const panels: { id: string; title: string; hint?: string; locked?: boolean; node: ReactNode }[] = [
     ...builtIn,
     ...usePluginPanels(slot),
   ];
@@ -44,15 +48,22 @@ export function ArrangedTabs({
     order,
   );
   const ANALYTICS = '\0analytics';
-  if (analytics) {
-    // Only the page's owners get it: on a person's page, that is only them.
-    const owners = kind in KINDS ? KINDS[kind as keyof typeof KINDS].owners : null;
-    const only = owners ? `only ${owners.title} can see` : 'only you can see';
+  // Only the page's owners see its analytics: on a person's page, that is only them. Anyone else sees the tab locked,
+  // and opening it says how to become an owner.
+  const owners = kind in KINDS ? KINDS[kind as keyof typeof KINDS].owners : null;
+  const locked = !analytics && owners !== null && !!claimPath;
+  if (analytics || locked) {
+    const who = owners ? owners.title.replace(/^the /, '') : null;
     panels.push({
       id: ANALYTICS,
       title: 'Analytics',
-      note: only,
-      node: <AnalyticsPanel data={analytics} kind={kind} />,
+      hint: who ? `${who[0].toUpperCase()}${who.slice(1)} only` : 'Only you can see this',
+      locked,
+      node: analytics ? (
+        <AnalyticsPanel data={analytics} kind={kind} />
+      ) : (
+        <LockedAnalytics who={who!} claim={owners!.claim} claimPath={claimPath!} />
+      ),
     });
     ids.push(ANALYTICS);
   }
@@ -73,16 +84,15 @@ export function ArrangedTabs({
               role="tab"
               type="button"
               aria-selected={id === shown}
+              title={id === LEAD ? undefined : byId.get(id)!.hint}
               onClick={() => {
                 setChosen(id);
                 track('tab_opened', { target: id === ANALYTICS ? 'analytics' : id || 'lead' });
               }}
-              className={`-mb-px cursor-pointer border-b-2 pb-1 ${id === shown ? `border-ink ${ui.on}` : 'border-transparent text-muted'}`}
+              className={`-mb-px cursor-pointer border-b-2 pb-1 ${id === shown ? `border-ink ${ui.on}` : 'border-transparent text-muted'} ${id !== LEAD && byId.get(id)!.locked ? 'opacity-60' : ''}`}
             >
+              {id !== LEAD && byId.get(id)!.locked && <LockIcon className="mr-1 inline size-3 -translate-y-px" />}
               {title(id)}
-              {id !== LEAD && byId.get(id)!.note && (
-                <span className="ml-1 text-xs text-muted">({byId.get(id)!.note})</span>
-              )}
             </button>
           ))}
         </div>
@@ -94,5 +104,27 @@ export function ArrangedTabs({
       )}
       {shown !== LEAD && <div role={tabs.length > 1 ? 'tabpanel' : undefined}>{byId.get(shown)!.node}</div>}
     </section>
+  );
+}
+
+/** What claiming a page is called, by how its owners are confirmed. */
+const CLAIM_ACTION: Record<ClaimPolicy, string> = {
+  authors: 'Claim this paper',
+  organisers: 'Claim this venue',
+  domain: 'See how to join',
+};
+
+/** A locked Analytics tab, opened: what is behind it, and how to become one who sees it. */
+function LockedAnalytics({ who, claim, claimPath }: { who: string; claim: ClaimPolicy; claimPath: string }) {
+  return (
+    <div className="flex flex-wrap items-center gap-x-4 gap-y-2 border border-frame bg-card px-4 py-3 font-sans text-[13px]">
+      <p className="min-w-0 flex-1 basis-64 text-muted">
+        <strong className="text-ink">Only {who} see this.</strong> Views over time, how long people read, where they
+        come from and what they open next.
+      </p>
+      <a href={claimPath} rel="nofollow" className={ui.btn({ ghost: true, inline: true, flush: true })}>
+        {CLAIM_ACTION[claim]}
+      </a>
+    </div>
   );
 }

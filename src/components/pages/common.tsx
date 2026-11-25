@@ -20,7 +20,7 @@ import type { OwnersInfo } from '@/server/owners';
 import type { PageLink } from '@/server/page-links';
 import { LinksBox } from './LinkLists';
 import { OwnClaimStatus } from './OwnClaimStatus';
-import { OwnersEmpty } from './OwnersEmpty';
+import { ForOwners } from './ForOwners';
 
 /**
  * What every kind of page has, and the panels that show it the same way on each (`lib/panels.ts`): its sections, as
@@ -172,10 +172,10 @@ export function Sections({ kind, address, ownersHtml, communityHtml, owners }: P
               </div>
             </OwnClaimStatus>
           ) : label && owners.claimed && !ownersHtml ? (
-            <OwnersEmpty {...(ask?.empty ?? OWNERS_EMPTY)}>
+            <ForOwners owner={<WritePrompt {...(ask?.empty ?? OWNERS_EMPTY)} />}>
               {label}
               <p className={`${ui.fine} font-sans`}>Nothing yet.</p>
-            </OwnersEmpty>
+            </ForOwners>
           ) : (
             label
           )}
@@ -202,7 +202,10 @@ export function Sections({ kind, address, ownersHtml, communityHtml, owners }: P
           {communityHtml ? (
             <Html html={communityHtml} />
           ) : (
-            <CommunityInvite kind={kind} paperPath={kind === 'paper' ? pagePath(address) : null} />
+            // Its owners are asked to write their own part instead.
+            <ForOwners owner={null}>
+              <CommunityInvite kind={kind} paperPath={kind === 'paper' ? pagePath(address) : null} />
+            </ForOwners>
           )}
           {kind === 'paper' && communityHtml && (
             <div className={`${ui.fine} mt-3 font-sans`}>
@@ -218,6 +221,20 @@ export function Sections({ kind, address, ownersHtml, communityHtml, owners }: P
         </div>
       )}
     </section>
+  );
+}
+
+/** An owner's part they have not started: an invitation to write it. */
+function WritePrompt({ title, hint }: { title: string; hint: string }) {
+  return (
+    <div className="flex flex-wrap items-center gap-x-4 gap-y-2 border border-dashed border-frame px-4 py-3 font-sans text-[13px]">
+      <p className="min-w-0 flex-1 basis-64 text-muted">
+        <strong className="text-ink">{title}</strong> {hint}
+      </p>
+      <a href={EDIT} rel="nofollow" className={ui.btn({ inline: true, flush: true })}>
+        Start writing
+      </a>
+    </div>
   );
 }
 

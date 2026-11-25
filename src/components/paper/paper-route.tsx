@@ -190,6 +190,7 @@ export async function PaperRoute({ scheme, segments }: { scheme: PaperScheme; se
   return (
     <PageView
       pageId={paper.id}
+      claimPath={owners?.claimPath}
       kind="paper"
       reviewAt={reviewAt}
       plugins={plugins}
