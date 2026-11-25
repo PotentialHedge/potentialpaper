@@ -8,6 +8,8 @@
  * is rendered on each visit anyway.
  */
 
+import { purgeEdge } from './edge-purge';
+
 const SHORT_PATH = /^\/s\/\d{1,12}$/;
 const DELAY_MS = 2_000;
 
@@ -37,6 +39,9 @@ async function drain(): Promise<void> {
       try {
         const res = await fetch(`${base}${path}`, { cache: 'no-store', signal: AbortSignal.timeout(30_000) });
         await res.arrayBuffer();
+        // The refresh purged the edge before Next dropped its copy (it does once the request that asked has answered),
+        // so a reader in between may have put the old page back at the edge: purged again, now that Next has the new.
+        if (res.ok) await purgeEdge([path]);
       } catch (err) {
         console.error('warm', path, err instanceof Error ? err.message : err);
       }

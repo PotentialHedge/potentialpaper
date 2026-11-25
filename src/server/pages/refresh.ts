@@ -5,14 +5,14 @@ import { pages, paperIdentifiers } from '@/db/schema';
 import { type PageAddress, pagePath } from '@/lib/kinds';
 import { paperPath, type PaperId } from '@/lib/paper-ids';
 import { revalidateInApp } from '../internal';
-import { siteUrl } from '../site';
 import { pageOf } from './kinds';
+import { purgeEdge } from './edge-purge';
 import { warmSoon } from './warm';
 import type { Reader } from './repo';
 
 /**
  * After a commit, makes the paper's pages show it: Next renders them again on their next request, and
- * Cloudflare drops its copies when production has a purge token (TODO.md). Never fails the commit, which
+ * Cloudflare drops its copies (`edge-purge.ts`). Never fails the commit, which
  * has happened by now.
  *
  * `revalidatePath` only works inside a Next request. Outside one (the SSH server, scripts) the app is asked to
@@ -74,19 +74,5 @@ async function refreshPaths(paths: readonly string[]): Promise<void> {
   }
   if (outside.length) await revalidateInApp(outside);
   else warmSoon(paths);
-  const token = process.env.CLOUDFLARE_PURGE_TOKEN;
-  const zone = process.env.CLOUDFLARE_ZONE_ID;
-  if (!token || !zone) return;
-  const files = paths.map((path) => `${siteUrl()}${path}`);
-  try {
-    const res = await fetch(`https://api.cloudflare.com/client/v4/zones/${zone}/purge_cache`, {
-      method: 'POST',
-      headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' },
-      body: JSON.stringify({ files }),
-      signal: AbortSignal.timeout(10_000),
-    });
-    if (!res.ok) console.error('edge purge', res.status, (await res.text()).slice(0, 200));
-  } catch (err) {
-    console.error('edge purge', err);
-  }
+  await purgeEdge(paths);
 }

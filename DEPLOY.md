@@ -97,6 +97,9 @@ then migrate and start as above.
 
 - **Migrations run as their own step**, never at app start. `dc run --rm tools npm run <script>` runs any
   other script against production the same way.
+- **Paper pages are cached at the edge** at their short address (`/s/<n>`), by path alone, HTML only: RSC requests
+  and `?v=` pass through. A commit's refresh purges them by prefix (`server/pages/edge-purge.ts`), with
+  `CLOUDFLARE_PURGE_TOKEN` in `.env.production`, a token for cache purge on this zone only.
 - **The edge-cache purge is not optional.** Cloudflare caches whole pages. They name the old build's scripts,
   which the new container no longer serves, so cached pages break until the cache is purged.
 

@@ -17,10 +17,6 @@ Things only you can do or decide, most urgent first. Milestones 1 and 2 and the 
 
 - [ ] **Contribution license.** The starting proposal is CC BY-SA for community content and CC BY for author
       sections.
-- [ ] **Decide how production purges the edge.** Pages now show edits, so each commit has to purge that page from
-      Cloudflare, and the app needs a token. Until it has one, the editor sees its own edit (it reloads with
-      `?v=`), but other readers get the edge's copy until it expires. I'd make one limited to cache purge on this zone, and put it in
-      `.env.production`. Production doesn't have one yet.
 - [ ] **Put `ppusercontent.com` on the Public Suffix List.** Demos (`<snapshot>.ppusercontent.com`) and the
       editor's webviews (`<uuid>.ppusercontent.com`) now each have their own origin on that domain (bought
       2026-11-16; DNS, TLS and Traefik set up, DEPLOY.md "User content"). Browsers still count them as one site,
