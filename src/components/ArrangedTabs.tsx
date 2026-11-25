@@ -5,6 +5,7 @@ import { type ReactNode, useState } from 'react';
 import { AnalyticsPanel, usePageAnalytics } from '@/components/pages/Analytics';
 import { usePluginPanels } from '@/components/plugins/PluginPanel';
 import { ui } from '@/components/ui';
+import { KINDS } from '@/lib/kinds';
 import { arrangePanels, type PanelKind } from '@/lib/panels';
 import { useSetting } from '@/lib/settings/client';
 
@@ -33,7 +34,10 @@ export function ArrangedTabs({
   const analytics = usePageAnalytics(pageId);
   const hidden = useSetting<string[]>(`${kind}.panels.hidden`);
   const order = useSetting<string[]>(`${kind}.panels.order`);
-  const panels = [...builtIn, ...usePluginPanels(slot)];
+  const panels: { id: string; title: string; note?: string; node: ReactNode }[] = [
+    ...builtIn,
+    ...usePluginPanels(slot),
+  ];
   const ids = arrangePanels(
     panels.map((p) => p.id),
     hidden,
@@ -41,7 +45,15 @@ export function ArrangedTabs({
   );
   const ANALYTICS = '\0analytics';
   if (analytics) {
-    panels.push({ id: ANALYTICS, title: 'Analytics', node: <AnalyticsPanel data={analytics} kind={kind} /> });
+    // Only the page's owners get it: on a person's page, that is only them.
+    const owners = kind in KINDS ? KINDS[kind as keyof typeof KINDS].owners : null;
+    const only = owners ? `only ${owners.title} can see` : 'only you can see';
+    panels.push({
+      id: ANALYTICS,
+      title: 'Analytics',
+      note: only,
+      node: <AnalyticsPanel data={analytics} kind={kind} />,
+    });
     ids.push(ANALYTICS);
   }
   const [chosen, setChosen] = useState<string | null>(null);
@@ -68,6 +80,9 @@ export function ArrangedTabs({
               className={`-mb-px cursor-pointer border-b-2 pb-1 ${id === shown ? `border-ink ${ui.on}` : 'border-transparent text-muted'}`}
             >
               {title(id)}
+              {id !== LEAD && byId.get(id)!.note && (
+                <span className="ml-1 text-xs text-muted">({byId.get(id)!.note})</span>
+              )}
             </button>
           ))}
         </div>
