@@ -36,6 +36,7 @@ export default function AboutPage() {
           Reading needs no account. Writing needs an institutional email address. Who said what is always shown: an
           author&apos;s words, the community&apos;s and a bot&apos;s never look alike.
         </p>
+        <p>potentialpaper is independent: it is not affiliated with or connected to any institution.</p>
       </div>
 
       <h2 className={ui.groupHeading}>Open by design</h2>
