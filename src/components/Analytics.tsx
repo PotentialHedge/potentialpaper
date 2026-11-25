@@ -8,7 +8,8 @@ const BEFORE_SEND = 'potentialPaperBeforeSend';
 type Payload = { url?: string; referrer?: string; [key: string]: unknown };
 
 /**
- * The Umami tracker: page views (client-side navigations included) and Core Web Vitals. Cookieless; it
+ * The Umami tracker: page views (client-side navigations included), Core Web Vitals, and uncaught JavaScript errors
+ * (Umami 3.5's error tracking: each with its message and stack, grouped into issues). Cookieless; it
  * never learns who the viewer is. Every hit passes through `analyticsUrl` first, and the hook must exist
  * before the tracker's first page view, so it is installed here and only then is the script added — never
  * a plain <script> in the layout, which could run first.
@@ -33,6 +34,7 @@ export function Analytics() {
     script.dataset.domains = UMAMI_DOMAIN;
     script.dataset.excludeHash = 'true';
     script.dataset.performance = 'true';
+    script.dataset.errors = 'true';
     document.head.appendChild(script);
   }, []);
   return null;

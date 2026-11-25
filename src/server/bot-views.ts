@@ -120,6 +120,31 @@ function identifierOfPath(path: string): { short: string } | { identifier: strin
   return kind ? { identifier: `${kind}:${value}` } : null;
 }
 
+/**
+ * Papers' page ids by their short paths (`/s/<n>`, `/agent/s/<n>`), most of what bots read, in one query: a merged
+ * paper's is its survivor's. Other paths are left for `pageIdOfPath`, one at a time.
+ */
+async function shortPaperIds(paths: string[], database: Database): Promise<Map<string, string | null>> {
+  const shortOf = new Map<string, number>();
+  for (const path of paths) {
+    const named = identifierOfPath(path);
+    if (named && 'short' in named) shortOf.set(path, Number(named.short));
+  }
+  const found = new Map<number, string>();
+  const ids = [...new Set(shortOf.values())];
+  for (let i = 0; i < ids.length; i += 5000) {
+    const result = await database.execute<{ short_id: number; id: string }>(sql`
+      select p.short_id, coalesce(pa.merged_into, p.id) as id
+        from pages p join papers pa on pa.id = p.id
+       where p.kind = 'paper' and p.short_id = any(${`{${ids.slice(i, i + 5000).join(',')}}`}::int[])
+    `);
+    for (const row of result.rows) found.set(Number(row.short_id), row.id);
+  }
+  const out = new Map<string, string | null>();
+  for (const [path, short] of shortOf) if (found.has(short)) out.set(path, found.get(short)!);
+  return out;
+}
+
 async function pageIdOfPath(path: string, database: Database): Promise<string | null> {
   const named = identifierOfPath(path);
   if (!named) return null;
@@ -141,7 +166,10 @@ export async function pullBotViews(
   const byPath = new Map<string, number>();
   await hits(token, zone, { from, to }, byPath);
 
-  const pageIds = new Map<string, string | null>();
+  const pageIds = await shortPaperIds(
+    [...byPath.keys()].map((key) => key.split('\0')[1]),
+    database,
+  );
   const byPage = new Map<string, number>();
   for (const [key, count] of byPath) {
     const [source, path] = key.split('\0') as [BotSource, string];

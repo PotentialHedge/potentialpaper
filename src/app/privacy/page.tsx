@@ -110,10 +110,10 @@ export default function PrivacyPage() {
       <div className={prose}>
         <ul className={list}>
           <li>
-            <b>Analytics.</b> We count page views, how fast pages load, and what people do on them (signing up,
-            following, sharing, commenting, using plugins) with Umami, run on our own server. It sets no cookies and
-            stores no IP address. Page addresses are stripped of anything personal before they are sent, and actions are
-            sent as short codes, never with your name, address or anything you typed.
+            <b>Analytics.</b> We count page views, how fast pages load, what people do on them (signing up, following,
+            sharing, commenting, using plugins) and the errors pages run into, with Umami, run on our own server. It
+            sets no cookies and stores no IP address. Page addresses are stripped of anything personal before they are
+            sent, and actions are sent as short codes, never with your name, address or anything you typed.
           </li>
           <li>
             <b>View counts.</b> A page&apos;s view count counts each visitor once a day: your account when signed in,
