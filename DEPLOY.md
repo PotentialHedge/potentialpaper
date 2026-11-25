@@ -36,7 +36,8 @@ in `~/.config/potentialpaper/staging-basic-auth` on this host). It is its own co
 `.env.production` with its own database password, auth secrets and host). Its images are `potentialpaper-staging-*`, so a
 staging build never replaces production's untagged tools image. Only `app` and `worker` run: no PDF ingest (it would
 write covers to production's bucket) and no SSH. Its database starts as a copy of production's. Its user content
-(demos, plugin frames) still comes from production's `ppusercontent.com`. Cloudflare's cache rules name
+(demos, plugin frames) still comes from production's `ppusercontent.com`. Production's `.env.production` names staging in `FRAME_ANCESTORS`, so
+that content may be framed there; a plugin installed only on staging isn't on production's content domain and won't load. Cloudflare's cache rules name
 `potentialpaper.com` only, so nothing behind the password is cached at the edge.
 
 ```sh

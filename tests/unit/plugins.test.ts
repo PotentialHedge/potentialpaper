@@ -299,7 +299,16 @@ describe("a plugin's CSP", () => {
     expect(csp).toContain("default-src 'self'");
     expect(csp).toContain("connect-src 'self' https://api.example.org");
     expect(csp).toMatch(/script-src 'self' 'wasm-unsafe-eval' .*https:\/\/ppusercontent\.com\/sdk\//);
-    expect(csp).toMatch(/frame-ancestors http:\/\/test\.local/);
+    expect(csp).toMatch(/frame-ancestors http:\/\/test\.local$/);
+  });
+
+  it('lets the sites FRAME_ANCESTORS names frame it too, such as staging', () => {
+    process.env.FRAME_ANCESTORS = 'https://staging.example.org/ not-a-url, http://test.local';
+    try {
+      expect(pluginCsp([])).toMatch(/frame-ancestors http:\/\/test\.local https:\/\/staging\.example\.org$/);
+    } finally {
+      delete process.env.FRAME_ANCESTORS;
+    }
   });
 });
 

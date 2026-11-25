@@ -5,7 +5,7 @@ import type { PluginManifest } from '@/lib/plugins/manifest';
 import { PUBLIC_SDK_BASE, SDK_BASE } from '@/lib/plugins/origin';
 import { getBlob } from '../demos/store';
 import { findFile } from '../demos/serve';
-import { siteUrl } from '../site';
+import { siteFramers } from '../site';
 
 /**
  * Answers every request to a plugin's host, `<label>.<content domain>` (`lib/plugins/origin.ts`): `/<commit>/<path>`
@@ -53,7 +53,7 @@ export function pluginCsp(network: readonly string[]): string {
     "object-src 'none'",
     "base-uri 'self'",
     "form-action 'none'",
-    `frame-ancestors ${new URL(siteUrl()).origin}`,
+    `frame-ancestors ${siteFramers()}`,
   ].join('; ');
 }
 
