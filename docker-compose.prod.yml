@@ -78,11 +78,13 @@ services:
           '-e',
           "fetch('http://127.0.0.1:3000/healthz').then(r=>process.exit(r.ok?0:1),()=>process.exit(1))",
         ]
-      interval: 30s
-      timeout: 5s
-      retries: 3
+      # Traefik routes only to a healthy container. Every 5 s and two failures, so a container a deploy drains
+      # (/healthz answers 503, scripts/deploy-prod.sh) is out of the rotation in about 10 s; while starting, every 2 s,
+      # so a new one is in within seconds.
+      interval: 5s
+      timeout: 4s
+      retries: 2
       start_period: 20s
-      # While starting, checked every 2 s, so a deploy's new container is routed to within seconds.
       start_interval: 2s
     labels:
       - traefik.enable=true
@@ -92,11 +94,6 @@ services:
       - traefik.http.routers.${COMPOSE_PROJECT_NAME:-potentialpaper}.tls=true
       - traefik.http.routers.${COMPOSE_PROJECT_NAME:-potentialpaper}.middlewares=${COMPOSE_PROJECT_NAME:-potentialpaper}-ratelimit,${COMPOSE_PROJECT_NAME:-potentialpaper}-compress
       - traefik.http.services.${COMPOSE_PROJECT_NAME:-potentialpaper}.loadbalancer.server.port=3000
-      # Traefik's own check, every 2 s: it stops routing to a container whose /healthz fails, as a draining one's does
-      # while a deploy stops it (scripts/deploy-prod.sh).
-      - traefik.http.services.${COMPOSE_PROJECT_NAME:-potentialpaper}.loadbalancer.healthcheck.path=/healthz
-      - traefik.http.services.${COMPOSE_PROJECT_NAME:-potentialpaper}.loadbalancer.healthcheck.interval=2s
-      - traefik.http.services.${COMPOSE_PROJECT_NAME:-potentialpaper}.loadbalancer.healthcheck.timeout=2s
       # A dumb-HTTP clone asks for each git object separately: over a thousand quick requests for a page with
       # a few hundred edits, all small primary-key reads. It would trip the limit below, and git gives up on a 429.
       - traefik.http.routers.${COMPOSE_PROJECT_NAME:-potentialpaper}-git.rule=Host(`${APP_HOST}`) && PathPrefix(`/git/`)

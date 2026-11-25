@@ -53,8 +53,39 @@ old=$(compose ps -q app)
 count=$(echo "$old" | grep -c . || true)
 echo "old app containers: $count"
 
-compose up -d --no-deps --no-recreate --scale app=$(( count + 1 )) app
-new=$(comm -13 <(echo "$old" | sort) <(compose ps -q app | sort))
+# Containers of one Traefik service must agree on its labels: while an old and a new one disagree, Traefik drops the
+# service and the site answers 404 (tried on staging, 2026-11-25). A deploy that changes them can't overlap.
+traefik_labels() { python3 -c '
+import json, sys
+labels = json.load(sys.stdin)
+if isinstance(labels, list): labels = dict(l.split("=", 1) for l in labels)
+print("\n".join(sorted(f"{k}={v}" for k, v in (labels or {}).items() if k.startswith("traefik."))))'; }
+# `compose config` writes a `$` as `$$`; the container has it once.
+wanted=$(compose config --format json | python3 -c 'import json,sys; print(json.dumps(json.load(sys.stdin)["services"]["app"].get("labels", {})).replace("$$", "$"))' | traefik_labels)
+for id in $old; do
+  if [[ "$(docker inspect -f '{{json .Config.Labels}}' "$id" | traefik_labels)" != "$wanted" ]]; then
+    if [[ -z "${RECREATE:-}" ]]; then
+      echo "the app's Traefik labels changed, so the old and new containers can't serve side by side." >&2
+      echo "RECREATE=1 replaces the app in place instead, with some seconds of downtime." >&2
+      exit 1
+    fi
+  fi
+done
+if [[ -n "${RECREATE:-}" ]]; then
+  echo "recreating the app in place (RECREATE=1)"
+  compose up -d --no-deps app
+  for _ in $(seq 1 90); do
+    [[ "$(docker inspect -f '{{.State.Health.Status}}' $(compose ps -q app))" == healthy ]] && break
+    sleep 2
+  done
+  old=""
+  new=$(compose ps -q app)
+fi
+
+if [[ -z "${RECREATE:-}" ]]; then
+  compose up -d --no-deps --no-recreate --scale app=$(( count + 1 )) app
+  new=$(comm -13 <(echo "$old" | sort) <(compose ps -q app | sort))
+fi
 [[ -n "$new" ]] || { echo "no new app container started" >&2; exit 1; }
 
 ips=()
@@ -93,14 +124,15 @@ if [[ $missing != 0 ]]; then
 fi
 
 if [[ -n "$old" ]]; then
-  # Drain first: the old containers' /healthz answers 503, Traefik's own check (every 2 s) stops routing to them,
-  # and the requests they have get a few seconds to finish. Stopping one Traefik still routes to fails a request.
+  # Drain first: the old containers' /healthz answers 503, Docker calls them unhealthy (two failed checks, 5 s
+  # apart), Traefik stops routing to them, and the requests they have get a few seconds to finish. Stopping one
+  # Traefik still routes to fails a request.
   old_ips=()
   for id in $old; do
     docker exec "$id" touch /tmp/draining
     old_ips+=("$(docker inspect -f '{{(index .NetworkSettings.Networks "web").IPAddress}}' "$id")")
   done
-  for _ in $(seq 1 30); do
+  for _ in $(seq 1 60); do
     up=$(curl -s "$TRAEFIK_SERVICE" | python3 -c '
 import json, sys
 status = json.load(sys.stdin).get("serverStatus", {})
@@ -110,7 +142,7 @@ print(" ".join(u for u, s in status.items() if s == "UP"))' || true)
     [[ $routed == 0 ]] && break
     sleep 1
   done
-  [[ $routed == 0 ]] || echo "Traefik still routes to an old container after 30 s; stopping it anyway" >&2
+  [[ $routed == 0 ]] || echo "Traefik still routes to an old container after 60 s; stopping it anyway" >&2
   sleep 5
   docker stop -t 30 $old >/dev/null
   docker rm $old >/dev/null
