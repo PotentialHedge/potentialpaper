@@ -1,3 +1,4 @@
+import { createHash } from 'node:crypto';
 import { getDb, type Database } from '@/db';
 import {
   encodeReviewFile,
@@ -299,6 +300,20 @@ function describe(venue: VenueInput, input: SubmissionInput, changes: FileChange
   return `${what} ${venue.name} submission ${input.externalId}: ${parts.join(', ')}`;
 }
 
+/**
+ * Submissions found unchanged, by paper and input, with the paper's head at the time. The importer sends a venue's
+ * every submission again each pass (ICLR's 20,000, 70 calls a minute) and nearly all are unchanged; while the head
+ * is the same, so is the answer, and reading and hashing the folder again is skipped. In this process only, so a
+ * new deploy starts empty and works it out once.
+ */
+const unchangedAt = new Map<string, string>();
+const UNCHANGED_MAX = 100_000;
+
+/** What decides an import's outcome besides the paper's head: the venue, where it is, and the submission. */
+function importKey(venueKey: string, input: SubmissionInput): string {
+  return createHash('sha256').update(venueKey).update('\n').update(JSON.stringify(input)).digest('base64');
+}
+
 /** Writes one submission's folder; whether it committed. */
 async function importOne(
   venue: VenueInput,
@@ -308,12 +323,15 @@ async function importOne(
   actor: Actor,
   options: ImportOptions,
   database: Database,
+  venueKey: string,
 ): Promise<{ status: 'committed' | 'unchanged' | 'skipped'; paperId?: string }> {
   const found = await findPaper(input.paper, database);
   if (!found) return { status: 'skipped' };
   const paperId = found.paper.id;
   const dir = submissionDir(venue.source, input.externalId);
   const head = await readHead(database, paperId);
+  const key = `${paperId}\n${importKey(venueKey, input)}`;
+  if (head && unchangedAt.get(key) === head) return { status: 'unchanged', paperId };
   const tree = head ? (await readCommit(database, paperId, head)).tree : null;
   const held = tree ? await readFolder(database, paperId, tree, dir) : null;
   let wanted = submissionFiles(venue, input);
@@ -341,7 +359,13 @@ async function importOne(
   const entry = versionEntry(place, venue.source, input, locations);
   const after = keptSite(attachSubmission(before, entry, { date, label: venueLabel(venue) }), entry.reviews, locations);
   changes.push(...versionChanges(before, after));
-  if (changes.length === 0) return { status: 'unchanged', paperId };
+  if (changes.length === 0) {
+    if (head) {
+      if (unchangedAt.size >= UNCHANGED_MAX) unchangedAt.delete(unchangedAt.keys().next().value!);
+      unchangedAt.set(key, head);
+    }
+    return { status: 'unchanged', paperId };
+  }
   const isNew = !held?.has(submissionFilePath(venue.source, input.externalId));
   const result = await commitPage(paperId, head, actor, changes, describe(venue, input, changes, isNew), {
     database,
@@ -405,6 +429,7 @@ export async function importReviews(
   const locations = (await venuePageNames(database, [place.edition.key])).locations.get(place.edition.key) ?? [];
   const actor = options.actor ?? (await botActor(OPENREVIEW_BOT, database));
   const all = [...new Map([...input].map((s) => [s.externalId, s])).values()];
+  const venueKey = JSON.stringify([venue, locations]);
   const result: ImportResult = {
     submissions: 0,
     notes: 0,
@@ -421,7 +446,7 @@ export async function importReviews(
       const item = all[next++];
       try {
         const { status, paperId } = await withRetry(() =>
-          importOne(venue, place, locations, item, actor, options, database),
+          importOne(venue, place, locations, item, actor, options, database, venueKey),
         );
         if (status === 'committed' && paperId) result.changed.push(paperId);
         if (status === 'skipped') result.skipped += 1;

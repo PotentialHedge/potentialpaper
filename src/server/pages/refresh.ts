@@ -7,6 +7,7 @@ import { paperPath, type PaperId } from '@/lib/paper-ids';
 import { revalidateInApp } from '../internal';
 import { siteUrl } from '../site';
 import { pageOf } from './kinds';
+import { warmSoon } from './warm';
 import type { Reader } from './repo';
 
 /**
@@ -72,6 +73,7 @@ async function refreshPaths(paths: readonly string[]): Promise<void> {
     }
   }
   if (outside.length) await revalidateInApp(outside);
+  else warmSoon(paths);
   const token = process.env.CLOUDFLARE_PURGE_TOKEN;
   const zone = process.env.CLOUDFLARE_ZONE_ID;
   if (!token || !zone) return;

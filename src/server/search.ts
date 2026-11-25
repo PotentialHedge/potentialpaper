@@ -15,6 +15,7 @@ import { CATEGORY_LABEL } from '@/lib/labeled-links';
 import { MARK_END, MARK_START, normalizeSearch, prefixTsquery, type SearchSort } from '@/lib/search';
 import { ratingJoins, ratingSql } from './paper-ratings';
 import { scoresTable } from './recommendations';
+import { ttlCache } from './ttl-cache';
 
 export const SEARCH_PAGE_SIZE = 50;
 
@@ -286,6 +287,27 @@ export async function searchPapers(
   return { hits, total: found.total };
 }
 
+/**
+ * The home page's lists that are the same for every reader (no follows, authorship or recommendations in them), kept
+ * a minute: the list as most see it was otherwise half a second of the database's time per view. A personal list is
+ * read fresh.
+ */
+const sharedLists = ttlCache<{ hits: SearchHit[]; total: number }>(60_000, 500);
+
+export function searchPapersShared(filter: SearchFilter): Promise<{ hits: SearchHit[]; total: number }> {
+  const personal =
+    filter.followedBy ||
+    filter.authoredBy ||
+    filter.exceptFollowedBy ||
+    filter.exceptAuthoredBy ||
+    filter.recommendScores;
+  if (personal) return searchPapers(filter);
+  const { q, venue, sort, page, limit } = filter;
+  return sharedLists(JSON.stringify([q ?? null, venue ?? null, sort ?? null, page ?? 1, limit ?? null]), () =>
+    searchPapers(filter),
+  );
+}
+
 type Found = Omit<SearchHit, 'matches' | 'matchCount'> & { id: string };
 
 async function readPage(
@@ -429,16 +451,21 @@ async function withMatches(
   });
 }
 
-/** The venues with the most papers, for the home page's filter. */
-export async function topVenues(limit = 8, database: Database = getDb()): Promise<string[]> {
-  const { rows } = await database.execute<{ venue: string }>(sql`
-    select venue from papers
-    where merged_into is null and venue is not null
-    group by venue
-    order by count(*) desc, venue
-    limit ${limit}
-  `);
-  return rows.map((r) => r.venue);
+const topVenuesCache = ttlCache<string[]>(10 * 60_000, 20);
+
+/** The venues with the most papers, for the home page's filter. Counting them reads every paper: kept ten minutes. */
+export function topVenues(limit = 8, database: Database = getDb()): Promise<string[]> {
+  const load = async () => {
+    const { rows } = await database.execute<{ venue: string }>(sql`
+      select venue from papers
+      where merged_into is null and venue is not null
+      group by venue
+      order by count(*) desc, venue
+      limit ${limit}
+    `);
+    return rows.map((r) => r.venue);
+  };
+  return database === getDb() ? topVenuesCache(String(limit), load) : load();
 }
 
 /** A paper whose title is like another's, as the "Add it?" page lists them (`app/new/paper`). */

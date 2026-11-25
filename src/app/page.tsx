@@ -27,7 +27,7 @@ import { viewerFromHeaders } from '@/server/auth';
 import { findPaper, PAPER_SOURCES } from '@/server/papers';
 import { canRecommend, recommendationScores } from '@/server/recommendations';
 import { siteUrl } from '@/server/site';
-import { SEARCH_PAGE_SIZE, searchPapers, topVenues, type SearchFilter, type SearchHit } from '@/server/search';
+import { SEARCH_PAGE_SIZE, searchPapersShared, topVenues, type SearchFilter, type SearchHit } from '@/server/search';
 
 export const dynamic = 'force-dynamic';
 
@@ -78,10 +78,10 @@ async function pageOf(
   filter: Omit<SearchFilter, 'page' | 'limit'>,
 ): Promise<{ hits: SearchHit[]; total: number; page: number; pages: number }> {
   const page = Math.max(1, Number.parseInt(one(requested) ?? '1', 10) || 1);
-  const found = await searchPapers({ ...filter, page, limit: size });
+  const found = await searchPapersShared({ ...filter, page, limit: size });
   const pages = Math.max(1, Math.ceil(found.total / size));
   if (page <= pages) return { ...found, page, pages };
-  return { ...(await searchPapers({ ...filter, page: pages, limit: size })), page: pages, pages };
+  return { ...(await searchPapersShared({ ...filter, page: pages, limit: size })), page: pages, pages };
 }
 
 export default async function Home({

@@ -1562,6 +1562,8 @@ export const scopeState = pgTable(
     dirtySince: timestamp('dirty_since', { withTimezone: true, mode: 'date' }),
     dueAt: timestamp('due_at', { withTimezone: true, mode: 'date' }),
     computedAt: timestamp('computed_at', { withTimezone: true, mode: 'date' }),
+    /** Not recomputed again before this: a scope that takes long to compute waits in proportion (`scope-stats.ts`). */
+    cooldownUntil: timestamp('cooldown_until', { withTimezone: true, mode: 'date' }),
   },
   (t) => [index('scope_state_due_idx').on(t.dueAt)],
 );

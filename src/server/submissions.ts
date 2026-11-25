@@ -1,4 +1,4 @@
-import { asc, eq, inArray, or } from 'drizzle-orm';
+import { asc, eq, inArray, sql } from 'drizzle-orm';
 import { getDb, type Database } from '@/db';
 import { papers, submissionNotes, submissions, venues } from '@/db/schema';
 import type { Submission } from '@/lib/submissions';
@@ -8,12 +8,15 @@ import type { Submission } from '@/lib/submissions';
  * those of duplicates merged into it, whose rows still name the duplicate.
  */
 export async function submissionsOf(paperId: string, database: Database = getDb()): Promise<Submission[]> {
-  const merged = database.select({ id: papers.id }).from(papers).where(eq(papers.mergedInto, paperId));
+  // The paper's and those merged into it, as one list: `paper_id = $1 or paper_id in (…)` scanned every submission.
   const rows = await database
     .select({ submission: submissions, venue: venues })
     .from(submissions)
     .innerJoin(venues, eq(venues.id, submissions.venueId))
-    .where(or(eq(submissions.paperId, paperId), inArray(submissions.paperId, merged)))
+    .where(
+      sql`${submissions.paperId} in (select ${paperId}::uuid union all
+                                      select ${papers.id} from ${papers} where ${papers.mergedInto} = ${paperId})`,
+    )
     .orderBy(asc(venues.name));
   if (rows.length === 0) return [];
   const notes = await database

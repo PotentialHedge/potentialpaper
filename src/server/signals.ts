@@ -487,6 +487,14 @@ export async function signalColumns(
   };
 }
 
+/**
+ * Papers row `p` is the paper or one merged into it. Not `coalesce(p.merged_into, p.id) = …`, which no index serves:
+ * that scanned every paper, 100 ms a paper page.
+ */
+function paperOrMergedInto(paperId: string) {
+  return sql`(p.merged_into = ${paperId}::uuid or (p.id = ${paperId}::uuid and p.merged_into is null))`;
+}
+
 /** One paper's values in every set (or one), live generations only, each named by its set. */
 export async function paperSignals(paperId: string, setId?: string, database: Database = getDb()) {
   const { rows } = await database.execute<{
@@ -508,7 +516,7 @@ export async function paperSignals(paperId: string, setId?: string, database: Da
       join signals g on g.set_id = v.set_id and g.name = v.signal
       left join signal_labels l on l.set_id = v.set_id and l.generation = v.generation and l.signal = v.signal
                                 and l.key = v.label
-     where coalesce(p.merged_into, p.id) = ${paperId}::uuid
+     where ${paperOrMergedInto(paperId)}
        ${setId ? sql`and v.set_id = ${setId}` : sql``}
      order by v.set_id, v.signal
   `);
@@ -555,7 +563,8 @@ async function vectorIndex(set: SetRow, signal: string, database: Db): Promise<V
   const work = (async (): Promise<VectorIndex> => {
     const spec = (await setSignals(set.id, database)).find((s) => s.name === signal)?.spec;
     if (!spec) throw new ApiError(404, 'not_found', `${set.id} has no signal "${signal}"`);
-    if (spec.kind !== 'vector') throw new ApiError(422, 'validation_error', `${signal} is a ${spec.kind}, not a vector`);
+    if (spec.kind !== 'vector')
+      throw new ApiError(422, 'validation_error', `${signal} is a ${spec.kind}, not a vector`);
     const columns = await signalColumns(set.id, [signal], { titles: true, database });
     const column = columns.signals[signal] as { dims: number; values: (number | null)[] };
     const keep: number[] = [];
@@ -765,7 +774,7 @@ export function pageHasSignals(page: { id: string; kind: string }, database: Db 
   const query =
     page.kind === 'paper'
       ? sql`select exists (select 1 from papers p join paper_identifiers i on i.paper_id = p.id ${live}
-                            where coalesce(p.merged_into, p.id) = ${page.id}::uuid) as found`
+                            where ${paperOrMergedInto(page.id)}) as found`
       : sql`select exists (select 1 from page_members m join paper_identifiers i on i.paper_id = m.paper_id ${live}
                             where m.scope_page_id in (${scopePagesOf(page.id)})) as found`;
   const value = database.execute<{ found: boolean }>(query).then((r) => Boolean(r.rows[0]?.found));

@@ -1,5 +1,6 @@
 import { revalidatePath } from 'next/cache';
 import { isInternalRequest } from '@/server/internal';
+import { warmSoon } from '@/server/pages/warm';
 
 export const dynamic = 'force-dynamic';
 
@@ -27,5 +28,6 @@ export async function POST(req: Request) {
     return Response.json({ error: 'paths: 1 to 20 paper paths' }, { status: 400, headers: NO_STORE });
   }
   for (const path of paths) revalidatePath(path);
+  warmSoon(paths);
   return Response.json({ status: 'ok' }, { headers: NO_STORE });
 }

@@ -1,4 +1,4 @@
-import { eq } from 'drizzle-orm';
+import { eq, sql } from 'drizzle-orm';
 import { afterAll, beforeEach, describe, expect, it } from 'vitest';
 import { getDb } from '@/db';
 import { pageCurrent, pdfDocuments, scopeState, scopeStats, venues } from '@/db/schema';
@@ -17,6 +17,7 @@ import { savePaper } from '@/server/papers';
 import { reviewsConsumer } from '@/server/review-projection';
 import { saveSiteSettings } from '@/server/settings';
 import {
+  markScopes,
   MAX_MARKS,
   recomputeDueScopes,
   scopeHasScores,
@@ -280,6 +281,29 @@ describe('scope statistics (A)', () => {
     await catchUp();
     const again = await getDb().select().from(scopeStats).where(eq(scopeStats.scopePageId, edition.id));
     expect(again.find((r) => r.field === 'rating')?.values).toEqual([6]);
+  });
+
+  it('holds a scope that took long to compute, so a busy import does not recompute it back to back', async () => {
+    const { edition } = await venuePages();
+    await submitted(ICLR_2027, null, [4]);
+    await catchUp();
+    const [state] = await getDb().select().from(scopeState).where(eq(scopeState.scopePageId, edition.id));
+    // Held for ten times what it took, here a moment.
+    expect(state.cooldownUntil).not.toBeNull();
+
+    // As ICLR is, which takes half a minute: marked again, it is due only once the cooldown is over.
+    const until = new Date(Date.now() + 5 * 60_000);
+    await getDb().update(scopeState).set({ cooldownUntil: until }).where(eq(scopeState.scopePageId, edition.id));
+    await markScopes(getDb(), sql`select ${edition.id}::uuid`);
+    const [marked] = await getDb().select().from(scopeState).where(eq(scopeState.scopePageId, edition.id));
+    expect(marked.dueAt!.getTime()).toBe(until.getTime());
+    expect((await recomputeDueScopes()).scopes).toBe(0);
+
+    // A scope that computes quickly is due a few seconds after a change, as before.
+    await getDb().update(scopeState).set({ cooldownUntil: null }).where(eq(scopeState.scopePageId, edition.id));
+    await markScopes(getDb(), sql`select ${edition.id}::uuid`);
+    const [quick] = await getDb().select().from(scopeState).where(eq(scopeState.scopePageId, edition.id));
+    expect(quick.dueAt!.getTime()).toBeLessThan(Date.now() + 10_000);
   });
 
   it('answers with an ETag and a 304, cached a minute', async () => {

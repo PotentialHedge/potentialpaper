@@ -36,6 +36,13 @@ export const DEBOUNCE = '5 seconds';
 export const MAX_WAIT = '1 minute';
 /** How long a scope taken to be recomputed is held, should the worker die halfway. */
 const LEASE = '5 minutes';
+/**
+ * A scope is not recomputed again within this many times its last computation took, nor more than `MAX_COOLDOWN_MS`
+ * later: ICLR (a million review scores, about 35 s) was otherwise recomputed back to back for as long as an import
+ * ran, a database core taken from every page. A scope that takes a second is held ten seconds, as good as not at all.
+ */
+const COOLDOWN_FACTOR = 10;
+const MAX_COOLDOWN_MS = 15 * 60_000;
 
 const SCOPE_KINDS = PAGE_KINDS.filter((kind) => KINDS[kind].scope);
 
@@ -58,7 +65,9 @@ export async function markScopes(db: Writer, ids: SQL): Promise<void> {
     on conflict (scope_page_id) do update
        set changed_at = excluded.changed_at,
            dirty_since = coalesce(scope_state.dirty_since, excluded.dirty_since),
-           due_at = least(excluded.due_at, coalesce(scope_state.dirty_since, excluded.dirty_since) + ${MAX_WAIT}::interval)
+           due_at = greatest(
+             least(excluded.due_at, coalesce(scope_state.dirty_since, excluded.dirty_since) + ${MAX_WAIT}::interval),
+             scope_state.cooldown_until)
   `);
 }
 
@@ -263,10 +272,20 @@ export async function recomputeDueScopes(
       returning scope_page_id, changed_at::text
     `);
     for (const row of taken) {
+      const started = Date.now();
       await recomputeScope(row.scope_page_id, database);
+      const cooldown = Math.min(MAX_COOLDOWN_MS, (Date.now() - started) * COOLDOWN_FACTOR);
+      const cooldownUntil = sql`clock_timestamp() + ${`${cooldown} milliseconds`}::interval`;
+      // Marked again meanwhile: due again, but not before the cooldown.
       await database.execute(sql`
-        update scope_state set due_at = null, dirty_since = null, computed_at = clock_timestamp()
-         where scope_page_id = ${row.scope_page_id} and changed_at = ${row.changed_at}::timestamptz
+        update scope_state
+           set cooldown_until = ${cooldownUntil},
+               due_at = case when changed_at = ${row.changed_at}::timestamptz then null
+                                         else greatest(due_at, ${cooldownUntil}) end,
+               dirty_since = case when changed_at = ${row.changed_at}::timestamptz then null else dirty_since end,
+               computed_at = case when changed_at = ${row.changed_at}::timestamptz then clock_timestamp()
+                                  else computed_at end
+         where scope_page_id = ${row.scope_page_id}
       `);
       done += 1;
     }

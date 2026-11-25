@@ -1,0 +1,1 @@
+ALTER TABLE "scope_state" ADD COLUMN "cooldown_until" timestamp with time zone;

@@ -192,6 +192,24 @@ describe('importing reviews', () => {
     const again = await importReviews(VENUE, [submission('forum1', [review('a', 3), review('b', 1)])], OPTIONS);
     expect(again).toMatchObject({ committed: 0, unchanged: 1 });
     expect(await revisions(paper)).toHaveLength(before.length);
+    // Known unchanged at this head: still so, without reading the folder again.
+    expect(await importReviews(VENUE, [submission('forum1', [review('a', 3), review('b', 1)])], OPTIONS)).toMatchObject(
+      { committed: 0, unchanged: 1 },
+    );
+
+    // Someone else's commit moves the head: the same input is looked at again, and puts back the note taken out.
+    await commitPage(
+      paper,
+      (await readHead(getDb(), paper))!,
+      await ensureBot(OPENREVIEW_BOT),
+      [{ path: noteFilePath('openreview', 'forum1', 'b'), content: null }],
+      'Take out a note',
+    );
+    expect(await importReviews(VENUE, [submission('forum1', [review('a', 3), review('b', 1)])], OPTIONS)).toMatchObject(
+      { committed: 1 },
+    );
+    expect((await files(paper)).has(noteFilePath('openreview', 'forum1', 'b'))).toBe(true);
+    const restored = (await revisions(paper)).length;
 
     const later = await importReviews(
       VENUE,
@@ -199,6 +217,7 @@ describe('importing reviews', () => {
       OPTIONS,
     );
     expect(later).toMatchObject({ committed: 1, notes: 1 });
+    expect(await revisions(paper)).toHaveLength(restored + 1);
     const last = (await revisions(paper)).at(-1)!;
     expect(last.summary).toBe('Update Test 2027 submission forum1: 1 note, 1 removed');
     // The decision is the version's to say, so its file changes, and submission.json doesn't.
