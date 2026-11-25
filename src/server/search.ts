@@ -32,6 +32,8 @@ export interface SearchHit {
   venue: string | null;
   /** Its reviews' mean of the venue's headline score (`paper_ratings`), or `null` when it has no scored reviews. */
   rating: number | null;
+  /** The same mean over its reviews' first recorded scores, before reviewers moved them; `null` without a rating. */
+  firstRating: number | null;
   /** The copy this site hosts: its newest version's PDF. */
   pdf: string | null;
   /**
@@ -325,6 +327,7 @@ async function readPage(
     database.execute<Found & Record<string, unknown>>(sql`
       select p.id, i.scheme, i.value, pg.short_id as "shortId", p.title, p.authors, left(p.abstract, 400) as abstract, p.year, p.venue,
              (select r.mean from paper_ratings r where r.paper_id = p.id) as rating,
+             (select r.first_mean from paper_ratings r where r.paper_id = p.id) as "firstRating",
              c.pdf ->> 'url' as pdf, coalesce(c.thumbnail ->> 'url', pd.cover_url) as cover,
              (select s.tldr from submissions s where s.paper_id = p.id and s.tldr is not null
                order by (select min(n.created_at) from submission_notes n where n.submission_id = s.id) desc nulls last,
@@ -382,10 +385,11 @@ async function withMatches(
     year,
     venue,
     rating,
+    firstRating,
     pdf,
     cover,
   }: Found): SearchHit => ({
-    ...{ scheme, value, shortId, title, authors, abstract, tldr, year, venue, rating, pdf, cover },
+    ...{ scheme, value, shortId, title, authors, abstract, tldr, year, venue, rating, firstRating, pdf, cover },
     matches: [],
     matchCount: 0,
   });

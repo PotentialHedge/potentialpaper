@@ -9,6 +9,43 @@ export interface RowLink {
   title?: string;
 }
 
+/** A paper's mean review score at its venue, and that mean over its reviews' first scores (`paper_ratings`). */
+export interface RowScore {
+  mean: number;
+  first: number | null;
+}
+
+/** How far reviewers moved the mean since they first scored, as shown, to one decimal; `0` when not, or not known. */
+function scoreMove(score: RowScore): number {
+  if (score.first === null) return 0;
+  return Math.round(Number(score.mean.toFixed(1)) * 10 - Number(score.first.toFixed(1)) * 10) / 10;
+}
+
+/** The venue as a row says it, for its title: "ICLR 2027 (5.5, up from 5.0 before reviewers changed their scores)". */
+function venueTitle(venue: string | null, score: RowScore | null): string | undefined {
+  if (!venue || !score) return venue ?? undefined;
+  const move = scoreMove(score);
+  const mean = `mean review score ${score.mean.toFixed(1)}`;
+  if (move === 0) return `${venue}, ${mean}`;
+  return `${venue}, ${mean}, ${move > 0 ? 'up' : 'down'} from ${score.first!.toFixed(1)} before reviewers changed their scores`;
+}
+
+/**
+ * The venue and its mean review score: "ICLR 2027 (5.5)", or where reviewers moved it, from where it stood to where it
+ * is, the latter coloured: "ICLR 2027 (5.0 → 5.5)".
+ */
+function Venue({ venue, score }: { venue: string | null; score: RowScore | null }) {
+  if (!venue || !score) return venue;
+  const move = scoreMove(score);
+  if (move === 0) return `${venue} (${score.mean.toFixed(1)})`;
+  return (
+    <>
+      {venue} ({score.first!.toFixed(1)} →{' '}
+      <span className={move > 0 ? 'text-up' : 'text-down'}>{score.mean.toFixed(1)}</span>)
+    </>
+  );
+}
+
 function SourceLink({ link }: { link: RowLink }) {
   return (
     <a
@@ -37,6 +74,7 @@ export function PaperRow({
   title,
   authors,
   venue,
+  score = null,
   year,
   link,
   href,
@@ -46,6 +84,8 @@ export function PaperRow({
   title: string;
   authors: string[];
   venue: string | null;
+  /** Its mean review score, after the venue. */
+  score?: RowScore | null;
   year: number | null;
   link: RowLink | null;
   href: string;
@@ -60,13 +100,13 @@ export function PaperRow({
         </Link>
         <span className="block font-sans text-xs text-muted">{authorLine(authors, year)}</span>
       </span>
-      <span className="truncate text-right font-sans text-xs text-muted narrow:hidden" title={venue ?? undefined}>
+      <span className="truncate text-right font-sans text-xs text-muted narrow:hidden" title={venueTitle(venue, score)}>
         {paper ? (
-          <RowNote paper={paper} venue={venue}>
-            {venue}
+          <RowNote paper={paper} venue={venueTitle(venue, score) ?? null}>
+            <Venue venue={venue} score={score} />
           </RowNote>
         ) : (
-          venue
+          <Venue venue={venue} score={score} />
         )}
       </span>
       <span className="flex items-center justify-end font-mono text-xs text-muted">
@@ -99,6 +139,7 @@ export function PaperCard({
   abstract,
   tldr = null,
   venue,
+  score = null,
   year,
   link,
   cover,
@@ -112,6 +153,7 @@ export function PaperCard({
   /** Its one-sentence summary, shown in the abstract's place when it has one. */
   tldr?: string | null;
   venue: string | null;
+  score?: RowScore | null;
   year: number | null;
   link: RowLink | null;
   cover: string | null;
@@ -157,13 +199,15 @@ export function PaperCard({
         )}
         <div className="mt-1.5 flex flex-wrap items-baseline gap-x-2 font-sans text-xs text-muted">
           {paper ? (
-            <span>
-              <RowNote paper={paper} venue={venue}>
-                {venue}
+            <span title={venueTitle(venue, score)}>
+              <RowNote paper={paper} venue={venueTitle(venue, score) ?? null}>
+                <Venue venue={venue} score={score} />
               </RowNote>
             </span>
           ) : (
-            venue
+            <span title={venueTitle(venue, score)}>
+              <Venue venue={venue} score={score} />
+            </span>
           )}
           {link && <SourceLink link={link} />}
           {paper && <RowActions paper={paper} />}

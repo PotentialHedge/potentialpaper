@@ -79,6 +79,21 @@ describe('paper ratings', () => {
     ]);
   });
 
+  it("keeps the mean over the reviews' first scores, before reviewers moved them", async () => {
+    await venue('openreview:Ten', form(1, 10));
+    const a = await paper('A');
+    await reviewed(a, 'openreview:Ten', [6, 4]);
+    // The first reviewer raised 4 to 6; confidence moves don't count.
+    await getDb().execute(sql`
+      update submission_notes set score_changes = ${JSON.stringify([
+        { field: 'confidence', from: 2, at: '2026-11-18T00:00:00Z' },
+        { field: 'rating', from: 4, at: '2026-11-18T00:00:00Z' },
+      ])}::jsonb where signature = 'Reviewer 0'`);
+    await refreshPaperRating(getDb(), a);
+    const [hit] = (await searchPapers({ sort: 'rating' })).hits;
+    expect([hit.rating, hit.firstRating]).toEqual([5, 4]);
+  });
+
   it('rates a paper by its latest reviewed submission', async () => {
     await venue('openreview:Ten', form(1, 10));
     const a = await paper('A');

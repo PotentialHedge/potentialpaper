@@ -1536,6 +1536,8 @@ export const paperRatings = pgTable(
     venueId: text('venue_id').notNull(),
     field: text('field').notNull(),
     mean: doublePrecision('mean').notNull(),
+    /** The same mean over each review's first recorded score (`score_changes`): where it stood before reviewers moved. */
+    firstMean: doublePrecision('first_mean'),
     reviews: integer('reviews').notNull(),
     /** The field's range by the venue's form; `null` when the form doesn't give one. */
     min: doublePrecision('min'),

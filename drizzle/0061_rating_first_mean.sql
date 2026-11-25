@@ -1,0 +1,1 @@
+ALTER TABLE "paper_ratings" ADD COLUMN "first_mean" double precision;

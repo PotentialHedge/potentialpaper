@@ -479,8 +479,9 @@ function Row({ hit, detailed }: { hit: SearchHit; detailed: boolean }) {
     paper: hitIdentifier(hit),
     title: hit.title,
     authors: hit.authors,
-    // The mean review score beside the venue, when there is one: "ICLR 2027 (5.5)".
-    venue: hit.venue && hit.rating !== null ? `${hit.venue} (${hit.rating.toFixed(1)})` : hit.venue,
+    venue: hit.venue,
+    // The mean review score beside the venue, when there is one: "ICLR 2027 (5.0 → 5.5)".
+    score: hit.venue && hit.rating !== null ? { mean: hit.rating, first: hit.firstRating } : null,
     year: hit.year,
     link: rowLink(hit),
     href: shortPath(hit.shortId),

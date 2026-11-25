@@ -428,6 +428,13 @@
       "when": 1795593566175,
       "tag": "0060_review_score_changes",
       "breakpoints": true
+    },
+    {
+      "idx": 61,
+      "version": "7",
+      "when": 1795597875602,
+      "tag": "0061_rating_first_mean",
+      "breakpoints": true
     }
   ]
 }

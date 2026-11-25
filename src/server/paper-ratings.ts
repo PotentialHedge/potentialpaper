@@ -50,21 +50,24 @@ export async function refreshPaperRatings(db: Writer, papers: SQL): Promise<void
     scores as (
       select s.id, s.paper_id, s.venue_id, f.key, f.min, f.max, n.created_at,
              case when jsonb_typeof(n.content -> f.key) = 'number' then (n.content ->> f.key)::float8
-                  else (regexp_match(n.content ->> f.key, ${SCORE_RE}))[1]::float8 end as score
+                  else (regexp_match(n.content ->> f.key, ${SCORE_RE}))[1]::float8 end as score,
+             (select (c ->> 'from')::float8 from jsonb_array_elements(n.score_changes) c
+               where c ->> 'field' = f.key limit 1) as first
         from submissions s
         join fields f on f.venue = s.venue_id
         join submission_notes n on n.submission_id = s.id and n.kind = 'review'
        where s.paper_id in (${papers})
     ),
     per_submission as (
-      select id, paper_id, venue_id, key, min, max, avg(score) as mean, count(*)::int as reviews,
+      select id, paper_id, venue_id, key, min, max, avg(score) as mean, avg(coalesce(first, score)) as first_mean,
+             count(*)::int as reviews,
              max(created_at) as latest
         from scores
        where score is not null
        group by id, paper_id, venue_id, key, min, max
     )
-    insert into paper_ratings (paper_id, venue_id, field, mean, reviews, min, max)
-    select distinct on (paper_id) paper_id, venue_id, key, mean, reviews, min, max
+    insert into paper_ratings (paper_id, venue_id, field, mean, first_mean, reviews, min, max)
+    select distinct on (paper_id) paper_id, venue_id, key, mean, first_mean, reviews, min, max
       from per_submission
      order by paper_id, latest desc, id
   `);
