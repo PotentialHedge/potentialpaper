@@ -2,7 +2,7 @@ import { eq } from 'drizzle-orm';
 import { getDb } from '@/db';
 import { demoSnapshots, type DemoFile } from '@/db/schema';
 import { CONTENT_SOURCE, DEMO_HEIGHT_MESSAGE } from '@/lib/demos';
-import { siteUrl } from '../site';
+import { siteFramers } from '../site';
 import { getBlob } from './store';
 
 /**
@@ -58,7 +58,7 @@ function headers(type: string): Record<string, string> {
     // which has the reporter added and may get a newer one.
     'Cache-Control': type.startsWith('text/html') ? 'public, max-age=300' : 'public, max-age=31536000, immutable',
     // Only the paper pages may frame a demo, and the web editor's preview, a webview on the content domain.
-    'Content-Security-Policy': `frame-ancestors ${new URL(siteUrl()).origin} ${CONTENT_SOURCE}`,
+    'Content-Security-Policy': `frame-ancestors ${siteFramers()} ${CONTENT_SOURCE}`,
     'Access-Control-Allow-Origin': '*',
     'Cross-Origin-Resource-Policy': 'cross-origin',
     'X-Content-Type-Options': 'nosniff',

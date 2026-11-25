@@ -1,5 +1,5 @@
 import { CONTENT_ORIGIN, CONTENT_SOURCE } from '../../lib/demos';
-import { siteUrl } from '../../server/site';
+import { siteFramers } from '../../server/site';
 import { VSCODE_BASE } from './index';
 
 /**
@@ -26,7 +26,7 @@ export function webviewTemplate(): string {
  * refuse them, and `'self'` on that origin would refuse the site framing them.
  */
 export function webviewCsp(): string {
-  return `frame-ancestors ${new URL(siteUrl()).origin} ${CONTENT_SOURCE}`;
+  return `frame-ancestors ${siteFramers()} ${CONTENT_SOURCE}`;
 }
 
 export function editorCsp(): string {
