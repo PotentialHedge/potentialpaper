@@ -187,7 +187,6 @@ export default async function Home({
       <Announcements items={announced.filter((a) => !dismissed.has(a.id))} />
       <header className="mt-12 pb-6 text-center narrow:mt-8">
         <h1 className="mt-2 mb-3 text-[30px] leading-snug font-normal narrow:text-2xl">{TITLE}</h1>
-        <InstitutionStrip names={institutions} />
         {!q && (
           <div className="mx-auto mt-5 max-w-[min(680px,85%)] text-[14px] leading-[1.55]">
             <HomeNextStep example={tutorialExample(all.hits)} host={new URL(siteUrl()).host} />
@@ -209,6 +208,7 @@ export default async function Home({
             </p>
           </div>
         )}
+        <InstitutionStrip names={institutions} />
       </header>
 
       {/* A plain GET form, so search works without JavaScript. */}
@@ -479,7 +479,8 @@ function Row({ hit, detailed }: { hit: SearchHit; detailed: boolean }) {
     paper: hitIdentifier(hit),
     title: hit.title,
     authors: hit.authors,
-    venue: hit.venue,
+    // The mean review score beside the venue, when there is one: "ICLR 2027 (5.5)".
+    venue: hit.venue && hit.rating !== null ? `${hit.venue} (${hit.rating.toFixed(1)})` : hit.venue,
     year: hit.year,
     link: rowLink(hit),
     href: shortPath(hit.shortId),

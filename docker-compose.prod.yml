@@ -32,6 +32,9 @@ services:
     restart: unless-stopped
     logging: *logging
     command: ['postgres', '-c', 'autovacuum_max_parallel_workers=2']
+    # Docker's default /dev/shm is 64 MB; parallel queries over signal_values ran out of it ("could not resize
+    # shared memory segment ... No space left on device").
+    shm_size: 1g
     environment:
       POSTGRES_USER: ${POSTGRES_USER}
       POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}

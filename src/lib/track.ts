@@ -4,7 +4,8 @@
  * itself (`components/Analytics.tsx`); these are the actions in between.
  *
  * Event data is **not personal, by construction**: only the fields in `EventData`, each a short code, a flag or a
- * small number. Never an email, handle, name, id, query or text someone typed. The page URL is filtered in
+ * small number. Never an email, handle, name, id, query or text someone typed (the one exception, `domain`, is
+ * only the part after the @ of an address refused because its domain isn't on the institution list). The page URL is filtered in
  * `lib/analytics.ts` for the same reason, and events must not be a way around it. Add a field only if it is as
  * harmless as the ones already there.
  *
@@ -122,6 +123,11 @@ export type EventName =
 export interface EventData {
   /** A refusal or failure: the error code or HTTP status, never its message. */
   reason?: string;
+  /**
+   * An address refused because its domain is not on the institution list: that domain (`gmail.com`), never the
+   * address, so the list can grow where people are turned away.
+   */
+  domain?: string;
   /** Follow: whether the page is now followed. */
   following?: boolean;
   signedIn?: boolean;

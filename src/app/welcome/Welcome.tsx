@@ -14,7 +14,7 @@ import {
 } from '@/components/GettingStarted';
 import { OnboardingCard } from '@/components/OnboardingCard';
 import { ui } from '@/components/ui';
-import { DOMAIN_NOT_LISTED, hasSubaddress, SUBADDRESS_REFUSED } from '@/lib/email-address';
+import { DOMAIN_NOT_LISTED, emailDomain, hasSubaddress, SUBADDRESS_REFUSED } from '@/lib/email-address';
 import { rememberPending } from '@/lib/pending-confirmation';
 import { authHref, VERIFY_EMAIL } from '@/lib/return-to';
 
@@ -157,7 +157,10 @@ function EmailStep({ next, institutionCount }: { next: string; institutionCount:
           }
           if (!res) return setError('Could not reach the server. Try again.');
           const code = (await res.json().catch(() => null))?.error?.code;
-          track('signup_refused', { reason: code ?? String(res.status) });
+          track('signup_refused', {
+            reason: code ?? String(res.status),
+            domain: code === 'email_domain_not_allowed' ? (emailDomain(address) ?? undefined) : undefined,
+          });
           if (code === 'email_domain_not_allowed') return setError(DOMAIN_NOT_LISTED);
           setError(
             code === 'rate_limited'
