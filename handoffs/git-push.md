@@ -3,7 +3,7 @@
 Read `handoff.md` first (stack, deploy, how to work with Benedict), then `DESIGN.md` §4 ("Each page is a git
 repo"). Work on branch `repo-files` (branched from `venue-versions`, which isn't merged yet). Commit and push to
 `origin repo-files` after each working step; no Claude attribution in commits. Don't merge to `main` and don't deploy.
-Pre-launch: breaking changes and data resets are fine. Don't screenshot or preview the UI; Benedict looks himself.
+The site is live (since 2026-11-24): keep data people made and don't reset production. Don't screenshot or preview the UI; Benedict looks himself.
 
 ## Goal
 
@@ -115,7 +115,7 @@ extensions/<id>/…               reserved, refused
 
 **Left undone / for later phases**
 
-- Old commits keep the old layout; reverting one from before the migration fails layout checks (fine pre-launch).
+- Old commits keep the old layout; reverting one from before the migration fails layout checks (acceptable then, before launch).
 - No "edit this file" view yet; section 0 can't include HTML sections.
 - Non-ASCII slugs are refused on purpose; titles can be anything (they come from the heading).
 

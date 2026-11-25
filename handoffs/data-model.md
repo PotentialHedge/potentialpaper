@@ -2,7 +2,7 @@
 
 Read `handoff.md` first (stack, deploy, how to work with Benedict), then `DESIGN.md` §3, §4.3, §4.4, §4.8–4.11 and
 §10 ("Server-side extensions: bots"). Work on a branch per phase, commit and push after each working step, no Claude
-attribution in commits. Pre-launch: breaking changes and data resets are fine. Don't screenshot or preview the UI;
+attribution in commits. The site is live (since 2026-11-24): keep data people made and don't reset production. Don't screenshot or preview the UI;
 Benedict looks himself.
 
 ## Goal

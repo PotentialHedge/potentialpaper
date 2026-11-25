@@ -1,8 +1,17 @@
 # Deploying
 
-**The site is not in production yet.** potentialpaper.com has no real users, so downtime, a failed
-deploy or a reset database costs nothing. Deploy straight from `main` on this host, with no staging step, no
-maintenance window and no rollback plan. Just fix forward. This changes once the owner says we have launched.
+**The site is live.** potentialpaper.com has had real readers since 24 November 2026 (hundreds of sessions a day,
+many sent from acceptodds), so a broken deploy, downtime or lost data now reaches people. Deploy from `main` on
+this host, and:
+
+- **Never reset, reseed or overwrite production's database.** Copying goes one way only, production into staging.
+- **Take a dump before migrating** (`docker exec potentialpaper-postgres-1 pg_dump -U potentialpaper -Fc
+  potentialpaper > ~/backups/potentialpaper-$(date +%F-%H%M).dump`). Migrations must not destroy data people made,
+  and the old app keeps serving while they run, so a migration should leave the schema usable by the running build.
+- **Try risky changes on staging first**: migrations that rewrite data, auth and sign-in changes, and anything the
+  consumers rebuild.
+- **Build before stopping anything**, so the app is down only while the new container starts. Keep the previous
+  image's commit at hand: going back means `GIT_COMMIT=<old> dc up -d app` and a cache purge.
 
 ## Recipe
 
