@@ -108,7 +108,7 @@ export function VersionsSection({
         </div>
       ) : (
         <form action={`/versions${here}`} method="get">
-          <div className={ui.tableScroll}>
+          <div className={ui.tableScroll} data-link-area="versions">
             <table className={`${ui.table} font-sans text-sm`}>
               <thead>
                 <tr>
@@ -223,7 +223,7 @@ export function VersionsSection({
 export function VersionsBox({ versions, paperPath }: { versions: PaperVersion[]; paperPath: string }) {
   if (versions.length === 0) return null;
   return (
-    <div className={ui.box}>
+    <div className={ui.box} data-link-area="versions">
       <div className={ui.boxHeadingRow}>
         <h2 className={ui.runIn}>Versions</h2>
         <AddMissing what="version" paperPath={paperPath} compact />

@@ -117,6 +117,8 @@ export function ConsentPrompt({
             rel="nofollow"
             className={ui.linkBtn}
             onClick={() => track('signin_prompt_clicked', { target: 'plugin_consent' })}
+            data-seen-event="signin_prompt_shown"
+            data-seen-target="plugin_consent"
           >
             Sign in to approve it
           </Link>

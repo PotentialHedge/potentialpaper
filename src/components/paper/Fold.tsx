@@ -75,7 +75,7 @@ export function Fold({
 
   return (
     <section id={id}>
-      <h2 className={ui.groupHeading}>
+      <h2 className={ui.groupHeading} data-seen-event="section_reached" data-seen-target={id}>
         <button
           type="button"
           aria-expanded={open}

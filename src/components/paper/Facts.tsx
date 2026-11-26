@@ -10,7 +10,7 @@ import type { PaperFacts } from '@/lib/paper-facts';
 export function Facts({ facts, pagePath }: { facts: PaperFacts; pagePath: string }) {
   const { published } = facts;
   return (
-    <div className={ui.box}>
+    <div className={ui.box} data-link-area="facts">
       <table className={`${ui.facts} empty:hidden`}>
         <tbody>
           {published && (

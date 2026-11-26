@@ -1,7 +1,7 @@
 'use client';
 
 import { track } from '@/lib/track';
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import type { z } from 'zod';
 import { Checkbox } from '@/components/controls';
 import { ui } from '@/components/ui';
@@ -161,6 +161,8 @@ export function Comments({ paper, path }: { paper: PaperId; path: string }) {
                 href={authHref('/signin', `${path}#discussion`)}
                 rel="nofollow"
                 onClick={() => track('signin_prompt_clicked', { target: 'comment' })}
+                data-seen-event="signin_prompt_shown"
+                data-seen-target="comment"
               >
                 Sign in
               </a>{' '}
@@ -318,6 +320,32 @@ function CommentForm({
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
   const empty = body.trim().length === 0;
+  const kind = parentId ? 'reply' : 'top';
+  // Something typed and not posted: counted as left behind if the box goes (a reply cancelled, another page) or the
+  // page is closed with it still there. Refs, as the page closing gives no render to read state in.
+  const typed = useRef(false);
+  const unposted = useRef(false);
+  useEffect(() => {
+    const leave = () => {
+      if (!unposted.current) return;
+      unposted.current = false;
+      track('comment_abandoned', { target: kind });
+    };
+    window.addEventListener('pagehide', leave);
+    return () => {
+      window.removeEventListener('pagehide', leave);
+      leave();
+    };
+  }, [kind]);
+
+  function edit(text: string) {
+    setBody(text);
+    unposted.current = text.trim().length > 0;
+    if (unposted.current && !typed.current) {
+      typed.current = true;
+      track('comment_started', { target: kind });
+    }
+  }
 
   async function togglePreview() {
     if (preview !== null) return setPreview(null);
@@ -344,7 +372,9 @@ function CommentForm({
     }).catch(() => null);
     setBusy(false);
     if (res?.ok) {
-      track('comment_posted', { target: parentId ? 'reply' : 'top', on: anonymous && !viewer.authorName });
+      track('comment_posted', { target: kind, on: anonymous && !viewer.authorName });
+      typed.current = false;
+      unposted.current = false;
       setBody('');
       setPreview(null);
       onPosted(await res.json());
@@ -363,7 +393,7 @@ function CommentForm({
       ) : (
         <textarea
           value={body}
-          onChange={(e) => setBody(e.target.value)}
+          onChange={(e) => edit(e.target.value)}
           maxLength={MAX_COMMENT_LENGTH}
           placeholder={placeholder}
           autoFocus={autoFocus}

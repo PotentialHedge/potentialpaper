@@ -38,6 +38,8 @@ export function FollowStar({ paper, className }: { paper: PaperId; className: st
         className={`${className} ${WITH_ICON}`}
         title="Sign in to follow"
         onClick={() => track('signin_prompt_clicked', { target: 'follow' })}
+        data-seen-event="signin_prompt_shown"
+        data-seen-target="follow"
       >
         <StarIcon />
         follow {count}

@@ -194,6 +194,8 @@ export function PluginsSettings() {
             <Link
               href="/signin?next=/settings/plugins"
               onClick={() => track('signin_prompt_clicked', { target: 'plugins' })}
+              data-seen-event="signin_prompt_shown"
+              data-seen-target="plugins"
             >
               Sign in
             </Link>{' '}

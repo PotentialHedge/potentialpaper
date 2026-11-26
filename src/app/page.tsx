@@ -8,7 +8,8 @@ import { InstitutionStrip } from '@/components/InstitutionStrip';
 import { redirect } from 'next/navigation';
 import { FilterIcon, MoreIcon } from '@/components/icons';
 import { Pager } from '@/components/Pager';
-import { PaperCard, PaperRow, type RowLink } from '@/components/paper/PaperRow';
+import { type Listed, PaperCard, PaperRow, type RowLink } from '@/components/paper/PaperRow';
+import { TrackShown } from '@/components/TrackShown';
 import { RowPlugins } from '@/components/plugins/RowPlugins';
 import { SearchMatches } from '@/components/paper/SearchMatches';
 import { SearchSyntax } from '@/components/paper/SearchSyntax';
@@ -309,6 +310,7 @@ export default async function Home({
         <div className="mt-2 font-sans text-[13px] text-down">Ignored: {parsed.errors.join('; ')}</div>
       )}
 
+      {q && <TrackShown event="search_shown" data={{ count: all.total, step: all.page, on: !!venueFilter }} />}
       {q && (
         <div className="mt-2 font-sans text-[13px] text-muted">
           {all.total.toLocaleString('en')} {all.total === 1 ? 'result' : 'results'} for “{q}”
@@ -404,8 +406,13 @@ export default async function Home({
               </>
             }
           >
-            {mine.hits.map((hit) => (
-              <Row key={`${hit.scheme}:${hit.value}`} hit={hit} detailed={detailed} />
+            {mine.hits.map((hit, i) => (
+              <Row
+                key={`${hit.scheme}:${hit.value}`}
+                hit={hit}
+                detailed={detailed}
+                listed={{ list: 'mine', rank: (mine.page - 1) * MINE_PAGE + i + 1 }}
+              />
             ))}
             <Pager page={mine.page} pages={mine.pages} href={pageHref('mpage', '#mine')} />
           </Collapsible>
@@ -423,8 +430,13 @@ export default async function Home({
               </>
             }
           >
-            {followed.hits.map((hit) => (
-              <Row key={`${hit.scheme}:${hit.value}`} hit={hit} detailed={detailed} />
+            {followed.hits.map((hit, i) => (
+              <Row
+                key={`${hit.scheme}:${hit.value}`}
+                hit={hit}
+                detailed={detailed}
+                listed={{ list: 'following', rank: (followed.page - 1) * FOLLOWING_PAGE + i + 1 }}
+              />
             ))}
             <Pager page={followed.page} pages={followed.pages} href={pageHref('fpage', '#following')} />
           </Collapsible>
@@ -440,8 +452,13 @@ export default async function Home({
             ) : (
               <div className="h-3.5" />
             )}
-            {all.hits.map((hit) => (
-              <Row key={`${hit.scheme}:${hit.value}`} hit={hit} detailed={detailed} />
+            {all.hits.map((hit, i) => (
+              <Row
+                key={`${hit.scheme}:${hit.value}`}
+                hit={hit}
+                detailed={detailed}
+                listed={{ list: q ? 'search' : 'browse', rank: (all.page - 1) * SEARCH_PAGE_SIZE + i + 1 }}
+              />
             ))}
             <Pager page={all.page} pages={all.pages} href={pageHref('page', pinnedCount > 0 ? '#all' : '')} />
           </section>
@@ -475,7 +492,7 @@ function rowLink(hit: SearchHit): RowLink | null {
   }
 }
 
-function Row({ hit, detailed }: { hit: SearchHit; detailed: boolean }) {
+function Row({ hit, detailed, listed }: { hit: SearchHit; detailed: boolean; listed: Listed }) {
   const props = {
     paper: hitIdentifier(hit),
     title: hit.title,
@@ -486,6 +503,7 @@ function Row({ hit, detailed }: { hit: SearchHit; detailed: boolean }) {
     year: hit.year,
     link: rowLink(hit),
     href: shortPath(hit.shortId),
+    listed,
   };
   return (
     <>

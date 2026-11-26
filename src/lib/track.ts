@@ -55,10 +55,23 @@ export type EventName =
   // for approval). With `signup_submitted` and
   // `signin_succeeded` after it in the same session, a funnel shows which prompts bring people in.
   | 'signin_prompt_clicked'
+  // one of those prompts on screen, once a page view (`trackSeen`); same `target`s. The header's "sign in" is on
+  // every page, so its views are the page views and it is left out
+  | 'signin_prompt_shown'
   // a prompt to claim a page followed; `target`: 'analytics' (the locked Analytics tab's button), 'banner' ("Is
   // this your paper?" over its sections), 'owners' (the link in the owners' line). The locked tab itself being
   // opened is `tab_opened` with target 'analytics_locked'.
   | 'claim_prompt_clicked'
+  | 'claim_prompt_shown'
+  // a search's results shown (`count` of them, `step` the page, `on` whether a venue filter is set), never its words;
+  // and a row of a list followed (`target` 'search' | 'browse', `position` from 1 across pages, `kind` 'internal' for
+  // its page or 'external' for its PDF)
+  | 'search_shown'
+  | 'result_opened'
+  // a section of a page scrolled to, once a page view (`target` its id: 'submissions', 'discussion', …)
+  | 'section_reached'
+  // the BibTeX copied (`PageActions`)
+  | 'bibtex_copied'
   // sharing: the popover opened, a link copied (`target`), a service's share page opened
   | 'share_opened'
   | 'share_copied'
@@ -71,8 +84,8 @@ export type EventName =
   | 'review_comments_opened'
   | 'review_comments_more'
   | 'section_toggled'
-  // a link in what a page's people wrote followed (`trackLinks`): `target` is where ('abstract' | 'owners' |
-  // 'community' | 'comment' | 'review'), `kind` whether it leads off the site, to this site, or within the page,
+  // a link in what a page's people wrote followed (`trackLinks`): `target` is where (a `LinkArea`:
+  // 'abstract', 'title_links', 'versions', 'comment', …), `kind` whether it leads off the site, to this site, or within the page,
   // `domain` the other site's host
   | 'link_followed'
   // the discussion under a page
@@ -81,6 +94,10 @@ export type EventName =
   | 'comment_failed'
   | 'comment_removed'
   | 'comment_reply_opened'
+  // something typed in a comment box (`target` 'top' | 'reply'), and the box left with it unposted (the page closed
+  // or navigated away, or a reply cancelled)
+  | 'comment_started'
+  | 'comment_abandoned'
   // editing: the dialog opened, the web editor opened from it, the clone or extension command copied, a commit made
   // in the web editor, a revert, a picture dropped in
   | 'edit_opened'
@@ -166,6 +183,10 @@ export interface EventData {
   plugin?: string;
   /** An announcement's id: the admin's message, about no one. */
   announcement?: string;
+  /** How many results a search found. */
+  count?: number;
+  /** A followed row's place in its list, counted from 1 across its pages. */
+  position?: number;
 }
 
 type Umami = { track: (name: string, data?: Record<string, unknown>) => void };
@@ -191,7 +212,17 @@ export function pluginLabel(p: { from: string; plugin?: { id: string } | null })
 }
 
 /** Where a link sits, for `link_followed`: set as `data-link-area` on the element around what people wrote. */
-export type LinkArea = 'abstract' | 'owners' | 'community' | 'comment' | 'review';
+export type LinkArea =
+  | 'abstract'
+  | 'owners'
+  | 'community'
+  | 'comment'
+  | 'review'
+  // the paper's own furniture: its authors' names, [arXiv] [code] … under the title, the infobox, the versions
+  | 'authors'
+  | 'title_links'
+  | 'facts'
+  | 'versions';
 
 /**
  * Counts links followed out of what people wrote (`data-link-area`): one listener for the whole document, since that
@@ -202,8 +233,7 @@ export function trackLinks(): () => void {
   const onClick = (e: MouseEvent) => {
     if (e.button > 1 || !(e.target instanceof Element)) return;
     const link = e.target.closest<HTMLAnchorElement>('a[href]');
-    const area = link?.closest<HTMLElement>('[data-link-area]')?.dataset.linkArea;
-    if (!link || !area || link.closest('[data-umami-event]')) return;
+    if (!link) return;
     let url: URL;
     try {
       url = new URL(link.href, window.location.href);
@@ -213,6 +243,17 @@ export function trackLinks(): () => void {
     const here = window.location;
     const external = url.origin !== here.origin;
     const anchor = !external && url.pathname === here.pathname && url.search === here.search && !!url.hash;
+    const row = link.closest<HTMLElement>('[data-rank]');
+    const list = row?.dataset.resultList;
+    if (row && list) {
+      return track('result_opened', {
+        target: list,
+        position: Number(row.dataset.rank),
+        kind: external ? 'external' : 'internal',
+      });
+    }
+    const area = link.closest<HTMLElement>('[data-link-area]')?.dataset.linkArea;
+    if (!area || link.closest('[data-umami-event]')) return;
     track('link_followed', {
       target: area,
       kind: external ? 'external' : anchor ? 'anchor' : 'internal',
@@ -224,5 +265,67 @@ export function trackLinks(): () => void {
   return () => {
     document.removeEventListener('click', onClick, true);
     document.removeEventListener('auxclick', onClick, true);
+  };
+}
+
+/** What `data-seen-event` may name. */
+const SEEN_EVENTS: ReadonlySet<string> = new Set<EventName>([
+  'signin_prompt_shown',
+  'claim_prompt_shown',
+  'section_reached',
+]);
+
+/**
+ * Counts what was on screen: an element with `data-seen-event` (and `data-seen-target`), once a page view, when at
+ * least half of it is in view. Works from Server Components, as `data-umami-event` does for clicks, and for elements
+ * added later (a prompt rendered once the viewer is known, a section unfolded). Returns its cleanup.
+ */
+export function trackSeen(): () => void {
+  if (typeof IntersectionObserver === 'undefined') return () => {};
+  let path = window.location.pathname;
+  const sent = new Set<string>();
+  const watched = new WeakSet<Element>();
+  const seen = new IntersectionObserver(
+    (entries) => {
+      if (window.location.pathname !== path) {
+        path = window.location.pathname;
+        sent.clear();
+      }
+      for (const entry of entries) {
+        if (!entry.isIntersecting) continue;
+        const el = entry.target as HTMLElement;
+        const name = el.dataset.seenEvent ?? '';
+        const target = el.dataset.seenTarget;
+        const key = `${name} ${target}`;
+        seen.unobserve(el);
+        if (!SEEN_EVENTS.has(name) || sent.has(key)) continue;
+        sent.add(key);
+        track(name as EventName, target ? { target } : undefined);
+      }
+    },
+    { threshold: 0.5 },
+  );
+  const scan = () => {
+    for (const el of document.querySelectorAll('[data-seen-event]')) {
+      if (watched.has(el)) continue;
+      watched.add(el);
+      seen.observe(el);
+    }
+  };
+  scan();
+  // Batched: a page's render adds many nodes at once.
+  let queued = false;
+  const added = new MutationObserver(() => {
+    if (queued) return;
+    queued = true;
+    requestAnimationFrame(() => {
+      queued = false;
+      scan();
+    });
+  });
+  added.observe(document.body, { childList: true, subtree: true });
+  return () => {
+    added.disconnect();
+    seen.disconnect();
   };
 }

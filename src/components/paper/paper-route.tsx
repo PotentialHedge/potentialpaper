@@ -205,7 +205,7 @@ export async function PaperRoute({ scheme, segments }: { scheme: PaperScheme; se
             }}
           />
           <PageHeader title={paper.title}>
-            <p className="mt-4 text-center">
+            <p className="mt-4 text-center" data-link-area="authors">
               {paper.authors.length > 0 ? (
                 // A confirmed author's name links to their page, unless they turned that off.
                 paper.authors.map((name, i) => {
@@ -234,6 +234,7 @@ export async function PaperRoute({ scheme, segments }: { scheme: PaperScheme; se
             <nav
               className="mt-2.5 flex flex-wrap justify-center gap-x-3 font-sans text-[13px]"
               aria-label="The paper elsewhere"
+              data-link-area="title_links"
             >
               {titleLinks({ ...linkSources, extra: current?.links ?? [] }).map((l, i) => (
                 <a key={i} href={l.url} className="text-accent" rel="noopener noreferrer" target="_blank">

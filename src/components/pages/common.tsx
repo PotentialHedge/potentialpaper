@@ -148,6 +148,8 @@ export function Sections({ kind, address, ownersHtml, communityHtml, owners }: P
             rel="nofollow"
             data-umami-event="claim_prompt_clicked"
             data-umami-event-target="owners"
+            data-seen-event="claim_prompt_shown"
+            data-seen-target="owners"
           >
             {ask.join}
           </a>
@@ -173,6 +175,8 @@ export function Sections({ kind, address, ownersHtml, communityHtml, owners }: P
                   rel="nofollow"
                   data-umami-event="claim_prompt_clicked"
                   data-umami-event-target="banner"
+                  data-seen-event="claim_prompt_shown"
+                  data-seen-target="banner"
                   className={ui.btn({ ghost: true, inline: true, flush: true })}
                 >
                   {ask.action}

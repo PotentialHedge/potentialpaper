@@ -1,6 +1,7 @@
 'use client';
 
 import { type ReactNode, useState } from 'react';
+import { track } from '@/lib/track';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/Popover';
 import { AgentIcon, HistoryIcon, QuoteIcon, WITH_ICON } from '@/components/icons';
 import { ui } from '@/components/ui';
@@ -180,6 +181,7 @@ function Copy({ value, label }: { value: () => string; label: string }) {
       onClick={async () => {
         try {
           await navigator.clipboard.writeText(value());
+          track('bibtex_copied');
           setCopied(true);
           setTimeout(() => setCopied(false), 1500);
         } catch {

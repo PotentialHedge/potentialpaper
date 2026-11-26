@@ -116,6 +116,8 @@ export default async function NewPaperPage({ searchParams }: Props) {
                     className="shrink-0 font-sans text-xs"
                     data-umami-event="signin_prompt_clicked"
                     data-umami-event-target="add_version"
+                    data-seen-event="signin_prompt_shown"
+                    data-seen-target="add_version"
                   >
                     Sign in to add as a version
                   </a>

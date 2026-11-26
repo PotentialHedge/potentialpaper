@@ -112,6 +112,8 @@ export function ViewCount({ pageId, className = 'text-muted' }: { pageId: string
         href={authHref('/signin', pathname)}
         aria-label="Sign in to see page views"
         onClick={() => track('signin_prompt_clicked', { target: 'views' })}
+        data-seen-event="signin_prompt_shown"
+        data-seen-target="views"
         className={`group relative no-underline ${WITH_ICON} ${className} hover:text-ink`}
       >
         <EyeIcon />

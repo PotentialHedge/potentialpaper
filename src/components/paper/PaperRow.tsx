@@ -60,6 +60,13 @@ function SourceLink({ link }: { link: RowLink }) {
   );
 }
 
+/** A row's list ('search' | 'browse' | 'mine' | 'following') and its place in it, counted from 1 across pages. */
+export type Listed = { list: string; rank: number };
+
+function listedData(listed: Listed | undefined) {
+  return listed ? { 'data-result-list': listed.list, 'data-rank': listed.rank } : {};
+}
+
 /**
  * One paper in a list: its PDF link (or, with no PDF, its page at its source), title, authors and year, and venue.
  * The whole row is one target: the title's link is stretched over the row (`after:inset-0`), since a row that is
@@ -78,6 +85,7 @@ export function PaperRow({
   year,
   link,
   href,
+  listed,
 }: {
   /** Its identifier (`arxiv:1706.03762`), which plugins' notes name it by. */
   paper?: string;
@@ -89,9 +97,14 @@ export function PaperRow({
   year: number | null;
   link: RowLink | null;
   href: string;
+  /** Its list and place in it, for counting which rows are followed (`result_opened`). */
+  listed?: Listed;
 }) {
   return (
-    <div className="relative grid grid-cols-[44px_1fr_150px_var(--row-actions,0px)] items-center gap-x-3.5 border-b border-dotted border-rule-strong py-2 hover:bg-highlight narrow:grid-cols-[44px_1fr_var(--row-actions,0px)]">
+    <div
+      {...listedData(listed)}
+      className="relative grid grid-cols-[44px_1fr_150px_var(--row-actions,0px)] items-center gap-x-3.5 border-b border-dotted border-rule-strong py-2 hover:bg-highlight narrow:grid-cols-[44px_1fr_var(--row-actions,0px)]"
+    >
       <span className="font-sans text-xs">{link && <SourceLink link={link} />}</span>
       <span className="min-w-0 leading-[1.35]">
         {/* At most two lines; the whole title on hover. */}
@@ -144,6 +157,7 @@ export function PaperCard({
   link,
   cover,
   href,
+  listed,
 }: {
   /** As `PaperRow`'s: a plugin's note takes the venue's place, and the plugins' ⋯ follows the PDF link. */
   paper?: string;
@@ -158,6 +172,7 @@ export function PaperCard({
   link: RowLink | null;
   cover: string | null;
   href: string;
+  listed?: Listed;
 }) {
   const page = cover ? (
     // A remote image already sized for this box: Next's optimizer would only fetch it again, and stop a GIF.
@@ -172,7 +187,10 @@ export function PaperCard({
   const frame =
     'relative block aspect-[210/297] w-[92px] shrink-0 overflow-hidden border border-rule bg-card shadow-[0_1px_2px_rgb(0_0_0/0.08)] narrow:w-[64px]';
   return (
-    <div className="relative flex gap-4 border-b border-dotted border-rule-strong py-3.5 hover:bg-highlight narrow:gap-3">
+    <div
+      {...listedData(listed)}
+      className="relative flex gap-4 border-b border-dotted border-rule-strong py-3.5 hover:bg-highlight narrow:gap-3"
+    >
       {/* Not a link of its own: a click falls through to the title's, which covers the card. */}
       <span className={frame} aria-hidden>
         {page}

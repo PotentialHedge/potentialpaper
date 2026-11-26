@@ -140,6 +140,8 @@ function LockedAnalytics({ who, claim, claimPath }: { who: string; claim: ClaimP
         rel="nofollow"
         className={ui.btn({ ghost: true, inline: true, flush: true })}
         onClick={() => track('claim_prompt_clicked', { target: 'analytics' })}
+        data-seen-event="claim_prompt_shown"
+        data-seen-target="analytics"
       >
         {CLAIM_ACTION[claim]}
       </a>
