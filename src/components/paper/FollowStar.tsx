@@ -37,7 +37,7 @@ export function FollowStar({ paper, className }: { paper: PaperId; className: st
         href={authHref('/signin', pathname)}
         className={`${className} ${WITH_ICON}`}
         title="Sign in to follow"
-        onClick={() => track('follow_signin_clicked')}
+        onClick={() => track('signin_prompt_clicked', { target: 'follow' })}
       >
         <StarIcon />
         follow {count}

@@ -10,6 +10,9 @@ import { authHref, VERIFY_EMAIL } from '@/lib/return-to';
 import { noteSignedIn, useSetting } from '@/lib/settings/client';
 import { ConfirmBanner } from './ConfirmBanner';
 import { SettingsImport } from './SettingsImport';
+import { track } from '@/lib/track';
+
+const signInClicked = () => track('signin_prompt_clicked', { target: 'nav' });
 
 interface SeenViewer {
   handle: string;
@@ -20,7 +23,11 @@ interface SeenViewer {
 function SignIn() {
   const pathname = usePathname();
   const qs = useSearchParams().toString();
-  return <Link href={authHref('/signin', qs ? `${pathname}?${qs}` : pathname)}>sign in</Link>;
+  return (
+    <Link href={authHref('/signin', qs ? `${pathname}?${qs}` : pathname)} onClick={signInClicked}>
+      sign in
+    </Link>
+  );
 }
 
 /**
@@ -87,7 +94,13 @@ export function NavUser() {
         ) : viewer === null ? (
           <>
             <NavLinks signedIn={false} />
-            <Suspense fallback={<Link href="/signin">sign in</Link>}>
+            <Suspense
+              fallback={
+                <Link href="/signin" onClick={signInClicked}>
+                  sign in
+                </Link>
+              }
+            >
               <SignIn />
             </Suspense>
           </>

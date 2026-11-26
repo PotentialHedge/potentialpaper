@@ -93,7 +93,9 @@ export function ArrangedTabs({
               title={id === LEAD ? undefined : byId.get(id)!.hint}
               onClick={() => {
                 setChosen(id);
-                track('tab_opened', { target: id === ANALYTICS ? 'analytics' : id || 'lead' });
+                track('tab_opened', {
+                  target: id === ANALYTICS ? (locked ? 'analytics_locked' : 'analytics') : id || 'lead',
+                });
               }}
               className={`-mb-px cursor-pointer border-b-2 pb-1 ${id === shown ? `border-ink ${ui.on}` : 'border-transparent text-muted'} ${id !== LEAD && byId.get(id)!.locked ? 'opacity-60' : ''}`}
             >
@@ -133,7 +135,12 @@ function LockedAnalytics({ who, claim, claimPath }: { who: string; claim: ClaimP
         <strong className="text-ink">Only {who} see this.</strong> Views over time, how long people read, where they
         come from and what they open next.
       </p>
-      <a href={claimPath} rel="nofollow" className={ui.btn({ ghost: true, inline: true, flush: true })}>
+      <a
+        href={claimPath}
+        rel="nofollow"
+        className={ui.btn({ ghost: true, inline: true, flush: true })}
+        onClick={() => track('claim_prompt_clicked', { target: 'analytics' })}
+      >
         {CLAIM_ACTION[claim]}
       </a>
     </div>

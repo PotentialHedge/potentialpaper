@@ -142,7 +142,12 @@ export function Sections({ kind, address, ownersHtml, communityHtml, owners }: P
         <>
           {' '}
           ·{' '}
-          <a href={owners.claimPath} rel="nofollow">
+          <a
+            href={owners.claimPath}
+            rel="nofollow"
+            data-umami-event="claim_prompt_clicked"
+            data-umami-event-target="owners"
+          >
             {ask.join}
           </a>
         </>
@@ -165,6 +170,8 @@ export function Sections({ kind, address, ownersHtml, communityHtml, owners }: P
                 <a
                   href={owners.claimPath ?? undefined}
                   rel="nofollow"
+                  data-umami-event="claim_prompt_clicked"
+                  data-umami-event-target="banner"
                   className={ui.btn({ ghost: true, inline: true, flush: true })}
                 >
                   {ask.action}

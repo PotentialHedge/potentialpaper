@@ -191,8 +191,13 @@ export function PluginsSettings() {
         )}
         {settings.loaded && !signedIn && (
           <p className={ui.fine}>
-            <Link href="/signin?next=/settings/plugins">Sign in</Link> to install plugins, or to turn the site&apos;s
-            off.
+            <Link
+              href="/signin?next=/settings/plugins"
+              onClick={() => track('signin_prompt_clicked', { target: 'plugins' })}
+            >
+              Sign in
+            </Link>{' '}
+            to install plugins, or to turn the site&apos;s off.
           </p>
         )}
       </section>

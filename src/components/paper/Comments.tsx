@@ -157,7 +157,11 @@ export function Comments({ paper, path }: { paper: PaperId; path: string }) {
             </>
           ) : (
             <>
-              <a href={authHref('/signin', `${path}#discussion`)} rel="nofollow">
+              <a
+                href={authHref('/signin', `${path}#discussion`)}
+                rel="nofollow"
+                onClick={() => track('signin_prompt_clicked', { target: 'comment' })}
+              >
                 Sign in
               </a>{' '}
               to comment.

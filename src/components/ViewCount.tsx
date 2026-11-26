@@ -1,5 +1,6 @@
 'use client';
 
+import { track } from '@/lib/track';
 import { usePathname } from 'next/navigation';
 import { useEffect, useState } from 'react';
 import { authHref } from '@/lib/return-to';
@@ -110,6 +111,7 @@ export function ViewCount({ pageId, className = 'text-muted' }: { pageId: string
       <a
         href={authHref('/signin', pathname)}
         aria-label="Sign in to see page views"
+        onClick={() => track('signin_prompt_clicked', { target: 'views' })}
         className={`group relative no-underline ${WITH_ICON} ${className} hover:text-ink`}
       >
         <EyeIcon />
