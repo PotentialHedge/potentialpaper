@@ -3,7 +3,8 @@ import { createServer, type Server as NetServer, type Socket } from 'node:net';
 import { Server, utils, type AuthContext, type Connection, type ServerChannel } from 'ssh2';
 import type { Database } from '@/db';
 import type { Account } from '@/db/schema';
-import { findRepo, type GitAddress, parseGitAddress } from '../pages/clone';
+import { ApiError } from '../api/errors';
+import { findRepo, type FindOptions, type GitAddress, parseGitAddress } from '../pages/clone';
 import { countQuietly } from '../page-analytics';
 import { consume, rateLimitConfig } from '../ratelimit';
 import { findSshKey, fingerprintOf, touchSshKey } from '../ssh-keys';
@@ -247,14 +248,17 @@ function finish(channel: ServerChannel, status: number, message?: string) {
   }
 }
 
-/** The page an address names, following the redirect `findRepo` gives for another address of the same page. */
-async function resolve(address: GitAddress, database: Database) {
-  let found = await findRepo(address, database);
+/**
+ * The page an address names, following the redirect `findRepo` gives for another address of the same page. A fetch
+ * starts the repo of a paper that has none yet, as over HTTPS.
+ */
+async function resolve(address: GitAddress, database: Database, options: FindOptions = {}) {
+  let found = await findRepo(address, database, options);
   for (let hops = 0; found.kind === 'redirect' && hops < 2; hops++) {
     // `to` is the canonical clone address, with the same service at its end.
     const next = parseGitAddress(found.to);
     if (!next) return null;
-    found = await findRepo(next, database);
+    found = await findRepo(next, database, options);
   }
   return found.kind === 'repo' ? found : null;
 }
@@ -314,12 +318,21 @@ async function serve(
       `ERROR: Too many requests for this account. Try again in ${rate.retryAfterSeconds} seconds.`,
     );
   }
-  const repo = await resolve(address, ctx.database);
+  let repo;
+  try {
+    const start = service === 'git-upload-pack' ? { by: `account:${account.id}` } : undefined;
+    repo = await resolve(address, ctx.database, { start });
+  } catch (err) {
+    if (err instanceof ApiError && err.status === 429) return finish(channel, 1, `ERROR: ${err.message}`);
+    throw err;
+  }
   if (!repo) {
     return finish(
       channel,
       1,
-      `ERROR: No page repository at ${address.scheme}/${address.raw}. A page has one once someone has edited it on the site.`,
+      service === 'git-upload-pack'
+        ? `ERROR: No page at ${address.scheme}/${address.raw}.`
+        : `ERROR: No page repository at ${address.scheme}/${address.raw}. Clone it first: that starts it.`,
     );
   }
 

@@ -263,7 +263,6 @@ export async function PaperRoute({ scheme, segments }: { scheme: PaperScheme; se
             pagePath: pagePath(shown),
             codePath: toolPath('code', shown),
             clone: cloneAddresses(canonical),
-            hasRepo: current !== undefined,
           }}
         />
       }

@@ -55,7 +55,14 @@ export async function gitGet(req: Request, database: Database = getDb()): Promis
   if (address?.file === 'info/refs' && service !== null) {
     if (service === 'git-receive-pack') return receivePackRefs(req, address, database);
     if (service !== 'git-upload-pack') return text(403, `Unsupported service ${service}\n`);
-    const repo = await findRepo(address, database);
+    // A clone of a paper nobody has edited yet starts its repo (`findRepo`).
+    let repo;
+    try {
+      repo = await findRepo(address, database, { start: { by: `ip:${clientIp(req) ?? 'unknown'}` } });
+    } catch (err) {
+      if (err instanceof ApiError && err.status === 429) return text(429, `${err.message}\n`);
+      throw err;
+    }
     if (repo.kind === 'missing') return notFound();
     if (repo.kind === 'redirect') return redirect(repo.to, url.search);
     // A clone or pull starts here, once per command: count it for the page's owners (`page-analytics.ts`).

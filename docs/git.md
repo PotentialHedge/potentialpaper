@@ -19,8 +19,8 @@ GitHub Desktop come with it) and run `git lfs install` once. The page's PDFs and
 clone then has them as files. Without it the clone still works, and those files are small text "pointers"
 instead: everything else can be edited, but a PDF or picture can't be added ([below](#pdfs-and-the-picture)).
 
-A page only has a repository once someone has edited it. Until then the address answers "not found". Make a
-first edit on the site to start one.
+Every paper can be cloned. A paper nobody has edited yet gets its repository when it is first cloned, with the
+files every page starts with. Its `README.md` says how the files are laid out and who may change which.
 
 Or over SSH, with a key on your profile ([below](#over-ssh)):
 
@@ -30,19 +30,20 @@ git clone ssh://git@git.potentialpaper.com:2222/abs/1706.03762.git
 
 ## What's in a page
 
-| Path                         | What it is                                            | Who may change it                                                   |
-| ---------------------------- | ----------------------------------------------------- | ------------------------------------------------------------------- |
-| `community/NN-slug.md`       | the community section, one file per section           | any verified account                                                |
-| `author/NN-slug.md`          | the author section                                    | the paper's confirmed authors                                       |
-| `versions/<id>.json`         | the paper's versions                                  | any verified account                                                |
-| `versions/<id>.pdf`          | that version's PDF (Git LFS)                          | any verified account                                                |
-| `links/NN-slug.json`         | the links under the title: `{ "label": …, "url": … }` | its authors once the paper is claimed, else anyone                  |
-| `thumbnail.png` (or `.jpg`…) | the picture shown in place of the PDF's first page    | its authors once the paper is claimed, else anyone                  |
-| `thumbnail.json`             | the picture's words: `{ "alt": …, "caption": … }`     | as the picture                                                      |
-| `demos/<name>/index.html`, … | a demo kept in the page                               | any verified account; once the author section shows it, its authors |
-| `.potentialpaper/…`          | metadata and the paper's PDF, written by the site     | nobody but the site                                                 |
-| `.gitattributes`             | says which files are Git LFS; the same on every page  | nobody                                                              |
-| `prek.toml`                  | checks to run before a commit; the same on every page | nobody                                                              |
+| Path                         | What it is                                             | Who may change it                                                   |
+| ---------------------------- | ------------------------------------------------------ | ------------------------------------------------------------------- |
+| `community/NN-slug.md`       | the community section, one file per section            | any verified account                                                |
+| `author/NN-slug.md`          | the author section                                     | the paper's confirmed authors                                       |
+| `versions/<id>.json`         | the paper's versions                                   | any verified account                                                |
+| `versions/<id>.pdf`          | that version's PDF (Git LFS)                           | any verified account                                                |
+| `links/NN-slug.json`         | the links under the title: `{ "label": …, "url": … }`  | its authors once the paper is claimed, else anyone                  |
+| `thumbnail.png` (or `.jpg`…) | the picture shown in place of the PDF's first page     | its authors once the paper is claimed, else anyone                  |
+| `thumbnail.json`             | the picture's words: `{ "alt": …, "caption": … }`      | as the picture                                                      |
+| `demos/<name>/index.html`, … | a demo kept in the page                                | any verified account; once the author section shows it, its authors |
+| `.potentialpaper/…`          | metadata and the paper's PDF, written by the site      | nobody but the site                                                 |
+| `.gitattributes`             | says which files are Git LFS; the same on every page   | nobody                                                              |
+| `prek.toml`                  | checks to run before a commit; the same on every page  | nobody                                                              |
+| `README.md`                  | how the repository is laid out; the same on every page | nobody                                                              |
 
 Sections can also be `.html` files, from a small allowlist of tags (no scripts, styles or classes). They show
 in the order of their file names, so `10-summary.md` comes before `20-results.md`; a section's title is the

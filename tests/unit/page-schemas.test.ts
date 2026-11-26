@@ -3,7 +3,14 @@ import { parseLinkFile } from '@/lib/paper-links';
 import { parseVersionFile } from '@/lib/versions';
 import { contentProblem, layoutProblem, parseThumbnailWords, pathDenied } from '@/server/pages/rules';
 import { PAGE_SCHEMA_NAMES, pageJsonSchema } from '@/server/pages/schemas';
-import { missingStarterFiles, prekConfig, prekProblem, starterFiles } from '@/server/pages/starter';
+import {
+  missingStarterFiles,
+  prekConfig,
+  prekProblem,
+  readme,
+  readmeProblem,
+  starterFiles,
+} from '@/server/pages/starter';
 
 const roles = { system: false, admin: false, verified: true, owner: false, claimed: false };
 
@@ -75,11 +82,25 @@ describe('starter files', () => {
     expect(contentProblem('community/10-summary.md', '')).toBeNull();
   });
 
+  it('starts every page with a fixed README.md that says how its repo is laid out', () => {
+    const files = new Map(starterFiles());
+    expect(files.get('README.md')).toBe(readme());
+    expect(readme()).toMatch(/community\/NN-slug\.md/);
+    expect(readme('venue')).toMatch(/venue\.json/);
+    expect(readme('venue')).not.toMatch(/thumbnail/);
+    expect(readmeProblem(readme())).toBeNull();
+    expect(readmeProblem(`${readme()}\nmore\n`)).toMatch(/fixed/);
+    expect(readmeProblem(readme('venue'), 'venue')).toBeNull();
+    expect(pathDenied('README.md', roles)).toMatch(/system/);
+    expect(layoutProblem('README.md')).toBeNull();
+  });
+
   it('adds what an older page is missing, without touching a part that has sections', () => {
     const paths = new Set(['.potentialpaper/metadata.json', 'community/10-summary.md']);
-    const changes = missingStarterFiles(paths, undefined);
+    const changes = missingStarterFiles(paths, {});
     expect(changes.map((c) => c.path)).toEqual([
       'prek.toml',
+      'README.md',
       'owners/10-tl-dr.md',
       'owners/20-overview.md',
       'owners/30-results.md',
@@ -88,6 +109,8 @@ describe('starter files', () => {
       'owners/60-talks.md',
     ]);
     const all = new Set([...paths, ...changes.map((c) => c.path)]);
-    expect(missingStarterFiles(all, prekConfig())).toEqual([]);
+    expect(missingStarterFiles(all, { prek: prekConfig(), readme: readme() })).toEqual([]);
+    // Other kinds start with no sections: only the fixed files.
+    expect(missingStarterFiles(new Set(), {}, 'category').map((c) => c.path)).toEqual(['prek.toml', 'README.md']);
   });
 });

@@ -24,8 +24,6 @@ export interface EditOptions {
   pagePath: string;
   codePath: string;
   clone: { https: string; ssh: string | null };
-  /** The page has a repository yet: it starts with its first edit, so until then only the web editor works. */
-  hasRepo: boolean;
   /** A form of the kind's own for the common edits, offered first (a category's names and article). */
   form?: { href: string; label: string };
 }
@@ -44,7 +42,7 @@ const VSIX = '/editor/potentialpaper.vsix';
 /** Remembers, in this browser, that the reader declined the extension, so copying doesn't ask again. */
 const DECLINED = 'pp:edit:no-extension';
 
-export function EditDialog({ pagePath, codePath, clone, hasRepo, form }: EditOptions) {
+export function EditDialog({ pagePath, codePath, clone, form }: EditOptions) {
   const dialog = useRef<HTMLDialogElement>(null);
   const [via, setVia] = useState<'https' | 'ssh'>('https');
   const [offer, setOffer] = useState(false);
@@ -157,50 +155,42 @@ export function EditDialog({ pagePath, codePath, clone, hasRepo, form }: EditOpt
           </div>
 
           <h3 className={`${ui.runIn} mt-5 block`}>Or clone it with git</h3>
-          {hasRepo ? (
-            <>
-              <div className="mt-1 flex items-center gap-2 text-xs text-muted">
-                <span>Run in a terminal:</span>
-                <span className="flex-1" />
-                <div role="tablist" aria-label="Clone over" className="inline-flex border border-rule">
-                  {(['https', 'ssh'] as const).map((v) => (
-                    <button
-                      key={v}
-                      type="button"
-                      role="tab"
-                      aria-selected={via === v}
-                      onClick={() => setVia(v)}
-                      className={`cursor-pointer px-2 py-0.5 not-first:border-l not-first:border-rule ${via === v ? 'bg-tint text-ink' : 'text-accent'}`}
-                    >
-                      {v.toUpperCase()}
-                    </button>
-                  ))}
-                </div>
-              </div>
-              {address ? (
-                <TerminalLine text={`git clone ${address}`} onCopied={onCopied} />
-              ) : (
-                <p className="mt-2 text-muted">Cloning over SSH isn&apos;t open yet. Use HTTPS for now.</p>
-              )}
-              <p className={ui.fine}>
-                Needs <a href="https://git-lfs.com">Git LFS</a>.{' '}
-                {via === 'ssh' ? (
-                  <>
-                    To push, add an SSH key on <a href="/profile#ssh-keys">your profile</a>.
-                  </>
-                ) : (
-                  <>
-                    To push, use an API key from <a href="/profile#agents">your profile</a> as the password.
-                  </>
-                )}
-              </p>
-              {offer && <ExtensionOffer onDecline={decline} />}
-            </>
+          <div className="mt-1 flex items-center gap-2 text-xs text-muted">
+            <span>Run in a terminal:</span>
+            <span className="flex-1" />
+            <div role="tablist" aria-label="Clone over" className="inline-flex border border-rule">
+              {(['https', 'ssh'] as const).map((v) => (
+                <button
+                  key={v}
+                  type="button"
+                  role="tab"
+                  aria-selected={via === v}
+                  onClick={() => setVia(v)}
+                  className={`cursor-pointer px-2 py-0.5 not-first:border-l not-first:border-rule ${via === v ? 'bg-tint text-ink' : 'text-accent'}`}
+                >
+                  {v.toUpperCase()}
+                </button>
+              ))}
+            </div>
+          </div>
+          {address ? (
+            <TerminalLine text={`git clone ${address}`} onCopied={onCopied} />
           ) : (
-            <p className="mt-1 text-muted">
-              The page gets its repository with its first edit, so start in the web editor.
-            </p>
+            <p className="mt-2 text-muted">Cloning over SSH isn&apos;t open yet. Use HTTPS for now.</p>
           )}
+          <p className={ui.fine}>
+            Needs <a href="https://git-lfs.com">Git LFS</a>.{' '}
+            {via === 'ssh' ? (
+              <>
+                To push, add an SSH key on <a href="/profile#ssh-keys">your profile</a>.
+              </>
+            ) : (
+              <>
+                To push, use an API key from <a href="/profile#agents">your profile</a> as the password.
+              </>
+            )}
+          </p>
+          {offer && <ExtensionOffer onDecline={decline} />}
 
           <h3 className={`${ui.runIn} mt-5 block`}>Or let your agent set it up</h3>
           <p className="mt-1 text-xs text-muted">

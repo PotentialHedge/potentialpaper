@@ -438,7 +438,8 @@ export async function receiveCommits(
   if (!OID.test(update.new)) throw refuse(`${update.new} is not a commit id`);
 
   const head = await readHead(database, pageId);
-  if (!head) throw refuse('this page has no history yet; it starts with its first edit on the site', undefined, 409);
+  if (!head)
+    throw refuse('this page has no history yet; clone it, which starts it, and push from that clone', undefined, 409);
   if (update.old !== head) {
     throw refuse(
       'the page has changed since you fetched it; git pull --rebase, then push again',

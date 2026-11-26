@@ -184,10 +184,13 @@ gives a normal repo.
 23 GB, which one Postgres handles comfortably. The primary key leads with `page_id`, so hash
 partitioning remains available later.
 
-### 4.2 A repo exists only after the first edit
+### 4.2 A repo exists only after the first edit or clone
 
-A page nobody has edited is a `papers` row with no objects. Millions of stubs therefore cost almost
+A page nobody has edited or cloned is a `papers` row with no objects. Millions of stubs therefore cost almost
 nothing, and the first commit creates the repo with the paper's `paper.json`, written from what its source said.
+A git client fetching a paper with no repo (`git-upload-pack`, over HTTPS or SSH) starts it with the system's
+commit of just the starter files (`startRepo`, decided 2026-11-26), so every paper can be cloned; an address may
+start at most 30 an hour (`REPO_START_LIMIT`). The dumb protocol and every other reader never start one.
 From then on `paper.json` is what the paper is (title, authors, abstract), and the row's columns its projection
 (decided 2026-11-23: one source for each fact). The row's `venue` and `year` are a projection of the versions.
 
@@ -198,6 +201,7 @@ big files. `src/server/pages/rules.ts` is the authority.
 
 ```
 .gitattributes                  system, always the same: which files are Git LFS
+README.md                       system, the same on every page of a kind: how the repo is laid out
 .potentialpaper/metadata.json   system: layout version, kind and key
 paper.json                      the paper: { "title", "authors", "abstract", "license" }; the card's writers
 owners/10-tl-dr.md              the owners' sections (a paper's confirmed authors'), one file per section

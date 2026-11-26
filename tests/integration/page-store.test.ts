@@ -8,7 +8,7 @@ import { dirname, join } from 'node:path';
 import { asc, eq, sql } from 'drizzle-orm';
 import fc from 'fast-check';
 import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it } from 'vitest';
-import { starterFiles } from '@/server/pages/starter';
+import { readme, starterFiles } from '@/server/pages/starter';
 import * as gitRoute from '@/app/git/[...path]/route';
 import { getDb } from '@/db';
 import {
@@ -529,12 +529,15 @@ describe('commitPage', () => {
       [person, 'owners/10-overview.md'],
       [unverified, 'community/10-tl-dr.md'],
       [admin, 'extensions/x/data.json'],
-      [admin, 'README.md'],
+      [person, 'README.md'],
       [SYSTEM_ACTOR, 'community/10-tl-dr.md'],
     ] as [Actor, string][]) {
       const err = await refusal(commitPage(paperId, null, actor, [{ path, content: '{}' }], 'Edit'));
       expect([path, err.code]).toEqual([path, 'forbidden']);
     }
+    // The README is the system's, and fixed: not even an admin can change what it says.
+    const readmeEdit = await refusal(commitPage(paperId, null, admin, [{ path: 'README.md', content: '{}' }], 'Edit'));
+    expect(readmeEdit.code).toBe('validation_error');
     // One forbidden path refuses the commit, not just that file.
     await refusal(
       commitPage(
@@ -993,6 +996,36 @@ describe('git clone', () => {
     );
   });
 
+  it('starts the repo of a paper nobody has edited when git clones it, once', async () => {
+    const paperId = await newPaper(ARXIV);
+    // Only a git client fetching starts it: the dumb protocol's answers stay as they were.
+    expect((await request('/git/arxiv/1706.03762.git/info/refs')).status).toBe(404);
+    expect(await readHead(getDb(), paperId)).toBeNull();
+
+    const clone = join(workDir(), 'page');
+    await gitOverHttp(['clone', '-q', `${base}${clonePath(ARXIV)}`, clone]);
+    fsck(clone);
+    expect(git(['rev-list', '--count', 'HEAD'], clone).trim()).toBe('1');
+    expect(readFileSync(join(clone, 'README.md'), 'utf8')).toBe(readme());
+    expect(JSON.parse(readFileSync(join(clone, 'paper.json'), 'utf8')).title).toBeTruthy();
+    for (const [path, text] of starterFiles()) expect(readFileSync(join(clone, path), 'utf8')).toBe(text);
+
+    const again = join(workDir(), 'again');
+    await gitOverHttp(['clone', '-q', `${base}${clonePath(ARXIV)}`, again]);
+    expect(git(['rev-parse', 'HEAD'], again).trim()).toBe(git(['rev-parse', 'HEAD'], clone).trim());
+    expect(await pageHistory(paperId)).toHaveLength(1);
+  });
+
+  it('starts repos for one address only so fast', async () => {
+    await newPaper(ARXIV);
+    await getDb().execute(
+      sql`insert into rate_limit_buckets (key, tokens, updated_at) values ('repo-start:ip:unknown', 0, clock_timestamp())`,
+    );
+    const res = await request('/git/arxiv/1706.03762.git/info/refs?service=git-upload-pack');
+    expect(res.status).toBe(429);
+    expect(await res.text()).toMatch(/too many new clones/);
+  });
+
   it('marks objects cacheable and everything else not', async () => {
     const paperId = await newPaper(ARXIV);
     const { oid } = await commitPage(paperId, null, SYSTEM_ACTOR, [], 'Start');
@@ -1046,7 +1079,7 @@ describe('git clone', () => {
         '/git/arxiv/9999.99999.git/info/refs',
         '/git/arxiv/9999.99999.git/HEAD',
         '/git/arxiv/9999.99999.git/objects/ab/' + 'c'.repeat(38),
-        '/git/arxiv/2001.11111.git/info/refs', // a paper nobody has edited has no repo
+        '/git/arxiv/2001.11111.git/info/refs', // a paper nobody has edited has no repo, until git fetches it
         `/git/arxiv/2001.11111.git/objects/${oid!.slice(0, 2)}/${oid!.slice(2)}`, // another page's object
         '/git/doi/10.1000/nothing.git/info/refs',
         '/git/openreview/notapaper.git/HEAD',

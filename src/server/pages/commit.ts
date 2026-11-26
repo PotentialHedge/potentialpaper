@@ -35,6 +35,7 @@ import {
   METADATA_PATH,
   normalizePath,
   PREK_PATH,
+  README_PATH,
 } from './rules';
 import { insertPage, mustPage, type PageRow } from './kinds';
 import { refreshPages } from './refresh';
@@ -254,7 +255,7 @@ export async function commitPage(
           continue;
         }
         // Two valid edits can merge into something invalid, which is as much a conflict as any other.
-        if (merge.content !== content && fileProblem(path, merge.content)) {
+        if (merge.content !== content && fileProblem(path, merge.content, roles.kind)) {
           conflicts.push({ path, base, ours: content, theirs });
           continue;
         }
@@ -337,7 +338,7 @@ export async function commitPage(
 /**
  * Makes a page of a kind other than a paper (`lib/kinds.ts`), or returns the one there is, with its repo started:
  * the system's first commit, of its `.potentialpaper/metadata.json` (`{ layout, kind, key }`), `.gitattributes`
- * and `prek.toml`. A paper's repo starts with its first edit (DESIGN.md §4.2); another kind's page is made on
+ * and `prek.toml`. A paper's repo starts with its first edit or clone (`startRepo`); another kind's page is made on
  * purpose, so it has a repo to clone and push to from the start. What it says is its kind file and sections,
  * written by whoever the kind's path rules let (`rules.ts`).
  */
@@ -353,6 +354,18 @@ export async function createPage(
   // Its address may have been answered "not found" and cached.
   await refreshPages({ kind, key });
   return { ...page, head: result.oid! };
+}
+
+/**
+ * Starts a paper's repo, if it has none yet, with the system's first commit: what a first edit would start it with
+ * and nothing else (DESIGN.md §4.2). A clone does this (`clone.ts`), so every paper can be cloned; a stub nobody
+ * clones or edits still has no repo. Returns the head. Two at once make one commit: the second finds it there.
+ */
+export async function startRepo(pageId: string, database: Database = getDb()): Promise<string> {
+  const head = await readHead(database, pageId);
+  if (head) return head;
+  const result = await commitPage(pageId, null, SYSTEM_ACTOR, [], 'Start the page', { database });
+  return result.oid!;
 }
 
 /**
@@ -384,7 +397,8 @@ export async function revertCommit(
       (parent ||
         (file.path !== METADATA_PATH && file.path !== KINDS.paper.kindFile && started.get(file.path) !== file.after)) &&
       file.path !== GITATTRIBUTES_PATH &&
-      file.path !== PREK_PATH,
+      file.path !== PREK_PATH &&
+      file.path !== README_PATH,
   );
   // A commit from before the page's files were laid out as they are now (`layout-migration.ts`) would put
   // back files that have no place any more. Its text is still in the history and the diff, to copy from.

@@ -116,7 +116,7 @@ function git(args: string[], cwd: string): string {
     .trim();
 }
 
-async function newPaper() {
+async function newPaper({ start = true } = {}) {
   count += 1;
   const id = { scheme: 'arxiv', value: `2202.${String(count).padStart(5, '0')}` } as const;
   const paperId = await savePaper({
@@ -128,7 +128,7 @@ async function newPaper() {
     abstractLicense: 'CC0-1.0',
     identifiers: [id],
   });
-  await commitPage(paperId, null, SYSTEM_ACTOR, [], 'Start the page');
+  if (start) await commitPage(paperId, null, SYSTEM_ACTOR, [], 'Start the page');
   return { paperId, id };
 }
 
@@ -292,11 +292,19 @@ describe('git over SSH', () => {
     expect(sftp.ok).toBe(false);
   });
 
-  it('says so for an address with no page repository', async () => {
+  it('starts the repo of a paper nobody has edited when it is cloned', async () => {
+    const { paperId, id } = await newPaper({ start: false });
+    const { key } = await newPusher();
+    const clone = await cloneAs(key, sshUrl(`abs/${id.value}.git`));
+    expect(readFileSync(join(clone, 'README.md'), 'utf8')).toMatch(/^# This is a paper's page/);
+    expect(git(['rev-parse', 'HEAD'], clone)).toBe(await readHead(getDb(), paperId));
+  });
+
+  it('says so for an address with no page', async () => {
     const { key } = await newPusher();
     const missing = await gitWith(key, ['clone', '-q', sshUrl('abs/2299.99999.git'), 'x']);
     expect(missing.ok).toBe(false);
-    expect(missing.output).toContain('ERROR: No page repository at arxiv/2299.99999.');
+    expect(missing.output).toContain('ERROR: No page at arxiv/2299.99999.');
     const junk = await gitWith(key, ['clone', '-q', sshUrl('etc/passwd'), 'y']);
     expect(junk.output).toContain("ERROR: '/etc/passwd' is not a page's address.");
   });

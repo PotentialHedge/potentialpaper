@@ -203,7 +203,7 @@ describe('who may write where', () => {
     ['community/10-summary.md', ['admin', 'verified', 'author', 'verifiedOnClaimed']],
     ['versions/v_k3x9q2ab.json', ['system', 'admin', 'verified', 'author', 'verifiedOnClaimed']],
     ['extensions/x/data.json', []],
-    ['README.md', []],
+    ['README.md', ['system', 'admin']],
     ['authors/page.md', []],
     // The first layout's places.
     ['metadata.json', []],

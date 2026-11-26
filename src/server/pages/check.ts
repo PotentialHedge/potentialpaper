@@ -34,6 +34,7 @@ import {
   parseLfsPointer,
   pathDenied,
   PREK_PATH,
+  README_PATH,
   type Roles,
   sectionName,
   THUMBNAIL_PATH,
@@ -44,7 +45,7 @@ import {
   versionPath,
   versionPdfIdOf,
 } from './rules';
-import { prekProblem } from './starter';
+import { prekProblem, readmeProblem } from './starter';
 import { pageClaimRoles } from '../page-claims';
 import { domainsAbove, isOrgMember } from '../org-roles';
 import { checkProtection, isEstablished } from '../page-protection';
@@ -267,9 +268,11 @@ export async function checkMayWrite(db: Reader, pageId: string, actor: Actor, pa
   await checkProtection(db, pageId, roles, paths);
 }
 
-/** Why this can't be the file's content, or `null`: `contentProblem`, and the page's fixed `prek.toml`. */
+/** Why this can't be the file's content, or `null`: `contentProblem`, and the page's fixed `prek.toml` and `README.md`. */
 export function fileProblem(path: string, content: string, kind: PageKind = 'paper'): string | null {
-  return path === PREK_PATH ? prekProblem(content) : contentProblem(path, content, kind);
+  if (path === PREK_PATH) return prekProblem(content);
+  if (path === README_PATH) return readmeProblem(content, kind);
+  return contentProblem(path, content, kind);
 }
 
 export function invalidContent(path: string, problem: string): ApiError {

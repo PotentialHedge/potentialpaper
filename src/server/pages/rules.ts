@@ -23,6 +23,7 @@ import { htmlProblem } from './html';
  *
  *   .gitattributes                  the system's, always the same: which files are kept with Git LFS
  *   prek.toml                       the system's, always the same: checks to run before a commit
+ *   README.md                       the system's, the same on every page of a kind: how the repo is laid out
  *   .potentialpaper/metadata.json   the system's: the layout's version, the kind and the key
  *   paper.json                      the paper's title, authors and abstract (`lib/kinds.ts`)
  *   owners/10-overview.md           the owners' sections (on a paper, its confirmed authors'), a file per section
@@ -38,9 +39,9 @@ import { htmlProblem } from './html';
  *   reviews/<source>/<submission>/  a bot's import of a submission and its notes (`lib/review-files.ts`)
  *   extensions/<id>/…               reserved
  *
- * Every kind of page (`lib/kinds.ts`) has the same shape: `.gitattributes`, `prek.toml` and `.potentialpaper/` for
- * the system, its parts' sections (`<part>/NN-slug.md`) and each part's labeled links (`<part>/links.jsonl`), its
- * kind file, and `extensions/`. The rest above is a paper's own. Other kinds today:
+ * Every kind of page (`lib/kinds.ts`) has the same shape: `.gitattributes`, `prek.toml`, `README.md` and
+ * `.potentialpaper/` for the system, its parts' sections (`<part>/NN-slug.md`) and each part's labeled links
+ * (`<part>/links.jsonl`), its kind file, and `extensions/`. The rest above is a paper's own. Other kinds today:
  *
  *   venue.json, category.json, org.json or profile.json   the kind file (`lib/kinds.ts`)
  *   forms.json                      a venue's forms for its notes, by source (`lib/review-files.ts`)
@@ -115,6 +116,8 @@ export const GITATTRIBUTES_PATH = '.gitattributes';
  * names programs to run. `check.ts` holds it to its one content.
  */
 export const PREK_PATH = 'prek.toml';
+/** How the page's repository is laid out (`starter.ts`): the same on every page of a kind, and the system's. */
+export const README_PATH = 'README.md';
 export const GITATTRIBUTES = `# PDFs and pictures are kept with Git LFS (https://git-lfs.com). With it installed (\`git lfs install\`),
 # a clone has the files, and \`git add\` of one stores a pointer. This file is the same on every page.
 /.potentialpaper/*.pdf filter=lfs diff=lfs merge=lfs -text
@@ -325,10 +328,10 @@ function kindLayout(kind: PageKind): string {
   const sections = `${parts.join(' and ')} (sections named like 10-summary.md or 20-results.html, links.jsonl${(KINDS[kind].fileTypes as readonly string[]).includes('fact') ? ', facts.jsonl' : ''}${kind === 'paper' ? `; ${OWNERS_DIR}/ also plugins.json` : ''})`;
   if (kind !== 'paper') {
     const forms = kind === 'venue' ? `, ${VENUE_FORMS_FILE}` : '';
-    return `${kind} pages hold .gitattributes, prek.toml, ${METADATA_PATH}, ${KINDS[kind].kindFile}${forms}, ${sections} and extensions/`;
+    return `${kind} pages hold .gitattributes, prek.toml, README.md, ${METADATA_PATH}, ${KINDS[kind].kindFile}${forms}, ${sections} and extensions/`;
   }
   return (
-    `pages hold .gitattributes, prek.toml, .potentialpaper/ (metadata.json), paper.json, ${sections}, ` +
+    `pages hold .gitattributes, prek.toml, README.md, .potentialpaper/ (metadata.json), paper.json, ${sections}, ` +
     'versions/<id>.json and <id>.pdf, links/ (named like 10-code.json), thumbnail.png (or .jpg, .gif, .webp, .avif) ' +
     'and thumbnail.json, demos/<name>/, reviews/<source>/<submission>/ and extensions/'
   );
@@ -488,9 +491,12 @@ function rulesOf(kind: PageKind): PathRule[] {
   const systemPaths = kind === 'paper' ? SYSTEM_PATHS : new Set([METADATA_PATH]);
   return [
     {
-      covers: (path) => path.startsWith(`${SYSTEM_DIR}/`) || path === GITATTRIBUTES_PATH || path === PREK_PATH,
+      covers: (path) =>
+        path.startsWith(`${SYSTEM_DIR}/`) || path === GITATTRIBUTES_PATH || path === PREK_PATH || path === README_PATH,
       layout: (path) =>
-        systemPaths.has(path) || path === GITATTRIBUTES_PATH || path === PREK_PATH ? null : kindLayout(kind),
+        systemPaths.has(path) || path === GITATTRIBUTES_PATH || path === PREK_PATH || path === README_PATH
+          ? null
+          : kindLayout(kind),
       denied: may.system,
     },
     ...(owners ? [partRule(kind, OWNERS_DIR, may.owners(ownersRefusal))] : []),

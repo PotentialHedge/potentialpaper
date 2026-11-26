@@ -1,15 +1,16 @@
 import 'dotenv/config';
 import { parseArgs } from 'node:util';
 import { getDb, getPool } from '@/db';
-import { pageRefs } from '@/db/schema';
+import { pageRefs, pages } from '@/db/schema';
+import { eq } from 'drizzle-orm';
 import { commitPage, SYSTEM_ACTOR } from '@/server/pages/commit';
 import { readCommit, readFiles, readText } from '@/server/pages/repo';
-import { PREK_PATH } from '@/server/pages/rules';
+import { PREK_PATH, README_PATH } from '@/server/pages/rules';
 import { missingStarterFiles } from '@/server/pages/starter';
 
-const USAGE = `Gives every page repo the files a new page starts with (src/server/pages/starter.ts): prek.toml as it is now,
-and empty sections for each part that has none. A system commit per page that needs one; safe to run again.
-Run it again when prek.toml changes (a new site address, new hook versions).
+const USAGE = `Gives every page repo the files a new page starts with (src/server/pages/starter.ts): prek.toml and README.md
+as they are now, and on a paper empty sections for each part that has none. A system commit per page that needs one;
+safe to run again. Run it again when prek.toml or README.md changes (a new site address, new hook versions).
 
   npm run pages:add-starter [-- --dry-run]`;
 
@@ -20,14 +21,18 @@ async function main() {
     return;
   }
   const db = getDb();
-  const refs = await db.select({ paperId: pageRefs.pageId, head: pageRefs.head }).from(pageRefs);
+  const refs = await db
+    .select({ paperId: pageRefs.pageId, head: pageRefs.head, kind: pages.kind })
+    .from(pageRefs)
+    .innerJoin(pages, eq(pages.id, pageRefs.pageId));
   let changed = 0;
   let failed = 0;
-  for (const [index, { paperId, head }] of refs.entries()) {
+  for (const [index, { paperId, head, kind }] of refs.entries()) {
     const oid = head.toString('hex');
     const files = await readFiles(db, paperId, (await readCommit(db, paperId, oid)).tree);
     const prek = (await readText(db, paperId, files.get(PREK_PATH))) ?? undefined;
-    const changes = missingStarterFiles(new Set(files.keys()), prek);
+    const readme = (await readText(db, paperId, files.get(README_PATH))) ?? undefined;
+    const changes = missingStarterFiles(new Set(files.keys()), { prek, readme }, kind);
     if (changes.length === 0) continue;
     if (values['dry-run']) {
       console.log(`${paperId}: ${changes.map((c) => c.path).join(' ')}`);

@@ -165,7 +165,6 @@ export async function KeyedPageRoute({ kind, segments }: { kind: KeyedKind; segm
                   pagePath: pagePath(address),
                   codePath: toolPath('code', address),
                   clone: cloneAddresses(address),
-                  hasRepo: current !== null,
                   // A category's name and article have a form of their own.
                   form:
                     kind === 'category'

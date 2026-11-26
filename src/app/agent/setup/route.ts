@@ -101,7 +101,7 @@ The prompt usually names the page by its path on ${origin}. A paper's agent page
   }.
 
 - Ask where to put it if the person has not said, then \`git clone <address>\` (${ssh ? 'over SSH once step 5 is done, otherwise HTTPS' : 'HTTPS'}). Anyone may clone; no key is needed for that.
-- "Not found": the page has no repository yet. It gets one with its first edit, so ask the person to make one in the web editor (the page's address with \`/code\` in front: \`${origin}/code/s/42\`), then clone again.
+- Every page can be cloned: a paper nobody has edited yet gets its repository when it is first cloned. Its \`README.md\` says how the files are laid out and who may change which.
 - In the clone, \`git lfs ls-files\` lists the PDFs and picture, and they open as real files, not small text pointers. If they are pointers, step 2 was skipped: do it, then \`git lfs pull\`.
 
 **Set the page's identity, in the clone, not globally.** Pages never carry a name or email address. Each commit is made as an id the site gives the person on that page: \`u_…\` on most pages, \`a_…\` on a paper they are a confirmed author of. You don't look it up: the first push with another identity is refused, and its \`remote:\` lines give the two \`git config user.name\`/\`user.email\` commands for that page. Run them, remake the commits (\`git commit --amend --reset-author --no-edit\`, or \`git rebase --exec 'git commit --amend --reset-author --no-edit' origin/main\` for several) and push again.

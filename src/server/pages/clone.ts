@@ -8,13 +8,18 @@ import { findKeyedPage, type PageRow } from './kinds';
 import { gitSshUrl, siteUrl } from '../site';
 import { looseObject } from './git-objects';
 import { pageRepo, readHead } from '../git/repo';
+import { ApiError } from '../api/errors';
+import { consume, type RateLimitConfig } from '../ratelimit';
+import { startRepo } from './commit';
+import { refreshPages } from './refresh';
 
 /**
  * Clone addresses, and git's dumb HTTP protocol, read-only (DESIGN.md §4.6), as answers for
  * `server/git/http.ts`. The smart protocol is in `server/git/`.
  *
- * The addresses are unbounded, so this only reads. It never asks a paper source about an identifier and
- * never writes a row, and each answer but an object that exists says not to cache it.
+ * The addresses are unbounded, so this only reads, with one exception: a clone of a paper that has no repo yet
+ * starts it (`findRepo`'s `start`), bounded per address it comes from. It never asks a paper source about an
+ * identifier, and each answer but an object that exists says not to cache it.
  */
 
 export type GitAnswer =
@@ -90,13 +95,26 @@ export interface FoundRepo {
   identifiers: PaperId[];
 }
 
+/** How many papers' repos one address (an IP, or an account over SSH) may start by cloning them: a person's worth. */
+export const REPO_START_LIMIT: RateLimitConfig = { burst: 30, perSecond: 30 / 3600 };
+
+export interface FindOptions {
+  /**
+   * A git client is fetching (`git-upload-pack`): start the repo of a paper that has none yet (`startRepo`), so it
+   * can be cloned, taking one from the bucket of `start.by`. Without it such a paper has no repo to answer with.
+   */
+  start?: { by: string };
+}
+
 /**
- * The page repo an address names: its paper, if that has a repo, or the one address of it to go to instead.
- * One address per repo, so one set of cached objects. Git follows a redirect on its first request.
+ * The page repo an address names: its paper, if that has a repo (or `start` starts one), or the one address of it
+ * to go to instead. One address per repo, so one set of cached objects. Git follows a redirect on its first request.
+ * Throws `429` when `start` would start one and its bucket is empty.
  */
 export async function findRepo(
   { page, scheme, raw, file }: GitAddress,
   database: Database = getDb(),
+  { start }: FindOptions = {},
 ): Promise<FoundRepo | { kind: 'redirect'; to: string } | { kind: 'missing' }> {
   if (!KINDS[page.kind].repo) return { kind: 'missing' };
   if (page.kind !== 'paper') {
@@ -110,12 +128,26 @@ export async function findRepo(
   const { id } = page;
   const found = await findPaper(id, database);
   if (!found) return { kind: 'missing' };
-  const head = await readHead(database, found.paper.id);
-  if (!head) return { kind: 'missing' };
+  let head = await readHead(database, found.paper.id);
+  if (!head && !start) return { kind: 'missing' };
   const canonical = canonicalPaperId(found.identifiers) ?? id;
   if (canonical.scheme !== scheme || canonical.value !== raw) {
     return { kind: 'redirect', to: clonePath(canonical, `/${file}`) };
   }
+  if (!head && start) {
+    const limit = await consume(`repo-start:${start.by}`, REPO_START_LIMIT);
+    if (!limit.allowed) {
+      throw new ApiError(429, 'rate_limited', `too many new clones; try again in ${limit.retryAfterSeconds} seconds`, {
+        retryAfterSeconds: limit.retryAfterSeconds,
+      });
+    }
+    head = await startRepo(found.paper.id, database);
+    // The page now offers its clone address and has a history.
+    await refreshPages({ kind: 'paper', id: canonical }, found.identifiers).catch((err) =>
+      console.error('refreshing a page after starting its repo', err),
+    );
+  }
+  if (!head) return { kind: 'missing' };
   const [short] = await database.select({ shortId: pages.shortId }).from(pages).where(eq(pages.id, found.paper.id));
   return {
     kind: 'repo',
