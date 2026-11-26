@@ -142,8 +142,9 @@ function readmeBody(kind: PageKind, origin: string): string {
         ];
   rows.push(...SYSTEM_TREE);
   const paper = kind === 'paper';
-  return `The files behind ${paper ? 'this paper' : `this ${kind}`}'s page on ${new URL(origin).host}: commit, \`git push\`,
-and the page shows your changes. Guide: ${origin}/agent/setup
+  const host = new URL(origin).host;
+  return `The files behind ${paper ? 'this paper' : `this ${kind}`}'s page on ${host}: commit, \`git push\`, and the page
+shows your changes.
 
 \`\`\`text
 ${drawTree(rows)}
@@ -167,6 +168,17 @@ Kept with [Git LFS](https://git-lfs.com): run \`git lfs install\` once. PDFs up 
 Run \`prek install\` once to check each commit as the site will (https://prek.j178.dev). Push to \`main\`, on top of
 the page as it is (\`git pull --rebase\` first). Use an API key from ${origin}/profile as the password, or add an
 SSH key there.
+
+## For AI agents
+
+\`\`\`text
+This repo is a page on ${host}. Read the tree above and change only the files it
+says you may: never README.md, prek.toml, .gitattributes or .potentialpaper/.
+Write sections in Markdown, one file each, named NN-slug.md.
+Before committing, run \`prek run --all-files\` and fix what it reports.
+Commit with a one-line summary, \`git pull --rebase\`, then \`git push\`.
+If the push is refused, its message says what to fix.
+\`\`\`
 `;
 }
 
