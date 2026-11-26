@@ -103,8 +103,23 @@ export function slotPanels<K extends PanelKind>(kind: K, slot: string): (typeof 
 
 export type PanelId<K extends PanelKind = PanelKind> = (typeof PAGE_PANELS)[K][number]['id'];
 
+/**
+ * Tabs every kind's pages have beside their panels, drawn in the browser rather than rendered with the page
+ * (`ArrangedTabs`): the page's git repository, and its analytics for its owners. In `<kind>.tabs`, hidden and ordered
+ * by the same settings as its panels.
+ */
+export const PAGE_TABS = [
+  { id: 'repo', title: 'Repo' },
+  { id: 'analytics', title: 'Analytics' },
+] as const;
+
+/** Every panel of a kind the settings arrange: its built-in panels, then the tabs every page has. */
+export function panelInfos(kind: PanelKind): PanelInfo[] {
+  return [...PAGE_PANELS[kind], ...PAGE_TABS.map((tab) => ({ ...tab, slot: `${kind}.tabs` }))];
+}
+
 export function panelIds(kind: PanelKind): string[] {
-  return PAGE_PANELS[kind].map((p) => p.id);
+  return panelInfos(kind).map((p) => p.id);
 }
 
 /**

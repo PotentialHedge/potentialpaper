@@ -3,7 +3,7 @@ import { HIDE_UNTIL, type HideUntil } from '../scope-stats';
 import { KINDS } from '../kinds';
 import { HIDEABLE_NAV_IDS, NAV_IDS, NAV_ITEMS } from '../nav';
 import { actionsOf, BAR_SIZE } from '../page-actions';
-import { PAGE_PANELS, PANEL_KINDS, panelIds, SLOT_TITLES, type PanelKind } from '../panels';
+import { PANEL_KINDS, panelIds, panelInfos, SLOT_TITLES, type PanelKind } from '../panels';
 import { movablePlaces, PLUGIN_PANEL_ID_RE } from '../plugins/manifest';
 import { parsePluginSource, sourceKey } from '../plugins/sources';
 import { PLUGIN_ID_RE } from './spec';
@@ -77,7 +77,7 @@ function panelList(
     description,
     group: `${KINDS[kind].title} pages`,
     widget,
-    choices: PAGE_PANELS[kind].map((p) => ({ value: p.id, label: p.title, group: SLOT_TITLES[p.slot] ?? p.slot })),
+    choices: panelInfos(kind).map((p) => ({ value: p.id, label: p.title, group: SLOT_TITLES[p.slot] ?? p.slot })),
     sanitize: (raw) => {
       if (!Array.isArray(raw)) return undefined;
       return [

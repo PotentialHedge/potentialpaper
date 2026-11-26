@@ -73,6 +73,16 @@ describe('the settings form', () => {
     expect(items.some((i) => i.key === 'navbar.hidden')).toBe(false);
   });
 
+  it("offers every kind's Repo and Analytics tabs among its panels, under Tabs", () => {
+    for (const kind of ['paper', 'venue', 'user'] as const) {
+      const panels = coreItems().find((i) => i.key === `${kind}.panels.order`)!;
+      const choices = (panels.control as { choices: { value: string; group?: string }[] }).choices;
+      expect(choices.filter((c) => c.group === 'Tabs').map((c) => c.value)).toEqual(
+        expect.arrayContaining(['repo', 'analytics']),
+      );
+    }
+  });
+
   it('draws "Not a reviewer at" as a box per venue under review, ticked for those listed', () => {
     const venue = { value: 'openreview:ICLR.cc/2027/Conference', label: 'ICLR 2027' };
     const item = coreItems(undefined, { 'paper.notReviewerAt': [venue] }).find((i) => i.key === 'paper.notReviewerAt')!;

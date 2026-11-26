@@ -50,17 +50,12 @@ export function ArrangedTabs({
     lock?: 'open' | 'shut';
     node: ReactNode;
   }[] = [...builtIn, ...usePluginPanels(slot)];
-  const ids = arrangePanels(
-    panels.map((p) => p.id),
-    hidden,
-    order,
-  );
-  const REPO = '\0repo';
+  // The Repo and Analytics tabs (`PAGE_TABS`) come after the rest by default, and hide and move by the same settings.
+  const REPO = 'repo';
   if (repo) {
     panels.push({ id: REPO, title: 'Repo', hint: 'The page’s files, as git has them', node: <RepoTab {...repo} /> });
-    ids.push(REPO);
   }
-  const ANALYTICS = '\0analytics';
+  const ANALYTICS = 'analytics';
   // Only the page's owners see its analytics: on a person's page, that is only them. Anyone else sees the tab locked,
   // and opening it says how to become an owner.
   const owners = kind in KINDS ? KINDS[kind as keyof typeof KINDS].owners : null;
@@ -80,8 +75,12 @@ export function ArrangedTabs({
         <LockedAnalytics who={who!} claim={owners!.claim} claimPath={claimPath!} />
       ),
     });
-    ids.push(ANALYTICS);
   }
+  const ids = arrangePanels(
+    panels.map((p) => p.id),
+    hidden,
+    order,
+  );
   const [chosen, setChosen] = useState<string | null>(null);
   const hasRepo = !!repo;
   // A link into the repo (`#repo/…`) opens its tab, on arrival and as the reader goes back and forth.
@@ -95,6 +94,8 @@ export function ArrangedTabs({
     window.addEventListener('hashchange', onHash);
     return () => window.removeEventListener('hashchange', onHash);
   }, [hasRepo]);
+  // A link into the repo opens it even where the reader hid its tab.
+  if (chosen === REPO && repo && !ids.includes(REPO)) ids.push(REPO);
   const LEAD = '';
   const tabs = lead ? [LEAD, ...ids] : ids;
   const shown = tabs.includes(chosen ?? '\0') ? chosen! : tabs[0];
