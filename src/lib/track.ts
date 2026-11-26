@@ -189,7 +189,7 @@ export interface EventData {
   position?: number;
 }
 
-type Umami = { track: (name: string, data?: Record<string, unknown>) => void };
+type Umami = { track: (name: string, data?: Record<string, unknown>) => unknown };
 
 const ATTEMPTS = 20;
 const RETRY_MS = 500;
@@ -198,7 +198,12 @@ export function track(name: EventName, data?: EventData, attempt = 0): void {
   if (typeof window === 'undefined') return;
   try {
     const umami = (window as unknown as { umami?: Umami }).umami;
-    if (umami) return umami.track(name, data as Record<string, unknown> | undefined);
+    if (umami) {
+      // Umami's `track` returns a Promise, whatever its type says: never pass it on, or an effect written as
+      // `useEffect(() => track(…))` hands React a Promise as its cleanup, which throws on unmount.
+      void Promise.resolve(umami.track(name, data as Record<string, unknown> | undefined)).catch(() => {});
+      return;
+    }
     // Analytics off or not loaded yet; give the script a few seconds.
     if (attempt < ATTEMPTS) setTimeout(() => track(name, data, attempt + 1), RETRY_MS);
   } catch {

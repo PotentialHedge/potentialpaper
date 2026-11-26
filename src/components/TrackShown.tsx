@@ -9,6 +9,8 @@ import { type EventData, type EventName, track } from '@/lib/track';
  */
 export function TrackShown({ event, data }: { event: EventName; data?: EventData }) {
   const key = JSON.stringify(data ?? null);
-  useEffect(() => track(event, JSON.parse(key) ?? undefined), [event, key]);
+  useEffect(() => {
+    track(event, JSON.parse(key) ?? undefined);
+  }, [event, key]);
   return null;
 }

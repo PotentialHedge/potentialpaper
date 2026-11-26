@@ -32,7 +32,9 @@ export function Finish({
   const [error, setError] = useState<string | null>(null);
 
   // Once, as it opens: what is owed.
-  useEffect(() => track('finish_shown', { needsName: needsProfile, needsPassword }), [needsProfile, needsPassword]);
+  useEffect(() => {
+    track('finish_shown', { needsName: needsProfile, needsPassword });
+  }, [needsProfile, needsPassword]);
 
   function finish(how: 'done' | 'skip' = 'done') {
     track('finish_completed', { target: how });
