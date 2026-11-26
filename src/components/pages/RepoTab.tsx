@@ -1,13 +1,14 @@
 'use client';
 
-import { Fragment, useEffect, useState } from 'react';
-import { FileIcon, FolderIcon } from '@/components/icons';
+import { Fragment, useEffect, useRef, useState } from 'react';
+import { languageOf, useHighlight } from '@/components/highlight';
+import { FileIcon, FolderIcon, PencilIcon, WITH_ICON } from '@/components/icons';
 import { ui } from '@/components/ui';
 import { ago } from '@/lib/ago';
 import { type PageAddress, pageRefOf } from '@/lib/kinds';
 import { toolPath } from '@/lib/page-tools';
 import { track } from '@/lib/track';
-import { CloneCommand } from './CloneCommand';
+import { OPEN_EDIT } from './EditDialog';
 
 /**
  * A page's Repo tab: its git repository as GitHub's file browser shows one, from `GET /api/v1/repo` (a folder at a
@@ -111,7 +112,7 @@ function fileTarget(path: string, view: FileView): string {
   return view.type === 'text' ? 'text' : 'other';
 }
 
-export function RepoTab({ address, clone }: { address: PageAddress; clone: { https: string; ssh: string | null } }) {
+export function RepoTab({ address }: { address: PageAddress }) {
   const [where, setWhere] = useState<Where>(() =>
     typeof window === 'undefined'
       ? { type: 'tree', path: '' }
@@ -181,7 +182,7 @@ export function RepoTab({ address, clone }: { address: PageAddress; clone: { htt
 
   return (
     <div className="font-sans text-sm">
-      <Header folder={head} address={address} clone={clone} diffPath={diffPath} />
+      <Header folder={head} address={address} diffPath={diffPath} />
       <Crumbs where={where} go={go} />
       {where.type === 'tree' ? (
         <FolderView loaded={folderShown} go={go} diffPath={diffPath} />
@@ -195,20 +196,17 @@ export function RepoTab({ address, clone }: { address: PageAddress; clone: { htt
 function Header({
   folder,
   address,
-  clone,
   diffPath,
 }: {
   folder: Folder | null;
   address: PageAddress;
-  clone: { https: string; ssh: string | null };
   diffPath: (oid: string) => string;
 }) {
-  const [cloneOpen, setCloneOpen] = useState(false);
   const head = folder?.head;
   const who = head ? (head.authorName ?? (head.handle ? `@${head.handle}` : 'potentialpaper')) : null;
   return (
-    <>
-      <div className="flex flex-wrap items-baseline gap-x-3 gap-y-1 border border-frame bg-card px-3 py-2 text-[13px]">
+    <div className="flex items-stretch gap-3 narrow:flex-col">
+      <div className="flex min-w-0 flex-1 flex-wrap items-baseline gap-x-3 gap-y-1 border border-frame bg-card px-3 py-2 text-[13px]">
         {head ? (
           <span className="min-w-0 flex-1 basis-64 truncate">
             <span className="text-ink">{who}</span>{' '}
@@ -233,16 +231,17 @@ function Header({
             {folder.commits} commit{folder.commits === 1 ? '' : 's'}
           </a>
         )}
-        <button type="button" className={ui.linkBtn} aria-expanded={cloneOpen} onClick={() => setCloneOpen(!cloneOpen)}>
-          clone
-        </button>
       </div>
-      {cloneOpen && (
-        <div className="border border-t-0 border-frame bg-card px-3 pt-1 pb-2.5">
-          <CloneCommand clone={clone} onCopied={(via) => track('repo_clone_copied', { target: via })} />
-        </div>
-      )}
-    </>
+      {/* The Edit dialog under the title (`EditDialog`): the web editor, the clone command and the agent's prompt. */}
+      <button
+        type="button"
+        className={`${ui.btn({ inline: true, flush: true })} ${WITH_ICON} justify-center`}
+        onClick={() => window.dispatchEvent(new Event(OPEN_EDIT))}
+      >
+        <PencilIcon />
+        Clone or edit
+      </button>
+    </div>
   );
 }
 
@@ -286,6 +285,8 @@ function FolderView({
   go: (to: Where) => string;
   diffPath: (oid: string) => string;
 }) {
+  const readme = useRef<HTMLDivElement>(null);
+  useHighlight(readme, loaded);
   if (loaded.state === 'loading') return <p className="mt-3 text-muted">Loading…</p>;
   if (loaded.state === 'error') return <p className={ui.note(false)}>{loaded.message}</p>;
   const { data } = loaded;
@@ -345,7 +346,7 @@ function FolderView({
         {data.entries.length === 0 && <p className={ui.empty}>This folder is empty.</p>}
       </div>
       {data.readme && (
-        <div className="mt-6 border border-frame bg-card">
+        <div ref={readme} className="mt-6 border border-frame bg-card">
           <p className={`border-b border-rule px-3 py-1.5 ${ui.mono} text-subtle`}>
             {data.readme.path.split('/').pop()}
           </p>
@@ -365,6 +366,8 @@ function FileShown({
   codePath: (path?: string) => string;
   address: PageAddress;
 }) {
+  const shown = useRef<HTMLDivElement>(null);
+  useHighlight(shown, loaded);
   if (loaded.state === 'loading') return <p className="mt-3 text-muted">Loading…</p>;
   if (loaded.state === 'error') return <p className={ui.note(false)}>{loaded.message}</p>;
   const { data } = loaded;
@@ -372,7 +375,7 @@ function FileShown({
   const ref = pageRefOf(address);
   const shownBytes = view.type === 'lfs' ? view.bytes : data.bytes;
   return (
-    <div className="mt-2 border border-frame bg-card">
+    <div ref={shown} className="mt-2 border border-frame bg-card">
       <div className="flex flex-wrap items-baseline gap-x-3 gap-y-1 border-b border-rule px-3 py-1.5 text-[13px]">
         <span className={`${ui.mono} text-ink`}>{data.path.split('/').pop()}</span>
         <span className="text-faint">
@@ -404,7 +407,9 @@ function FileShown({
               ' An empty section isn\u2019t shown on the page until someone writes in it.'}
           </p>
         ) : (
-          <pre className={`overflow-x-auto px-3 py-2.5 leading-snug ${ui.mono}`}>{view.text}</pre>
+          <pre className={`overflow-x-auto px-3 py-2.5 leading-snug ${ui.mono}`}>
+            <code className={`language-${languageOf(data.path)}`}>{view.text}</code>
+          </pre>
         ))}
       {view.type === 'lfs' &&
         (view.url ? (

@@ -45,7 +45,7 @@ export function PageView({
   /** Where to claim it: anyone but its owners sees the Analytics tab locked, pointing there. */
   claimPath?: string | null;
   /** Where its repo is, for the Repo tab; none for a kind without files (a person's page). */
-  repo?: { address: PageAddress; clone: { https: string; ssh: string | null } };
+  repo?: { address: PageAddress };
 }) {
   const slot = (name: GenericSlot) => `${kind}.${name}`;
   return (

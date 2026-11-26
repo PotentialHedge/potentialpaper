@@ -1,6 +1,6 @@
 import { eq } from 'drizzle-orm';
-import { papers } from '@/db/schema';
-import { ALL_PARTS, KINDS, type PageKind } from '@/lib/kinds';
+import { pageCurrent, papers } from '@/db/schema';
+import { ALL_PARTS, KINDS, type PageKind, pageName } from '@/lib/kinds';
 import { encodePaperFile, paperFileOf } from '@/lib/paper-file';
 import { siteUrl } from '../site';
 import type { FileChange } from './commit';
@@ -93,142 +93,133 @@ export function prekProblem(content: string): string | null {
   return content === prekConfig() ? null : 'is the same on every page, and fixed';
 }
 
-/** A paper's files, as its `README.md` lists them: path, what it is, who may change it. */
-type Row = [path: string, what: string, who: string];
+/** One line of the tree in a page's `README.md`: a file or folder at the top, and what it is. */
+type Row = [name: string, what: string];
 
-const SYSTEM_ROW: Row = [
-  '`README.md`, `prek.toml`, `.gitattributes`, `.potentialpaper/`',
-  'this file, the checks, Git LFS, metadata',
-  'only the site',
+const PAPER_TREE: Row[] = [
+  ['paper.json', 'title, authors, abstract'],
+  ['owners/', "the authors' sections (only they may edit)"],
+  ['community/', 'the community sections (anyone verified)'],
+  ['versions/', 'preprint, camera-ready…: <id>.json and its PDF'],
+  ['links/', 'the links under the title'],
+  ['thumbnail.png', 'the picture shown for the paper'],
+  ['demos/', 'demos the sections show'],
+  ['reviews/', 'imported reviews (read-only)'],
 ];
 
-const PAPER_FILES: Row[] = [
-  ['`paper.json`', 'the title, authors and abstract', 'its confirmed authors once claimed, else anyone verified'],
-  ['`owners/NN-slug.md`', "the authors' sections, one file per section", "the paper's confirmed authors"],
-  ['`owners/plugins.json`', "the plugins' panels the authors show", "the paper's confirmed authors"],
-  ['`community/NN-slug.md`', 'the community sections, one file per section', 'anyone verified'],
-  ['`<part>/links.jsonl`', "that part's labeled links", 'as its sections'],
-  ['`<part>/facts.jsonl`', "that part's rows of the infobox", 'as its sections'],
-  ['`versions/<id>.json`', 'a version of the paper: preprint, submission, camera-ready', 'anyone verified'],
-  ['`versions/<id>.pdf`', "that version's PDF (Git LFS)", 'anyone verified'],
-  ['`links/NN-slug.json`', 'a link under the title: `{ "label", "url" }`', 'as `paper.json`'],
-  [
-    '`thumbnail.png`',
-    'the picture shown in place of the PDF (Git LFS; or `.jpg`, `.gif`, `.webp`, `.avif`)',
-    'as `paper.json`',
-  ],
-  ['`thumbnail.json`', "the picture's alt text and caption", 'as `paper.json`'],
-  [
-    '`demos/<name>/…`',
-    'a demo kept in the page, `index.html` and the files it loads',
-    'anyone verified; its authors once their section shows it',
-  ],
-  ['`reviews/<source>/…`', "a submission's reviews and decisions, imported", 'only the import bot'],
-  ['`extensions/<id>/…`', 'reserved for extensions', 'nobody yet'],
-  SYSTEM_ROW,
+/** The files only the site writes, last. */
+const SYSTEM_TREE: Row[] = [
+  ['README.md', "this file (the site's)"],
+  ['prek.toml', "checks before each commit (the site's)"],
+  ['.gitattributes', "Git LFS settings (the site's)"],
+  ['.potentialpaper/', "page metadata (the site's)"],
 ];
 
-/**
- * A page's `README.md`: how its repository is laid out and how to work in it. The same on every page of a kind, and
- * the system's, as `prek.toml` is (`check.ts` holds it to its one content), so it can't drift from what the site
- * takes. `scripts/add-page-starter.ts` writes it again into every repo when it changes.
- */
-export function readme(kind: PageKind = 'paper', origin: string = siteUrl()): string {
-  const host = new URL(origin).host;
-  const table = (rows: Row[]) =>
-    [
-      '| Path | What it is | Who may change it |',
-      '| --- | --- | --- |',
-      ...rows.map((r) => `| ${r.join(' | ')} |`),
-    ].join('\n');
+/** Rows as a tree, `tree` would draw it: names padded so the notes line up. */
+function drawTree(rows: Row[]): string {
+  const width = Math.max(...rows.map(([name]) => name.length)) + 2;
+  return [
+    '.',
+    ...rows.map(([name, what], i) => `${i === rows.length - 1 ? '└──' : '├──'} ${name.padEnd(width)}${what}`),
+  ].join('\n');
+}
+
+/** A title on one line, as a heading takes it. */
+function oneLine(title: string): string {
+  return title.replace(/\s+/g, ' ').trim() || 'Untitled';
+}
+
+/** The `README.md` after its title: the same on every page of a kind. */
+function readmeBody(kind: PageKind, origin: string): string {
   const { kindFile, owners, community } = KINDS[kind];
-  const rows: Row[] = [...PAPER_FILES];
-  if (kind !== 'paper') {
-    rows.length = 0;
-    if (kindFile)
-      rows.push([`\`${kindFile}\``, `what the ${kind} is`, owners ? `its ${owners.noun}` : 'anyone verified']);
-    if (owners)
-      rows.push(['`owners/NN-slug.md`', `${owners.title}' sections, one file per section`, `its ${owners.noun}`]);
-    if (community)
-      rows.push(['`community/NN-slug.md`', 'the community sections, one file per section', 'anyone verified']);
-    rows.push(
-      ['`<part>/links.jsonl`', "that part's labeled links", 'as its sections'],
-      ['`extensions/<id>/…`', 'reserved for extensions', 'nobody yet'],
-      SYSTEM_ROW,
-    );
-  }
-  const what = kind === 'paper' ? "a paper's page" : `a ${kind}'s page`;
-  return `# This is ${what} on ${host}
+  const rows: Row[] =
+    kind === 'paper'
+      ? [...PAPER_TREE]
+      : [
+          ...(kindFile ? [[kindFile, `what the ${kind} is`] as Row] : []),
+          ...(owners ? [['owners/', `${owners.title}' sections (only they may edit)`] as Row] : []),
+          ...(community ? [['community/', 'the community sections (anyone verified)'] as Row] : []),
+        ];
+  rows.push(...SYSTEM_TREE);
+  const paper = kind === 'paper';
+  return `The files behind ${paper ? 'this paper' : `this ${kind}`}'s page on ${new URL(origin).host}: commit, \`git push\`,
+and the page shows your changes. Guide: ${origin}/agent/setup
 
-Each file here is part of the page: edit them, commit and \`git push\`, and the page shows your changes as if you had
-made them on the site. The page's address is in \`.potentialpaper/metadata.json\`. This file is the same on every
-page; the full guide is ${origin}/agent/setup.
-
-## What's where
-
-${table(rows)}
-
-"Anyone verified" is any account with a confirmed institutional address.
+\`\`\`text
+${drawTree(rows)}
+\`\`\`
 
 ## Sections
 
-A part's sections show in the order of their file names, so \`10-summary.md\` comes before \`20-results.md\`. Name new
-ones the same way: two digits, a dash and a lower-case slug. A section's title is the \`#\` heading it starts with, or
-else its file name. Write in Markdown, or in HTML from a small allowlist of tags (no scripts, styles or classes).
-
+One file each, \`NN-slug.md\`, shown in file-name order. The first \`#\` heading is the title. Markdown, or HTML from a
+small allowlist. ${paper ? 'Empty files are not shown. ' : ''}At most 256 KB a file.
 ${
-  kind === 'paper'
-    ? `The page starts with an empty file for each section it might have. An empty file isn't shown: write in one to add
-that section, and rename or delete the rest as you like. `
-    : ''
-}Files are plain UTF-8 text, at most 256 KB each${kind === 'paper' ? ' (1 MB in `demos/`)' : ''}.
-${
-  kind === 'paper'
+  paper
     ? `
-## PDFs and the picture
+## PDFs and pictures
 
-They are kept with [Git LFS](https://git-lfs.com): install it and run \`git lfs install\` once, and a clone has them as
-files; \`git push\` uploads them. A version's PDF sits beside its \`.json\`, at most 40 MB. The picture is one
-\`thumbnail.*\`, at most 8 MB, named for its type.
+Kept with [Git LFS](https://git-lfs.com): run \`git lfs install\` once. PDFs up to 40 MB, the picture up to 8 MB.
 `
     : ''
 }
-## Before you commit
-
-\`prek.toml\` holds the checks the site runs: \`prek install\` once in this clone (https://prek.j178.dev), and each
-commit is checked and formatted first. The site checks every push again.
-
 ## Pushing
 
-To push, make an API key that may \`git push\` on your profile (${origin}/profile) and use it as the
-password, or add an SSH key there. Commit as the id the site gives you on this page: push once, and if it is
-wrong the push is refused with the two \`git config\` lines to run. Push one line of commits on \`main\`, on top
-of the page as it is now (\`git pull --rebase\` first).
+Run \`prek install\` once to check each commit as the site will (https://prek.j178.dev). Push to \`main\`, on top of
+the page as it is (\`git pull --rebase\` first). Use an API key from ${origin}/profile as the password, or add an
+SSH key there.
 `;
 }
 
-/** Why this can't be the page's `README.md`, or `null`. */
+/**
+ * A page's `README.md`: its title, then how its repository is laid out and how to work in it, the same on every page
+ * of a kind. The system's, as `prek.toml` is (`check.ts` holds it to that form), so it can't drift from what the site
+ * takes. `scripts/add-page-starter.ts` writes it again into every repo when it changes, or the page's title does.
+ */
+export function readme(kind: PageKind, title: string, origin: string = siteUrl()): string {
+  return `# ${oneLine(title)}\n\n${readmeBody(kind, origin)}`;
+}
+
+/** Why this can't be the page's `README.md`, or `null`: any one-line title, over the body every page of its kind has. */
 export function readmeProblem(content: string, kind: PageKind = 'paper'): string | null {
-  return content === readme(kind) ? null : 'is the same on every page, and fixed';
+  const title = /^# [^\n]+\n\n/.exec(content);
+  return title && content.slice(title[0].length) === readmeBody(kind, siteUrl())
+    ? null
+    : 'is the same on every page but its title, and fixed';
 }
 
 /**
- * The files a page's first commit starts with, besides its metadata and `.gitattributes`. Only a paper starts
- * with empty sections; what other kinds start with is decided with each kind's phase (`handoffs/pages.md`).
+ * The files a page's first commit starts with, besides its metadata and `.gitattributes`, for a page called `title`.
+ * Only a paper starts with empty sections; what other kinds start with is decided with each kind's phase
+ * (`handoffs/pages.md`).
  */
-export function starterFiles(kind: PageKind = 'paper'): [path: string, content: string][] {
-  if (kind !== 'paper')
-    return [
-      [PREK_PATH, prekConfig()],
-      [README_PATH, readme(kind)],
-    ];
-  return [
+export function starterFiles(kind: PageKind, title: string): [path: string, content: string][] {
+  const fixed: [string, string][] = [
     [PREK_PATH, prekConfig()],
-    [README_PATH, readme(kind)],
+    [README_PATH, readme(kind, title)],
+  ];
+  if (kind !== 'paper') return fixed;
+  return [
+    ...fixed,
     ...(['owners', 'community'] as const).flatMap((part) =>
       STARTER_SECTIONS[part].map((name): [string, string] => [`${part}/${name}`, '']),
     ),
   ];
+}
+
+/** What a page is called, for its `README.md`: its name as last committed, else its paper's title or its key. */
+export async function pageTitle(db: Reader, pageId: string): Promise<string> {
+  const page = await mustPage(db, pageId);
+  const [current] = await db.select({ name: pageCurrent.name }).from(pageCurrent).where(eq(pageCurrent.pageId, pageId));
+  if (current?.name) return current.name;
+  if (page.kind !== 'paper') return pageName(page.kind, page.key, null);
+  const [paper] = await db.select({ title: papers.title }).from(papers).where(eq(papers.id, pageId));
+  return paper?.title ?? page.key;
+}
+
+/** The page's starter files (`starterFiles`), under its title. */
+export async function starterFilesOf(db: Reader, pageId: string): Promise<[path: string, content: string][]> {
+  const page = await mustPage(db, pageId);
+  return starterFiles(page.kind, await pageTitle(db, pageId));
 }
 
 /**
@@ -247,23 +238,24 @@ export async function firstCommitFiles(db: Reader, pageId: string): Promise<[pat
     const [paper] = await db.select().from(papers).where(eq(papers.id, pageId));
     files.push([KINDS.paper.kindFile!, encodePaperFile(paperFileOf(paper))]);
   }
-  files.push([GITATTRIBUTES_PATH, GITATTRIBUTES], ...starterFiles(page.kind));
+  files.push([GITATTRIBUTES_PATH, GITATTRIBUTES], ...(await starterFilesOf(db, pageId)));
   return files;
 }
 
 /**
- * What a page made before the starter files needs to have them: `prek.toml` and `README.md` as they are now (`fixed`
- * holds what the page has of each), and on a paper the empty sections of each part that has none yet, so nothing
+ * What a page made before the starter files needs to have them: `prek.toml` and `README.md` as they are now, under the
+ * page's `title` (`fixed` holds what the page has of each), and on a paper the empty sections of each part that has none yet, so nothing
  * anyone wrote is touched. None if it has them.
  */
 export function missingStarterFiles(
   paths: ReadonlySet<string>,
   fixed: { prek?: string; readme?: string },
-  kind: PageKind = 'paper',
+  kind: PageKind,
+  title: string,
 ): FileChange[] {
   const changes: FileChange[] = [];
   if (fixed.prek !== prekConfig()) changes.push({ path: PREK_PATH, content: prekConfig() });
-  if (fixed.readme !== readme(kind)) changes.push({ path: README_PATH, content: readme(kind) });
+  if (fixed.readme !== readme(kind, title)) changes.push({ path: README_PATH, content: readme(kind, title) });
   if (kind !== 'paper') return changes;
   for (const part of ['owners', 'community'] as const) {
     if ([...paths].some((path) => sectionName(path, part))) continue;

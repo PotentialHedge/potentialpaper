@@ -62,7 +62,7 @@ describe('page file schemas', () => {
 
 describe('starter files', () => {
   it('starts a page with prek.toml and empty sections', () => {
-    const files = new Map(starterFiles());
+    const files = new Map(starterFiles('paper', 'A paper'));
     expect(files.get('prek.toml')).toBe(prekConfig());
     expect(files.get('community/10-tl-dr.md')).toBe('');
     expect(files.get('owners/10-tl-dr.md')).toBe('');
@@ -82,22 +82,30 @@ describe('starter files', () => {
     expect(contentProblem('community/10-summary.md', '')).toBeNull();
   });
 
-  it('starts every page with a fixed README.md that says how its repo is laid out', () => {
-    const files = new Map(starterFiles());
-    expect(files.get('README.md')).toBe(readme());
-    expect(readme()).toMatch(/community\/NN-slug\.md/);
-    expect(readme('venue')).toMatch(/venue\.json/);
-    expect(readme('venue')).not.toMatch(/thumbnail/);
-    expect(readmeProblem(readme())).toBeNull();
-    expect(readmeProblem(`${readme()}\nmore\n`)).toMatch(/fixed/);
-    expect(readmeProblem(readme('venue'), 'venue')).toBeNull();
+  it('starts every page with a README.md, fixed but for its title, that says how its repo is laid out', () => {
+    const files = new Map(starterFiles('paper', 'Attention Is All You Need'));
+    const paper = readme('paper', 'Attention Is All You Need');
+    expect(files.get('README.md')).toBe(paper);
+    expect(paper).toMatch(/^# Attention Is All You Need\n\n/);
+    expect(paper).toMatch(/```text\n\.\n├── paper\.json +title, authors, abstract\n/);
+    expect(paper).toMatch(/├── community\//);
+    expect(readme('paper', '  Two\n lines ')).toMatch(/^# Two lines\n/);
+    expect(readme('venue', 'ICLR 2027')).toMatch(/venue\.json/);
+    expect(readme('venue', 'ICLR 2027')).not.toMatch(/thumbnail/);
+    expect(readmeProblem(paper)).toBeNull();
+    // Any title, over the body of its own kind only.
+    expect(readmeProblem(readme('paper', 'Another title'))).toBeNull();
+    expect(readmeProblem(`${paper}\nmore\n`)).toMatch(/fixed/);
+    expect(readmeProblem(paper.replace(/^# .*\n\n/, ''))).toMatch(/fixed/);
+    expect(readmeProblem(readme('venue', 'ICLR 2027'), 'venue')).toBeNull();
+    expect(readmeProblem(readme('venue', 'ICLR 2027'))).toMatch(/fixed/);
     expect(pathDenied('README.md', roles)).toMatch(/system/);
     expect(layoutProblem('README.md')).toBeNull();
   });
 
   it('adds what an older page is missing, without touching a part that has sections', () => {
     const paths = new Set(['.potentialpaper/metadata.json', 'community/10-summary.md']);
-    const changes = missingStarterFiles(paths, {});
+    const changes = missingStarterFiles(paths, {}, 'paper', 'A paper');
     expect(changes.map((c) => c.path)).toEqual([
       'prek.toml',
       'README.md',
@@ -109,8 +117,19 @@ describe('starter files', () => {
       'owners/60-talks.md',
     ]);
     const all = new Set([...paths, ...changes.map((c) => c.path)]);
-    expect(missingStarterFiles(all, { prek: prekConfig(), readme: readme() })).toEqual([]);
+    expect(
+      missingStarterFiles(all, { prek: prekConfig(), readme: readme('paper', 'A paper') }, 'paper', 'A paper'),
+    ).toEqual([]);
+    // A page renamed since gets its README's title brought up to date.
+    expect(
+      missingStarterFiles(all, { prek: prekConfig(), readme: readme('paper', 'Old') }, 'paper', 'A paper').map(
+        (c) => c.path,
+      ),
+    ).toEqual(['README.md']);
     // Other kinds start with no sections: only the fixed files.
-    expect(missingStarterFiles(new Set(), {}, 'category').map((c) => c.path)).toEqual(['prek.toml', 'README.md']);
+    expect(missingStarterFiles(new Set(), {}, 'category', 'Linear attention').map((c) => c.path)).toEqual([
+      'prek.toml',
+      'README.md',
+    ]);
   });
 });

@@ -8,7 +8,7 @@ import { checkMayWrite, rolesOf } from './pages/check';
 import { gitObject, parseMessage } from './pages/git-objects';
 import { mergeWithMarkers } from './pages/merge';
 import { findCommit, readCommit, readFiles, readHead, readObject, readText } from './pages/repo';
-import { starterFiles } from './pages/starter';
+import { starterFilesOf } from './pages/starter';
 import { mustPage } from './pages/kinds';
 import { KINDS, type PageKind, partsOf } from '@/lib/kinds';
 import { encodeLfsPointer, lfsKindOf, parseLfsPointer, pathDenied } from './pages/rules';
@@ -101,7 +101,7 @@ export async function readWorkspace(
   // A page without a repo yet shows the files its first commit will start with (`starter.ts`), so the editor
   // opens on its empty sections; untouched, they are written by that commit as they are.
   if (!head) {
-    for (const [path, text] of starterFiles(kind)) {
+    for (const [path, text] of await starterFilesOf(database, pageId)) {
       files.push({ path, oid: gitObject('blob', Buffer.from(text)).oid, text, readonly: denied(path) });
     }
     files.sort((a, b) => a.path.localeCompare(b.path, 'en'));

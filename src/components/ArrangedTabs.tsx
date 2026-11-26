@@ -37,7 +37,7 @@ export function ArrangedTabs({
   /** Where to claim the page (`OwnersInfo.claimPath`): anyone else sees its Analytics tab locked, pointing there. */
   claimPath?: string | null;
   /** A page with files gets a Repo tab, its git repository browsed (`RepoTab`), loaded only once opened. */
-  repo?: { address: PageAddress; clone: { https: string; ssh: string | null } };
+  repo?: { address: PageAddress };
 }) {
   const analytics = usePageAnalytics(pageId);
   const hidden = useSetting<string[]>(`${kind}.panels.hidden`);

@@ -7,8 +7,8 @@ import { ui } from '@/components/ui';
 export type CloneVia = 'https' | 'ssh';
 
 /**
- * `git clone` for a page, over HTTPS or SSH, with what pushing back needs: shown by the Edit dialog and the Repo tab,
- * so both say the same. `onCopied` is told which address was copied.
+ * `git clone` for a page, over HTTPS or SSH, with what pushing back needs (the Edit dialog's). `onCopied` is told
+ * which address was copied.
  */
 export function CloneCommand({
   clone,

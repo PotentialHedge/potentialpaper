@@ -57,7 +57,8 @@ describe('the Repo tab', () => {
     ]);
     expect(top.body.entries.every((e: any) => e.last === null)).toBe(true);
     expect(top.body.readme.path).toBe('README.md');
-    expect(top.body.readme.html).toContain("This is a paper's page");
+    expect(top.body.readme.html).toContain('>Attention Is All You Need<');
+    expect(top.body.readme.html).toContain('class="language-text"');
 
     const paperJson = await file('paper.json');
     expect(paperJson.status).toBe(200);
@@ -137,7 +138,7 @@ describe('the Repo tab', () => {
     expect(venue.status).toBe(200);
     expect(venue.body).toMatchObject({ placeholder: false, commits: 1 });
     expect(names(venue.body)).toContain('README.md');
-    expect(venue.body.readme.html).toContain("This is a venue's page");
+    expect(venue.body.readme.html).toContain("this venue's page");
 
     expect((await folder('', { scheme: 'venue', value: 'nowhere/2027' })).status).toBe(404);
   });

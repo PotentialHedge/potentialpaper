@@ -9,7 +9,7 @@ describe('the placeholder repo', () => {
   const files: [string, string][] = [
     ['.potentialpaper/metadata.json', '{"layout":7}\n'],
     [GITATTRIBUTES_PATH, GITATTRIBUTES],
-    ...starterFiles('paper'),
+    ...starterFiles('paper', 'A paper'),
   ];
 
   it('is the tree a commit of the same files stores', async () => {
@@ -24,8 +24,8 @@ describe('the placeholder repo', () => {
     const top = parseTree((await repo.read([root])).get(root)!.body);
     expect(top.filter((e) => e.isTree).map((e) => e.name)).toEqual(['.potentialpaper', 'community', 'owners']);
     const entry = top.find((e) => e.name === README_PATH)!;
-    expect((await repo.read([entry.oid])).get(entry.oid)!.body.toString('utf8')).toBe(readme('paper'));
-    expect((await repo.sizes([entry.oid])).get(entry.oid)).toBe(Buffer.byteLength(readme('paper')));
+    expect((await repo.read([entry.oid])).get(entry.oid)!.body.toString('utf8')).toBe(readme('paper', 'A paper'));
+    expect((await repo.sizes([entry.oid])).get(entry.oid)).toBe(Buffer.byteLength(readme('paper', 'A paper')));
   });
 });
 

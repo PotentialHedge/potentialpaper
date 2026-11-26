@@ -6,11 +6,12 @@ import { eq } from 'drizzle-orm';
 import { commitPage, SYSTEM_ACTOR } from '@/server/pages/commit';
 import { readCommit, readFiles, readText } from '@/server/pages/repo';
 import { PREK_PATH, README_PATH } from '@/server/pages/rules';
-import { missingStarterFiles } from '@/server/pages/starter';
+import { missingStarterFiles, pageTitle } from '@/server/pages/starter';
 
 const USAGE = `Gives every page repo the files a new page starts with (src/server/pages/starter.ts): prek.toml and README.md
 as they are now, and on a paper empty sections for each part that has none. A system commit per page that needs one;
-safe to run again. Run it again when prek.toml or README.md changes (a new site address, new hook versions).
+safe to run again. Run it again when prek.toml or README.md changes (a new site address, new hook versions), or to bring a README's
+title up to date with its page's.
 
   npm run pages:add-starter [-- --dry-run]`;
 
@@ -32,7 +33,8 @@ async function main() {
     const files = await readFiles(db, paperId, (await readCommit(db, paperId, oid)).tree);
     const prek = (await readText(db, paperId, files.get(PREK_PATH))) ?? undefined;
     const readme = (await readText(db, paperId, files.get(README_PATH))) ?? undefined;
-    const changes = missingStarterFiles(new Set(files.keys()), { prek, readme }, kind);
+    const title = await pageTitle(db, paperId);
+    const changes = missingStarterFiles(new Set(files.keys()), { prek, readme }, kind, title);
     if (changes.length === 0) continue;
     if (values['dry-run']) {
       console.log(`${paperId}: ${changes.map((c) => c.path).join(' ')}`);

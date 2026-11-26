@@ -8,7 +8,7 @@ import { dirname, join } from 'node:path';
 import { asc, eq, sql } from 'drizzle-orm';
 import fc from 'fast-check';
 import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it } from 'vitest';
-import { readme, starterFiles } from '@/server/pages/starter';
+import { readme, starterFiles, starterFilesOf } from '@/server/pages/starter';
 import * as gitRoute from '@/app/git/[...path]/route';
 import { getDb } from '@/db';
 import {
@@ -39,7 +39,7 @@ import { closePool, resetDatabase } from './helpers';
 
 /** The paths a paper's first commit has besides its own: the metadata, `paper.json`, `.gitattributes` and the starter files. */
 const byBytes = (a: string, b: string) => Buffer.compare(Buffer.from(a), Buffer.from(b));
-const STARTER_PATHS = starterFiles().map(([path]) => path);
+const STARTER_PATHS = starterFiles('paper', 'A paper').map(([path]) => path);
 const firstPaths = (...own: string[]) =>
   [...new Set(['.gitattributes', '.potentialpaper/metadata.json', 'paper.json', ...STARTER_PATHS, ...own])].sort(
     byBytes,
@@ -190,12 +190,13 @@ describe('every repo passes git fsck --strict', () => {
         const expected = new Map<string, string>();
         for (const changes of commits) {
           const head = await readHead(getDb(), paperId);
+          const starter = head ? [] : await starterFilesOf(getDb(), paperId);
           try {
             const result = await commitPage(paperId, head, admin, changes, summary, { rateLimit: NO_LIMIT });
             if (result.status === 'committed') accepted += 1;
             // A page's first commit starts it with the starter files the commit doesn't write itself.
             if (!head && result.status === 'committed') {
-              for (const [p, c] of starterFiles()) {
+              for (const [p, c] of starter) {
                 if (!changes.some((change) => change.path.normalize('NFC') === p)) expected.set(p, c);
               }
             }
@@ -1006,9 +1007,10 @@ describe('git clone', () => {
     await gitOverHttp(['clone', '-q', `${base}${clonePath(ARXIV)}`, clone]);
     fsck(clone);
     expect(git(['rev-list', '--count', 'HEAD'], clone).trim()).toBe('1');
-    expect(readFileSync(join(clone, 'README.md'), 'utf8')).toBe(readme());
+    const title = JSON.parse(readFileSync(join(clone, 'paper.json'), 'utf8')).title;
+    expect(readFileSync(join(clone, 'README.md'), 'utf8')).toBe(readme('paper', title));
     expect(JSON.parse(readFileSync(join(clone, 'paper.json'), 'utf8')).title).toBeTruthy();
-    for (const [path, text] of starterFiles()) expect(readFileSync(join(clone, path), 'utf8')).toBe(text);
+    for (const [path, text] of starterFiles('paper', title)) expect(readFileSync(join(clone, path), 'utf8')).toBe(text);
 
     const again = join(workDir(), 'again');
     await gitOverHttp(['clone', '-q', `${base}${clonePath(ARXIV)}`, again]);

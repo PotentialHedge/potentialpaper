@@ -36,7 +36,7 @@ import {
 } from './rules';
 import { insertPage, mustPage, type PageRow } from './kinds';
 import { refreshPages } from './refresh';
-import { firstCommitFiles, starterFiles } from './starter';
+import { firstCommitFiles, starterFilesOf } from './starter';
 
 export { type Actor, COMMIT_RATE_LIMIT, newIdentity, SYSTEM_ACTOR } from './check';
 
@@ -365,7 +365,7 @@ export async function revertCommit(
   // The first commit's starter files are the system's, as its metadata is, unless the commit wrote in one.
   const page = await mustPage(database, pageId);
   const started = new Map(
-    starterFiles(page.kind).map(([path, text]) => [path, gitObject('blob', Buffer.from(text)).oid]),
+    (await starterFilesOf(database, pageId)).map(([path, text]) => [path, gitObject('blob', Buffer.from(text)).oid]),
   );
   const changed = changedFiles(before, await readFiles(database, pageId, commit.tree)).filter(
     (file) =>

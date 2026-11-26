@@ -217,3 +217,52 @@
     @apply text-muted italic;
   }
 }
+
+/*
+ * Code highlighted by highlight.js (`components/highlight.ts`): a few quiet colours that sit with the page's ink and
+ * maroon accent, rather than a theme's.
+ */
+@layer components {
+  .hljs-comment,
+  .hljs-quote,
+  .hljs-meta {
+    @apply text-faint italic;
+  }
+  .hljs-keyword,
+  .hljs-selector-tag,
+  .hljs-literal,
+  .hljs-section,
+  .hljs-name {
+    color: #7a1f5c;
+  }
+  .hljs-string,
+  .hljs-regexp,
+  .hljs-addition {
+    color: #1a6b3c;
+  }
+  .hljs-number,
+  .hljs-symbol,
+  .hljs-bullet {
+    color: #9a5b00;
+  }
+  .hljs-attr,
+  .hljs-attribute,
+  .hljs-variable,
+  .hljs-template-variable,
+  .hljs-property {
+    color: #1f4e8c;
+  }
+  .hljs-title,
+  .hljs-strong {
+    @apply font-semibold;
+  }
+  .hljs-emphasis {
+    @apply italic;
+  }
+  .hljs-deletion {
+    color: var(--color-down);
+  }
+  .hljs-link {
+    @apply underline;
+  }
+}

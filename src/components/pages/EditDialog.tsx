@@ -30,6 +30,12 @@ export interface EditOptions {
 
 const OPENS = /^#edit(?:-[a-z0-9-]+)?$/;
 
+/**
+ * Opens the dialog from elsewhere on the page without touching the address's hash, which the Repo tab keeps its
+ * place in (`RepoTab`): `window.dispatchEvent(new Event(OPEN_EDIT))`.
+ */
+export const OPEN_EDIT = 'pp:open-edit';
+
 /** The command-line launcher of each VS Code-family editor, for `--install-extension`. */
 const EDITORS = [
   { name: 'VS Code', cli: 'code' },
@@ -79,7 +85,11 @@ export function EditDialog({ pagePath, codePath, clone, form }: EditOptions) {
     };
     check();
     window.addEventListener('hashchange', check);
-    return () => window.removeEventListener('hashchange', check);
+    window.addEventListener(OPEN_EDIT, open);
+    return () => {
+      window.removeEventListener('hashchange', check);
+      window.removeEventListener(OPEN_EDIT, open);
+    };
   }, [open]);
 
   const close = () => {

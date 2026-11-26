@@ -136,7 +136,7 @@ export async function KeyedPageRoute({ kind, segments }: { kind: KeyedKind; segm
       pageId={page.id}
       claimPath={owners?.claimPath}
       kind={kind}
-      repo={KINDS[kind].repo ? { address, clone: cloneAddresses(address) } : undefined}
+      repo={KINDS[kind].repo ? { address } : undefined}
       plugins={{ kind, page: summary, scopes, facts }}
       panels={buildPanels(kind, KIND_PANELS[kind], props, (id) => presentPanel(props, id))}
       header={
