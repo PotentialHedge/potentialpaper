@@ -8,7 +8,7 @@ describe('purgeEdge', () => {
   });
 
   function calls() {
-    const fetchMock = vi.fn(async () => new Response('{"success":true}'));
+    const fetchMock = vi.fn<typeof fetch>(async () => new Response('{"success":true}'));
     vi.stubGlobal('fetch', fetchMock);
     return fetchMock;
   }
@@ -20,7 +20,7 @@ describe('purgeEdge', () => {
     const fetchMock = calls();
     const shorts = Array.from({ length: 31 }, (_, i) => `/s/${i + 1}`);
     await purgeEdge([...shorts, '/openreview/abc']);
-    const bodies = fetchMock.mock.calls.map(([, init]) => JSON.parse((init as RequestInit).body as string));
+    const bodies = fetchMock.mock.calls.map(([, init]) => JSON.parse(init?.body as string));
     expect(bodies).toEqual([
       { prefixes: shorts.slice(0, 30).map((p) => `potentialpaper.com${p}`) },
       { prefixes: ['potentialpaper.com/s/31'] },
