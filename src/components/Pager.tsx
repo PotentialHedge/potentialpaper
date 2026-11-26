@@ -1,4 +1,4 @@
-import Link from 'next/link';
+import { ListLink as Link } from '@/components/ListLink';
 import type { ReactNode } from 'react';
 import { ui } from './ui';
 

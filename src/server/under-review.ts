@@ -1,5 +1,6 @@
 import { sql, type SQL } from 'drizzle-orm';
 import { getDb, type Database } from '@/db';
+import { ttlCache } from './ttl-cache';
 
 /**
  * Whether a paper is under anonymous review: a submission of it, or of a duplicate merged into it, is still under
@@ -31,4 +32,21 @@ export async function reviewVenues(paperId: string, database: Database = getDb()
 export async function underReview(paperId: string, database: Database = getDb()): Promise<boolean> {
   const { rows } = await database.execute<{ under: boolean }>(sql`select ${UNDER_REVIEW(paperId)} as under`);
   return rows[0]?.under ?? false;
+}
+
+const reviewingCache = ttlCache<ReviewVenue[]>(10 * 60_000, 1);
+
+/**
+ * Every venue with a paper still under review there, by name: the choices of the reader's "Not a reviewer at" setting
+ * (`paper.notReviewerAt`). Kept ten minutes.
+ */
+export function reviewingVenues(database: Database = getDb()): Promise<ReviewVenue[]> {
+  const load = async () => {
+    const { rows } = await database.execute<{ id: string; name: string }>(sql`
+      select v.id, v.name from venues v
+       where exists (select 1 from submissions s where s.venue_id = v.id and s.status = 'under_review')
+       order by v.name, v.id`);
+    return rows.map(({ id, name }) => ({ id, name }));
+  };
+  return database === getDb() ? reviewingCache('', load) : load();
 }

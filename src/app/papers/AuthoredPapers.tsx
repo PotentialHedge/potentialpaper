@@ -2,6 +2,7 @@
 
 import { track } from '@/lib/track';
 import { venueLine } from '@/lib/paper-file';
+import { EntityLink } from '@/components/EntityLink';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { useState } from 'react';
@@ -36,10 +37,13 @@ export function AuthoredPapers({
   initial: rows,
   n,
   canVouch,
+  venueLinks,
 }: {
   initial: AuthoredRow[];
   n: number;
   canVouch: boolean;
+  /** The venue pages here, by venue name (`server/entity-paths.ts`). */
+  venueLinks?: Readonly<Record<string, string>>;
 }) {
   const [open, setOpen] = useState<string | null>(null);
   const openRow = rows.find((r) => r.paperId === open);
@@ -67,7 +71,15 @@ export function AuthoredPapers({
                   <td className={`${ui.td} font-serif`}>
                     <Link href={row.path}>{row.title}</Link>
                     {(row.year || row.venue) && (
-                      <div className="font-sans text-xs text-faint">{venueLine(row.venue, row.year)}</div>
+                      <div className="font-sans text-xs text-faint">
+                        {row.venue ? (
+                          <EntityLink name={row.venue} paths={venueLinks}>
+                            {venueLine(row.venue, row.year)}
+                          </EntityLink>
+                        ) : (
+                          venueLine(row.venue, row.year)
+                        )}
+                      </div>
                     )}
                   </td>
                   <td className={ui.td}>

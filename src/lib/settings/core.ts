@@ -31,10 +31,10 @@ export interface CoreSetting<T = unknown> {
    */
   sanitize?: (raw: unknown) => T | undefined;
   /**
-   * How the form draws it: a list of choices as `toggles` (a box each) or `order` (a list to arrange); a boolean as a
-   * `switch` (one box).
+   * How the form draws it: a list of choices as `toggles` (a box each, ticked for those not listed), `checks` (a box
+   * each, ticked for those listed) or `order` (a list to arrange); a boolean as a `switch` (one box).
    */
-  widget?: 'toggles' | 'order' | 'switch';
+  widget?: 'toggles' | 'checks' | 'order' | 'switch';
   /** The choices of a list setting, with their labels, for the form. */
   choices?: { value: string; label: string; group?: string; locked?: boolean }[];
   /**
@@ -353,8 +353,9 @@ const REVIEW_SETTINGS: Record<string, CoreSetting> = {
     sanitize: (raw) => (Array.isArray(raw) ? raw.filter((v): v is string => typeof v === 'string') : undefined),
     title: 'Not a reviewer at',
     description:
-      'The venues you don\'t review for, by id ("openreview:ICLR.cc/2027/Conference"). A paper under review at a venue is blurred but for its title, unless you\'re listed as not reviewing there.',
+      'The venues you don\'t review for. A paper under review at a venue is blurred but for its title, so that a reviewer doesn\'t see who wrote it or what others think, unless the venue is ticked here. Only venues with papers under review are listed; in settings.json, by id ("openreview:ICLR.cc/2027/Conference").',
     group: `${KINDS.paper.title} pages`,
+    widget: 'checks',
   },
 };
 

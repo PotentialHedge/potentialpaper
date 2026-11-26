@@ -1,5 +1,5 @@
 import { cookies, headers } from 'next/headers';
-import Link from 'next/link';
+import { ListLink } from '@/components/ListLink';
 import { Announcements } from '@/components/Announcements';
 import { Collapsible } from '@/components/Collapsible';
 import type { TutorialExample } from '@/components/GettingStarted';
@@ -21,9 +21,11 @@ import { HOME_VIEW_COOKIE, homeView, type HomeView } from '@/lib/home-view';
 import { DISMISSED_COOKIE, parseDismissed } from '@/lib/announcements';
 import { newPaperPath, paperIdFromText, paperPath, shortPath, sourceLinks } from '@/lib/paper-ids';
 import { parseSearch } from '@/lib/query';
+import { exampleOf, SEARCH_EXAMPLES } from '@/lib/search-examples';
 import { normalizeSearch, SEARCH_MAX_LENGTH, SEARCH_SORTS, type SearchSort } from '@/lib/search';
 import { institutionNames } from '@/server/affiliations';
 import { currentAnnouncements } from '@/server/announcements';
+import { institutionPaths, venuePaths } from '@/server/entity-paths';
 import { viewerFromHeaders } from '@/server/auth';
 import { findPaper, PAPER_SOURCES } from '@/server/papers';
 import { canRecommend, recommendationScores } from '@/server/recommendations';
@@ -140,9 +142,12 @@ export default async function Home({
     pins ? pageOf(sp.fpage, FOLLOWING_PAGE, { ...browse, followedBy: me, exceptAuthoredBy: me }) : null,
     topVenues(),
     currentAnnouncements(viewer !== null),
-    institutionNames(),
+    institutionNames().then(async (names) => ({ names, paths: await institutionPaths(names) })),
   ]);
   const venues = venue && !topVenueList.includes(venue) ? [...topVenueList, venue] : topVenueList;
+  const venueLinks = await venuePaths(
+    [...(mine?.hits ?? []), ...(followed?.hits ?? []), ...all.hits].map((h) => h.venue),
+  );
   const cookieJar = await cookies();
   // Compact rows by default; detailed shows each paper's cover and TL;DR or abstract. The choice is remembered.
   const detailed = homeView(one(sp.view), one(sp.abstracts), cookieJar.get(HOME_VIEW_COOKIE)?.value) === 'detailed';
@@ -210,7 +215,7 @@ export default async function Home({
             </p>
           </div>
         )}
-        <InstitutionStrip names={institutions} />
+        <InstitutionStrip names={institutions.names} paths={institutions.paths} />
       </header>
 
       {/* A plain GET form, so search works without JavaScript. */}
@@ -223,6 +228,7 @@ export default async function Home({
           maxLength={SEARCH_MAX_LENGTH}
           aria-label="Search papers"
           placeholder="Search for a paper"
+          examples={SEARCH_EXAMPLES}
           className={ui.searchInput}
         />
         <button type="submit" className={ui.searchBtn}>
@@ -258,9 +264,9 @@ export default async function Home({
               <div className="flex flex-wrap gap-x-4 gap-y-2">
                 {sorts.map((s) => (
                   <PopoverClose key={s} asChild>
-                    <Link href={href({ sort: s })} className={s === sort ? ON : ''}>
+                    <ListLink href={href({ sort: s })} className={s === sort ? ON : ''}>
                       {s}
-                    </Link>
+                    </ListLink>
                   </PopoverClose>
                 ))}
               </div>
@@ -269,24 +275,24 @@ export default async function Home({
               <h3 className={ui.boxHeading}>Venue</h3>
               <div className="flex flex-wrap gap-x-4 gap-y-2">
                 <PopoverClose asChild>
-                  <Link href={href({ venue: '' })} className={venue ? '' : ON}>
+                  <ListLink href={href({ venue: '' })} className={venue ? '' : ON}>
                     all venues
-                  </Link>
+                  </ListLink>
                 </PopoverClose>
                 {venues.map((v) => (
                   <PopoverClose key={v} asChild>
-                    <Link href={href({ venue: v })} className={v === venue ? ON : ''}>
+                    <ListLink href={href({ venue: v })} className={v === venue ? ON : ''}>
                       {v}
-                    </Link>
+                    </ListLink>
                   </PopoverClose>
                 ))}
               </div>
             </div>
             {viewer && (
               <PopoverClose asChild>
-                <Link href={href({ following: onlyFollowed ? '0' : '1' })} className={onlyFollowed ? ON : ''}>
+                <ListLink href={href({ following: onlyFollowed ? '0' : '1' })} className={onlyFollowed ? ON : ''}>
                   ★ following only
-                </Link>
+                </ListLink>
               </PopoverClose>
             )}
             <div>
@@ -310,11 +316,16 @@ export default async function Home({
         <div className="mt-2 font-sans text-[13px] text-down">Ignored: {parsed.errors.join('; ')}</div>
       )}
 
-      {q && <TrackShown event="search_shown" data={{ count: all.total, step: all.page, on: !!venueFilter }} />}
+      {q && (
+        <TrackShown
+          event="search_shown"
+          data={{ count: all.total, step: all.page, on: !!venueFilter, example: exampleOf(q)?.id }}
+        />
+      )}
       {q && (
         <div className="mt-2 font-sans text-[13px] text-muted">
           {all.total.toLocaleString('en')} {all.total === 1 ? 'result' : 'results'} for “{q}”
-          {venueFilter && <> in {venueFilter}</>}. <Link href={href({ q: '' })}>clear</Link>
+          {venueFilter && <> in {venueFilter}</>}. <ListLink href={href({ q: '' })}>clear</ListLink>
         </div>
       )}
 
@@ -330,9 +341,9 @@ export default async function Home({
           {sorts
             .filter((s) => !MENU_SORTS.includes(s))
             .map((s) => (
-              <Link key={s} href={href({ sort: s })} className={s === sort ? ON : ''}>
+              <ListLink key={s} href={href({ sort: s })} className={s === sort ? ON : ''}>
                 {s}
-              </Link>
+              </ListLink>
             ))}
         </span>
         {/* The rarer sorts and the filters, out of the way. */}
@@ -349,31 +360,31 @@ export default async function Home({
           <PopoverContent menu align="end" className="text-[13px]">
             {MENU_SORTS.map((s) => (
               <PopoverClose key={s} asChild>
-                <Link href={href({ sort: s })} className={s === sort ? ON : ''}>
+                <ListLink href={href({ sort: s })} className={s === sort ? ON : ''}>
                   sort: {s}
-                </Link>
+                </ListLink>
               </PopoverClose>
             ))}
             <PopoverClose asChild>
-              <Link href={href({ venue: '' })} className={`mt-1 border-t border-rule pt-1.5 ${venue ? '' : ON}`}>
+              <ListLink href={href({ venue: '' })} className={`mt-1 border-t border-rule pt-1.5 ${venue ? '' : ON}`}>
                 all venues
-              </Link>
+              </ListLink>
             </PopoverClose>
             {venues.map((v) => (
               <PopoverClose key={v} asChild>
-                <Link href={href({ venue: v })} className={v === venue ? ON : ''}>
+                <ListLink href={href({ venue: v })} className={v === venue ? ON : ''}>
                   {v}
-                </Link>
+                </ListLink>
               </PopoverClose>
             ))}
             {viewer && (
               <PopoverClose asChild>
-                <Link
+                <ListLink
                   href={href({ following: onlyFollowed ? '0' : '1' })}
                   className={`mt-1 border-t border-rule pt-1.5 ${onlyFollowed ? ON : ''}`}
                 >
                   ★ following
-                </Link>
+                </ListLink>
               </PopoverClose>
             )}
           </PopoverContent>
@@ -393,77 +404,82 @@ export default async function Home({
           <div className={ui.empty}>No papers here yet.</div>
         ))}
 
-      <RowPlugins list="home" papers={listed}>
-        {mine && mine.total > 0 && (
-          <Collapsible
-            id="mine"
-            cookie={MINE_COOKIE}
-            open={mineOpen}
-            className="group"
-            summary={
-              <>
-                My papers <span className="font-normal">({mine.total})</span>
-              </>
-            }
-          >
-            {mine.hits.map((hit, i) => (
-              <Row
-                key={`${hit.scheme}:${hit.value}`}
-                hit={hit}
-                detailed={detailed}
-                listed={{ list: 'mine', rank: (mine.page - 1) * MINE_PAGE + i + 1 }}
-              />
-            ))}
-            <Pager page={mine.page} pages={mine.pages} href={pageHref('mpage', '#mine')} />
-          </Collapsible>
-        )}
+      <div data-list>
+        <RowPlugins list="home" papers={listed}>
+          {mine && mine.total > 0 && (
+            <Collapsible
+              id="mine"
+              cookie={MINE_COOKIE}
+              open={mineOpen}
+              className="group"
+              summary={
+                <>
+                  My papers <span className="font-normal">({mine.total})</span>
+                </>
+              }
+            >
+              {mine.hits.map((hit, i) => (
+                <Row
+                  key={`${hit.scheme}:${hit.value}`}
+                  hit={hit}
+                  detailed={detailed}
+                  venueLinks={venueLinks}
+                  listed={{ list: 'mine', rank: (mine.page - 1) * MINE_PAGE + i + 1 }}
+                />
+              ))}
+              <Pager page={mine.page} pages={mine.pages} href={pageHref('mpage', '#mine')} />
+            </Collapsible>
+          )}
 
-        {followed && followed.total > 0 && (
-          <Collapsible
-            id="following"
-            cookie={FOLLOWING_COOKIE}
-            open={followingOpen}
-            className="group"
-            summary={
-              <>
-                Following <span className="font-normal">({followed.total})</span>
-              </>
-            }
-          >
-            {followed.hits.map((hit, i) => (
-              <Row
-                key={`${hit.scheme}:${hit.value}`}
-                hit={hit}
-                detailed={detailed}
-                listed={{ list: 'following', rank: (followed.page - 1) * FOLLOWING_PAGE + i + 1 }}
-              />
-            ))}
-            <Pager page={followed.page} pages={followed.pages} href={pageHref('fpage', '#following')} />
-          </Collapsible>
-        )}
+          {followed && followed.total > 0 && (
+            <Collapsible
+              id="following"
+              cookie={FOLLOWING_COOKIE}
+              open={followingOpen}
+              className="group"
+              summary={
+                <>
+                  Following <span className="font-normal">({followed.total})</span>
+                </>
+              }
+            >
+              {followed.hits.map((hit, i) => (
+                <Row
+                  key={`${hit.scheme}:${hit.value}`}
+                  hit={hit}
+                  detailed={detailed}
+                  venueLinks={venueLinks}
+                  listed={{ list: 'following', rank: (followed.page - 1) * FOLLOWING_PAGE + i + 1 }}
+                />
+              ))}
+              <Pager page={followed.page} pages={followed.pages} href={pageHref('fpage', '#following')} />
+            </Collapsible>
+          )}
 
-        {all.total > 0 && (
-          <section id="all">
-            {pinnedCount > 0 ? (
-              <h2 className={`mt-7 mb-2 ${ui.section}`}>
-                {sort === 'recommended' ? 'Recommended for you' : 'All papers'}{' '}
-                <span className="font-normal">({all.total.toLocaleString('en')})</span>
-              </h2>
-            ) : (
-              <div className="h-3.5" />
-            )}
-            {all.hits.map((hit, i) => (
-              <Row
-                key={`${hit.scheme}:${hit.value}`}
-                hit={hit}
-                detailed={detailed}
-                listed={{ list: q ? 'search' : 'browse', rank: (all.page - 1) * SEARCH_PAGE_SIZE + i + 1 }}
-              />
-            ))}
-            <Pager page={all.page} pages={all.pages} href={pageHref('page', pinnedCount > 0 ? '#all' : '')} />
-          </section>
-        )}
-      </RowPlugins>
+          {all.total > 0 && (
+            <section id="all">
+              {pinnedCount > 0 ? (
+                <h2 className={`mt-7 mb-2 ${ui.section}`}>
+                  {sort === 'recommended' ? 'Recommended for you' : 'All papers'}{' '}
+                  <span className="font-normal">({all.total.toLocaleString('en')})</span>
+                </h2>
+              ) : (
+                <div className="h-3.5" />
+              )}
+              {all.hits.map((hit, i) => (
+                <Row
+                  key={`${hit.scheme}:${hit.value}`}
+                  hit={hit}
+                  detailed={detailed}
+                  venueLinks={venueLinks}
+                  listed={{ list: q ? 'search' : 'browse', rank: (all.page - 1) * SEARCH_PAGE_SIZE + i + 1 }}
+                />
+              ))}
+              <Pager page={all.page} pages={all.pages} href={pageHref('page', pinnedCount > 0 ? '#all' : '')} />
+            </section>
+          )}
+        </RowPlugins>
+      </div>
     </main>
   );
 }
@@ -492,12 +508,23 @@ function rowLink(hit: SearchHit): RowLink | null {
   }
 }
 
-function Row({ hit, detailed, listed }: { hit: SearchHit; detailed: boolean; listed: Listed }) {
+function Row({
+  hit,
+  detailed,
+  listed,
+  venueLinks,
+}: {
+  hit: SearchHit;
+  detailed: boolean;
+  listed: Listed;
+  venueLinks: Readonly<Record<string, string>>;
+}) {
   const props = {
     paper: hitIdentifier(hit),
     title: hit.title,
     authors: hit.authors,
     venue: hit.venue,
+    venueHref: hit.venue ? venueLinks[hit.venue] : null,
     // The mean review score beside the venue, when there is one: "ICLR 2027 (5.0 → 5.5)".
     score: hit.venue && hit.rating !== null ? { mean: hit.rating, first: hit.firstRating } : null,
     year: hit.year,

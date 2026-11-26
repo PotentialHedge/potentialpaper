@@ -149,6 +149,8 @@ function coreControl(setting: CoreSetting, extra: Choice[]): Control {
       return { kind: 'switch' };
     case 'toggles':
       return { kind: 'checklist', choices, inverted: true };
+    case 'checks':
+      return { kind: 'checklist', choices, inverted: false };
     case 'order':
       return { kind: 'rank', choices };
     default:
@@ -175,7 +177,11 @@ export function arrangedList(key: string): string | null {
  * (`arrangedList`): their panels to a kind's panels (`pluginPanelChoices`), their pages to the navbar, their actions to
  * a kind's actions.
  */
-export function coreItems(pluginChoices: (list: string) => Choice[] = () => []): SettingItem[] {
+export function coreItems(
+  pluginChoices: (list: string) => Choice[] = () => [],
+  /** Choices known only at run time, by setting: the venues with papers under review, for `paper.notReviewerAt`. */
+  liveChoices: Readonly<Record<string, Choice[]>> = {},
+): SettingItem[] {
   const out: SettingItem[] = [];
   for (const [key, setting] of Object.entries(CORE_SETTINGS)) {
     const category = coreCategory(key, setting);
@@ -186,7 +192,7 @@ export function coreItems(pluginChoices: (list: string) => Choice[] = () => []):
     if (list && setting.widget === 'toggles') continue;
     // A kind's plugin panel places are edited in its Panels control too.
     if (key.endsWith('.panels.placement')) continue;
-    const control = coreControl(setting, list ? pluginChoices(list) : []);
+    const control = coreControl(setting, list ? pluginChoices(list) : (liveChoices[key] ?? []));
     const pageTitle = findCategory(category)?.title.toLowerCase() ?? 'these pages';
     const arranged = list && control.kind === 'rank';
     const actions = list?.endsWith('.actions') ?? false;

@@ -1,6 +1,7 @@
 'use client';
 
 import { track } from '@/lib/track';
+import { EntityLink } from '@/components/EntityLink';
 import { useRouter } from 'next/navigation';
 import { useState } from 'react';
 import { CodeInput } from '@/components/CodeInput';
@@ -47,7 +48,16 @@ async function errorText(res: Response): Promise<string> {
  * Each added address gets a 6-digit code by mail, typed in its row; only a
  * confirmed one counts. Writes go through `/api/v1/me/affiliations`.
  */
-export function Affiliations({ initial, n }: { initial: AffiliationRow[]; n: number }) {
+export function Affiliations({
+  initial,
+  n,
+  orgPaths,
+}: {
+  initial: AffiliationRow[];
+  n: number;
+  /** The org pages of the rows' institutions, by name (`server/entity-paths.ts`). */
+  orgPaths?: Readonly<Record<string, string>>;
+}) {
   const router = useRouter();
   const [rows, setRows] = useState(initial);
   const [email, setEmail] = useState('');
@@ -135,7 +145,9 @@ export function Affiliations({ initial, n }: { initial: AffiliationRow[]; n: num
             {rows.map((r) => (
               <tr key={r.id} className="align-baseline">
                 <td className={`${ui.td} ${ui.mono} break-all`}>{r.email}</td>
-                <td className={`${ui.td}`}>{r.institutionName}</td>
+                <td className={`${ui.td}`}>
+                  <EntityLink name={r.institutionName} paths={orgPaths} />
+                </td>
                 <td className={ui.td}>
                   {r.verifiedAt ? (
                     <span className="text-muted">

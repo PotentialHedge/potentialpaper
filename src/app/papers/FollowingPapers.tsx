@@ -1,6 +1,7 @@
 'use client';
 
 import { venueLine } from '@/lib/paper-file';
+import { EntityLink } from '@/components/EntityLink';
 import Link from 'next/link';
 import { useState } from 'react';
 import { ui } from '@/components/ui';
@@ -13,7 +14,16 @@ export type FollowingRow = Omit<FollowedPaper, 'followedAt'> & { followedAt: str
  * The papers the viewer follows, as Table `n`, each with a button to unfollow (`DELETE /api/v1/follows`). An
  * unfollowed row stays, struck through, with a button to follow it again, so a slip is one click to undo.
  */
-export function FollowingPapers({ initial: rows, n }: { initial: FollowingRow[]; n: number }) {
+export function FollowingPapers({
+  initial: rows,
+  n,
+  venueLinks,
+}: {
+  initial: FollowingRow[];
+  n: number;
+  /** The venue pages here, by venue name (`server/entity-paths.ts`). */
+  venueLinks?: Readonly<Record<string, string>>;
+}) {
   const [off, setOff] = useState<Set<string>>(new Set());
   const [busy, setBusy] = useState<string | null>(null);
   const [problem, setProblem] = useState<string | null>(null);
@@ -67,7 +77,15 @@ export function FollowingPapers({ initial: rows, n }: { initial: FollowingRow[];
                   <td className={`${ui.td} font-serif ${unfollowed ? 'text-muted line-through' : ''}`}>
                     <Link href={row.path}>{row.title}</Link>
                     {(row.year || row.venue) && (
-                      <div className="font-sans text-xs text-faint">{venueLine(row.venue, row.year)}</div>
+                      <div className="font-sans text-xs text-faint">
+                        {row.venue ? (
+                          <EntityLink name={row.venue} paths={venueLinks}>
+                            {venueLine(row.venue, row.year)}
+                          </EntityLink>
+                        ) : (
+                          venueLine(row.venue, row.year)
+                        )}
+                      </div>
                     )}
                   </td>
                   <td className={`${ui.td} whitespace-nowrap text-subtle tabular-nums`}>

@@ -266,3 +266,13 @@
     @apply underline;
   }
 }
+
+/* The home list while a sort, filter or page chosen for it is on its way (`ListLink`): faded after a moment, so a
+   quick answer doesn't flicker. */
+[data-list] {
+  transition: opacity 0.15s ease-out;
+}
+html[data-list-pending] [data-list] {
+  opacity: 0.45;
+  transition-delay: 0.1s;
+}

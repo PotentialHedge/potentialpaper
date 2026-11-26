@@ -34,13 +34,28 @@ function venueTitle(venue: string | null, score: RowScore | null): string | unde
  * The venue and its mean review score: "ICLR 2027 (5.5)", or where reviewers moved it, from where it stood to where it
  * is, the latter coloured: "ICLR 2027 (5.0 → 5.5)".
  */
-function Venue({ venue, score }: { venue: string | null; score: RowScore | null }) {
-  if (!venue || !score) return venue;
+function Venue({ venue, score, href }: { venue: string | null; score: RowScore | null; href?: string | null }) {
+  if (!venue) return null;
+  // Above the title's stretched link, as the PDF link is.
+  const name = href ? (
+    <a href={href} className="relative z-10 text-inherit hover:text-accent">
+      {venue}
+    </a>
+  ) : (
+    venue
+  );
+  if (!score) return name;
   const move = scoreMove(score);
-  if (move === 0) return `${venue} (${score.mean.toFixed(1)})`;
+  if (move === 0) {
+    return (
+      <>
+        {name} ({score.mean.toFixed(1)})
+      </>
+    );
+  }
   return (
     <>
-      {venue} ({score.first!.toFixed(1)} →{' '}
+      {name} ({score.first!.toFixed(1)} →{' '}
       <span className={move > 0 ? 'text-up' : 'text-down'}>{score.mean.toFixed(1)}</span>)
     </>
   );
@@ -81,6 +96,7 @@ export function PaperRow({
   title,
   authors,
   venue,
+  venueHref = null,
   score = null,
   year,
   link,
@@ -92,6 +108,8 @@ export function PaperRow({
   title: string;
   authors: string[];
   venue: string | null;
+  /** The venue's page here, when it has one (`server/entity-paths.ts`). */
+  venueHref?: string | null;
   /** Its mean review score, after the venue. */
   score?: RowScore | null;
   year: number | null;
@@ -116,10 +134,10 @@ export function PaperRow({
       <span className="truncate text-right font-sans text-xs text-muted narrow:hidden" title={venueTitle(venue, score)}>
         {paper ? (
           <RowNote paper={paper} venue={venueTitle(venue, score) ?? null}>
-            <Venue venue={venue} score={score} />
+            <Venue venue={venue} score={score} href={venueHref} />
           </RowNote>
         ) : (
-          <Venue venue={venue} score={score} />
+          <Venue venue={venue} score={score} href={venueHref} />
         )}
       </span>
       <span className="flex items-center justify-end font-mono text-xs text-muted">
@@ -152,6 +170,7 @@ export function PaperCard({
   abstract,
   tldr = null,
   venue,
+  venueHref = null,
   score = null,
   year,
   link,
@@ -167,6 +186,7 @@ export function PaperCard({
   /** Its one-sentence summary, shown in the abstract's place when it has one. */
   tldr?: string | null;
   venue: string | null;
+  venueHref?: string | null;
   score?: RowScore | null;
   year: number | null;
   link: RowLink | null;
@@ -219,12 +239,12 @@ export function PaperCard({
           {paper ? (
             <span title={venueTitle(venue, score)}>
               <RowNote paper={paper} venue={venueTitle(venue, score) ?? null}>
-                <Venue venue={venue} score={score} />
+                <Venue venue={venue} score={score} href={venueHref} />
               </RowNote>
             </span>
           ) : (
             <span title={venueTitle(venue, score)}>
-              <Venue venue={venue} score={score} />
+              <Venue venue={venue} score={score} href={venueHref} />
             </span>
           )}
           {link && <SourceLink link={link} />}

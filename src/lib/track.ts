@@ -68,6 +68,10 @@ export type EventName =
   // its page or 'external' for its PDF)
   | 'search_shown'
   | 'result_opened'
+  // the search box's example searches (`lib/search-examples.ts`): one shown in its placeholder, once a page view each,
+  // and one filled in with Tab or →; a search run that is one of them is `search_shown` with its `example`
+  | 'search_example_shown'
+  | 'search_example_used'
   // a section of a page scrolled to, once a page view (`target` its id: 'submissions', 'discussion', …)
   | 'section_reached'
   // the BibTeX copied (`PageActions`)
@@ -193,6 +197,8 @@ export interface EventData {
   count?: number;
   /** A followed row's place in its list, counted from 1 across its pages. */
   position?: number;
+  /** One of the search box's example searches, by its id (`lib/search-examples.ts`): our words, not a reader's. */
+  example?: string;
 }
 
 type Umami = { track: (name: string, data?: Record<string, unknown>) => unknown };

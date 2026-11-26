@@ -73,6 +73,13 @@ describe('the settings form', () => {
     expect(items.some((i) => i.key === 'navbar.hidden')).toBe(false);
   });
 
+  it('draws "Not a reviewer at" as a box per venue under review, ticked for those listed', () => {
+    const venue = { value: 'openreview:ICLR.cc/2027/Conference', label: 'ICLR 2027' };
+    const item = coreItems(undefined, { 'paper.notReviewerAt': [venue] }).find((i) => i.key === 'paper.notReviewerAt')!;
+    expect(item.category).toBe(coreItems().find((i) => i.key === 'paper.panels.order')!.category);
+    expect(item.control).toEqual({ kind: 'checklist', choices: [venue], inverted: false });
+  });
+
   it("draws a plugin's settings with the standard controls, in their order", () => {
     const items = pluginItems('o/p', {
       b: { type: 'enum', default: 'x', values: ['x', 'y'], display: 'radio', order: 2 },

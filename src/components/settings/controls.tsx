@@ -106,6 +106,7 @@ export function SettingControl({
         />
       );
     case 'checklist':
+      if (control.choices.length === 0) return <p className={`${ui.fine} mt-0`}>None to choose from right now.</p>;
       return (
         <CheckboxGroup
           options={control.choices}

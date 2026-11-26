@@ -15,11 +15,11 @@ function shuffle<T>(items: readonly T[]): T[] {
 
 /**
  * "Researchers from" and a slow strip of institution names (`institutionNames`) under the home page's abstract, in a fresh
- * random order on every render. Names, not logos: a logo reads as an endorsement the institution never gave. Pure CSS:
+ * random order on every render, each linked to its org page; the strip stops while the pointer is on it. Names, not logos: a logo reads as an endorsement the institution never gave. Pure CSS:
  * the row is drawn twice and slid by half its width, so it loops without a seam. Under reduced motion it stands still,
  * and the second copy is hidden.
  */
-export function InstitutionStrip({ names }: { names: string[] }) {
+export function InstitutionStrip({ names, paths }: { names: string[]; paths?: Readonly<Record<string, string>> }) {
   if (names.length < MIN_NAMES) return null;
   const order = shuffle(names);
   const row = (copy: number) => (
@@ -29,7 +29,13 @@ export function InstitutionStrip({ names }: { names: string[] }) {
     >
       {order.map((name) => (
         <li key={name} className="shrink-0 whitespace-nowrap after:px-5 after:text-faint after:content-['·']">
-          {name}
+          {paths?.[name] ? (
+            <a href={paths[name]} tabIndex={copy > 0 ? -1 : undefined} className="text-inherit hover:text-accent">
+              {name}
+            </a>
+          ) : (
+            name
+          )}
         </li>
       ))}
     </ul>
@@ -42,7 +48,7 @@ export function InstitutionStrip({ names }: { names: string[] }) {
       <span className="shrink-0 font-sans text-[12px] text-muted">Researchers from</span>
       <div className="min-w-0 flex-1 overflow-hidden text-[14px] text-subtle italic [mask-image:linear-gradient(to_right,transparent,black_6%,black_94%,transparent)]">
         <div
-          className="flex w-max animate-marquee motion-reduce:animate-none"
+          className="flex w-max animate-marquee hover:[animation-play-state:paused] motion-reduce:animate-none"
           style={{ animationDuration: `${order.length * SECONDS_PER_NAME}s` }}
         >
           {row(0)}

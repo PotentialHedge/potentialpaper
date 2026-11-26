@@ -38,7 +38,7 @@ import {
   requestClaim,
   withdrawClaim,
 } from '../claims';
-import { underReview } from '../under-review';
+import { reviewingVenues, underReview } from '../under-review';
 import { authoredPapers } from '../my-papers';
 import { confirmClaimCode, sendClaimCode } from '../claim-addresses';
 import { askCoAuthors, claimSuggestions, denyClaim, paperAddresses } from '../claim-requests';
@@ -1329,6 +1329,11 @@ async function scopeSummary(pageId: string) {
   if (!summary) throw new ApiError(404, 'not_found', 'no such page');
   return summary;
 }
+
+/** The venues with papers under review: what a reader may say they don't review for (`paper.notReviewerAt`). Public. */
+export const getReviewingVenues = route(async (req) => {
+  return respondCached(req, S.ReviewingVenues, { venues: await reviewingVenues() }, PUBLIC_MINUTE);
+});
 
 /** A scope's venues and score fields with their counts (data for plugins A, `scope.scores`). Public, ETagged. */
 export const getPageScores = route(async (req, params) => {

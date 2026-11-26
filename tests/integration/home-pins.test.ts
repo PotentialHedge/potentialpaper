@@ -3,7 +3,7 @@ import { getDb } from '@/db';
 import { accounts, authorClaims } from '@/db/schema';
 import { followPaper } from '@/server/follows';
 import { savePaper } from '@/server/papers';
-import { searchPapers } from '@/server/search';
+import { searchPapers, searchPapersShared } from '@/server/search';
 import { closePool, resetDatabase, signUp } from './helpers';
 
 beforeEach(resetDatabase);
@@ -51,5 +51,15 @@ describe('the home page’s pinned sections', () => {
     expect(await titles({ followedBy: me, exceptAuthoredBy: me })).toEqual(['Paper 3']);
     expect(await titles({ exceptAuthoredBy: me, exceptFollowedBy: me })).toEqual(['Paper 4']);
     expect(await titles({ followedBy: me })).toEqual(['Paper 1', 'Paper 3']);
+
+    // The list everyone shares, kept once in order, with this viewer's pinned papers taken out of it.
+    const shared = async (filter: Parameters<typeof searchPapersShared>[0]) => {
+      const { hits, total } = await searchPapersShared({ sort: 'title', ...filter });
+      return { titles: hits.map((h) => h.title), total };
+    };
+    expect(await shared({})).toEqual({ titles: ['Paper 1', 'Paper 2', 'Paper 3', 'Paper 4'], total: 4 });
+    expect(await shared({ exceptAuthoredBy: me, exceptFollowedBy: me })).toEqual({ titles: ['Paper 4'], total: 1 });
+    expect(await shared({ exceptAuthoredBy: me, limit: 1, page: 2 })).toEqual({ titles: ['Paper 4'], total: 2 });
+    expect(await shared({ q: 'paper', sort: 'newest', exceptFollowedBy: me, limit: 2 })).toMatchObject({ total: 2 });
   });
 });

@@ -7,6 +7,7 @@ import { authHref, VERIFY_EMAIL } from '@/lib/return-to';
 import { viewerFromHeaders } from '@/server/auth';
 import { followedPapers } from '@/server/follows';
 import { authoredPapers } from '@/server/my-papers';
+import { venuePaths } from '@/server/entity-paths';
 import { AuthoredPapers } from './AuthoredPapers';
 import { FollowingPapers } from './FollowingPapers';
 
@@ -24,6 +25,7 @@ export default async function MyPapers() {
   const { account } = viewer;
   if (!account.profileCompletedAt) redirect(authHref(VERIFY_EMAIL, '/papers'));
   const [authored, following] = await Promise.all([authoredPapers(account.id), followedPapers(account.id)]);
+  const venueLinks = await venuePaths([...authored, ...following].map((row) => row.venue));
   const canVouch = account.verifiedAt !== null && !account.isBot;
   return (
     <main className={ui.page}>
@@ -40,6 +42,7 @@ export default async function MyPapers() {
           <AuthoredPapers
             n={1}
             canVouch={canVouch}
+            venueLinks={venueLinks}
             initial={authored.map(({ waiting, ...row }) => ({
               ...row,
               waiting: waiting.map((w) => ({ ...w, createdAt: w.createdAt.toISOString() })),
@@ -61,6 +64,7 @@ export default async function MyPapers() {
       ) : (
         <FollowingPapers
           n={authored.length === 0 ? 1 : 2}
+          venueLinks={venueLinks}
           initial={following.map(({ followedAt, ...row }) => ({ ...row, followedAt: followedAt.toISOString() }))}
         />
       )}

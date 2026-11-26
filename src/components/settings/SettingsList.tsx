@@ -17,6 +17,7 @@ import {
   pluginCategory,
   pluginItems,
   pluginSettingsPath,
+  type Choice,
   type SettingItem,
 } from '@/lib/settings/form';
 import { SettingControl } from './controls';
@@ -41,10 +42,38 @@ export function pluginsWithPages(plugins: InstalledPlugin[]): InstalledPlugin[] 
   });
 }
 
+/** The venues with papers under review (`/api/v1/venues/under-review`), fetched once a page load. */
+let reviewing: Promise<Choice[]> | null = null;
+
+function fetchReviewing(): Promise<Choice[]> {
+  reviewing ??= fetch('/api/v1/venues/under-review')
+    .then((res) => (res.ok ? (res.json() as Promise<{ venues: { id: string; name: string }[] }>) : { venues: [] }))
+    .then(({ venues }) => venues.map((v) => ({ value: v.id, label: v.name })))
+    .catch(() => {
+      reviewing = null;
+      return [];
+    });
+  return reviewing;
+}
+
+/** The choices of `paper.notReviewerAt`: empty until they have loaded. */
+function useReviewingChoices(): Choice[] {
+  const [choices, setChoices] = useState<Choice[]>([]);
+  useEffect(() => {
+    let live = true;
+    fetchReviewing().then((c) => live && setChoices(c));
+    return () => {
+      live = false;
+    };
+  }, []);
+  return choices;
+}
+
 /** Every setting the form shows the reader, the pages they are on, and whether the reader is signed in. */
 export function useSettingItems() {
   const settings = useSettings();
   const { plugins, loaded: pluginsLoaded } = usePlugins(null);
+  const reviewingChoices = useReviewingChoices();
   const signedIn = settings.loaded && settings.signedIn;
   return useMemo(() => {
     const withPages = pluginsWithPages(plugins);
@@ -65,20 +94,22 @@ export function useSettingItems() {
     ];
     const shown = new Set(pages.map((p) => p.id));
     const items = [
-      ...coreItems((list) =>
-        list === 'navbar'
-          ? pluginNavItems(plugins).map((i) => ({ value: i.id, label: `${i.title} (${i.plugin})` }))
-          : list.endsWith('.actions')
-            ? pluginActions(plugins, { kind: list.split('.')[0] as PanelKind }).map((a) => ({
-                value: a.id,
-                label: `${a.title} (${a.plugin})`,
-              }))
-            : pluginPanelChoices(plugins, list.split('.')[0] as PanelKind),
+      ...coreItems(
+        (list) =>
+          list === 'navbar'
+            ? pluginNavItems(plugins).map((i) => ({ value: i.id, label: `${i.title} (${i.plugin})` }))
+            : list.endsWith('.actions')
+              ? pluginActions(plugins, { kind: list.split('.')[0] as PanelKind }).map((a) => ({
+                  value: a.id,
+                  label: `${a.title} (${a.plugin})`,
+                }))
+              : pluginPanelChoices(plugins, list.split('.')[0] as PanelKind),
+        { 'paper.notReviewerAt': reviewingChoices },
       ),
       ...withPages.flatMap((p) => pluginItems(p.plugin!.id, p.plugin!.manifest.contributes.settings)),
     ].filter((item) => shown.has(item.category));
     return { items, pages, signedIn, loaded: settings.loaded && pluginsLoaded, plugins };
-  }, [plugins, signedIn, settings.loaded, pluginsLoaded]);
+  }, [plugins, signedIn, settings.loaded, pluginsLoaded, reviewingChoices]);
 }
 
 /**

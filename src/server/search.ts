@@ -165,7 +165,15 @@ function predicate(node: SearchNode, fuzzy: boolean, scopes: Scopes): SQL {
         return node.op === '=' ? inOne : sql`not ${inOne}`;
       }
       if (node.field === 'author') {
-        const named = sql`exists (select from jsonb_array_elements_text(p.authors) a(name) where a.name ilike ${pattern})`;
+        const each = sql`exists (select from jsonb_array_elements_text(p.authors) a(name) where a.name ilike ${pattern})`;
+        // The trigram index on the authors' JSON text finds the candidates, and each name is then checked on its
+        // own: reading every paper's authors took most of a second. JSON escapes only quotes, backslashes and
+        // control characters, so a value without them matches the text wherever it matches a name. Trigrams need
+        // three letters.
+        const named =
+          node.value.length < 3 || /["\\\p{Cc}]/u.test(node.value)
+            ? each
+            : sql`(p.authors::text ilike ${pattern} and ${each})`;
         return node.op === '=' ? named : sql`not ${named}`;
       }
       const column = node.field === 'title' ? sql`p.title` : sql`coalesce(p.venue, '')`;
@@ -276,10 +284,7 @@ export async function searchPapers(
   filter: SearchFilter = {},
   database: Database = getDb(),
 ): Promise<{ hits: SearchHit[]; total: number }> {
-  const text = normalizeSearch(filter.q);
-  const parsed = text === null ? null : parseSearch(text);
-  const node = parsed?.node ?? null;
-  const scopes = scopesOf(parsed?.scopes ?? DEFAULT_SCOPES);
+  const { node, scopes } = parsedQuery(filter.q);
   let found = await readPage(filter, node, false, scopes, database);
   if (found.total === 0 && scopes.paper && hasPlainWords(node))
     found = await readPage(filter, node, true, scopes, database);
@@ -287,47 +292,129 @@ export async function searchPapers(
   return { hits, total: found.total };
 }
 
-/**
- * The home page's lists that are the same for every reader (no follows, authorship or recommendations in them), kept
- * a minute: the list as most see it was otherwise half a second of the database's time per view. A personal list is
- * read fresh.
- */
-const sharedLists = ttlCache<{ hits: SearchHit[]; total: number }>(60_000, 500);
-
-export function searchPapersShared(filter: SearchFilter): Promise<{ hits: SearchHit[]; total: number }> {
-  const personal =
-    filter.followedBy ||
-    filter.authoredBy ||
-    filter.exceptFollowedBy ||
-    filter.exceptAuthoredBy ||
-    filter.recommendScores;
-  if (personal) return searchPapers(filter);
-  const { q, venue, sort, page, limit } = filter;
-  return sharedLists(JSON.stringify([q ?? null, venue ?? null, sort ?? null, page ?? 1, limit ?? null]), () =>
-    searchPapers(filter),
-  );
+function parsedQuery(q: string | null | undefined): { node: SearchNode | null; scopes: Scopes } {
+  const text = normalizeSearch(q);
+  const parsed = text === null ? null : parseSearch(text);
+  return { node: parsed?.node ?? null, scopes: scopesOf(parsed?.scopes ?? DEFAULT_SCOPES) };
 }
 
-type Found = Omit<SearchHit, 'matches' | 'matchCount'> & { id: string };
+/**
+ * How many of a shared list's papers are kept in order (`orderedList`): the first pages, which nearly every reader
+ * stays within. A page past them is read from the database as it is asked for.
+ */
+const LIST_KEPT = 1000;
 
-async function readPage(
-  {
-    venue,
-    sort = 'relevance',
-    page = 1,
-    limit = SEARCH_PAGE_SIZE,
-    followedBy,
-    authoredBy,
-    exceptFollowedBy,
-    exceptAuthoredBy,
-    recommendScores,
-  }: SearchFilter,
+/** A shared list's first `LIST_KEPT` papers in order, and how many it has in all. */
+interface OrderedList {
+  ids: string[];
+  total: number;
+  /** Whether the words were taken as a misspelled title, since as words they found nothing. */
+  fuzzy: boolean;
+}
+
+/**
+ * The home page's lists as most readers see them (a search, a venue, a sort: no follows, authorship or
+ * recommendations), each kept in order, a first stretch of ids at a time: one ordering serves every page of it and
+ * every reader. A signed-in reader's list leaves out the papers pinned above it (their own and those they follow),
+ * which are taken out of the kept ids here rather than making the list theirs alone. Kept a minute, and for ten more
+ * given at once while a fresh one is read: ordering every paper by rating, or ranking every paper with a common word,
+ * is most of a second of the database's time.
+ */
+const sharedLists = ttlCache<OrderedList>(60_000, 500, { staleMs: 10 * 60_000 });
+
+export async function searchPapersShared(filter: SearchFilter): Promise<{ hits: SearchHit[]; total: number }> {
+  if (filter.followedBy || filter.authoredBy || filter.recommendScores?.size) return searchPapers(filter);
+  const { q, venue, sort = 'relevance', page = 1, limit = SEARCH_PAGE_SIZE } = filter;
+  const database = getDb();
+  const { node, scopes } = parsedQuery(q);
+  const key = JSON.stringify([normalizeSearch(q), venue ?? null, sort]);
+  const [list, pinned] = await Promise.all([
+    sharedLists(key, () => orderedList({ venue, sort }, node, scopes, database)),
+    pinnedPapers(filter, database),
+  ]);
+  const kept = pinned.size === 0 ? list.ids : list.ids.filter((id) => !pinned.has(id));
+  const complete = list.ids.length === list.total;
+  const end = page * limit;
+  // Past the kept stretch: this page is read as it is asked for.
+  if (!complete && kept.length < end) return searchPapers(filter);
+  const total =
+    pinned.size === 0
+      ? list.total
+      : complete
+        ? kept.length
+        : list.total - (await countAmong(pinned, { venue }, node, list.fuzzy, scopes, database));
+  const shown = await hydrate(kept.slice(end - limit, end), database);
+  return { hits: await withMatches(shown, node, scopes, database), total };
+}
+
+/** The papers a list leaves out for being pinned above it: the reader's own, and those they follow. */
+async function pinnedPapers(
+  { exceptAuthoredBy, exceptFollowedBy }: SearchFilter,
+  database: Database,
+): Promise<Set<string>> {
+  const parts = [
+    ...(exceptAuthoredBy
+      ? [
+          sql`select a.paper_id from author_claims a where a.account_id = ${exceptAuthoredBy}::uuid and a.status in ('confirmed', 'pending')`,
+        ]
+      : []),
+    ...(exceptFollowedBy
+      ? [sql`select f.paper_id from paper_follows f where f.account_id = ${exceptFollowedBy}::uuid`]
+      : []),
+  ];
+  if (parts.length === 0) return new Set();
+  const { rows } = await database.execute<{ paper_id: string }>(sql.join(parts, sql` union `));
+  return new Set(rows.map((r) => r.paper_id));
+}
+
+/** How many of `ids` a list holds: the pinned papers it would have listed, for its total once they are out. */
+async function countAmong(
+  ids: ReadonlySet<string>,
+  filter: SearchFilter,
   node: SearchNode | null,
   fuzzy: boolean,
   scopes: Scopes,
   database: Database,
-): Promise<{ hits: Found[]; total: number }> {
-  const where = sql.join(
+): Promise<number> {
+  const where = sql`p.id = any(${sql.param([...ids])}::uuid[]) and ${whereOf(filter, node, fuzzy, scopes)}`;
+  const { rows } = await database.execute<{ n: number }>(sql`select count(*)::int as n from papers p where ${where}`);
+  return rows[0].n;
+}
+
+/** A shared list's first `LIST_KEPT` papers in order and its total, trying a misspelled title when words find none. */
+async function orderedList(
+  filter: SearchFilter,
+  node: SearchNode | null,
+  scopes: Scopes,
+  database: Database,
+): Promise<OrderedList> {
+  const read = async (fuzzy: boolean): Promise<OrderedList> => {
+    const where = whereOf(filter, node, fuzzy, scopes);
+    const [{ rows: counted }, { rows }] = await Promise.all([
+      database.execute<{ total: number }>(sql`select count(*)::int as total from papers p where ${where}`),
+      database.execute<{ id: string }>(sql`
+        select p.id from papers p ${joinsOf(filter, node, scopes)}
+        where ${where}
+        order by ${orderOf(filter, node, scopes)}
+        limit ${LIST_KEPT}
+      `),
+    ]);
+    return { ids: rows.map((r) => r.id), total: counted[0].total, fuzzy };
+  };
+  const words = await read(false);
+  return words.total === 0 && scopes.paper && hasPlainWords(node) ? read(true) : words;
+}
+
+type Found = Omit<SearchHit, 'matches' | 'matchCount'> & { id: string };
+
+/** Which papers a list holds, on `papers p`. */
+function whereOf(
+  { venue, followedBy, authoredBy, exceptFollowedBy, exceptAuthoredBy }: SearchFilter,
+  node: SearchNode | null,
+  fuzzy: boolean,
+  scopes: Scopes,
+): SQL {
+  return sql.join(
     [
       sql`p.merged_into is null`,
       ...(venue ? [sql`p.venue = ${venue}`] : []),
@@ -339,46 +426,76 @@ async function readPage(
     ],
     sql` and `,
   );
+}
+
+/** What a list's order reads beside `papers p`. */
+function joinsOf({ sort = 'relevance', recommendScores }: SearchFilter, node: SearchNode | null, scopes: Scopes): SQL {
   const recommending = recommendScores?.size ? recommendScores : null;
-  const order = sql.join(
-    [...(recommending ? [sql`rec.score desc nulls last`] : []), ...ordering(sort, node, scopes), sql`p.id`],
+  return sql`left join page_current c on c.page_id = p.id
+    ${fileRanks(sort, node, scopes)}
+    ${recommending ? sql`left join ${scoresTable(recommending)} rec on rec.paper_id = p.id` : sql``}
+    ${sort === 'rating' ? ratingJoins : sql``}`;
+}
+
+/** A list's order, ending with the paper's id so that pages never overlap. */
+function orderOf({ sort = 'relevance', recommendScores }: SearchFilter, node: SearchNode | null, scopes: Scopes): SQL {
+  return sql.join(
+    [...(recommendScores?.size ? [sql`rec.score desc nulls last`] : []), ...ordering(sort, node, scopes), sql`p.id`],
     sql`, `,
   );
-  const [{ rows: counted }, { rows }] = await Promise.all([
+}
+
+async function readPage(
+  filter: SearchFilter,
+  node: SearchNode | null,
+  fuzzy: boolean,
+  scopes: Scopes,
+  database: Database,
+): Promise<{ hits: Found[]; total: number }> {
+  const { page = 1, limit = SEARCH_PAGE_SIZE } = filter;
+  const where = whereOf(filter, node, fuzzy, scopes);
+  const [{ rows: counted }, hits] = await Promise.all([
     database.execute<{ total: number }>(sql`select count(*)::int as total from papers p where ${where}`),
-    database.execute<Found & Record<string, unknown>>(sql`
-      select p.id, i.scheme, i.value, pg.short_id as "shortId", p.title, p.authors, left(p.abstract, 400) as abstract, p.year, p.venue,
-             (select r.mean from paper_ratings r where r.paper_id = p.id) as rating,
-             (select r.first_mean from paper_ratings r where r.paper_id = p.id) as "firstRating",
-             c.pdf ->> 'url' as pdf, coalesce(c.thumbnail ->> 'url', pd.cover_url) as cover,
-             (select s.tldr from submissions s where s.paper_id = p.id and s.tldr is not null
-               order by (select min(n.created_at) from submission_notes n where n.submission_id = s.id) desc nulls last,
-                        s.fetched_at desc
-               limit 1) as tldr
-      from unnest(array(
-        select p.id from papers p
-        left join page_current c on c.page_id = p.id
-        ${fileRanks(sort, node, scopes)}
-        ${recommending ? sql`left join ${scoresTable(recommending)} rec on rec.paper_id = p.id` : sql``}
-        ${sort === 'rating' ? ratingJoins : sql``}
+    hydrate(
+      sql`array(
+        select p.id from papers p ${joinsOf(filter, node, scopes)}
         where ${where}
-        order by ${order}
+        order by ${orderOf(filter, node, scopes)}
         limit ${limit} offset ${(page - 1) * limit}
-      )) with ordinality as shown(id, position)
-      join papers p on p.id = shown.id
-      join pages pg on pg.id = p.id
-      left join page_current c on c.page_id = p.id
-      left join pdf_documents pd on pd.sha256 = c.pdf ->> 'sha256'
-      cross join lateral (
-        select scheme, value from paper_identifiers
-        where paper_id = p.id
-        order by array_position(array['arxiv', 'doi', 'openreview'], scheme)
-        limit 1
-      ) i
-      order by shown.position
-    `),
+      )`,
+      database,
+    ),
   ]);
-  return { hits: rows, total: counted[0].total };
+  return { hits, total: counted[0].total };
+}
+
+/** The rows shown for papers, in the order given: ids, or a query of them as an array. */
+async function hydrate(ids: string[] | SQL, database: Database): Promise<Found[]> {
+  if (Array.isArray(ids) && ids.length === 0) return [];
+  const list = Array.isArray(ids) ? sql`${sql.param(ids)}::uuid[]` : ids;
+  const { rows } = await database.execute<Found & Record<string, unknown>>(sql`
+    select p.id, i.scheme, i.value, pg.short_id as "shortId", p.title, p.authors, left(p.abstract, 400) as abstract, p.year, p.venue,
+           r.mean as rating, r.first_mean as "firstRating",
+           c.pdf ->> 'url' as pdf, coalesce(c.thumbnail ->> 'url', pd.cover_url) as cover,
+           (select s.tldr from submissions s where s.paper_id = p.id and s.tldr is not null
+             order by (select min(n.created_at) from submission_notes n where n.submission_id = s.id) desc nulls last,
+                      s.fetched_at desc
+             limit 1) as tldr
+    from unnest(${list}) with ordinality as shown(id, position)
+    join papers p on p.id = shown.id
+    join pages pg on pg.id = p.id
+    left join page_current c on c.page_id = p.id
+    left join pdf_documents pd on pd.sha256 = c.pdf ->> 'sha256'
+    left join paper_ratings r on r.paper_id = p.id
+    cross join lateral (
+      select scheme, value from paper_identifiers
+      where paper_id = p.id
+      order by array_position(array['arxiv', 'doi', 'openreview'], scheme)
+      limit 1
+    ) i
+    order by shown.position
+  `);
+  return rows;
 }
 
 /** `ts_headline`'s options: a fragment or two around the matched words, marked with private-use characters. */

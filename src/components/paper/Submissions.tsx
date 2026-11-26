@@ -246,12 +246,21 @@ function Forum({ submission }: { submission: Submission }) {
   );
 }
 
-function SubmissionView({ submission }: { submission: Submission }) {
+/** Its venue's name leads to the venue's page here, which links on to the source; with none here, to the source's. */
+function SubmissionView({
+  submission,
+  venueLinks,
+}: {
+  submission: Submission;
+  venueLinks?: Readonly<Record<string, string>>;
+}) {
+  const page = venueLinks?.[submission.venue.name];
+  const href = page ?? submission.venue.url;
   return (
     <section className="mt-5">
       <h3 className={ui.sectionHeading}>
-        {submission.venue.url ? (
-          <a href={submission.venue.url} rel="noopener">
+        {href ? (
+          <a href={href} rel={page ? undefined : 'noopener'}>
             {submission.venue.name}
           </a>
         ) : (
@@ -280,7 +289,16 @@ function SubmissionView({ submission }: { submission: Submission }) {
   );
 }
 
-export function SubmissionsSection({ submissions, paperPath }: { submissions: Submission[]; paperPath: string }) {
+export function SubmissionsSection({
+  submissions,
+  paperPath,
+  venueLinks,
+}: {
+  submissions: Submission[];
+  paperPath: string;
+  /** The venue pages here, by venue name (`server/entity-paths.ts`). */
+  venueLinks?: Readonly<Record<string, string>>;
+}) {
   const add = <AddMissing what="submission" paperPath={paperPath} />;
   return (
     <Fold id="submissions" title="Submissions">
@@ -291,7 +309,7 @@ export function SubmissionsSection({ submissions, paperPath }: { submissions: Su
       ) : (
         <>
           {submissions.map((submission) => (
-            <SubmissionView key={submission.venue.id} submission={submission} />
+            <SubmissionView key={submission.venue.id} submission={submission} venueLinks={venueLinks} />
           ))}
           <div className="mt-3 font-sans text-xs">{add}</div>
         </>

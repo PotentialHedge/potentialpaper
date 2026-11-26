@@ -37,6 +37,8 @@ export interface PanelProps extends PageCommon {
   canonical: PaperId;
   /** What the infobox, the JSON-LD and the meta tags say about it (`lib/paper-facts.ts`). */
   facts: PaperFacts;
+  /** The venue pages here of the venues it names, by name (`server/entity-paths.ts`). */
+  venueLinks: Readonly<Record<string, string>>;
 }
 
 /** Its Markdown and TeX rendered, with "Abstract." run into its first paragraph. */
@@ -132,16 +134,23 @@ function ReadThePaper({ identifiers, pdf, picture, canonical, address }: PanelPr
   );
 }
 
-function Submissions({ submissions, address }: PanelProps) {
-  return <SubmissionsSection submissions={submissions} paperPath={pagePath(address)} />;
+function Submissions({ submissions, address, venueLinks }: PanelProps) {
+  return <SubmissionsSection submissions={submissions} paperPath={pagePath(address)} venueLinks={venueLinks} />;
 }
 
 function FactsAside({ facts, address }: PanelProps) {
   return <Facts facts={facts} pagePath={pagePath(address)} />;
 }
 
-function Versions({ versions, paper, address }: PanelProps) {
-  return <VersionsSection versions={versions} paperPath={pagePath(address)} paperTitle={paper.title} />;
+function Versions({ versions, paper, address, venueLinks }: PanelProps) {
+  return (
+    <VersionsSection
+      versions={versions}
+      paperPath={pagePath(address)}
+      paperTitle={paper.title}
+      venueLinks={venueLinks}
+    />
+  );
 }
 
 function VersionsAside({ versions, address }: PanelProps) {

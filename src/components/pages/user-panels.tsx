@@ -1,3 +1,5 @@
+import { Fragment } from 'react';
+import { EntityLinks } from '@/components/EntityLink';
 import { ui } from '@/components/ui';
 import { AbstractText } from '@/components/AbstractText';
 import { ProfileLinksLine } from '@/components/ProfileLinksLine';
@@ -20,11 +22,22 @@ const day = (at: Date) =>
  * person themselves a way back to editing it.
  */
 export function UserByline({ user }: { user: UserPageView }) {
-  const parts = [user.realName, user.institutions?.join(', ')].filter((part): part is string => Boolean(part));
-  if (user.bot) parts.push('A bot');
+  const institutions = user.institutions?.length ? (
+    <EntityLinks names={user.institutions} paths={user.institutionPaths} />
+  ) : null;
+  const parts = [user.realName, institutions, user.bot && 'A bot'].filter(Boolean);
   return (
     <>
-      {parts.length > 0 && <p className="mt-2.5 text-center font-sans text-[15px] text-muted">{parts.join(' · ')}</p>}
+      {parts.length > 0 && (
+        <p className="mt-2.5 text-center font-sans text-[15px] text-muted">
+          {parts.map((part, i) => (
+            <Fragment key={i}>
+              {i > 0 && ' · '}
+              {part}
+            </Fragment>
+          ))}
+        </p>
+      )}
       <ProfileLinksLine links={user.links} className="mt-2" />
       <OwnProfileLink handle={user.handle} />
     </>

@@ -3,12 +3,14 @@ import { headers } from 'next/headers';
 import Link from 'next/link';
 import { redirect } from 'next/navigation';
 import { AbstractText } from '@/components/AbstractText';
+import { EntityLink } from '@/components/EntityLink';
 import { SignOut } from '@/components/SignOut';
 import { ui } from '@/components/ui';
 import { keyedPagePath } from '@/lib/kinds';
 import { shownHandle } from '@/lib/profile';
 import { authHref, VERIFY_EMAIL } from '@/lib/return-to';
 import { listAffiliations } from '@/server/affiliations';
+import { institutionPaths } from '@/server/entity-paths';
 import { otherAddresses } from '@/server/claim-addresses';
 import { claimedNames } from '@/server/claim-requests';
 import { viewerFromHeaders } from '@/server/auth';
@@ -44,6 +46,7 @@ export default async function Profile() {
     listTokens(account.id),
     listSshKeys(account.id),
   ]);
+  const orgPaths = await institutionPaths([...account.institutions, ...rows.map((r) => r.institutionName)]);
   const handle = `@${shownHandle(account.handle, account.isBot)}`;
   return (
     <main className={ui.page}>
@@ -54,7 +57,9 @@ export default async function Profile() {
           {account.institutions.map((name, i) => (
             <span key={name}>
               {i === 0 ? (account.realName ? ', ' : '') : '; '}
-              <i>{name}</i>
+              <i>
+                <EntityLink name={name} paths={orgPaths} />
+              </i>
             </span>
           ))}
         </p>
@@ -104,6 +109,7 @@ export default async function Profile() {
       </h2>
       <Affiliations
         n={1}
+        orgPaths={orgPaths}
         initial={rows.map((r) => ({
           id: r.id,
           email: r.email,

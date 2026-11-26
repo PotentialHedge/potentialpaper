@@ -386,6 +386,10 @@ export const CoAuthorAdded = z.object({ authorIndex: z.number().int(), authorNam
 /** The invited account's answer to an invitation (`addCoAuthor`). */
 export const InvitationAnswerBody = z.object({ paper: PaperIdentifier, accept: z.boolean() });
 /** Accounts whose handle starts with `q`, to pick a co-author from. */
+export const ReviewingVenues = z.object({
+  venues: z.array(z.object({ id: z.string(), name: z.string() })),
+});
+
 export const HandleSearchQuery = z.object({ q: z.string().trim().min(1).max(64) });
 export const HandleMatches = z.object({
   accounts: z.array(z.object({ handle: z.string(), institution: z.string().nullable() })),

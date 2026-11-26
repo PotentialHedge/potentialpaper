@@ -1,4 +1,5 @@
 import { ui } from '@/components/ui';
+import { keyedPagePath } from '@/lib/kinds';
 import { evidenceLabel } from '@/lib/evidence';
 import type { SubmissionStatus } from '@/lib/submissions';
 import {
@@ -22,22 +23,38 @@ function tone(status: SubmissionStatus | undefined): string {
   return 'text-muted';
 }
 
-/** Where a version went, a line per venue: "ICLR 2026 Rejected · reviews ↓". */
-function Sent({ submissions }: { submissions: VersionSubmission[] }) {
+/**
+ * Where a version went, a line per venue: "ICLR 2026 Rejected · forum · reviews ↓". The venue's name leads to its page
+ * here when it has one, and its forum at the venue has a link of its own; a venue with no page here leads to the forum.
+ */
+function Sent({
+  submissions,
+  venueLinks,
+}: {
+  submissions: VersionSubmission[];
+  venueLinks?: Readonly<Record<string, string>>;
+}) {
   return (
     <>
       {submissions.map((s, i) => {
         const standing = submissionStanding(s);
+        const page = s.page ? keyedPagePath('venue', s.page) : s.venue ? venueLinks?.[s.venue] : undefined;
+        const href = page ?? s.url;
         return (
           <span key={`${s.venue}-${i}`} className="block">
-            {s.url ? (
-              <a href={s.url} rel="noopener">
+            {href ? (
+              <a href={href} rel={page ? undefined : 'noopener'}>
                 {s.venue}
               </a>
             ) : (
               s.venue
             )}
             {standing && <span className={`ml-2 ${tone(s.status)}`}>{standing}</span>}
+            {page && s.url && (
+              <a href={s.url} rel="noopener" className="ml-2 text-xs" title="Its forum at the venue">
+                forum
+              </a>
+            )}
             {s.reviews && (
               <a href="#submissions" className="ml-2 text-xs">
                 reviews ↓
@@ -78,8 +95,11 @@ export function VersionsSection({
   versions,
   paperPath: here,
   paperTitle,
+  venueLinks,
 }: {
   versions: PaperVersion[];
+  /** The venue pages here of the venues the versions name, by name (`server/entity-paths.ts`). */
+  venueLinks?: Readonly<Record<string, string>>;
   /** The paper's address, its short one (`/s/42`), which its "Add" prompts and its tools' links go by. */
   paperPath: string;
   paperTitle: string;
@@ -172,7 +192,7 @@ export function VersionsSection({
                       </td>
                       <td className={ui.td}>
                         {v.submissions?.length ? (
-                          <Sent submissions={v.submissions} />
+                          <Sent submissions={v.submissions} venueLinks={venueLinks} />
                         ) : (
                           <span className="text-faint">—</span>
                         )}

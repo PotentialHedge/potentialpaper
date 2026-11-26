@@ -1,4 +1,6 @@
 import { venueLine } from '@/lib/paper-file';
+import { ENTITY_LINK, EntityLink } from '@/components/EntityLink';
+import { venuePaths } from '@/server/entity-paths';
 import 'katex/dist/katex.min.css';
 import { eq, sql } from 'drizzle-orm';
 import type { Metadata } from 'next';
@@ -128,6 +130,12 @@ export async function PaperRoute({ scheme, segments }: { scheme: PaperScheme; se
     pageHasSignals({ id: paper.id, kind: 'paper' }),
     reviewVenues(paper.id),
   ]);
+  // The venues it names, linked to their pages here: the header's, each submission's, each version's.
+  const venueLinks = await venuePaths([
+    paper.venue,
+    ...submissions.map((s) => s.venue.name),
+    ...(current?.versions ?? []).flatMap((v) => (v.submissions ?? []).map((s) => s.venue)),
+  ]);
   // Shown and shared at its short address, and the page tools at theirs (`/history/s/42`).
   const shown = shortId === null ? address : { ...address, shortId };
   if (owners) owners.claimPath = toolPath('claim', shown);
@@ -160,6 +168,7 @@ export async function PaperRoute({ scheme, segments }: { scheme: PaperScheme; se
     versions: sortVersions(current?.versions ?? []),
     canonical,
     facts: await factsOf(found),
+    venueLinks,
   };
   const url = `${siteUrl()}${pagePath(shown)}`;
   // What the page's plugins are told about it (`components/plugins/`).
@@ -231,7 +240,17 @@ export async function PaperRoute({ scheme, segments }: { scheme: PaperScheme; se
                 <span className="text-muted italic">Anonymous authors</span>
               )}
             </p>
-            {about && <p className="mt-2.5 text-center text-xs text-faint">{about}</p>}
+            {about && (
+              <p className="mt-2.5 text-center text-xs text-faint">
+                {paper.venue ? (
+                  <EntityLink name={paper.venue} paths={venueLinks} className={ENTITY_LINK}>
+                    {about}
+                  </EntityLink>
+                ) : (
+                  about
+                )}
+              </p>
+            )}
             <nav
               className="mt-2.5 flex flex-wrap justify-center gap-x-3 font-sans text-[13px]"
               aria-label="The paper elsewhere"

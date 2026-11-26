@@ -15,6 +15,7 @@ import { LINKS_FILE } from '@/lib/labeled-links';
 import { parseSettings, resolveSettings } from '@/lib/settings';
 import { shownFromSettings, type UserShown } from '@/lib/user-pages';
 import type { PageSummary } from '@/lib/plugins/protocol';
+import { institutionPaths } from './entity-paths';
 import type { PageRow } from './pages/kinds';
 import { refreshPageIds, refreshPages } from './pages/refresh';
 import type { Reader } from './pages/repo';
@@ -135,6 +136,8 @@ export interface UserPageView {
   /** Each item only when shown, else `null`. */
   realName: string | null;
   institutions: string[] | null;
+  /** The org pages of those institutions, by name, for those that have one (`server/entity-paths.ts`). */
+  institutionPaths: Record<string, string>;
   claimedPapers: ClaimedPaper[] | null;
   activity: ActivityItem[] | null;
   comments: CommentItem[] | null;
@@ -152,10 +155,12 @@ export async function userPageView(
   const account = await accountOfUserPage(database, page.key);
   if (!account) return null;
   const shown = await shownFor(account);
-  const [claimedPapers, activity, commentList] = await Promise.all([
+  const institutions = shown.institution ? account.institutions : null;
+  const [claimedPapers, activity, commentList, institutionPathsOf] = await Promise.all([
     shown.claimedPapers ? claimedPapersOf(account.id, database) : null,
     shown.activity && !account.isBot ? activityOf(account.id, limit, database) : shown.activity ? [] : null,
     shown.comments ? commentsOf(account.id, limit, database) : null,
+    institutionPaths(institutions ?? [], database),
   ]);
   return {
     handle: account.handle,
@@ -164,7 +169,8 @@ export async function userPageView(
     bio: account.bio,
     links: { homepage: account.homepage, orcid: account.orcid, scholar: account.scholar },
     realName: shown.realName ? account.realName : null,
-    institutions: shown.institution ? account.institutions : null,
+    institutions,
+    institutionPaths: institutionPathsOf,
     claimedPapers,
     activity,
     comments: commentList,
