@@ -2,7 +2,9 @@
 
 import { pluginLabel, track } from '@/lib/track';
 import Link from 'next/link';
+import { usePathname } from 'next/navigation';
 import { type ReactNode, useMemo, useRef, useState } from 'react';
+import { authHref } from '@/lib/return-to';
 import { Popover, PopoverClose, PopoverContent, PopoverTrigger } from '@/components/Popover';
 import { ui } from '@/components/ui';
 import { grantPlugin, usePlugins } from '@/lib/plugins/client';
@@ -50,6 +52,7 @@ export function ConsentPrompt({
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [dismissed, setDismissed] = useState(false);
+  const pathname = usePathname();
   if (dismissed) return null;
   const { manifest, commit, sourceUrl, id } = plugin.plugin;
   const asks = manifest.permissions as PluginPermission[];
@@ -109,7 +112,14 @@ export function ConsentPrompt({
             {busy ? 'Allowing…' : 'Allow'}
           </button>
         ) : (
-          <span className={ui.fine}>Sign in to approve it.</span>
+          <Link
+            href={authHref('/signin', pathname)}
+            rel="nofollow"
+            className={ui.linkBtn}
+            onClick={() => track('signin_prompt_clicked', { target: 'plugin_consent' })}
+          >
+            Sign in to approve it
+          </Link>
         )}
         <button
           type="button"

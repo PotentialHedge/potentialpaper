@@ -51,7 +51,8 @@ export type EventName =
   | 'follow_toggled'
   // a prompt to sign in followed by a signed-out reader; `target` says which: 'follow' (the star), 'views' (the
   // blurred view count), 'comment' ("Sign in to comment"), 'add_version' (/new/paper's "Sign in to add as a
-  // version"), 'nav' (the header's "sign in"), 'plugins' (/settings/plugins). With `signup_submitted` and
+  // version"), 'nav' (the header's "sign in"), 'plugins' (/settings/plugins), 'plugin_consent' (a plugin panel asking
+  // for approval). With `signup_submitted` and
   // `signin_succeeded` after it in the same session, a funnel shows which prompts bring people in.
   | 'signin_prompt_clicked'
   // a prompt to claim a page followed; `target`: 'analytics' (the locked Analytics tab's button), 'banner' ("Is
