@@ -1,7 +1,20 @@
+import { eq } from 'drizzle-orm';
+import { papers } from '@/db/schema';
 import { ALL_PARTS, KINDS, type PageKind } from '@/lib/kinds';
+import { encodePaperFile, paperFileOf } from '@/lib/paper-file';
 import { siteUrl } from '../site';
 import type { FileChange } from './commit';
-import { PREK_PATH, README_PATH, sectionName } from './rules';
+import { mustPage } from './kinds';
+import type { Reader } from './repo';
+import {
+  GITATTRIBUTES,
+  GITATTRIBUTES_PATH,
+  LAYOUT_VERSION,
+  METADATA_PATH,
+  PREK_PATH,
+  README_PATH,
+  sectionName,
+} from './rules';
 import { PAGE_SCHEMA_NAMES, PAGE_SCHEMAS } from './schemas';
 
 /**
@@ -216,6 +229,26 @@ export function starterFiles(kind: PageKind = 'paper'): [path: string, content: 
       STARTER_SECTIONS[part].map((name): [string, string] => [`${part}/${name}`, '']),
     ),
   ];
+}
+
+/**
+ * Every file a page's first commit writes by itself, in order (DESIGN.md §4.2): its `metadata.json` (`{ layout, kind,
+ * key }`, in the layout the repo starts in), a paper's first `paper.json` from its row as the paper's source filled it
+ * in (`server/papers.ts`; from then on the file is what the paper is, and the row its projection), `.gitattributes`
+ * and the starter files. `commitPage` writes these, less what the edit itself says, and the Repo tab shows them for a
+ * paper with no repo yet (`browse.ts`), so the two can't differ. Reads, never writes.
+ */
+export async function firstCommitFiles(db: Reader, pageId: string): Promise<[path: string, content: string][]> {
+  const page = await mustPage(db, pageId);
+  const files: [string, string][] = [
+    [METADATA_PATH, `${JSON.stringify({ layout: LAYOUT_VERSION, kind: page.kind, key: page.key }, null, 2)}\n`],
+  ];
+  if (page.kind === 'paper') {
+    const [paper] = await db.select().from(papers).where(eq(papers.id, pageId));
+    files.push([KINDS.paper.kindFile!, encodePaperFile(paperFileOf(paper))]);
+  }
+  files.push([GITATTRIBUTES_PATH, GITATTRIBUTES], ...starterFiles(page.kind));
+  return files;
 }
 
 /**

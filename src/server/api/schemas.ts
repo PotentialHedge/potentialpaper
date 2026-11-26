@@ -659,6 +659,59 @@ export const WorkspaceResponse = z.object({
 
 export const WorkspaceBlobQuery = PageQuery.extend({ oid: Oid });
 
+/** A folder or file of a page's repo, for its Repo tab (`server/pages/browse.ts`). */
+export const RepoQuery = PageQuery.extend({ path: z.string().max(1000).default('') });
+
+const RepoLast = z.object({ oid: z.string(), summary: z.string(), at: z.string() });
+
+export const RepoFolderResponse = z.object({
+  placeholder: z.boolean(),
+  head: z
+    .object({
+      oid: z.string(),
+      seq: z.number().int(),
+      summary: z.string(),
+      authorId: z.string(),
+      handle: z.string().nullable(),
+      authorName: z.string().nullable(),
+      at: z.string(),
+    })
+    .nullable(),
+  commits: z.number().int(),
+  path: z.string(),
+  entries: z.array(
+    z.object({
+      name: z.string(),
+      path: z.string(),
+      type: z.enum(['folder', 'file']),
+      bytes: z.number().int().nullable(),
+      lfs: z.boolean(),
+      last: RepoLast.nullable(),
+    }),
+  ),
+  readme: z.object({ path: z.string(), html: z.string() }).nullable(),
+});
+
+export const RepoFileResponse = z.object({
+  placeholder: z.boolean(),
+  path: z.string(),
+  oid: z.string(),
+  bytes: z.number().int(),
+  view: z.discriminatedUnion('type', [
+    z.object({ type: z.literal('markdown'), html: z.string() }),
+    z.object({ type: z.literal('text'), text: z.string() }),
+    z.object({
+      type: z.literal('lfs'),
+      kind: z.enum(['pdf', 'image']),
+      sha256: z.string(),
+      bytes: z.number().int(),
+      url: z.string().nullable(),
+    }),
+    z.object({ type: z.literal('binary') }),
+    z.object({ type: z.literal('large') }),
+  ]),
+});
+
 export const WorkspaceCommitBody = z.object({
   paper: PageIdentifier,
   baseOid: Oid.nullable(),

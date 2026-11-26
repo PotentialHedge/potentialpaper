@@ -1,5 +1,6 @@
 'use client';
 
+import { ago } from '@/lib/ago';
 import { track } from '@/lib/track';
 import { useCallback, useEffect, useRef, useState } from 'react';
 import type { z } from 'zod';
@@ -29,23 +30,6 @@ async function errorText(res: Response | null, fallback: string): Promise<string
 
 /** What a comment's text may contain, for the line under the editor. */
 const MARKDOWN_HINT = 'Markdown and TeX math ($…$, $$…$$) work.';
-
-function ago(iso: string): string {
-  const s = Math.max(0, (Date.now() - new Date(iso).getTime()) / 1000);
-  if (s < 60) return 'just now';
-  const [n, unit] =
-    s < 3600
-      ? [s / 60, 'minute']
-      : s < 86_400
-        ? [s / 3600, 'hour']
-        : s < 30 * 86_400
-          ? [s / 86_400, 'day']
-          : s < 365 * 86_400
-            ? [s / (30 * 86_400), 'month']
-            : [s / (365 * 86_400), 'year'];
-  const k = Math.floor(n);
-  return `${k} ${unit}${k === 1 ? '' : 's'} ago`;
-}
 
 /** How the viewer's next comment will be signed. */
 function signedAs(viewer: Viewer, anonymous: boolean): string {

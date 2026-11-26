@@ -3,7 +3,7 @@ import { ArrangedPanels } from '@/components/ArrangedPanels';
 import { ArrangedTabs } from '@/components/ArrangedTabs';
 import { type PluginPageData, PluginPageProvider } from '@/components/plugins/PluginPage';
 import { ui } from '@/components/ui';
-import { type GenericSlot, KINDS, type PageKind } from '@/lib/kinds';
+import { type GenericSlot, KINDS, type PageAddress, type PageKind } from '@/lib/kinds';
 import { ReviewBlur } from '@/components/paper/ReviewBlur';
 import type { ReviewVenue } from '@/server/under-review';
 import type { BuiltPanel } from './common';
@@ -29,6 +29,7 @@ export function PageView({
   after,
   reviewAt = [],
   claimPath = null,
+  repo,
 }: {
   kind: PageKind;
   /** For the Analytics tab its owners see (`Analytics.tsx`). */
@@ -43,6 +44,8 @@ export function PageView({
   reviewAt?: ReviewVenue[];
   /** Where to claim it: anyone but its owners sees the Analytics tab locked, pointing there. */
   claimPath?: string | null;
+  /** Where its repo is, for the Repo tab; none for a kind without files (a person's page). */
+  repo?: { address: PageAddress; clone: { https: string; ssh: string | null } };
 }) {
   const slot = (name: GenericSlot) => `${kind}.${name}`;
   return (
@@ -58,6 +61,7 @@ export function PageView({
               panels={panels.tabs}
               pageId={pageId}
               claimPath={claimPath}
+              repo={repo}
               lead={{
                 title: KINDS[kind].title,
                 node: (

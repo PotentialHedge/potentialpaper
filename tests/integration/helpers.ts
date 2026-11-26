@@ -24,6 +24,8 @@ import * as workspaceBlob from '@/app/api/v1/workspace/blob/route';
 import * as workspaceCommit from '@/app/api/v1/workspace/commit/route';
 import * as workspaceRebase from '@/app/api/v1/workspace/rebase/route';
 import * as workspaceFiles from '@/app/api/v1/workspace/files/route';
+import * as repoFolder from '@/app/api/v1/repo/route';
+import * as repoFile from '@/app/api/v1/repo/file/route';
 import * as claims from '@/app/api/v1/claims/route';
 import * as agentCode from '@/app/api/v1/agent/code/route';
 import * as agentToken from '@/app/api/v1/agent/token/route';
@@ -131,6 +133,8 @@ const ROUTES: [RegExp, any][] = [
   [/^\/workspace\/commit$/, workspaceCommit],
   [/^\/workspace\/rebase$/, workspaceRebase],
   [/^\/workspace\/files$/, workspaceFiles],
+  [/^\/repo(\?.*)?$/, repoFolder],
+  [/^\/repo\/file(\?.*)?$/, repoFile],
   [/^\/claims(\?.*)?$/, claims],
   [/^\/claims\/code$/, claimCode],
   [/^\/claims\/code\/confirm$/, claimCodeConfirm],

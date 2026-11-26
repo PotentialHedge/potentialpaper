@@ -1,12 +1,13 @@
 'use client';
 
 import { track } from '@/lib/track';
-import { type ReactNode, useState } from 'react';
+import { type ReactNode, useEffect, useState } from 'react';
 import { AnalyticsPanel, usePageAnalytics } from '@/components/pages/Analytics';
+import { REPO_HASH, RepoTab, repoWhere } from '@/components/pages/RepoTab';
 import { usePluginPanels } from '@/components/plugins/PluginPanel';
 import { LockIcon, LockOpenIcon } from '@/components/icons';
 import { ui } from '@/components/ui';
-import { type ClaimPolicy, KINDS } from '@/lib/kinds';
+import { type ClaimPolicy, KINDS, type PageAddress } from '@/lib/kinds';
 import { arrangePanels, type PanelKind } from '@/lib/panels';
 import { useSetting } from '@/lib/settings/client';
 
@@ -25,6 +26,7 @@ export function ArrangedTabs({
   lead,
   pageId,
   claimPath,
+  repo,
 }: {
   kind: PanelKind;
   /** The slot's full name (`venue.tabs`), for plugins' panels, which join as tabs of their own. */
@@ -34,6 +36,8 @@ export function ArrangedTabs({
   pageId?: string;
   /** Where to claim the page (`OwnersInfo.claimPath`): anyone else sees its Analytics tab locked, pointing there. */
   claimPath?: string | null;
+  /** A page with files gets a Repo tab, its git repository browsed (`RepoTab`), loaded only once opened. */
+  repo?: { address: PageAddress; clone: { https: string; ssh: string | null } };
 }) {
   const analytics = usePageAnalytics(pageId);
   const hidden = useSetting<string[]>(`${kind}.panels.hidden`);
@@ -51,6 +55,11 @@ export function ArrangedTabs({
     hidden,
     order,
   );
+  const REPO = '\0repo';
+  if (repo) {
+    panels.push({ id: REPO, title: 'Repo', hint: 'The page’s files, as git has them', node: <RepoTab {...repo} /> });
+    ids.push(REPO);
+  }
   const ANALYTICS = '\0analytics';
   // Only the page's owners see its analytics: on a person's page, that is only them. Anyone else sees the tab locked,
   // and opening it says how to become an owner.
@@ -74,6 +83,18 @@ export function ArrangedTabs({
     ids.push(ANALYTICS);
   }
   const [chosen, setChosen] = useState<string | null>(null);
+  const hasRepo = !!repo;
+  // A link into the repo (`#repo/…`) opens its tab, on arrival and as the reader goes back and forth.
+  useEffect(() => {
+    if (!hasRepo) return;
+    const onHash = () => {
+      const inRepo = repoWhere(window.location.hash) !== null;
+      setChosen((was) => (inRepo ? REPO : was === REPO ? null : was));
+    };
+    onHash();
+    window.addEventListener('hashchange', onHash);
+    return () => window.removeEventListener('hashchange', onHash);
+  }, [hasRepo]);
   const LEAD = '';
   const tabs = lead ? [LEAD, ...ids] : ids;
   const shown = tabs.includes(chosen ?? '\0') ? chosen! : tabs[0];
@@ -93,8 +114,21 @@ export function ArrangedTabs({
               title={id === LEAD ? undefined : byId.get(id)!.hint}
               onClick={() => {
                 setChosen(id);
+                // The repo's place is in the address (`RepoTab`); leaving its tab leaves it, as a new entry, so the
+                // back button comes back to it.
+                const inRepo = repoWhere(window.location.hash) !== null;
+                if (id === REPO && !inRepo) history.pushState(null, '', REPO_HASH);
+                if (id !== REPO && inRepo)
+                  history.pushState(null, '', window.location.pathname + window.location.search);
                 track('tab_opened', {
-                  target: id === ANALYTICS ? (locked ? 'analytics_locked' : 'analytics') : id || 'lead',
+                  target:
+                    id === ANALYTICS
+                      ? locked
+                        ? 'analytics_locked'
+                        : 'analytics'
+                      : id === REPO
+                        ? 'repo'
+                        : id || 'lead',
                 });
               }}
               className={`-mb-px cursor-pointer border-b-2 pb-1 ${id === shown ? `border-ink ${ui.on}` : 'border-transparent text-muted'} ${id !== LEAD && byId.get(id)!.locked ? 'opacity-60' : ''}`}

@@ -17,11 +17,14 @@ export function EditorHost({
   frameSrc,
   editorName,
   pagePath,
+  openPath,
 }: {
   page: PageRef;
   frameSrc: string;
   editorName: string;
   pagePath: string;
+  /** A file to open once the editor has loaded the page (`/code/…?file=`). */
+  openPath?: string;
 }) {
   const [committed, setCommitted] = useState(false);
   /** The editor has loaded the page's files (its `ready`); until then a notice covers its frame. */
@@ -31,9 +34,15 @@ export function EditorHost({
 
   useEffect(() => {
     const channel = new BroadcastChannel(editorChannelName({ scheme: page.scheme, value: page.value }));
+    let opened = false;
     channel.onmessage = (event: MessageEvent<EditorMessage>) => {
       const message = event.data;
-      if (message?.type === 'ready') setReady(true);
+      if (message?.type === 'ready') {
+        setReady(true);
+        // Once: `ready` comes again whenever the host page says hello.
+        if (openPath && !opened) channel.postMessage({ type: 'open', path: openPath } satisfies HostMessage);
+        opened = true;
+      }
       if (message?.type === 'committed') {
         setCommitted(true);
         track('edit_saved', { target: 'web_editor' });
@@ -45,7 +54,7 @@ export function EditorHost({
       channel.close();
       clearTimeout(timer);
     };
-  }, [page.scheme, page.value]);
+  }, [page.scheme, page.value, openPath]);
 
   return (
     <div className="flex min-h-0 flex-1 flex-col">

@@ -192,6 +192,7 @@ export async function PaperRoute({ scheme, segments }: { scheme: PaperScheme; se
       pageId={paper.id}
       claimPath={owners?.claimPath}
       kind="paper"
+      repo={{ address: shown, clone: cloneAddresses(canonical) }}
       reviewAt={reviewAt}
       plugins={plugins}
       panels={buildPanels('paper', PAPER_PANELS, props)}

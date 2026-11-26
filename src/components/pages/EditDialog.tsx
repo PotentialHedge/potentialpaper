@@ -3,8 +3,8 @@
 import { track } from '@/lib/track';
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { AgentPromptField } from '@/components/AgentPromptField';
-import { CopyField } from '@/components/CopyField';
 import { PencilIcon, WITH_ICON } from '@/components/icons';
+import { CloneCommand, type CloneVia, TerminalLine } from './CloneCommand';
 import { ui } from '@/components/ui';
 import { setupPrompt } from '@/lib/agent-prompt';
 
@@ -44,7 +44,6 @@ const DECLINED = 'pp:edit:no-extension';
 
 export function EditDialog({ pagePath, codePath, clone, form }: EditOptions) {
   const dialog = useRef<HTMLDialogElement>(null);
-  const [via, setVia] = useState<'https' | 'ssh'>('https');
   const [offer, setOffer] = useState(false);
   const [prompt, setPrompt] = useState('');
 
@@ -92,7 +91,7 @@ export function EditDialog({ pagePath, codePath, clone, form }: EditOptions) {
     if (OPENS.test(window.location.hash))
       history.replaceState(null, '', window.location.pathname + window.location.search);
   };
-  const onCopied = () => {
+  const onCopied = (via: CloneVia) => {
     track('edit_clone_copied', { target: via });
     let declined = false;
     try {
@@ -111,7 +110,6 @@ export function EditDialog({ pagePath, codePath, clone, form }: EditOptions) {
     }
   };
 
-  const address = via === 'ssh' ? clone.ssh : clone.https;
   return (
     <>
       <button type="button" className={`${ui.linkBtn} ${WITH_ICON}`} onClick={open}>
@@ -155,41 +153,7 @@ export function EditDialog({ pagePath, codePath, clone, form }: EditOptions) {
           </div>
 
           <h3 className={`${ui.runIn} mt-5 block`}>Or clone it with git</h3>
-          <div className="mt-1 flex items-center gap-2 text-xs text-muted">
-            <span>Run in a terminal:</span>
-            <span className="flex-1" />
-            <div role="tablist" aria-label="Clone over" className="inline-flex border border-rule">
-              {(['https', 'ssh'] as const).map((v) => (
-                <button
-                  key={v}
-                  type="button"
-                  role="tab"
-                  aria-selected={via === v}
-                  onClick={() => setVia(v)}
-                  className={`cursor-pointer px-2 py-0.5 not-first:border-l not-first:border-rule ${via === v ? 'bg-tint text-ink' : 'text-accent'}`}
-                >
-                  {v.toUpperCase()}
-                </button>
-              ))}
-            </div>
-          </div>
-          {address ? (
-            <TerminalLine text={`git clone ${address}`} onCopied={onCopied} />
-          ) : (
-            <p className="mt-2 text-muted">Cloning over SSH isn&apos;t open yet. Use HTTPS for now.</p>
-          )}
-          <p className={ui.fine}>
-            Needs <a href="https://git-lfs.com">Git LFS</a>.{' '}
-            {via === 'ssh' ? (
-              <>
-                To push, add an SSH key on <a href="/profile#ssh-keys">your profile</a>.
-              </>
-            ) : (
-              <>
-                To push, use an API key from <a href="/profile#agents">your profile</a> as the password.
-              </>
-            )}
-          </p>
+          <CloneCommand clone={clone} onCopied={onCopied} />
           {offer && <ExtensionOffer onDecline={decline} />}
 
           <h3 className={`${ui.runIn} mt-5 block`}>Or let your agent set it up</h3>
@@ -238,15 +202,6 @@ function ExtensionOffer({ onDecline }: { onDecline: () => void }) {
           no thanks
         </button>
       </p>
-    </div>
-  );
-}
-
-/** A shell command to copy (`CopyField`, with `$` in front). */
-function TerminalLine({ text, onCopied }: { text: string; onCopied?: () => void }) {
-  return (
-    <div className="mt-2">
-      <CopyField value={text} label="Command" marker="shell" onCopied={onCopied} />
     </div>
   );
 }

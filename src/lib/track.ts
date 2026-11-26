@@ -131,6 +131,13 @@ export type EventName =
   | 'plugin_link_opened'
   | 'plugin_consent_dismissed'
   | 'tab_opened'
+  // a page's Repo tab: a folder opened (`step` its depth, 0 for the top), a file opened (`target` what it shows as:
+  // 'section' | 'readme' | 'markdown' | 'json' | 'text' | 'pdf' | 'image' | 'other'), never its path; the clone
+  // command copied there (`target` 'https' | 'ssh'), the web editor opened from it at a file
+  | 'repo_folder_opened'
+  | 'repo_file_opened'
+  | 'repo_clone_copied'
+  | 'repo_edit_opened'
   // managing plugins (`lib/plugins/client.ts`, so from wherever it is done), and settings
   | 'plugin_installed'
   | 'plugin_install_refused'

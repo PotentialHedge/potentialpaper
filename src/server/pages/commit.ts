@@ -1,7 +1,7 @@
 import { and, eq, max, sql } from 'drizzle-orm';
 import { getDb, type Database } from '@/db';
 import { pgErrorCode } from '@/db/errors';
-import { pageEvents, pageRefs, pageRevisions, papers } from '@/db/schema';
+import { pageEvents, pageRefs, pageRevisions } from '@/db/schema';
 import { ApiError } from '../api/errors';
 import { EVENTS_CHANNEL } from '../consumers/types';
 import { pageRepo } from '../git/repo';
@@ -21,17 +21,14 @@ import {
   takeCommit,
 } from './check';
 import { KINDS, type KeyedKind } from '@/lib/kinds';
-import { encodePaperFile, paperFileOf } from '@/lib/paper-file';
 import { buildTrees, type Commit, type EditKind, encodeCommit, gitObject, type GitObject } from './git-objects';
 import { mergeFile, type Version } from './merge';
 import { lockPage, writeCurrent, writeRevision, type Writer } from './projections';
 import { changedFiles, findCommit, readCommit, readFiles, readHead, readText, toBytes } from './repo';
 import {
   cleanSummary,
-  GITATTRIBUTES,
   GITATTRIBUTES_PATH,
   layoutProblem,
-  LAYOUT_VERSION,
   METADATA_PATH,
   normalizePath,
   PREK_PATH,
@@ -39,7 +36,7 @@ import {
 } from './rules';
 import { insertPage, mustPage, type PageRow } from './kinds';
 import { refreshPages } from './refresh';
-import { starterFiles } from './starter';
+import { firstCommitFiles, starterFiles } from './starter';
 
 export { type Actor, COMMIT_RATE_LIMIT, newIdentity, SYSTEM_ACTOR } from './check';
 
@@ -86,24 +83,6 @@ export interface CommitOptions {
    * however many, on a merged page too. What it writes is still checked. System only.
    */
   migration?: boolean;
-}
-
-/**
- * The first commit's `metadata.json` (DESIGN.md §4.2), with the layout the repo starts in (`rules.ts`): what the page
- * is, its kind and key, whatever its kind. Stable, so that it hashes the same when unchanged.
- */
-async function metadataSnapshot(tx: Writer, pageId: string): Promise<string> {
-  const page = await mustPage(tx, pageId);
-  return `${JSON.stringify({ layout: LAYOUT_VERSION, kind: page.kind, key: page.key }, null, 2)}\n`;
-}
-
-/**
- * A paper's first `paper.json`, from its row as the paper's source filled it in (`server/papers.ts`, an import). From
- * then on the file is what the paper is, and the row its projection.
- */
-async function firstPaperFile(tx: Writer, pageId: string): Promise<string> {
-  const [paper] = await tx.select().from(papers).where(eq(papers.id, pageId));
-  return encodePaperFile(paperFileOf(paper));
 }
 
 function normalizeChanges(changes: readonly FileChange[], migration: boolean): FileChange[] {
@@ -277,19 +256,15 @@ export async function commitPage(
       // whoever's edit starts it, so they are checked as there. An edit to a starter file replaces it.
       const before = new Map(headFiles);
       if (isFirstCommit) {
-        const start: [string, () => Promise<string>][] = [
-          [METADATA_PATH, () => metadataSnapshot(tx, pageId)],
-          ...(roles.kind === 'paper' && !changes.some((change) => change.path === KINDS.paper.kindFile)
-            ? [[KINDS.paper.kindFile, () => firstPaperFile(tx, pageId)] as [string, () => Promise<string>]]
-            : []),
-          [GITATTRIBUTES_PATH, async () => GITATTRIBUTES],
-          ...starterFiles(roles.kind)
-            .filter(([path]) => !changes.some((change) => change.path === path))
-            .map(([path, content]): [string, () => Promise<string>] => [path, async () => content]),
-        ];
-        for (const [path, make] of start) {
+        // What `firstCommitFiles` gives, less what the edit itself says of a file it may write (its `paper.json`, an
+        // empty section): the metadata and `.gitattributes` are always the system's.
+        const start = (await firstCommitFiles(tx, pageId)).filter(
+          ([path]) =>
+            path === METADATA_PATH || path === GITATTRIBUTES_PATH || !changes.some((change) => change.path === path),
+        );
+        for (const [path, content] of start) {
           if (files.has(path)) continue;
-          const blob = gitObject('blob', Buffer.from(await make()));
+          const blob = gitObject('blob', Buffer.from(content));
           blobs.push(blob);
           files.set(path, blob.oid);
           before.set(path, blob.oid);

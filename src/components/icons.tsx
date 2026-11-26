@@ -185,3 +185,21 @@ export function ChevronDownIcon({ className = 'size-3' }: { className?: string }
     </svg>
   );
 }
+
+/** A folder: a directory of a page's repo. */
+export function FolderIcon({ className = 'size-3.5' }: { className?: string }) {
+  return (
+    <svg {...line} className={className}>
+      <path d="M1.5 4V12.5h13V5.5H7.5L6 4z" />
+    </svg>
+  );
+}
+
+/** A sheet with a folded corner: a file of a page's repo. */
+export function FileIcon({ className = 'size-3.5' }: { className?: string }) {
+  return (
+    <svg {...line} className={className}>
+      <path d="M3.5 1.5h6l3 3v10h-9zM9.5 1.5v3h3" />
+    </svg>
+  );
+}

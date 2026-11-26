@@ -4,6 +4,7 @@ import type { Account, Affiliation } from '@/db/schema';
 import { searchHandles, updateProfile } from '../accounts';
 import { addAffiliation, listAffiliations, removeAffiliation, verifyAffiliation } from '../affiliations';
 import { authenticate, requireAuth, requireSession, requireVerified, viewerFromHeaders, type Principal } from '../auth';
+import { readRepoFile, readRepoFolder } from '../pages/browse';
 import { cloneAddresses } from '../pages/clone';
 import { shortIdOf } from '../share';
 import { commitWorkspace, readBlob, readWorkspace, rebaseWorkspace, storeWorkspaceFile } from '../workspace';
@@ -26,7 +27,8 @@ import { addSshKey, listSshKeys, removeSshKey } from '../ssh-keys';
 import { previewDemoSources } from '../demos/attach';
 import { snapshotDemo } from '../demos/snapshot';
 import { CONTENT_HOSTNAME, demoUrl, isContentHost } from '@/lib/demos';
-import { addressOfRef, formatIdentifier, keyedPagePath, pagePath, pageRefOf } from '@/lib/kinds';
+import { addressOfRef, formatIdentifier, keyedPagePath, KINDS, pagePath, pageRefOf } from '@/lib/kinds';
+import { NO_REPO } from '../pages/rules';
 import {
   addCoAuthor,
   answerInvitation,
@@ -979,6 +981,38 @@ export const getWorkspaceBlob = route(async (req) => {
       'Content-Disposition': 'attachment',
     },
   });
+});
+
+/** The page behind a Repo tab's request: any kind with files (a person's page has none). */
+async function repoPage(req: Request) {
+  const { path, ...ref } = parseQuery(req, S.RepoQuery);
+  const { page, address } = await knownPage(ref);
+  if (!KINDS[address.kind].repo) throw new ApiError(404, 'not_found', NO_REPO);
+  return { page, path };
+}
+
+/**
+ * A folder of a page's repo at its head, with the latest commit and the folder's README, for the page's Repo tab.
+ * Public, as a clone is; never cached, so the tab shows a commit as soon as it is made.
+ */
+export const getRepoFolder = route(async (req) => {
+  const { page, path } = await repoPage(req);
+  const folder = await readRepoFolder(page.id, path);
+  return respond(
+    S.RepoFolderResponse,
+    {
+      ...folder,
+      head: folder.head && { ...folder.head, at: folder.head.at.toISOString() },
+      entries: folder.entries.map((e) => ({ ...e, last: e.last && { ...e.last, at: e.last.at.toISOString() } })),
+    },
+    { headers: { 'Cache-Control': 'no-store' } },
+  );
+});
+
+/** One file of a page's repo at its head, as the Repo tab shows it. */
+export const getRepoFile = route(async (req) => {
+  const { page, path } = await repoPage(req);
+  return respond(S.RepoFileResponse, await readRepoFile(page.id, path), { headers: { 'Cache-Control': 'no-store' } });
 });
 
 export const postWorkspaceCommit = route(async (req) => {
