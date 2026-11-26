@@ -71,6 +71,10 @@ export type EventName =
   | 'review_comments_opened'
   | 'review_comments_more'
   | 'section_toggled'
+  // a link in what a page's people wrote followed (`trackLinks`): `target` is where ('abstract' | 'owners' |
+  // 'community' | 'comment' | 'review'), `kind` whether it leads off the site, to this site, or within the page,
+  // `domain` the other site's host
+  | 'link_followed'
   // the discussion under a page
   | 'comment_previewed'
   | 'comment_posted'
@@ -137,6 +141,8 @@ export interface EventData {
    * address, so the list can grow where people are turned away.
    */
   domain?: string;
+  /** A followed link: 'external' (then `domain` is its host, like `github.com`: published, about no one) | 'internal' | 'anchor'. */
+  kind?: 'external' | 'internal' | 'anchor';
   /** Follow: whether the page is now followed. */
   following?: boolean;
   signedIn?: boolean;
@@ -182,4 +188,41 @@ export function track(name: EventName, data?: EventData, attempt = 0): void {
 /** A plugin as events name it: its id, or 'dev' for one served from the reader's own machine, unpublished. */
 export function pluginLabel(p: { from: string; plugin?: { id: string } | null }): string | undefined {
   return p.from === 'dev' ? 'dev' : p.plugin?.id;
+}
+
+/** Where a link sits, for `link_followed`: set as `data-link-area` on the element around what people wrote. */
+export type LinkArea = 'abstract' | 'owners' | 'community' | 'comment' | 'review';
+
+/**
+ * Counts links followed out of what people wrote (`data-link-area`): one listener for the whole document, since that
+ * text is Markdown rendered to HTML, with no component per link. A click, a middle-click or ⌘/Ctrl-click; links that
+ * count themselves (`data-umami-event`) are left to that. Returns its cleanup.
+ */
+export function trackLinks(): () => void {
+  const onClick = (e: MouseEvent) => {
+    if (e.button > 1 || !(e.target instanceof Element)) return;
+    const link = e.target.closest<HTMLAnchorElement>('a[href]');
+    const area = link?.closest<HTMLElement>('[data-link-area]')?.dataset.linkArea;
+    if (!link || !area || link.closest('[data-umami-event]')) return;
+    let url: URL;
+    try {
+      url = new URL(link.href, window.location.href);
+    } catch {
+      return;
+    }
+    const here = window.location;
+    const external = url.origin !== here.origin;
+    const anchor = !external && url.pathname === here.pathname && url.search === here.search && !!url.hash;
+    track('link_followed', {
+      target: area,
+      kind: external ? 'external' : anchor ? 'anchor' : 'internal',
+      ...(external && { domain: url.hostname.replace(/^www\./, '') }),
+    });
+  };
+  document.addEventListener('click', onClick, true);
+  document.addEventListener('auxclick', onClick, true);
+  return () => {
+    document.removeEventListener('click', onClick, true);
+    document.removeEventListener('auxclick', onClick, true);
+  };
 }

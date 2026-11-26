@@ -496,7 +496,11 @@ function CommentItem({
       {c.removed ? (
         <p className="mt-1 text-sm text-muted italic">Removed by its author.</p>
       ) : (
-        <div className="md comment-md mt-1" dangerouslySetInnerHTML={{ __html: c.html ?? '' }} />
+        <div
+          className="md comment-md mt-1"
+          data-link-area="comment"
+          dangerouslySetInnerHTML={{ __html: c.html ?? '' }}
+        />
       )}
       {!c.removed && (onReply || c.author.isYou) && (
         <div className="mt-1 flex flex-wrap items-baseline gap-x-3 font-sans text-xs text-muted">

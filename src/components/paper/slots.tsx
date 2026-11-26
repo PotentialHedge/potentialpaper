@@ -60,7 +60,7 @@ function Abstract({ paper, facts }: PanelProps) {
   return (
     <>
       {tldr}
-      <AbstractText text={paper.abstract} />
+      <AbstractText text={paper.abstract} area="abstract" />
     </>
   );
 }

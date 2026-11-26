@@ -130,7 +130,11 @@ function Sections({ fields }: { fields: ShownField[] }) {
       <div key={field.key} className="mt-2 text-[15px]">
         {/* A comment's one passage needs no label. */}
         {field.key !== 'comment' && <h5 className="font-sans text-[13px] font-semibold text-subtle">{field.label}</h5>}
-        <div className="md comment-md break-words" dangerouslySetInnerHTML={{ __html: renderSourceText(field.text) }} />
+        <div
+          className="md comment-md break-words"
+          data-link-area="review"
+          dangerouslySetInnerHTML={{ __html: renderSourceText(field.text) }}
+        />
       </div>
     ));
 }

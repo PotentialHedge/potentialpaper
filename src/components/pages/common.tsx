@@ -21,6 +21,7 @@ import type { PageLink } from '@/server/page-links';
 import { LinksBox } from './LinkLists';
 import { OwnClaimStatus } from './OwnClaimStatus';
 import { ForOwners } from './ForOwners';
+import type { LinkArea } from '@/lib/track';
 
 /**
  * What every kind of page has, and the panels that show it the same way on each (`lib/panels.ts`): its sections, as
@@ -104,8 +105,8 @@ const COMMUNITY_INVITE: Partial<Record<PageKind, { title: string; hint: string }
 };
 const INVITE = { title: 'Know something about this?', hint: 'Write what would help the next reader.' };
 
-function Html({ html }: { html: string }) {
-  return <div className="md" dangerouslySetInnerHTML={{ __html: html }} />;
+function Html({ html, area }: { html: string; area: LinkArea }) {
+  return <div className="md" data-link-area={area} dangerouslySetInnerHTML={{ __html: html }} />;
 }
 
 /** A part's small label, with its edit links: "From the authors: Ada Lovelace · edit". */
@@ -186,7 +187,7 @@ export function Sections({ kind, address, ownersHtml, communityHtml, owners }: P
           ) : (
             label
           )}
-          {ownersHtml && <Html html={ownersHtml} />}
+          {ownersHtml && <Html html={ownersHtml} area="owners" />}
           {/* The plugins' panels a paper's authors let in (`paper.author`, `owners/plugins.json`). */}
           {kind === 'paper' && (
             <div className="flow-root">
@@ -207,7 +208,7 @@ export function Sections({ kind, address, ownersHtml, communityHtml, owners }: P
             </PartLabel>
           )}
           {communityHtml ? (
-            <Html html={communityHtml} />
+            <Html html={communityHtml} area="community" />
           ) : (
             // Its owners are asked to write their own part instead.
             <ForOwners owner={null}>

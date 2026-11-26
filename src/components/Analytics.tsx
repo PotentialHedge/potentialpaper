@@ -2,6 +2,7 @@
 
 import { useEffect } from 'react';
 import { analyticsUrl, UMAMI_DOMAIN, UMAMI_SCRIPT, UMAMI_WEBSITE_ID } from '@/lib/analytics';
+import { trackLinks } from '@/lib/track';
 
 const BEFORE_SEND = 'potentialPaperBeforeSend';
 
@@ -37,5 +38,6 @@ export function Analytics() {
     script.dataset.errors = 'true';
     document.head.appendChild(script);
   }, []);
+  useEffect(trackLinks, []);
   return null;
 }
