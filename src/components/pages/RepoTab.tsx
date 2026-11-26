@@ -208,12 +208,6 @@ function Header({
   const who = head ? (head.authorName ?? (head.handle ? `@${head.handle}` : 'potentialpaper')) : null;
   return (
     <>
-      {folder?.placeholder && (
-        <p className="mb-3 border border-frame bg-tint px-3 py-2 text-[13px] text-subtle">
-          <strong className="text-ink">This repository doesn&apos;t exist yet.</strong> It is created the first time
-          someone clones or edits the page, and starts with the files below.
-        </p>
-      )}
       <div className="flex flex-wrap items-baseline gap-x-3 gap-y-1 border border-frame bg-card px-3 py-2 text-[13px]">
         {head ? (
           <span className="min-w-0 flex-1 basis-64 truncate">
