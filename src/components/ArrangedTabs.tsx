@@ -1,7 +1,7 @@
 'use client';
 
 import { track } from '@/lib/track';
-import { type ReactNode, useEffect, useState } from 'react';
+import { type ReactNode, useEffect, useState, useSyncExternalStore } from 'react';
 import { AnalyticsPanel, usePageAnalytics } from '@/components/pages/Analytics';
 import { REPO_HASH, RepoTab, repoWhere } from '@/components/pages/RepoTab';
 import { usePluginPanels } from '@/components/plugins/PluginPanel';
@@ -15,6 +15,9 @@ import { useSetting } from '@/lib/settings/client';
  * A `<kind>.tabs` slot: its panels as the reader's settings arrange them (as `ArrangedPanels`), shown one at a
  * time under a row of tabs, or alone when there is one. Panels are rendered on the server, the same for every
  * reader; only which one shows is decided here.
+ *
+ * The open tab is in the URL's hash (`#papers`, `#analytics`, `#repo/…`; none for the first), so it survives a reload
+ * and a shared link opens it. Umami ignores the hash, so a tab is no page view (its `tab_opened` event counts it).
  *
  * With `lead`, that comes first as a tab of its own, which settings don't move or hide (a paper page's "Paper": the
  * page itself, which a plugin's tab is shown in place of). It stays mounted while another tab shows.
@@ -82,23 +85,26 @@ export function ArrangedTabs({
     order,
   );
   const [chosen, setChosen] = useState<string | null>(null);
-  const hasRepo = !!repo;
-  // A link into the repo (`#repo/…`) opens its tab, on arrival and as the reader goes back and forth.
-  useEffect(() => {
-    if (!hasRepo) return;
-    const onHash = () => {
-      const inRepo = repoWhere(window.location.hash) !== null;
-      setChosen((was) => (inRepo ? REPO : was === REPO ? null : was));
-    };
-    onHash();
-    window.addEventListener('hashchange', onHash);
-    return () => window.removeEventListener('hashchange', onHash);
-  }, [hasRepo]);
-  // A link into the repo opens it even where the reader hid its tab.
-  if (chosen === REPO && repo && !ids.includes(REPO)) ids.push(REPO);
+  // The tab the URL names wins (a shared link, a link to another tab on this page, the back button); a plugin's tab
+  // may arrive after the page, and opens then. A link into the repo (`#repo/…`) opens its tab, even where the
+  // reader hid it.
+  const linked = hashTab(useSyncExternalStore(onHashChange, () => location.hash, () => ''));
+  if (linked === REPO && repo && !ids.includes(REPO)) ids.push(REPO);
   const LEAD = '';
   const tabs = lead ? [LEAD, ...ids] : ids;
-  const shown = tabs.includes(chosen ?? '\0') ? chosen! : tabs[0];
+  const shown = [linked, chosen].find((id) => id !== null && tabs.includes(id)) ?? tabs[0];
+  // A hash that names no tab is an anchor within the one open, which stays open; no hash (back to the page as it
+  // opened) is the first tab.
+  const key = tabs.join('\0');
+  useEffect(() => {
+    const follow = () => {
+      const id = hashTab(location.hash);
+      if (id !== null && key.split('\0').includes(id)) setChosen(id);
+      else if (id === null) setChosen(null);
+    };
+    window.addEventListener('hashchange', follow);
+    return () => window.removeEventListener('hashchange', follow);
+  }, [key]);
   if (shown === undefined) return null;
   const byId = new Map(panels.map((p) => [p.id, p]));
   const title = (id: string) => (id === LEAD ? lead!.title : byId.get(id)!.title);
@@ -115,12 +121,16 @@ export function ArrangedTabs({
               title={id === LEAD ? undefined : byId.get(id)!.hint}
               onClick={() => {
                 setChosen(id);
-                // The repo's place is in the address (`RepoTab`); leaving its tab leaves it, as a new entry, so the
-                // back button comes back to it.
+                // The tab goes in the hash, replacing the last one. The repo's place is in it too (`RepoTab`), so
+                // entering or leaving the repo is a new entry, and the back button comes back to it.
                 const inRepo = repoWhere(window.location.hash) !== null;
-                if (id === REPO && !inRepo) history.pushState(null, '', REPO_HASH);
-                if (id !== REPO && inRepo)
-                  history.pushState(null, '', window.location.pathname + window.location.search);
+                if (id === REPO) {
+                  if (!inRepo) history.pushState(null, '', REPO_HASH);
+                } else {
+                  const url = `${location.pathname}${location.search}${id && id !== tabs[0] ? `#${encodeURIComponent(id)}` : ''}`;
+                  if (inRepo) history.pushState(null, '', url);
+                  else history.replaceState(history.state, '', url);
+                }
                 track('tab_opened', {
                   target:
                     id === ANALYTICS
@@ -153,6 +163,25 @@ export function ArrangedTabs({
       {shown !== LEAD && <div role={tabs.length > 1 ? 'tabpanel' : undefined}>{byId.get(shown)!.node}</div>}
     </section>
   );
+}
+
+/** The tab a hash names: `repo` for any place in the repo, else its id; `null` for none. */
+function hashTab(hash: string): string | null {
+  if (repoWhere(hash) !== null) return 'repo';
+  try {
+    return decodeURIComponent(hash.slice(1)) || null;
+  } catch {
+    return null;
+  }
+}
+
+function onHashChange(update: () => void) {
+  window.addEventListener('hashchange', update);
+  window.addEventListener('popstate', update);
+  return () => {
+    window.removeEventListener('hashchange', update);
+    window.removeEventListener('popstate', update);
+  };
 }
 
 /** What claiming a page is called, by how its owners are confirmed. */
