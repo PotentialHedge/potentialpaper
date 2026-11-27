@@ -14,7 +14,8 @@ export interface PluginPageData {
   kind: PageKind;
   page: PageSummary;
   scopes: PageSummary[];
-  facts: { hasScores: boolean; hasSubmissions: boolean; hasSignals: boolean };
+  /** `hasPresentations`: a paper with a time it is presented at a venue (`page.hasPresentations`). */
+  facts: { hasScores: boolean; hasSubmissions: boolean; hasSignals: boolean; hasPresentations?: boolean };
   /** A paper's `owners/plugins.json`: the panels its authors let into the author section. */
   authorPanels?: AuthorPanel[];
 }

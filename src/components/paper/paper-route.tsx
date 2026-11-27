@@ -186,6 +186,9 @@ export async function PaperRoute({ scheme, segments }: { scheme: PaperScheme; se
       hasSubmissions: submissions.length > 0,
       hasScores: submissionsHaveScores(submissions),
       hasSignals,
+      hasPresentations: (current?.versions ?? []).some((v) =>
+        (v.submissions ?? []).some((s) => (s.presentations?.length ?? 0) > 0),
+      ),
     },
     authorPanels: current?.authorPlugins ?? [],
   };

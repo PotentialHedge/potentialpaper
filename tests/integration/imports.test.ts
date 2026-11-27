@@ -7,7 +7,9 @@ import { getDb } from '@/db';
 import { accounts, pageCurrent, venues as venuesTable } from '@/db/schema';
 import { ensureBot, grantBot, OPENREVIEW_BOT } from '@/server/bots';
 import { findKeyedPage } from '@/server/pages/kinds';
+import { runConsumer } from '@/server/consumers/run';
 import { findPaper } from '@/server/papers';
+import { reviewsConsumer } from '@/server/review-projection';
 import { mintToken } from '@/server/tokens';
 import { versionsAt } from '@/server/versions';
 import { api, closePool, grantVenuesBot, resetDatabase, signUp } from './helpers';
@@ -65,6 +67,44 @@ beforeEach(async () => {
 afterAll(closePool);
 
 describe('the import API', () => {
+  it("writes a venue's schedule into the imported entry, and an import of its reviews keeps it", async () => {
+    const token = await botToken();
+    await grantBot(OPENREVIEW_BOT, 'reviews/openreview/**', { grantedBy: 'system' });
+    await api('POST', '/imports/papers', { token, body: PAPERS });
+    const body = { venue: VENUE, submissions: [submission()] };
+    await api('POST', '/imports/submissions', { token, body });
+
+    const poster = {
+      kind: 'Poster',
+      session: 'Poster Session 1',
+      room: 'Hall 1 - 4',
+      board: '#S12',
+      start: '2026-12-08T10:00:00+11:00',
+      end: '2026-12-08T13:00:00+11:00',
+    };
+    const schedule = {
+      source: 'openreview',
+      submissions: [
+        { externalId: 'forum1', presentations: [poster] },
+        { externalId: 'missing', presentations: [poster] },
+      ],
+    };
+    const written = await api('POST', '/imports/presentations', { token, body: schedule });
+    expect(written.body).toMatchObject({ submissions: 1, skipped: 1, committed: 1, failed: [] });
+    expect((await api('POST', '/imports/presentations', { token, body: schedule })).body).toMatchObject({
+      unchanged: 1,
+    });
+    // The reviews' import doesn't know the schedule, and keeps it.
+    await api('POST', '/imports/submissions', { token, body: { venue: VENUE, submissions: [submission(2)] } });
+
+    const found = await findPaper({ scheme: 'openreview', value: 'forum1' });
+    const { versions } = await versionsAt(found!.paper.id);
+    expect(versions[0].submissions![0]).toMatchObject({ decision: 'Accept (Poster)', presentations: [poster] });
+    expect(await runConsumer(reviewsConsumer, { retryNow: true })).toMatchObject({ status: 'caught-up' });
+    const forPlugins = await api('GET', '/pages/openreview:forum1/submissions');
+    expect(forPlugins.body.submissions[0]).toMatchObject({ presentations: [poster] });
+  });
+
   it("is a bot's token only: not a person's, not a bot without grants", async () => {
     const cookie = await signUp('ada@ethz.ch');
     expect((await api('POST', '/imports/papers', { cookie, body: PAPERS })).status).toBe(403);
@@ -81,7 +121,7 @@ describe('the import API', () => {
 
     const added = await api('POST', '/imports/papers', { token, body: PAPERS });
     expect(added).toMatchObject({ status: 200, body: { added: 1 } });
-    expect((await api('POST', '/imports/papers', { token, body: PAPERS })).body).toEqual({ added: 0 });
+    expect((await api('POST', '/imports/papers', { token, body: PAPERS })).body).toEqual({ added: 0, named: 0 });
 
     const listed = await api('GET', '/imports/papers?scheme=openreview', { token });
     expect(listed.body).toMatchObject({

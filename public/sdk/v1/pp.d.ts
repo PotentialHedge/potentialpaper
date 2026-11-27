@@ -148,6 +148,29 @@ declare namespace PP {
     url: string | null;
     fetchedAt: string;
     notes: Note[];
+    /** Where it is presented, for a venue held in several places at once: "Sydney". */
+    site: string | null;
+    /** When and where it is presented, soonest first: its poster session, its oral. */
+    presentations: Presentation[];
+  }
+
+  /**
+   * One time a submission is presented. Times are local to where it is held, with that place's offset
+   * (`2026-12-08T10:00:00+11:00`): read the wall-clock time off the string to show the venue's own clock.
+   */
+  interface Presentation {
+    /** "Poster", "Oral". */
+    kind: string;
+    /** "Sydney Poster Session 1". */
+    session?: string;
+    /** "Hall 1 - 4". */
+    room?: string;
+    /** Its poster board: "#S2609". */
+    board?: string;
+    start: string;
+    end?: string;
+    /** Its page in the venue's own schedule. */
+    url?: string;
   }
 
   /** Fixed-width bins: `counts[i]` holds the means in `[lo + i·width, lo + (i+1)·width)`, the last closed at `hi`. */

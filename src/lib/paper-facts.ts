@@ -3,7 +3,8 @@ import { keyedPagePath } from './kinds';
 import { sourceLinks, type PaperId } from './paper-ids';
 import { reviewsKey } from './review-files';
 import type { Submission, SubmissionStatus } from './submissions';
-import { sortVersions, venueOf, type PaperVersion } from './versions';
+import { sortPresentations } from './presentations';
+import { sortVersions, venueOf, type PaperVersion, type Presentation } from './versions';
 import { venuePlace } from './venues';
 
 /**
@@ -25,6 +26,8 @@ export interface VenueFact {
   site: string | null;
   /** When the version went there: `YYYY`, `YYYY-MM` or `YYYY-MM-DD`. */
   date: string | null;
+  /** When and where it is presented there, soonest first. */
+  presentations: Presentation[];
 }
 
 export interface PaperFacts {
@@ -104,6 +107,7 @@ export function paperFacts({
         presentation: presentationOf(s.decision),
         site: s.site ?? null,
         date: v.date ?? null,
+        presentations: sortPresentations(s.presentations ?? []),
       })),
     )
     .reverse();

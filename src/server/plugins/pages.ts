@@ -4,7 +4,9 @@ import { pageAncestors, pageCurrent, pageMembers, pages, paperIdentifiers, paper
 import { formatIdentifier, KINDS, pageName, pagePath, partsOf, type PageAddress } from '@/lib/kinds';
 import { canonicalPaperId } from '@/lib/paper-ids';
 import type { PageSummary } from '@/lib/plugins/protocol';
+import { reviewsKey } from '@/lib/review-files';
 import { scoreTable, type Submission } from '@/lib/submissions';
+import type { PaperVersion } from '@/lib/versions';
 import { ApiError } from '../api/errors';
 import { linksFrom, type PageLink } from '../page-links';
 import { rolledUp, scopeMemberCount, scopeMembers } from '../page-members';
@@ -105,6 +107,15 @@ export async function scopesOfPage(page: PageRow, database: Database = getDb()):
   return ids.flatMap((id) => (found.has(id) ? [found.get(id)!] : []));
 }
 
+/** A paper's versions as its page holds them (`page_current.versions`). */
+async function paperVersions(pageId: string, database: Database): Promise<PaperVersion[]> {
+  const [row] = await database
+    .select({ versions: pageCurrent.versions })
+    .from(pageCurrent)
+    .where(eq(pageCurrent.pageId, pageId));
+  return row?.versions ?? [];
+}
+
 /** Whether a paper's submissions have scores (a review with a score field), for `page.hasScores`. */
 export function submissionsHaveScores(list: readonly Submission[]): boolean {
   return list.some((s) => scoreTable(s) !== null);
@@ -117,12 +128,22 @@ export function submissionsHaveScores(list: readonly Submission[]): boolean {
 export async function pageFacts(
   page: PageRow,
   database: Database = getDb(),
-): Promise<{ hasScores: boolean; hasSubmissions: boolean; hasSignals: boolean }> {
+): Promise<{ hasScores: boolean; hasSubmissions: boolean; hasSignals: boolean; hasPresentations: boolean }> {
   if (page.kind === 'paper') {
-    const [list, signals] = await Promise.all([submissionsOf(page.id, database), pageHasSignals(page, database)]);
-    return { hasSubmissions: list.length > 0, hasScores: submissionsHaveScores(list), hasSignals: signals };
+    const [list, signals, versions] = await Promise.all([
+      submissionsOf(page.id, database),
+      pageHasSignals(page, database),
+      paperVersions(page.id, database),
+    ]);
+    return {
+      hasSubmissions: list.length > 0,
+      hasScores: submissionsHaveScores(list),
+      hasSignals: signals,
+      hasPresentations: versions.some((v) => (v.submissions ?? []).some((s) => (s.presentations?.length ?? 0) > 0)),
+    };
   }
-  if (!KINDS[page.kind].scope) return { hasScores: false, hasSubmissions: false, hasSignals: false };
+  if (!KINDS[page.kind].scope)
+    return { hasScores: false, hasSubmissions: false, hasSignals: false, hasPresentations: false };
   const [row] = await database
     .execute<{ submissions: boolean; scores: boolean }>(
       sql`
@@ -136,6 +157,7 @@ export async function pageFacts(
     hasSubmissions: Boolean(row?.submissions),
     hasScores: Boolean(row?.scores),
     hasSignals: await pageHasSignals(page, database),
+    hasPresentations: false,
   };
 }
 
@@ -293,10 +315,16 @@ export async function pageMembersForPlugins(
 export async function paperSubmissionsForPlugins(identifier: string, database: Database = getDb()) {
   const page = await mustFindPage(identifier, database);
   if (page.kind !== 'paper') throw new ApiError(422, 'validation_error', `${identifier} is not a paper`);
-  const list = await submissionsOf(page.id, database);
+  const [list, versions] = await Promise.all([submissionsOf(page.id, database), paperVersions(page.id, database)]);
+  // Where and when each is presented is kept in its version's entry, the one naming its reviews folder.
+  const entries = new Map(
+    versions.flatMap((v) => v.submissions ?? []).flatMap((e) => (e.reviews ? [[e.reviews, e] as const] : [])),
+  );
   return {
     submissions: list.map((s) => ({
       ...s,
+      site: entries.get(reviewsKey(s.venue.id.split(':')[0], s.externalId))?.site ?? null,
+      presentations: entries.get(reviewsKey(s.venue.id.split(':')[0], s.externalId))?.presentations ?? [],
       fetchedAt: s.fetchedAt.toISOString(),
       notes: s.notes.map((n) => ({ ...n, createdAt: n.createdAt.toISOString() })),
     })),

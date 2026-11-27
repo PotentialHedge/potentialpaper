@@ -6,6 +6,7 @@ import { PAPER_SCHEMES } from '@/lib/paper-ids';
 import { NOTE_KINDS, SUBMISSION_STATUSES, type VenueForms } from '@/lib/submissions';
 import { requireAuth } from '../auth';
 import { IMPORT_RATE_LIMIT, importReviews } from '../import-reviews';
+import { importPresentations } from '../import-presentations';
 import { importSubmissions } from '../import-submissions';
 import { importLinks, importPapers, importPdf, importsFrom, importVersions, requireImporter } from '../imports';
 import type { CommitResult } from '../pages/commit';
@@ -13,6 +14,7 @@ import { refreshPageIds, refreshPaperPages } from '../pages/refresh';
 import { syncVenuePages } from '../venue-pages';
 import { ApiError } from './errors';
 import { parseBody, parseQuery, respond, route } from './http';
+import { presentationSchema } from '@/lib/versions';
 import { PaperIdentifier, VersionFields, VersionPdf } from './schemas';
 
 /**
@@ -115,6 +117,30 @@ export const ImportSubmissionsBody = z.object({
 export const ImportedSubmissions = z.object({
   submissions: z.number().int(),
   notes: z.number().int(),
+  skipped: z.number().int(),
+  committed: z.number().int(),
+  unchanged: z.number().int(),
+  failed: z.array(z.object({ externalId: z.string(), error: z.string() })),
+});
+
+/** A venue's schedule: when and where each of its submissions is presented, onto the entry its reviews' import made. */
+export const ImportPresentationsBody = z.object({
+  source: Source,
+  submissions: z
+    .array(
+      z.object({
+        externalId: z.string().min(1).max(200),
+        url: Url.nullish(),
+        /** Where it is presented, for a venue held in several places at once: "Sydney". */
+        site: z.string().max(200).nullish(),
+        /** Every time it is presented; one left out is removed. */
+        presentations: z.array(presentationSchema).max(20),
+      }),
+    )
+    .max(MAX_IMPORT_SUBMISSIONS),
+});
+export const ImportedPresentations = z.object({
+  submissions: z.number().int(),
   skipped: z.number().int(),
   committed: z.number().int(),
   unchanged: z.number().int(),
@@ -240,4 +266,16 @@ export const postImportLinks = route(async (req) => {
   const { result, identifiers } = await importLinks(actor, await parseBody(req, ImportLinksBody));
   if (result.status === 'committed') await refreshPaperPages(identifiers);
   return respond(ImportCommitted, committed(result), { principal });
+});
+
+export const postImportPresentations = route(async (req) => {
+  const { principal, grants, actor } = await importer(req);
+  const { source, submissions } = await parseBody(req, ImportPresentationsBody);
+  if (!importsFrom(grants, source)) {
+    throw new ApiError(403, 'forbidden', `this bot is not granted reviews/${source}/**`);
+  }
+  const result = await importPresentations(source, submissions, { actor });
+  await refreshPageIds(getDb(), result.changed);
+  const { changed: _, ...body } = result;
+  return respond(ImportedPresentations, body, { principal });
 });

@@ -44,6 +44,7 @@ import * as pageVersions from '@/app/api/v1/pages/versions/route';
 import * as files from '@/app/api/v1/files/route';
 import * as importPapers from '@/app/api/v1/imports/papers/route';
 import * as importSubmissions from '@/app/api/v1/imports/submissions/route';
+import * as importPresentations from '@/app/api/v1/imports/presentations/route';
 import * as importVenues from '@/app/api/v1/imports/venues/route';
 import * as importVersions from '@/app/api/v1/imports/versions/route';
 import * as importPdfs from '@/app/api/v1/imports/pdfs/route';
@@ -157,6 +158,7 @@ const ROUTES: [RegExp, any][] = [
   [/^\/files$/, files],
   [/^\/imports\/papers(\?.*)?$/, importPapers],
   [/^\/imports\/submissions$/, importSubmissions],
+  [/^\/imports\/presentations$/, importPresentations],
   [/^\/imports\/venues$/, importVenues],
   [/^\/imports\/versions$/, importVersions],
   [/^\/imports\/pdfs$/, importPdfs],

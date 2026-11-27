@@ -50,6 +50,12 @@ export interface VersionSubmission {
    * `locations`, one of them or its first part ("Sydney" for "Sydney, Australia"), kept and shown in that short form.
    */
   site?: string;
+  /**
+   * When and where it is presented there: its poster session, its oral, each with its room and, for a poster, its
+   * board. Written by the bot that imports the venue's schedule (`server/import-presentations.ts`), and kept when an
+   * import of its reviews, which doesn't know them, rewrites the entry.
+   */
+  presentations?: Presentation[];
   /** Its number at the venue. */
   number?: number;
   /** Where it is at the venue: its forum. */
@@ -57,6 +63,26 @@ export interface VersionSubmission {
   /** The folder of the venue's reviews, `<source>/<submission>` under `reviews/`, when a bot imported them. */
   reviews?: string;
   evidence?: string[];
+}
+
+/**
+ * One time a submission is presented at its venue: a poster session or an oral. Times are local to where it is held,
+ * with that place's offset (`2026-12-08T10:00:00+11:00` in Sydney), so they show as the venue's own clock says them,
+ * wherever the reader is and whichever machine draws the page.
+ */
+export interface Presentation {
+  /** "Poster", "Oral". */
+  kind: string;
+  /** "Sydney Poster Session 1". */
+  session?: string;
+  /** "Hall 1 - 4". */
+  room?: string;
+  /** Its poster board: "#S2609". */
+  board?: string;
+  start: string;
+  end?: string;
+  /** Its page in the venue's own schedule. */
+  url?: string;
 }
 
 /**
@@ -107,6 +133,7 @@ export const MAX_VERSION_NOTE = 2000;
 export const MAX_SUBMISSIONS = 10;
 export const MAX_VENUE = 200;
 export const MAX_SITE = 100;
+export const MAX_PRESENTATIONS = 10;
 const MAX_URL = 2000;
 
 /**
@@ -117,6 +144,8 @@ export const VERSION_ID = /^[a-z0-9][a-z0-9_-]{0,47}$/;
 /** `openreview/abc123`: a folder under `reviews/` (`lib/review-files.ts`). */
 export const REVIEWS_KEY = /^[a-z0-9]+(?:-[a-z0-9]+)*\/[a-z0-9_-]+$/;
 const DATE = /^\d{4}(-(0[1-9]|1[0-2])(-(0[1-9]|[12]\d|3[01]))?)?$/;
+/** A local time with its offset, to the minute or second: `2026-12-08T10:00:00+11:00`. */
+const LOCAL_TIME = /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}(:\d{2})?([+-]\d{2}:\d{2}|Z)$/;
 
 /** Free text: not blank, and no control characters but newlines. */
 function text(max: number) {
@@ -138,6 +167,21 @@ const evidenceSchema = z
   .meta({
     description: `Up to ${MAX_EVIDENCE} https addresses (or files uploaded here) that back the version up: its forum, the venue's list of accepted papers.`,
   });
+
+const localTime = z.string().regex(LOCAL_TIME);
+
+/** One `presentations` item of a submission entry (`Presentation`). */
+export const presentationSchema = z.strictObject({
+  kind: text(40).meta({ description: 'What it is: "Poster", "Oral".' }),
+  session: text(200).optional().meta({ description: 'The session: "Sydney Poster Session 1".' }),
+  room: text(200).optional().meta({ description: 'Where it is held: "Hall 1 - 4".' }),
+  board: text(40).optional().meta({ description: 'Its poster board: "#S2609".' }),
+  start: localTime.meta({
+    description: 'When it starts, local to where it is held, with that offset: "2026-12-08T10:00:00+11:00".',
+  }),
+  end: localTime.optional().meta({ description: 'When it ends, as "start".' }),
+  url: httpUrl(MAX_URL).optional().meta({ description: "Its page in the venue's schedule." }),
+});
 
 /** What a version is, as its file and the site both have it, but for its id and PDF. */
 const versionShape = {
@@ -178,6 +222,10 @@ const versionShape = {
           site: text(MAX_SITE).optional().meta({
             description:
               'Where it is presented, for a venue held in several places at once: "Sydney". With a venue page that lists locations, one of them or its first part ("Sydney" for "Sydney, Australia").',
+          }),
+          presentations: z.array(presentationSchema).max(MAX_PRESENTATIONS).optional().meta({
+            description:
+              "When and where it is presented at the venue: its poster session, its oral. Set by the bot that imports the venue's schedule.",
           }),
           number: z.number().int().positive().optional().meta({ description: 'Its number at the venue.' }),
           url: httpUrl(MAX_URL).optional().meta({ description: 'Where it is at the venue: its forum.' }),

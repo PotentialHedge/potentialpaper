@@ -187,7 +187,14 @@ export function whenHolds(text: string | undefined, context: WhenContext): boole
 /** The context a page of a kind offers, from what the page knows: only the kind's own keys are set. */
 export function pageWhenContext(
   kind: PageKind,
-  facts: { hasScores?: boolean; hasSubmissions?: boolean; hasSignals?: boolean; signedIn: boolean; isOwner: boolean },
+  facts: {
+    hasScores?: boolean;
+    hasSubmissions?: boolean;
+    hasSignals?: boolean;
+    hasPresentations?: boolean;
+    signedIn: boolean;
+    isOwner: boolean;
+  },
 ): WhenContext {
   const all: WhenContext = {
     'page.kind': kind,
@@ -196,6 +203,7 @@ export function pageWhenContext(
     'page.hasScores': facts.hasScores ?? false,
     'page.hasSubmissions': facts.hasSubmissions ?? false,
     'page.hasSignals': facts.hasSignals ?? false,
+    'page.hasPresentations': facts.hasPresentations ?? false,
   };
   return Object.fromEntries(KINDS[kind].contextKeys.map((key) => [key, all[key]]));
 }

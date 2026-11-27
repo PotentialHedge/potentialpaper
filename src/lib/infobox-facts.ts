@@ -31,6 +31,8 @@ export const BUILT_IN_LABELS: Partial<Record<PageKind, readonly string[]>> = {
     'withdrawn from',
     'desk rejected at',
     'submitted to',
+    'poster',
+    'oral',
     'area',
     'keywords',
   ],

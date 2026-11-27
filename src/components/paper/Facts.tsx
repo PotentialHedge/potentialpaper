@@ -1,9 +1,10 @@
 import { AddFactRow, OwnFactRows } from '@/components/pages/OwnFacts';
 import { ui } from '@/components/ui';
 import type { PaperFacts } from '@/lib/paper-facts';
+import { presentationWhen, presentationWhere } from '@/lib/presentations';
 
 /**
- * The infobox's facts about a paper, a row each as Wikipedia's: where it was accepted and presented, its area and
+ * The infobox's facts about a paper, a row each as Wikipedia's: where it was accepted and presented (and when: its poster session, its oral), its area and
  * keywords, then the rows its authors and the community added. Where else it was sent is the Versions box's. Built from `paperFacts` (`lib/paper-facts.ts`), as the
  * page's JSON-LD and meta tags are, so they never disagree. A venue links to its page here.
  */
@@ -35,6 +36,15 @@ export function Facts({ facts, pagePath }: { facts: PaperFacts; pagePath: string
               </td>
             </tr>
           )}
+          {published?.presentations.map((p) => (
+            <tr key={`${p.kind} ${p.start}`}>
+              <th scope="row">{p.kind}</th>
+              <td title={p.session}>
+                {presentationWhen(p)}
+                {presentationWhere(p) && <div className="text-muted">{presentationWhere(p)}</div>}
+              </td>
+            </tr>
+          ))}
           {facts.area && (
             <tr>
               <th scope="row">Area</th>
